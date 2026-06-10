@@ -4,7 +4,7 @@
 > each agent's rolling log, not here. This file is **replaced, never stacked** —
 > update at MAJOR boundaries only (rule 9 in `agent_handoff/README.md`).
 
-_Last updated: 2026-06-11 01:34 +10:00 · Claude — command-center expansion designed + docs locked + FE shell scaffolded (mock-first); `tsc` + `next build` clean. All command-center changes UNCOMMITTED. Locks released._
+_Last updated: 2026-06-11 01:41 +10:00 · Claude — command-center expansion designed + docs locked + FE shell scaffolded (mock-first); `tsc` + `next build` clean. Committed `afaafd2` + **pushed**; `main` ↔ `origin/main` in sync._
 
 **Model:** stay on **Fable 5** for all Selom work — Selom carries no biology/security
 flag. Only *reading the EAMOS build repo* escalates a session to Opus, and that
@@ -14,7 +14,7 @@ source is not needed here. Do not switch to Opus for Selom.
 
 | Agent | Role | Lane | Status |
 |---|---|---|---|
-| Claude | Frontend (UI/design/product copy) | `app/frontend` + `plans/v2-frontend.md` | IDLE (clear-safe) — **command-center expansion designed + docs locked + FE shell scaffolded** mock-first (`docs/command-center/design.md`; Home dashboard + Skill Store + project Overview/Data/Workbench/Figure; figure editor reused). `tsc` + `next build` clean. Command-center changes UNCOMMITTED; figure-editor commits `e63f38b`/`5c4a1fd` local-only (main 2 ahead of origin). |
+| Claude | Frontend (UI/design/product copy) | `app/frontend` + `plans/v2-frontend.md` | IDLE (clear-safe) — **command-center expansion designed + docs locked + FE shell scaffolded** mock-first (`docs/command-center/design.md`; Home dashboard + Skill Store + project Overview/Data/Workbench/Figure; figure editor reused). `tsc` + `next build` clean. Committed `afaafd2` + pushed; `main` ↔ `origin/main` in sync. |
 | Codex | Backend (APIs/skill runners/data/tests) | `app/backend` + `plans/v2-backend.md` | IDLE — skeleton scaffolded + committed; P0 not started |
 
 Roles are explicit; any swap is written here before work proceeds.
@@ -29,9 +29,9 @@ None held.
 
 ## Cross-Agent Requests
 
-- **GitHub: connected ✓** Pushed to **github.com/steveneam/selom** (private) on
-  2026-06-10 21:15 +10:00 — `main` tracks `origin/main` (in sync). Commits: `4ccb6b6`
-  scaffold + `e3dd7cd` CURRENT.md sync. Commit identity is local
+- **GitHub: connected ✓** Pushed to **github.com/steveneam/selom** (private); `main` ↔
+  `origin/main` in sync as of 2026-06-11 01:41 +10:00. Latest: `afaafd2` (command-center
+  scaffold + design) atop `e63f38b`/`5c4a1fd` (figure editor). Commit identity is local
   `Steven <mactechdish@gmail.com>` — adjust if GitHub commit attribution should differ.
 
 - **FE → Codex (await Codex return, ~2026-06-11):** _Update 2026-06-10 22:44 — FE is no longer
@@ -138,16 +138,16 @@ None held.
     as Project ▸ Figure (run a skill → `runSkill` MSW mock → editable Plotly figure).
   **Verified:** `tsc --noEmit` clean + **`next build` clean** (all 4 routes compile/type-check/prerender).
   Live browser click-through was blocked by a stale Chrome profile lock (env, not code); mock dev server is up
-  on **:3001** (`npm run dev:mock`; :3000 already in use). **All command-center changes are UNCOMMITTED**
-  (figure-editor commits `e63f38b`+`5c4a1fd` remain local-only, main 2 ahead of origin).
+  on **:3001** (`npm run dev:mock`; :3000 already in use). **Committed `afaafd2` + pushed**; `main` ↔
+  `origin/main` in sync (the push also carried `e63f38b`/`5c4a1fd`). Removed orphaned
+  `components/app/top-bar.tsx` + `components/upload/upload-hero.tsx` (superseded by the new shell).
 - **Next:** browser-verify the C1–C3 flows once a clean Chrome is available; C2/C3 polish (registry-driven
-  Store via `GET /skills` when B1 lands; wire intake to live `POST /intake` at B2). Owner decisions open:
-  (1) commit the command-center scaffold now? (2) push the local commits to origin?
+  Store via `GET /skills` when B1 lands; wire intake to live `POST /intake` at B2).
 - **Resume:**
   ```
-  # Resume · 2026-06-11 01:34 +10:00 · Selom · Claude (frontend)
+  # Resume · 2026-06-11 01:41 +10:00 · Selom · Claude (frontend)
   Selom build repo D:/selom. CLAUDE.md auto-loads. Read agent_handoff/README.md + CURRENT.md (this) + docs/command-center/design.md + plans/v2-frontend.md + ROADMAP.md (C/B phases).
-  Delta: command-center expansion DESIGNED + DOCS LOCKED + FE shell SCAFFOLDED mock-first (project-first IDE: sidebar projects + Home dashboard + Skill Store browse/install + guided intake + project Overview/Data/Workbench/Figure; existing figure editor reused as the Figure tab). Data layer = localStorage ProjectStore + ~32-skill catalog seed + deterministic intake mock, all schema-aligned for Supabase. tsc + next build CLEAN. UNCOMMITTED. Backend (registry API, ingest/intake, runners, Supabase) filed to Codex in CURRENT.md → Cross-Agent Requests.
+  Delta: command-center expansion DESIGNED + DOCS LOCKED + FE shell SCAFFOLDED mock-first (project-first IDE: sidebar projects + Home dashboard + Skill Store browse/install + guided intake + project Overview/Data/Workbench/Figure; existing figure editor reused as the Figure tab). Data layer = localStorage ProjectStore + ~32-skill catalog seed + deterministic intake mock, all schema-aligned for Supabase. tsc + next build CLEAN. Committed afaafd2 + PUSHED (main↔origin in sync). Backend (registry API, ingest/intake, runners, Supabase) filed to Codex in CURRENT.md → Cross-Agent Requests.
   Next: browser-verify C1–C3 (blocked this session by a Chrome profile lock; dev:mock on :3001); then registry-driven Store + live intake when B1/B2 land. Stay on Fable 5. End clear-safe.
   ```
 
