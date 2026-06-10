@@ -4,7 +4,7 @@
 > each agent's rolling log, not here. This file is **replaced, never stacked** —
 > update at MAJOR boundaries only (rule 9 in `agent_handoff/README.md`).
 
-_Last updated: 2026-06-10 21:15 +10:00 · synced from the scaffolding session (vault)_
+_Last updated: 2026-06-10 23:18 +10:00 · Claude — no-code figure-editor framework (P1) built + verified in-browser against the MSW mock; FE uncommitted_
 
 **Model:** stay on **Fable 5** for all Selom work — Selom carries no biology/security
 flag. Only *reading the EAMOS build repo* escalates a session to Opus, and that
@@ -14,7 +14,7 @@ source is not needed here. Do not switch to Opus for Selom.
 
 | Agent | Role | Lane | Status |
 |---|---|---|---|
-| Claude | Frontend (UI/design/product copy) | `app/frontend` + `plans/v2-frontend.md` | IDLE — skeleton scaffolded + committed; P0 not started |
+| Claude | Frontend (UI/design/product copy) | `app/frontend` + `plans/v2-frontend.md` | ACTIVE — no-code figure-editor framework (P1) built on the real dark-IDE brand + verified in-browser (upload→render→JSON-Patch live edit→undo, MSW mock, :8000 DOWN). `tsc --noEmit` clean. FE changes uncommitted. |
 | Codex | Backend (APIs/skill runners/data/tests) | `app/backend` + `plans/v2-backend.md` | IDLE — skeleton scaffolded + committed; P0 not started |
 
 Roles are explicit; any swap is written here before work proceeds.
@@ -33,6 +33,25 @@ None held.
   2026-06-10 21:15 +10:00 — `main` tracks `origin/main` (in sync). Commits: `4ccb6b6`
   scaffold + `e3dd7cd` CURRENT.md sync. Commit identity is local
   `Steven <mactechdish@gmail.com>` — adjust if GitHub commit attribution should differ.
+
+- **FE → Codex (await Codex return, ~2026-06-11):** _Update 2026-06-10 22:44 — FE is no longer
+  blocked: an MSW mock of `POST /api/skills/umap_scrna/run` now renders the stub UMAP end-to-end
+  in-browser with :8000 DOWN (`npm run dev:mock`, verified via chrome-devtools). These asks remain
+  open for LIVE integration._ Three asks, in priority order:
+  1. **Boot the backend stub** (`uv python install 3.12` → `uv sync` → `uvicorn main:app
+     --reload` on :8000). The FE proxies `/api/* → :8000`; once the stub `umap_scrna/run`
+     responds, the P0 render path is verifiable end-to-end.
+  2. **Resolve a contract ambiguity (backend-led, rule 5).** `plans/v2-frontend.md` P0 describes
+     a **two-step** flow (`POST /upload` → dataset handle → `POST /skills/{id}/run`), but the
+     scaffolded `app/frontend/app/page.tsx` does a **one-shot** multipart POST of the file
+     straight to `/skills/umap_scrna/run` (form field `matrix`). The current `main.py` stub
+     needs to match whichever contract we pick. **Request:** confirm the canonical P0 contract
+     (one-shot vs upload-then-run) and align the stub; FE will conform to it.
+  3. **FYI — no backend action needed:** FE deps were re-pinned. `plotly.js@^2.37` did not exist
+     (install hard-failed); bumped to `plotly.js@^3.6` + `react-plotly.js@^3.0` (now natively
+     supports React 19, so `--legacy-peer-deps` is no longer strictly required). This is FE-lane
+     only — the wire format (Plotly `{data, layout}` JSON) is unchanged, so the contract is
+     unaffected. Worth updating RISKS #1/#3 (Codex/shared) at some point.
 
 ## Current State
 
@@ -62,17 +81,35 @@ None held.
 
 ## Claude — Last Task & Resume
 
-- **Last:** frontend skeleton scaffolded (`app/page.tsx` upload→render against the P0 contract).
-- **Next:** `cd app/frontend && npm install --legacy-peer-deps && npm run dev`; confirm
-  the page renders the backend's stub UMAP; then build the no-code figure editor
-  (custom shadcn/ui panel → RFC-6902 JSON-Patch; `react-chart-editor` is dead, RISKS #1).
-  Invoke `ui-ux-pro-max` + `frontend-design`.
+- **Last:** Built the **no-code figure-editor framework (P1)** against the MSW mock, on the **real
+  dark-IDE brand** (deep blue-black shell, cyan accent, glassy panels, molecular hex mark; the figure
+  sits on a light "paper" artboard). Layers:
+  - **Design system** — Tailwind v4 `@theme` brand tokens in `globals.css`, Geist + Geist Mono fonts,
+    shadcn-style primitives on Radix in `components/ui/` (button/input/label/slider/select/switch/tabs/
+    separator/tooltip/scroll-area/card), `components/brand/selom-mark.tsx`, `lib/cn.ts`.
+  - **Core engine** — `lib/figure-spec.ts` (normalize + publication defaults + colourways), `lib/patch.ts`
+    (RFC-6902 apply + `classifyPatch` client-vs-server boundary), `lib/skills-api.ts`,
+    `hooks/use-figure-store.ts` (spec = source of truth + checkpoint undo/redo; same patch protocol the
+    future LLM copilot will use).
+  - **Editor** — `components/figure/*` (canvas = f(spec); tabbed Inspector Style/Axes/Legend/Data/Page,
+    each control emitting JSON-Patch), `components/upload/upload-hero.tsx`, `components/app/top-bar.tsx`;
+    `app/page.tsx` rewired into the workspace (+ ⌘Z/⌘⇧Z undo/redo).
+  - Deps added: radix primitives, `fast-json-patch`, `class-variance-authority`/`clsx`/`tailwind-merge`,
+    `lucide-react`, `geist`, `@types/react-plotly.js`. Added `app/frontend/.gitignore` (tsbuildinfo /
+    next-env.d.ts / dev screenshots).
+  **Verified in-browser** (chrome-devtools, `npm run dev:mock`, **:8000 DOWN**): upload `demo.csv` →
+  editable UMAP renders → palette select recolours the live figure (Okabe-Ito↔Viridis) → **undo reverts**;
+  live slider point-size 7→10. `tsc --noEmit` clean, zero console errors. **FE changes uncommitted.**
+- **Next:** wire the **Export** action + journal `layout.template` presets; omics-specific panels (volcano
+  threshold + label-top-N, color-by-gene → server recompute via `classifyPatch`); make the skill picker
+  **registry-driven** from `GET /skills/{id}`. When Codex boots :8000 + confirms the P0 contract, run
+  `npm run dev` (mock off) to verify LIVE. Owner decision still open: commit now or fold into first P0 commit.
 - **Resume:**
   ```
-  # Resume · 2026-06-10 20:52 +10:00 · Selom · Claude (frontend)
+  # Resume · 2026-06-10 23:18 +10:00 · Selom · Claude (frontend)
   Selom build repo D:/selom. CLAUDE.md auto-loads. Read agent_handoff/README.md (protocol) + CURRENT.md (this) + plans/v2-frontend.md.
-  Delta: scaffold committed 4ccb6b6 (main, local-only); FE shell + BE stub-UMAP skeleton exist; no installs/push yet.
-  Next: npm install --legacy-peer-deps + npm run dev → verify stub UMAP renders → build the JSON-Patch figure editor. Stay on Fable 5. End clear-safe.
+  Delta: no-code figure-editor framework (P1) built on the real dark-IDE brand + verified in-browser (upload→render→JSON-Patch live edit→undo) against the MSW mock with :8000 DOWN (`npm run dev:mock`). spec=source-of-truth + RFC-6902 engine in lib/ + hooks/; shadcn-style UI on Radix. tsc clean. FE uncommitted.
+  Next: Export + journal presets + omics panels + registry-driven skill picker; verify LIVE when Codex boots :8000 + confirms contract. Stay on Fable 5. End clear-safe.
   ```
 
 ## Codex — Last Task & Resume
