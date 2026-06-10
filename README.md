@@ -1,8 +1,8 @@
 # Selom
 
-A no-code multi-omics figure SaaS. A wet-lab biologist with no bioinformatician drops raw omics data (h5ad / CSV / mzML), applies composable, reproducible analysis **skills** (UMAP, clustering, DEG, volcano, heatmap, GSEA), and gets publication-ready, editable figures plus auto-generated methods text — every figure traceable to a versioned analysis recipe, not a black box.
+A no-code multi-omics figure SaaS — a **project-first command center / IDE** for biology. A wet-lab biologist with no bioinformatician drops raw omics data (h5ad / CSV / mzML), **browses and installs analysis skills like apps in an App Store**, answers a few guided questions, and gets publication-ready, editable figures plus auto-generated methods text — every figure traceable to a versioned analysis recipe, not a black box. Skills are sourced from **bioSkills** (540 reference) + **ClawBio** (88 runnable); the launch wedge runs natively, the catalog grows to the full ~600 via the Skill Foundry.
 
-See `PRODUCT.md` for the vision and `ROADMAP.md` for the plan.
+See `PRODUCT.md` for the vision, `docs/command-center/design.md` for the command-center architecture, and `ROADMAP.md` for the plan.
 
 ## Stack
 
@@ -41,7 +41,13 @@ npm run dev                        # :3000
 
 ## Status
 
-**Scaffold / pre-build.** Repo skeleton and agent-boot files are in place; the P0 hello-UMAP path is not yet wired.
+**P1 figure editor built; command-center expansion in design.** The editable-Plotly
+figure editor (spec = source of truth, RFC-6902 JSON-Patch, dark-IDE brand) is built
+and verified in-browser against an MSW mock. The **project-first command center**
+(projects sidebar + Skill Store + guided intake) is specced in
+`docs/command-center/design.md`; the frontend shell is being scaffolded mock-first
+(phases C1–C3). Backend (registry API, ingest/intake, Supabase persistence, Verified
+runner expansion) is filed to the Codex lane (phases B1–B4).
 
 ## Reference
 

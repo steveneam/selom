@@ -19,9 +19,36 @@ The opportunity is grounded: ~35% of wet-lab scientists have no bioinformatician
 1. **Skill library (v1).** Curated, parameterised, combinable analysis+plot recipes. Apply a skill to your data, tune parameters, chain skills into derived figures. Each skill is a versioned, reproducible unit behind a language-agnostic contract (Python / R / selom-native interchangeable).
 2. **Extract-Skills (v2 beta) — the moat.** Drop a paper PDF or point at its GitHub repo; the tool reads the methods + figures, finds the code, and auto-generates a reproducible custom skill so you can recreate that figure on your own data. Sandboxed; do not build until v1 is live.
 
+## The product surface — a project-first command center
+
+The two features above are delivered through a **no-code multi-omics IDE**, not a
+single upload box. Full design: `docs/command-center/design.md`. The shape:
+
+- **Project folders in a left sidebar.** Each project holds datasets, an
+  installed-skills workbench, and figures. The command center is where the magic
+  happens — intuitive and guiding, not a blank canvas.
+- **A Skill Store** — browse and install bioinformatics skills as easily as apps on
+  the Mac App Store. Inventory = the ~600 skills in **bioSkills** (540 reference) +
+  **ClawBio** (88 runnable). Every skill is browsable from day one; execution lights
+  up progressively (**hybrid-tiered**: *Verified* runs now, *Community* is queued).
+- **Guided intake.** Drop a file and Selom asks a few pre-made questions (organism,
+  cell type of interest, condition/disease, expected findings). An LLM turns the
+  answers + the dataset shape into a **proposed** cleaning + analysis pipeline with
+  pre-filled parameters — only when the user hasn't already pre-picked skills. The
+  LLM proposes; the scientist approves (navigator, not analyst).
+- **Automatic ingest + cleaning.** Selom absorbs the lab-specific data at intake
+  (detect modality → clean/normalize → surface statistical guardrails) so the
+  user reaches standardized, field-agnostic figures fast.
+
+**North star (owner directive):** *every one of the 500+ catalog skills eventually
+runs in Selom* — by hand-porting ("building it ourselves") and/or sandboxed
+execution. The **Skill Foundry** (manual now, LLM-assisted later) is the pipeline
+that promotes a browsable skill into a runnable one — and it is where the v2
+Extract-Skills moat generalizes (drop a paper/repo → a reproducible Selom skill).
+
 ## Scope (v1)
 
-Broad multi-omics from day one: **scRNA-seq + bulk RNA-seq + mass-spec proteomics/phosphoproteomics**. Launch bundle is ~6-8 skills (UMAP, cluster, DEG, volcano, heatmap, enrichment).
+Broad multi-omics from day one: **scRNA-seq + bulk RNA-seq + mass-spec proteomics/phosphoproteomics**. Launch bundle is ~6-8 skills (UMAP, cluster, DEG, volcano, heatmap, enrichment) — the first **Verified** tier of a catalog designed to grow to the full ~600.
 
 ## Differentiators
 

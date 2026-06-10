@@ -4,7 +4,7 @@
 > each agent's rolling log, not here. This file is **replaced, never stacked** —
 > update at MAJOR boundaries only (rule 9 in `agent_handoff/README.md`).
 
-_Last updated: 2026-06-10 23:18 +10:00 · Claude — no-code figure-editor framework (P1) built + verified in-browser against the MSW mock; FE uncommitted_
+_Last updated: 2026-06-11 01:34 +10:00 · Claude — command-center expansion designed + docs locked + FE shell scaffolded (mock-first); `tsc` + `next build` clean. All command-center changes UNCOMMITTED. Locks released._
 
 **Model:** stay on **Fable 5** for all Selom work — Selom carries no biology/security
 flag. Only *reading the EAMOS build repo* escalates a session to Opus, and that
@@ -14,7 +14,7 @@ source is not needed here. Do not switch to Opus for Selom.
 
 | Agent | Role | Lane | Status |
 |---|---|---|---|
-| Claude | Frontend (UI/design/product copy) | `app/frontend` + `plans/v2-frontend.md` | ACTIVE — no-code figure-editor framework (P1) built on the real dark-IDE brand + verified in-browser (upload→render→JSON-Patch live edit→undo, MSW mock, :8000 DOWN). `tsc --noEmit` clean. FE changes uncommitted. |
+| Claude | Frontend (UI/design/product copy) | `app/frontend` + `plans/v2-frontend.md` | IDLE (clear-safe) — **command-center expansion designed + docs locked + FE shell scaffolded** mock-first (`docs/command-center/design.md`; Home dashboard + Skill Store + project Overview/Data/Workbench/Figure; figure editor reused). `tsc` + `next build` clean. Command-center changes UNCOMMITTED; figure-editor commits `e63f38b`/`5c4a1fd` local-only (main 2 ahead of origin). |
 | Codex | Backend (APIs/skill runners/data/tests) | `app/backend` + `plans/v2-backend.md` | IDLE — skeleton scaffolded + committed; P0 not started |
 
 Roles are explicit; any swap is written here before work proceeds.
@@ -53,6 +53,41 @@ None held.
      only — the wire format (Plotly `{data, layout}` JSON) is unchanged, so the contract is
      unaffected. Worth updating RISKS #1/#3 (Codex/shared) at some point.
 
+- **FE → Codex (NEW 2026-06-11 01:03 — command-center backend; full spec in `docs/command-center/design.md` §3–§9):**
+  The frontend is building the project-first command center **mock-first** (no backend dependency to
+  build). When the backend lane resumes, these are the new contracts to own/finalize — all **additive**;
+  the figure wire format (Plotly `{data, layout}` JSON) is unchanged:
+  1. **Skill registry API (B1).** `GET /skills` (filterable list of `SkillCatalogEntry`) +
+     `GET /skills/{id}` (detail/SkillSpec). Seed from the ingested **ClawBio `skills/catalog.json`**
+     (maps ~1:1) + **bioSkills** categories/`SKILL.md` frontmatter. The full ~600-skill catalog is
+     browsable; each entry carries `tier` (verified|community), `engine`, `status`, `input_formats`,
+     `provenance`, `license`. Shape = design §3.1.
+  2. **Ingest + intake (B2).** `POST /upload` returns a dataset handle **plus** an ingest/QC report
+     (detected modality, n_obs/n_var, guardrail flags). `POST /intake` takes questionnaire answers +
+     dataset shape → schema-constrained **`IntakeProposal`** (cleaning steps + 1–3 proposed skills with
+     pre-filled params + rationale/confidence) via the **shared AI gateway**. LLM proposes, never
+     auto-runs. Shapes = design §4.3 / §7.
+  3. **Verified runner expansion (B3).** Generalize `POST /skills/{id}/run` beyond `umap_scrna` to any
+     Verified skill; async (arq) for heavy ones. **Skill Foundry (manual):** hand-port the wedge
+     (~6–8: UMAP/cluster/DEG/volcano/heatmap/enrichment) + selected ClawBio runnable skills into the
+     SkillSpec contract, each emitting an editable Plotly spec + provenance/golden-image test.
+  4. **Supabase persistence (B4).** Tables = design §5 (`projects`, `datasets`, `skill_installs`,
+     `intake_sessions`, `figures`, `figure_history`, `skill_catalog`; RLS by owner). FE persists through
+     a `ProjectStore` interface (localStorage now) designed to match this schema, so the swap is a
+     backend-impl change, not a FE rewrite.
+  5. **Skill execution toolchain (design §6.5).** What we download/install to actually test+run skills:
+     **(A)** catalog ingest — `git clone --depth 1` ClawBio + bioSkills, parse `catalog.json` + `SKILL.md`
+     → seed manifest (cheap, do-now, an `scripts/ingest-catalog` job). **(B)** Verified runners — the
+     existing `[omics]` extra (`uv sync --extra omics`: scverse + plotly/kaleido). **(C)** ClawBio runnable
+     — `pip install clawbio` + **Miniforge/mamba** for per-skill `environment.yml` + bioconda. **(D)**
+     bioSkills long tail — bioconda CLI toolchain (samtools/bcftools/STAR/salmon/GATK4/… + Snakemake/
+     Nextflow) consumed via the Skill Foundry. **(E)** Community sandbox — Docker + mamba images +
+     network policy + compute (v2, deferred). A+B are immediate; C is the contained next step; D/E grow
+     over time.
+  No action needed now — FE is unblocked and mock-first; this is the spec to build against when the
+  backend lane resumes. North star (owner): grow runnable coverage to the full 500+ via the Skill
+  Foundry (manual now → LLM-assisted = the v2 Extract-Skills moat).
+
 ## Current State
 
 - **Scaffold complete and committed:** git repo at `D:/selom`, branch `main`, commit
@@ -81,35 +116,39 @@ None held.
 
 ## Claude — Last Task & Resume
 
-- **Last:** Built the **no-code figure-editor framework (P1)** against the MSW mock, on the **real
-  dark-IDE brand** (deep blue-black shell, cyan accent, glassy panels, molecular hex mark; the figure
-  sits on a light "paper" artboard). Layers:
-  - **Design system** — Tailwind v4 `@theme` brand tokens in `globals.css`, Geist + Geist Mono fonts,
-    shadcn-style primitives on Radix in `components/ui/` (button/input/label/slider/select/switch/tabs/
-    separator/tooltip/scroll-area/card), `components/brand/selom-mark.tsx`, `lib/cn.ts`.
-  - **Core engine** — `lib/figure-spec.ts` (normalize + publication defaults + colourways), `lib/patch.ts`
-    (RFC-6902 apply + `classifyPatch` client-vs-server boundary), `lib/skills-api.ts`,
-    `hooks/use-figure-store.ts` (spec = source of truth + checkpoint undo/redo; same patch protocol the
-    future LLM copilot will use).
-  - **Editor** — `components/figure/*` (canvas = f(spec); tabbed Inspector Style/Axes/Legend/Data/Page,
-    each control emitting JSON-Patch), `components/upload/upload-hero.tsx`, `components/app/top-bar.tsx`;
-    `app/page.tsx` rewired into the workspace (+ ⌘Z/⌘⇧Z undo/redo).
-  - Deps added: radix primitives, `fast-json-patch`, `class-variance-authority`/`clsx`/`tailwind-merge`,
-    `lucide-react`, `geist`, `@types/react-plotly.js`. Added `app/frontend/.gitignore` (tsbuildinfo /
-    next-env.d.ts / dev screenshots).
-  **Verified in-browser** (chrome-devtools, `npm run dev:mock`, **:8000 DOWN**): upload `demo.csv` →
-  editable UMAP renders → palette select recolours the live figure (Okabe-Ito↔Viridis) → **undo reverts**;
-  live slider point-size 7→10. `tsc --noEmit` clean, zero console errors. **FE changes uncommitted.**
-- **Next:** wire the **Export** action + journal `layout.template` presets; omics-specific panels (volcano
-  threshold + label-top-N, color-by-gene → server recompute via `classifyPatch`); make the skill picker
-  **registry-driven** from `GET /skills/{id}`. When Codex boots :8000 + confirms the P0 contract, run
-  `npm run dev` (mock off) to verify LIVE. Owner decision still open: commit now or fold into first P0 commit.
+- **Last:** Designed + documented the **command-center expansion** and scaffolded its **frontend shell**
+  (mock-first). Docs (keystone): `docs/command-center/design.md` — research synthesis (bioSkills 540 +
+  ClawBio 88 + Hermes gateway), project-first IDE architecture, Skill Store catalog model (hybrid-tiered
+  Verified/Community), guided-intake flow, auto-clean/QC, **execution toolchain §6.5** (what to install to
+  run skills: clone+ingest → `[omics]` runners → `clawbio`+Miniforge → bioconda long tail → Docker
+  sandbox), and phased plan **C1–C3 (FE) / B1–B4 (BE)**. Framework locked into PRODUCT.md, README.md,
+  ROADMAP.md (C/B phases + toolchain), plans/v2-frontend.md (C1–C3), and CURRENT.md → Cross-Agent Requests
+  (backend spec for Codex). Memory: added `selom-command-center-architecture`. North star (owner): all 500+
+  skills runnable via the Skill Foundry (manual now → LLM-assisted = v2 Extract-Skills moat).
+  FE scaffold (`app/frontend`, mock-first, **no backend dependency**):
+  - **Data layer** — `lib/projects/{types,store}.ts` (localStorage `ProjectStore` via `useSyncExternalStore`,
+    schema-aligned to the planned Supabase tables), `lib/catalog/{types,seed}.ts` (~32-skill seed standing in
+    for the full ~600), `lib/intake/mock.ts` (adaptive questionnaire + deterministic `IntakeProposal` + QC).
+  - **Shell** — `components/shell/{app-shell,sidebar}.tsx` (project-first rail + header; wraps every route via
+    root `layout.tsx`), `components/ui/badge.tsx`.
+  - **Screens** — `app/page.tsx` (Home dashboard, replaces the old single-surface flow), `app/store/page.tsx`
+    + `components/store/*` (Skill Store: browse/filter/install, Verified/Community tiers, honest coverage
+    meter), `app/p/[id]/page.tsx` + `components/project/*` (workspace: Overview/Data/Workbench/Figure),
+    `components/intake/*` (questionnaire + proposal plan). The existing figure editor is **reused unchanged**
+    as Project ▸ Figure (run a skill → `runSkill` MSW mock → editable Plotly figure).
+  **Verified:** `tsc --noEmit` clean + **`next build` clean** (all 4 routes compile/type-check/prerender).
+  Live browser click-through was blocked by a stale Chrome profile lock (env, not code); mock dev server is up
+  on **:3001** (`npm run dev:mock`; :3000 already in use). **All command-center changes are UNCOMMITTED**
+  (figure-editor commits `e63f38b`+`5c4a1fd` remain local-only, main 2 ahead of origin).
+- **Next:** browser-verify the C1–C3 flows once a clean Chrome is available; C2/C3 polish (registry-driven
+  Store via `GET /skills` when B1 lands; wire intake to live `POST /intake` at B2). Owner decisions open:
+  (1) commit the command-center scaffold now? (2) push the local commits to origin?
 - **Resume:**
   ```
-  # Resume · 2026-06-10 23:18 +10:00 · Selom · Claude (frontend)
-  Selom build repo D:/selom. CLAUDE.md auto-loads. Read agent_handoff/README.md (protocol) + CURRENT.md (this) + plans/v2-frontend.md.
-  Delta: no-code figure-editor framework (P1) built on the real dark-IDE brand + verified in-browser (upload→render→JSON-Patch live edit→undo) against the MSW mock with :8000 DOWN (`npm run dev:mock`). spec=source-of-truth + RFC-6902 engine in lib/ + hooks/; shadcn-style UI on Radix. tsc clean. FE uncommitted.
-  Next: Export + journal presets + omics panels + registry-driven skill picker; verify LIVE when Codex boots :8000 + confirms contract. Stay on Fable 5. End clear-safe.
+  # Resume · 2026-06-11 01:34 +10:00 · Selom · Claude (frontend)
+  Selom build repo D:/selom. CLAUDE.md auto-loads. Read agent_handoff/README.md + CURRENT.md (this) + docs/command-center/design.md + plans/v2-frontend.md + ROADMAP.md (C/B phases).
+  Delta: command-center expansion DESIGNED + DOCS LOCKED + FE shell SCAFFOLDED mock-first (project-first IDE: sidebar projects + Home dashboard + Skill Store browse/install + guided intake + project Overview/Data/Workbench/Figure; existing figure editor reused as the Figure tab). Data layer = localStorage ProjectStore + ~32-skill catalog seed + deterministic intake mock, all schema-aligned for Supabase. tsc + next build CLEAN. UNCOMMITTED. Backend (registry API, ingest/intake, runners, Supabase) filed to Codex in CURRENT.md → Cross-Agent Requests.
+  Next: browser-verify C1–C3 (blocked this session by a Chrome profile lock; dev:mock on :3001); then registry-driven Store + live intake when B1/B2 land. Stay on Fable 5. End clear-safe.
   ```
 
 ## Codex — Last Task & Resume

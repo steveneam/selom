@@ -1,0 +1,362 @@
+import type { SkillCatalogEntry } from "./types";
+
+/**
+ * Representative seed of the Skill Store inventory.
+ *
+ * This is a curated slice (~32 entries) standing in for the FULL ~600-skill
+ * catalog — bioSkills (540 reference) + ClawBio (88 runnable). Phase B1 replaces
+ * this with the live `GET /skills` registry ingested from the real repos
+ * (ClawBio `skills/catalog.json` + bioSkills `SKILL.md` frontmatter). The shapes
+ * are identical, so nothing in the Store UI changes when the live registry lands.
+ *
+ * `tier: "verified"` = runs now (Selom-native scverse runners + ClawBio runnable).
+ * `tier: "community"` = browsable + installable-as-intent; runs later in a sandbox.
+ */
+
+/** True catalog sizes (for the honest coverage meter — design §6.4). */
+export const CATALOG_TOTAL_ESTIMATE = 628; // 540 bioSkills + 88 ClawBio
+export const BIOSKILLS_COUNT = 540;
+export const CLAWBIO_COUNT = 88;
+
+const e = (x: SkillCatalogEntry): SkillCatalogEntry => x;
+
+export const CATALOG: SkillCatalogEntry[] = [
+  // ── Selom-native (the launch wedge — Verified, run now) ───────────────────
+  e({
+    id: "selom.umap_scrna",
+    name: "UMAP (single-cell)",
+    summary: "QC → normalize → PCA → neighbors → UMAP, coloured by Leiden cluster.",
+    source: "selom", category: "single-cell", omics: ["scRNA-seq"],
+    tier: "verified", status: "production", engine: "python",
+    inputFormats: [".h5ad", ".csv"], chainsWith: ["selom.deg", "selom.heatmap"],
+    outputs: ["figure"], license: "MIT",
+    provenance: { repo: "selom/skills", path: "umap_scrna" }, version: "1.0.0", popularity: 98,
+  }),
+  e({
+    id: "selom.cluster",
+    name: "Leiden clustering",
+    summary: "Graph-based clustering with adjustable resolution; cluster sizes + QC.",
+    source: "selom", category: "single-cell", omics: ["scRNA-seq"],
+    tier: "verified", status: "production", engine: "python",
+    inputFormats: [".h5ad"], chainsWith: ["selom.umap_scrna", "selom.deg"],
+    outputs: ["figure", "tables"], license: "MIT",
+    provenance: { repo: "selom/skills", path: "cluster" }, version: "1.0.0", popularity: 81,
+  }),
+  e({
+    id: "selom.deg",
+    name: "Differential expression",
+    summary: "Bulk DE (pyDESeq2) or marker ranking (Wilcoxon) per contrast.",
+    source: "selom", category: "differential-expression", omics: ["bulk RNA-seq", "scRNA-seq"],
+    tier: "verified", status: "production", engine: "python",
+    inputFormats: [".h5ad", ".csv"], chainsWith: ["selom.volcano", "selom.enrichment"],
+    outputs: ["figure", "tables"], license: "MIT",
+    provenance: { repo: "selom/skills", path: "deg" }, version: "1.0.0", popularity: 90,
+  }),
+  e({
+    id: "selom.volcano",
+    name: "Volcano plot",
+    summary: "DE volcano with FDR/log2FC thresholds and top-N gene labels.",
+    source: "selom", category: "data-visualization", omics: ["bulk RNA-seq", "proteomics"],
+    tier: "verified", status: "production", engine: "python",
+    inputFormats: [".csv"], chainsWith: ["selom.enrichment"],
+    outputs: ["figure"], license: "MIT",
+    provenance: { repo: "selom/skills", path: "volcano" }, version: "1.0.0", popularity: 88,
+  }),
+  e({
+    id: "selom.heatmap",
+    name: "Expression heatmap",
+    summary: "Clustered heatmap of marker / top-variable genes with annotations.",
+    source: "selom", category: "data-visualization", omics: ["bulk RNA-seq", "scRNA-seq"],
+    tier: "verified", status: "production", engine: "python",
+    inputFormats: [".h5ad", ".csv"], chainsWith: ["selom.deg"],
+    outputs: ["figure"], license: "MIT",
+    provenance: { repo: "selom/skills", path: "heatmap" }, version: "1.0.0", popularity: 76,
+  }),
+  e({
+    id: "selom.enrichment",
+    name: "Pathway enrichment",
+    summary: "Over-representation / GSEA against GO & Reactome; dotplot output.",
+    source: "selom", category: "pathway-analysis", omics: ["bulk RNA-seq", "scRNA-seq", "proteomics"],
+    tier: "verified", status: "beta", engine: "python",
+    inputFormats: [".csv"], chainsWith: ["selom.deg", "selom.volcano"],
+    outputs: ["figure", "tables"], license: "GPL-2.0",
+    provenance: { repo: "selom/skills", path: "enrichment" }, version: "0.9.0", popularity: 72,
+  }),
+  e({
+    id: "selom.proteomics_volcano",
+    name: "Proteomics DE volcano",
+    summary: "Label-free / TMT proteomics differential abundance (alphastats).",
+    source: "selom", category: "proteomics", omics: ["proteomics"],
+    tier: "verified", status: "beta", engine: "python",
+    inputFormats: [".csv", ".tsv"], chainsWith: ["selom.enrichment"],
+    outputs: ["figure", "tables"], license: "Apache-2.0",
+    provenance: { repo: "selom/skills", path: "proteomics_volcano" }, version: "0.8.0", popularity: 64,
+  }),
+
+  // ── ClawBio runnable (Verified — wrap the ~29 production pipelines) ────────
+  e({
+    id: "clawbio.scrna-orchestrator",
+    name: "scRNA Orchestrator",
+    summary: "End-to-end QC → clustering → marker detection for single-cell RNA-seq.",
+    source: "clawbio", category: "single-cell", omics: ["scRNA-seq"],
+    tier: "verified", status: "production", engine: "python",
+    inputFormats: [".h5ad", ".csv"], chainsWith: ["selom.deg", "selom.volcano"],
+    outputs: ["figure", "report", "tables"], license: "MIT",
+    provenance: { repo: "ClawBio/ClawBio", path: "skills/scrna-orchestrator" }, version: "1.0.0", popularity: 85,
+  }),
+  e({
+    id: "clawbio.gwas-lookup",
+    name: "GWAS Lookup",
+    summary: "Query GWAS associations for variants/genes; Manhattan + region plots.",
+    source: "clawbio", category: "population-genetics", omics: ["genomics"],
+    tier: "verified", status: "production", engine: "python",
+    inputFormats: [".vcf", ".csv"], chainsWith: ["clawbio.ancestry-pca"],
+    outputs: ["figure", "report"], license: "MIT",
+    provenance: { repo: "ClawBio/ClawBio", path: "skills/gwas-lookup" }, version: "1.0.0", popularity: 70,
+  }),
+  e({
+    id: "clawbio.ancestry-pca",
+    name: "Ancestry PCA",
+    summary: "Population-structure PCA from genotypes with reference projection.",
+    source: "clawbio", category: "population-genetics", omics: ["genomics"],
+    tier: "verified", status: "production", engine: "python",
+    inputFormats: [".vcf"], chainsWith: ["clawbio.gwas-lookup"],
+    outputs: ["figure"], license: "MIT",
+    provenance: { repo: "ClawBio/ClawBio", path: "skills/ancestry-pca" }, version: "1.0.0", popularity: 61,
+  }),
+  e({
+    id: "clawbio.variant-annotation",
+    name: "Variant Annotation",
+    summary: "Annotate a VCF (VEP/ClinVar/gnomAD) with ACMG-style classification.",
+    source: "clawbio", category: "variant-calling", omics: ["genomics"],
+    tier: "verified", status: "production", engine: "python",
+    inputFormats: [".vcf"], chainsWith: ["clawbio.gwas-lookup"],
+    outputs: ["report", "tables"], license: "MIT",
+    provenance: { repo: "ClawBio/ClawBio", path: "skills/variant-annotation" }, version: "1.0.0", popularity: 67,
+  }),
+  e({
+    id: "clawbio.metagenomics-profiler",
+    name: "Metagenomics Profiler",
+    summary: "Taxonomic profiling (MetaPhlAn/Kraken2) → abundance bar/krona.",
+    source: "clawbio", category: "metagenomics", omics: ["metagenomics"],
+    tier: "verified", status: "beta", engine: "python",
+    inputFormats: [".fastq", ".fasta"], chainsWith: [],
+    outputs: ["figure", "report"], license: "MIT",
+    provenance: { repo: "ClawBio/ClawBio", path: "skills/metagenomics-profiler" }, version: "0.9.0", popularity: 48,
+  }),
+  e({
+    id: "clawbio.pharmgx-reporter",
+    name: "PharmGx Reporter",
+    summary: "Pharmacogenomic report from consumer/clinical genotypes.",
+    source: "clawbio", category: "pharmacogenomics", omics: ["genomics"],
+    tier: "verified", status: "production", engine: "python",
+    inputFormats: [".txt", ".vcf"], chainsWith: ["clawbio.variant-annotation"],
+    outputs: ["report"], license: "MIT",
+    provenance: { repo: "ClawBio/ClawBio", path: "skills/pharmgx-reporter" }, version: "1.0.0", popularity: 53,
+  }),
+  e({
+    id: "clawbio.galaxy-bridge",
+    name: "Galaxy Bridge",
+    summary: "Route an input to one of 8,000+ Galaxy tools and pull results back.",
+    source: "clawbio", category: "workflow", omics: ["genomics", "transcriptomics"],
+    tier: "community", status: "beta", engine: "agent-sandbox",
+    inputFormats: [".fastq", ".bam", ".vcf"], chainsWith: [],
+    outputs: ["report", "tables"], license: "MIT",
+    provenance: { repo: "ClawBio/ClawBio", path: "skills/galaxy-bridge" }, version: "0.7.0", popularity: 44,
+  }),
+
+  // ── bioSkills long tail (Community — browsable now, Foundry-ported later) ──
+  e({
+    id: "bioskills.rnaseq-workflow",
+    name: "RNA-seq Workflow",
+    summary: "Reference bulk RNA-seq pipeline: QC → align (STAR) → count → DE.",
+    source: "bioskills", category: "workflow", omics: ["bulk RNA-seq"],
+    tier: "community", status: "community", engine: "agent-sandbox",
+    inputFormats: [".fastq"], chainsWith: ["selom.deg"],
+    outputs: ["report", "tables"], license: "MIT",
+    provenance: { repo: "GPTomics/bioSkills", path: "rnaseq-workflow" }, version: "—", popularity: 59,
+  }),
+  e({
+    id: "bioskills.variant-calling",
+    name: "Somatic Variant Calling",
+    summary: "Tumor/normal calling (BWA → GATK4 Mutect2) with filtering guidance.",
+    source: "bioskills", category: "variant-calling", omics: ["genomics"],
+    tier: "community", status: "community", engine: "agent-sandbox",
+    inputFormats: [".bam", ".cram"], chainsWith: ["clawbio.variant-annotation"],
+    outputs: ["report", "tables"], license: "MIT",
+    provenance: { repo: "GPTomics/bioSkills", path: "variant-calling" }, version: "—", popularity: 57,
+  }),
+  e({
+    id: "bioskills.chip-seq",
+    name: "ChIP-seq Peaks",
+    summary: "Align → peak-call (MACS2) → annotate; signal + peak-overlap plots.",
+    source: "bioskills", category: "chip-seq", omics: ["epigenomics"],
+    tier: "community", status: "community", engine: "agent-sandbox",
+    inputFormats: [".fastq", ".bam"], chainsWith: [],
+    outputs: ["figure", "tables"], license: "MIT",
+    provenance: { repo: "GPTomics/bioSkills", path: "chip-seq" }, version: "—", popularity: 41,
+  }),
+  e({
+    id: "bioskills.atac-seq",
+    name: "ATAC-seq Accessibility",
+    summary: "Open-chromatin pipeline: QC → peaks → differential accessibility.",
+    source: "bioskills", category: "epigenomics", omics: ["epigenomics"],
+    tier: "community", status: "community", engine: "agent-sandbox",
+    inputFormats: [".fastq", ".bam"], chainsWith: ["bioskills.chip-seq"],
+    outputs: ["figure", "tables"], license: "MIT",
+    provenance: { repo: "GPTomics/bioSkills", path: "atac-seq" }, version: "—", popularity: 38,
+  }),
+  e({
+    id: "bioskills.spatial-transcriptomics",
+    name: "Spatial Transcriptomics",
+    summary: "Visium/Xenium QC, clustering, and spatially-variable gene maps.",
+    source: "bioskills", category: "single-cell", omics: ["spatial"],
+    tier: "community", status: "community", engine: "agent-sandbox",
+    inputFormats: [".h5ad"], chainsWith: ["selom.umap_scrna"],
+    outputs: ["figure"], license: "MIT",
+    provenance: { repo: "GPTomics/bioSkills", path: "spatial-transcriptomics" }, version: "—", popularity: 49,
+  }),
+  e({
+    id: "bioskills.trajectory-analysis",
+    name: "Trajectory / Pseudotime",
+    summary: "Infer developmental trajectories and order cells along pseudotime.",
+    source: "bioskills", category: "single-cell", omics: ["scRNA-seq"],
+    tier: "community", status: "community", engine: "agent-sandbox",
+    inputFormats: [".h5ad"], chainsWith: ["selom.umap_scrna"],
+    outputs: ["figure"], license: "MIT",
+    provenance: { repo: "GPTomics/bioSkills", path: "trajectory-analysis" }, version: "—", popularity: 46,
+  }),
+  e({
+    id: "bioskills.cnv-calling",
+    name: "Copy-number (CNVkit)",
+    summary: "Call and segment copy-number from tumor sequencing; genome plot.",
+    source: "bioskills", category: "copy-number", omics: ["genomics"],
+    tier: "community", status: "community", engine: "agent-sandbox",
+    inputFormats: [".bam"], chainsWith: [],
+    outputs: ["figure", "tables"], license: "Apache-2.0",
+    provenance: { repo: "GPTomics/bioSkills", path: "cnv-calling" }, version: "—", popularity: 33,
+  }),
+  e({
+    id: "bioskills.hic-contact-maps",
+    name: "Hi-C Contact Maps",
+    summary: "3D genome contact-matrix processing and TAD/compartment plots.",
+    source: "bioskills", category: "epigenomics", omics: ["epigenomics"],
+    tier: "community", status: "community", engine: "agent-sandbox",
+    inputFormats: [".fastq", ".cool"], chainsWith: [],
+    outputs: ["figure"], license: "MIT",
+    provenance: { repo: "GPTomics/bioSkills", path: "hic-contact-maps" }, version: "—", popularity: 27,
+  }),
+  e({
+    id: "bioskills.clip-seq",
+    name: "CLIP-seq Binding",
+    summary: "RNA–protein binding sites (PureCLIP) with ENCODE-style QC.",
+    source: "bioskills", category: "clip-seq", omics: ["transcriptomics"],
+    tier: "community", status: "community", engine: "agent-sandbox",
+    inputFormats: [".fastq", ".bam"], chainsWith: [],
+    outputs: ["figure", "tables"], license: "MIT",
+    provenance: { repo: "GPTomics/bioSkills", path: "clip-seq" }, version: "—", popularity: 22,
+  }),
+  e({
+    id: "bioskills.orthofinder",
+    name: "Orthology (OrthoFinder3)",
+    summary: "Infer orthogroups + gene trees across species; synteny overview.",
+    source: "bioskills", category: "comparative-genomics", omics: ["genomics"],
+    tier: "community", status: "community", engine: "agent-sandbox",
+    inputFormats: [".fasta"], chainsWith: [],
+    outputs: ["report", "tables"], license: "GPL-3.0",
+    provenance: { repo: "GPTomics/bioSkills", path: "orthofinder" }, version: "—", popularity: 31,
+  }),
+  e({
+    id: "bioskills.genome-assembly",
+    name: "Genome Assembly",
+    summary: "Long-read assembly → polish → QC (BUSCO) with contiguity plots.",
+    source: "bioskills", category: "genome-assembly", omics: ["genomics"],
+    tier: "community", status: "community", engine: "agent-sandbox",
+    inputFormats: [".fastq"], chainsWith: ["bioskills.genome-annotation"],
+    outputs: ["report"], license: "MIT",
+    provenance: { repo: "GPTomics/bioSkills", path: "genome-assembly" }, version: "—", popularity: 25,
+  }),
+  e({
+    id: "bioskills.genome-annotation",
+    name: "Genome Annotation",
+    summary: "Structural + functional annotation of an assembled genome.",
+    source: "bioskills", category: "genome-annotation", omics: ["genomics"],
+    tier: "community", status: "community", engine: "agent-sandbox",
+    inputFormats: [".fasta"], chainsWith: ["bioskills.genome-assembly"],
+    outputs: ["report", "tables"], license: "MIT",
+    provenance: { repo: "GPTomics/bioSkills", path: "genome-annotation" }, version: "—", popularity: 23,
+  }),
+  e({
+    id: "bioskills.immunoinformatics-tcr",
+    name: "TCR/BCR Repertoire",
+    summary: "Immune repertoire analysis (MixCR) with clonality + diversity plots.",
+    source: "bioskills", category: "immunoinformatics", omics: ["transcriptomics"],
+    tier: "community", status: "community", engine: "agent-sandbox",
+    inputFormats: [".fastq"], chainsWith: [],
+    outputs: ["figure", "tables"], license: "MIT",
+    provenance: { repo: "GPTomics/bioSkills", path: "immunoinformatics-tcr" }, version: "—", popularity: 29,
+  }),
+  e({
+    id: "bioskills.crispr-screen",
+    name: "CRISPR Screen (MAGeCK)",
+    summary: "Pooled screen analysis: count → test → rank essential genes.",
+    source: "bioskills", category: "crispr", omics: ["genomics"],
+    tier: "community", status: "community", engine: "agent-sandbox",
+    inputFormats: [".csv", ".fastq"], chainsWith: ["selom.enrichment"],
+    outputs: ["figure", "tables"], license: "MIT",
+    provenance: { repo: "GPTomics/bioSkills", path: "crispr-screen" }, version: "—", popularity: 35,
+  }),
+  e({
+    id: "bioskills.methylation",
+    name: "DNA Methylation",
+    summary: "Bisulfite/array methylation: DMR detection + methylation tracks.",
+    source: "bioskills", category: "epigenomics", omics: ["epigenomics"],
+    tier: "community", status: "community", engine: "agent-sandbox",
+    inputFormats: [".bam", ".csv"], chainsWith: [],
+    outputs: ["figure", "tables"], license: "Artistic-2.0",
+    provenance: { repo: "GPTomics/bioSkills", path: "methylation" }, version: "—", popularity: 21,
+  }),
+  e({
+    id: "bioskills.metabolomics-xcms",
+    name: "Metabolomics (XCMS)",
+    summary: "LC-MS peak picking → alignment → differential metabolite analysis.",
+    source: "bioskills", category: "metabolomics", omics: ["metabolomics"],
+    tier: "community", status: "community", engine: "agent-sandbox",
+    inputFormats: [".mzML"], chainsWith: ["selom.enrichment"],
+    outputs: ["figure", "tables"], license: "GPL-2.0",
+    provenance: { repo: "GPTomics/bioSkills", path: "metabolomics-xcms" }, version: "—", popularity: 30,
+  }),
+  e({
+    id: "bioskills.flow-cytometry",
+    name: "Flow Cytometry",
+    summary: "Gating + dimensionality reduction for cytometry (FCS) data.",
+    source: "bioskills", category: "flow-cytometry", omics: ["proteomics"],
+    tier: "community", status: "community", engine: "agent-sandbox",
+    inputFormats: [".fcs"], chainsWith: [],
+    outputs: ["figure"], license: "MIT",
+    provenance: { repo: "GPTomics/bioSkills", path: "flow-cytometry" }, version: "—", popularity: 19,
+  }),
+  e({
+    id: "bioskills.perceptual-palettes",
+    name: "Perceptual Palettes",
+    summary: "Colourblind-safe, perceptually-uniform palettes for omics figures.",
+    source: "bioskills", category: "data-visualization", omics: ["transcriptomics", "proteomics", "genomics"],
+    tier: "community", status: "community", engine: "agent-sandbox",
+    inputFormats: [".csv"], chainsWith: ["selom.heatmap", "selom.umap_scrna"],
+    outputs: ["figure"], license: "MIT",
+    provenance: { repo: "GPTomics/bioSkills", path: "perceptual-palettes" }, version: "—", popularity: 26,
+  }),
+];
+
+export function getSkill(id: string): SkillCatalogEntry | undefined {
+  return CATALOG.find((s) => s.id === id);
+}
+
+/** Distinct categories present in the seed, alphabetized. */
+export const CATEGORIES: string[] = Array.from(new Set(CATALOG.map((s) => s.category))).sort();
+
+/** Distinct omics facets present in the seed, alphabetized. */
+export const OMICS: string[] = Array.from(new Set(CATALOG.flatMap((s) => s.omics))).sort();
+
+/** Verified (runnable-now) count in the seed — for the honesty meter copy. */
+export const VERIFIED_SEEDED = CATALOG.filter((s) => s.tier === "verified").length;

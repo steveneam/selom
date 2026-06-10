@@ -3,6 +3,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { MSWProvider } from "./msw-provider";
+import { AppShell } from "@/components/shell/app-shell";
 
 export const metadata: Metadata = {
   title: "Selom — no-code multi-omics figures",
@@ -18,7 +19,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="min-h-dvh bg-background font-sans text-foreground antialiased">
-        <MSWProvider>{children}</MSWProvider>
+        <MSWProvider>
+          <AppShell>{children}</AppShell>
+        </MSWProvider>
       </body>
     </html>
   );

@@ -32,6 +32,39 @@ Talks to the backend over `NEXT_PUBLIC_API_BASE` (default `http://localhost:8000
 - On save, send the patched spec back to the backend to validate/persist.
 - Add an **Export** action → `POST /figures/{id}/export` → download PNG/SVG/PDF.
 
+## C1–C3 — the command center (project-first IDE)
+
+Turns the single upload→editor surface into a **project-first command center**.
+Full design: `../docs/command-center/design.md`. Mock-first (no backend dependency);
+the figure editor (P1) is **reused unchanged** as the Project ▸ Figure view.
+
+### C1 — command-center shell
+- Project-first IA: persistent **left rail** (Home, Skill Store, **Projects +**,
+  Settings) + context **main stage** + contextual right inspector. Routes:
+  `/` (Home dashboard), `/store`, `/p/{id}` (Overview/Data/Workbench/Figure).
+- `ProjectStore` interface + **localStorage** impl in `lib/projects/` — designed to
+  match the planned Supabase schema (design §5) so the later swap is mechanical.
+  **No component touches Supabase directly** — everything goes through `ProjectStore`.
+- Dock the existing figure editor as `/p/{id}/fig/{figId}`. Refactor `app/page.tsx`'s
+  single flow into the shell, preserving upload→editor as Data → Workbench → Figure.
+
+### C2 — Skill Store (the "App Store")
+- Seed `lib/catalog/` with `SkillCatalogEntry` rows (design §3.1) mocking the full
+  ~600-skill catalog (ClawBio `catalog.json` shape + bioSkills categories).
+- Browse/filter by category/omics/tier; skill cards + detail; **Install → project**
+  (adds a `skill_installs` row to the mock store). **Tier honesty:** Verified =
+  installs+runs; Community = "Queued — runs in a future sandbox" (no silent caps).
+- Later swap the seed for `GET /skills` / `GET /skills/{id}` (B1) — registry-driven.
+
+### C3 — guided intake
+- Adaptive questionnaire (by detected modality) shown after upload **when no skills
+  are pre-picked** (skippable otherwise): organism, cell type of interest,
+  condition/disease, expected findings, design.
+- `IntakeProposal` renderer (design §4.3): editable plan (cleaning steps + proposed
+  skills + pre-filled params + rationale/confidence) with a prominent **Run**.
+- Mock `POST /intake` (deterministic stub keyed off modality) + mock ingest/QC report
+  with guardrail flags; swap for B2 when live. **LLM proposes, user approves.**
+
 ## Notes
 - Tailwind **v4** = CSS-first config (`@theme`, no `tailwind.config.js`).
 - React Compiler auto-memoizes — don't over-hand-roll `useMemo`.
