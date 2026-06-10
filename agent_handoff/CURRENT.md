@@ -4,7 +4,7 @@
 > each agent's rolling log, not here. This file is **replaced, never stacked** —
 > update at MAJOR boundaries only (rule 9 in `agent_handoff/README.md`).
 
-_Last updated: 2026-06-11 01:41 +10:00 · Claude — command-center expansion designed + docs locked + FE shell scaffolded (mock-first); `tsc` + `next build` clean. Committed `afaafd2` + **pushed**; `main` ↔ `origin/main` in sync._
+_Last updated: 2026-06-11 01:47 +10:00 · Claude — command-center scaffold committed (`afaafd2`) + pushed (`main` ↔ `origin/main` in sync). Added a session-cleanup rule (kill background processes/dev servers before ending) to `agent_handoff/README.md` Stop/Break._
 
 **Model:** stay on **Fable 5** for all Selom work — Selom carries no biology/security
 flag. Only *reading the EAMOS build repo* escalates a session to Opus, and that

@@ -68,6 +68,10 @@ When the user says stop, break, wrap, or pause:
 - The final chat message ends with a labeled, single-line:
   `Safe to clear: yes | no` + a one-line reason.
 - Followed by a fenced, paste-ready resume `Prompt:` block.
+- **Kill anything you started.** Stop every dev server, watcher, or background process
+  you launched this session (e.g. `npm run dev:mock`) before ending — never leave them
+  running across sessions. Only kill what *you* opened; leave pre-existing processes
+  alone and note them instead. Mention the cleanup in your final message.
 
 ---
 
