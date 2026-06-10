@@ -1,0 +1,15 @@
+{
+  "id": "umap_scrna",
+  "version": "0.1.0",
+  "title": "scRNA UMAP",
+  "engine": "python",
+  "omics": "scrna-seq",
+  "entrypoint": "skills.umap_scrna.run:run",
+  "inputs": [{ "name": "matrix", "kind": "anndata|10x_mtx|h5ad", "required": true }],
+  "param_spec": {
+    "n_neighbors": { "type": "int", "default": 15, "min": 2, "max": 100 },
+    "n_pcs":       { "type": "int", "default": 50, "min": 2, "max": 200 },
+    "color_by":    { "type": "str", "default": "leiden" }
+  },
+  "outputs": [{ "name": "figure", "kind": "plotly_spec" }]
+}

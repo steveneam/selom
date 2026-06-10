@@ -1,0 +1,28 @@
+{
+  "name": "selom-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "//install": "react-plotly.js is stale (peer-deps cap React at <=18). Install with: npm install --legacy-peer-deps",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^16.2",
+    "react": "^19.2",
+    "react-dom": "^19.2",
+    "plotly.js": "^2.37",
+    "react-plotly.js": "^2.6"
+  },
+  "devDependencies": {
+    "typescript": "^6",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/plotly.js": "^2.12",
+    "tailwindcss": "^4",
+    "@tailwindcss/postcss": "^4",
+    "postcss": "^8"
+  }
+}

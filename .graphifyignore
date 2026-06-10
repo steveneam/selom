@@ -1,0 +1,31 @@
+# Graphify scan-ignore — keep the graph focused on source + docs.
+node_modules/
+**/node_modules/
+.next/
+dist/
+build/
+coverage/
+.venv/
+__pycache__/
+**/__pycache__/
+
+# Omics data payloads
+app/backend/data/
+data/
+
+# Temp / cache
+.tmp/
+.scratch/
+.pytest_cache/
+
+# Env (keep the example)
+.env
+.env.*
+!.env.example
+
+# Graphify volatile outputs
+graphify-out/cache/
+graphify-out/converted/
+graphify-out/cost.json
+graphify-out/memory/
+graphify-out/.graphify_*

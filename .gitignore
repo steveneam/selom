@@ -1,0 +1,47 @@
+# ── Python ──────────────────────────────────────────────
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# ── Node ────────────────────────────────────────────────
+node_modules/
+**/node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+.turbo/
+
+# ── Env (keep the example) ──────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── OS cruft ────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Logs / temp ─────────────────────────────────────────
+*.log
+.tmp/
+.scratch/
+
+# ── Omics data (never commit large/PHI-adjacent payloads) ─
+*.h5ad
+*.mzML
+app/backend/data/
+data/
+
+# ── Assistant-local (tracked .claude/ otherwise) ────────
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# ── Graphify volatile outputs ───────────────────────────
+graphify-out/cache/
+graphify-out/converted/
+graphify-out/cost.json
+graphify-out/memory/
+graphify-out/.graphify_*
