@@ -4,7 +4,7 @@
 > each agent's rolling log, not here. This file is **replaced, never stacked** —
 > update at MAJOR boundaries only (rule 9 in `agent_handoff/README.md`).
 
-_Last updated: 2026-06-10 20:52 +10:00 · synced from the scaffolding session (vault)_
+_Last updated: 2026-06-10 21:15 +10:00 · synced from the scaffolding session (vault)_
 
 **Model:** stay on **Fable 5** for all Selom work — Selom carries no biology/security
 flag. Only *reading the EAMOS build repo* escalates a session to Opus, and that
@@ -29,16 +29,16 @@ None held.
 
 ## Cross-Agent Requests
 
-- **[owner action — GitHub not connected yet]** Local commit `4ccb6b6` on `main` is
-  **not pushed**; no remote exists. Owner runs `gh auth login`, then
-  `gh repo create selom --private --source . --remote origin --push`. Until then the
-  repo is **local-only** (this is why it isn't visible on GitHub yet).
+- **GitHub: connected ✓** Pushed to **github.com/steveneam/selom** (private) on
+  2026-06-10 21:15 +10:00 — `main` tracks `origin/main` (in sync). Commits: `4ccb6b6`
+  scaffold + `e3dd7cd` CURRENT.md sync. Commit identity is local
+  `Steven <mactechdish@gmail.com>` — adjust if GitHub commit attribution should differ.
 
 ## Current State
 
 - **Scaffold complete and committed:** git repo at `D:/selom`, branch `main`, commit
   **`4ccb6b6`** ("chore: scaffold Selom build repo (skeleton + agent workflow)"),
-  40 files, clean tree. **Local only — not yet on GitHub.** Identity is set LOCALLY
+  40 files, clean tree. **Pushed to github.com/steveneam/selom (private); main ↔ origin/main in sync.** Identity is set LOCALLY
   to `Steven <mactechdish@gmail.com>` (correct it if that's not the intended GitHub
   identity).
 - **Skeletons that ALREADY EXIST — do NOT re-scaffold:**
