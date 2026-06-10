@@ -1,0 +1,9 @@
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Next.js auto-generated type shim (regenerated on dev/build)
+next-env.d.ts
+
+# Local dev verification artifacts (browser screenshots). Data fixtures like
+# sample-data/demo.csv stay tracked; throwaway PNGs do not.
+/sample-data/*.png

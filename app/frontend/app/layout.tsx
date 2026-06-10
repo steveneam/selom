@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
-
-const inter = Inter({ subsets: ["latin"] });
+import { MSWProvider } from "./msw-provider";
 
 export const metadata: Metadata = {
-  title: "Selom",
-  description: "Selom — no-code multi-omics figures",
+  title: "Selom — no-code multi-omics figures",
+  description:
+    "Visualizing biology. Without code. Turn raw multi-omics data into publication-quality, editable figures.",
 };
 
 export default function RootLayout({
@@ -15,8 +16,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={inter.className}>{children}</body>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+      <body className="min-h-dvh bg-background font-sans text-foreground antialiased">
+        <MSWProvider>{children}</MSWProvider>
+      </body>
     </html>
   );
 }

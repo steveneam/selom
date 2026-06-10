@@ -1,20 +1,153 @@
 @import "tailwindcss";
 
+/*
+  Selom design tokens — "Dark multiomics IDE with a luminous figure artboard."
+  Brand: deep blue-black workspace, glowing cyan accent, glassy panels, molecular
+  hex mark. The publication figure lives on a light `artboard` surface (journal
+  figures are light), floating in the dark shell — like a Figma artboard on canvas.
+  Dark is the default theme (brand-first); a light theme can be layered later.
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0e16; /* deep blue-black workspace */
+  --foreground: #e6edf3; /* near-white text */
+
+  --card: #111824; /* panels / raised surfaces */
+  --card-foreground: #e6edf3;
+
+  --popover: #141c28;
+  --popover-foreground: #e6edf3;
+
+  --primary: #22d3ee; /* cyan accent — the brand glow; reserved for key actions */
+  --primary-foreground: #04161b; /* dark ink on cyan */
+
+  --secondary: #1a2433; /* subtle raised surface / secondary buttons */
+  --secondary-foreground: #cdd9e5;
+
+  --muted: #161f2c;
+  --muted-foreground: #8b98a9; /* slate-400 secondary text */
+
+  --accent: #16404a; /* cyan-tinted hover / selected background */
+  --accent-foreground: #a5f3fc; /* cyan-200 */
+
+  --destructive: #f43f5e;
+  --destructive-foreground: #fff5f7;
+
+  --border: #1e2a3a; /* hairline dividers */
+  --input: #233044; /* control borders */
+  --ring: #22d3ee; /* focus ring (cyan) */
+
+  /* The publication "paper" the figure renders on — always light. */
+  --artboard: #ffffff;
+  --artboard-foreground: #0f172a;
+
+  /* Colourblind-aware default data colourway for figure traces. */
+  --chart-1: #22d3ee;
+  --chart-2: #a78bfa;
+  --chart-3: #fb923c;
+  --chart-4: #34d399;
+  --chart-5: #f472b6;
+  --chart-6: #facc15;
+  --chart-7: #60a5fa;
+  --chart-8: #f87171;
+
+  --radius: 0.625rem;
 }
 
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
-  background: var(--background);
-  color: var(--foreground);
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-artboard: var(--artboard);
+  --color-artboard-foreground: var(--artboard-foreground);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
+  --color-chart-8: var(--chart-8);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
 }
 
 * {
   box-sizing: border-box;
   padding: 0;
   margin: 0;
+  border-color: var(--border);
+}
+
+html,
+body {
+  max-width: 100vw;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+body {
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tabular figures everywhere numbers live in the editor (sliders, inputs, values). */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+}
+
+::selection {
+  background: color-mix(in oklab, var(--primary) 30%, transparent);
+}
+
+/* Quiet, on-theme scrollbars for the dark panels. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--input);
+  background-clip: content-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

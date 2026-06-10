@@ -1,35 +1,68 @@
 "use client";
 
-import { useState } from "react";
-import dynamic from "next/dynamic";
+import { useCallback, useEffect, useState } from "react";
+import { TopBar } from "@/components/app/top-bar";
+import { EditorWorkspace } from "@/components/figure/editor-workspace";
+import { UploadHero } from "@/components/upload/upload-hero";
+import { useFigureStore } from "@/hooks/use-figure-store";
+import { runSkill } from "@/lib/skills-api";
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+type Status = "idle" | "running" | "error";
 
 export default function Home() {
-  const [fig, setFig] = useState<any>(null);
+  const store = useFigureStore();
+  const [status, setStatus] = useState<Status>("idle");
+  const [error, setError] = useState<string>();
+  const [fileName, setFileName] = useState<string>();
 
-  async function run(file: File) {
-    const fd = new FormData();
-    fd.append("matrix", file);
-    const r = await fetch("/api/skills/umap_scrna/run", {
-      method: "POST",
-      body: fd,
-    });
-    setFig((await r.json()).figure); // {data, layout} = the editable spec
-  }
+  const handleFile = useCallback(
+    async (file: File) => {
+      setStatus("running");
+      setError(undefined);
+      setFileName(file.name);
+      try {
+        const figure = await runSkill("umap_scrna", file);
+        store.init(figure);
+        setStatus("idle");
+      } catch (e) {
+        setStatus("error");
+        setError(e instanceof Error ? e.message : "Upload failed. Please try again.");
+      }
+    },
+    [store],
+  );
+
+  const handleReset = useCallback(() => {
+    store.reset();
+    setStatus("idle");
+    setError(undefined);
+    setFileName(undefined);
+  }, [store]);
+
+  // Undo / redo keyboard shortcuts (Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      e.preventDefault();
+      if (e.shiftKey) store.redo();
+      else store.undo();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [store]);
+
+  const hasFigure = store.spec !== null;
 
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-semibold">
-        Selom — no-code multi-omics figures
-      </h1>
-      <input
-        type="file"
-        accept=".h5ad,.csv"
-        className="mt-4 block"
-        onChange={(e) => e.target.files && run(e.target.files[0])}
-      />
-      {fig && <Plot data={fig.data} layout={fig.layout} />}
-    </main>
+    <div className="flex h-dvh flex-col">
+      <TopBar store={store} fileName={fileName} hasFigure={hasFigure} onReset={handleReset} />
+      {hasFigure ? (
+        <EditorWorkspace store={store} />
+      ) : (
+        <UploadHero onFile={handleFile} status={status} error={error} fileName={fileName} />
+      )}
+    </div>
   );
 }

@@ -1,0 +1,4 @@
+gene,cell_1,cell_2,cell_3
+GENE_A,1,0,3
+GENE_B,0,2,1
+GENE_C,4,1,0
