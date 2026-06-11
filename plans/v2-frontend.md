@@ -54,7 +54,9 @@ the figure editor (P1) is **reused unchanged** as the Project ▸ Figure view.
 - Browse/filter by category/omics/tier; skill cards + detail; **Install → project**
   (adds a `skill_installs` row to the mock store). **Tier honesty:** Verified =
   installs+runs; Community = "Queued — runs in a future sandbox" (no silent caps).
-- Later swap the seed for `GET /skills` / `GET /skills/{id}` (B1) — registry-driven.
+- ✅ **DONE (B3, 2026-06-12) — registry-driven.** `lib/catalog/registry.ts` fetches live `GET /skills`, merges the
+  Verified slice over the seed's Community tail, falls back to the seed offline; `CoverageMeter` shows the live
+  runnable count; MSW mocks `/api/skills`. The seed now backs only the Community long-tail + `getSkill()` name lookups.
 
 ### C3 — guided intake
 - Adaptive questionnaire (by detected modality) shown after upload **when no skills

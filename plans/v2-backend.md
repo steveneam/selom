@@ -71,17 +71,38 @@ uploaded file; no bulk dataset bundled — golden tests use the stub), **GSEA = 
 B2 follow-ups (later): full GO/Reactome GMT ingestion to replace the bundled sample; real-engine numerical
 golden tests vs an R oracle (RISKS #7). Out of B2 scope: async queue (B3), reproducibility/guardrails/methods/Kaleido (B4).
 
-## Integration backlog (owner-directed 2026-06-12 · do next session) — see `../docs/integrations.md`
+## B3 (charter) — Skills as a service (jobs + storage) · ✅ CORE DONE 2026-06-12 (pushed)
 
-In addition to B3 (arq+Redis async, R2 store, live `GET /skills`):
+- **Live `GET /skills` registry.** `skills/registry.py` maps each `skills/<slug>/skill.json` (+ a new optional
+  `catalog` block on `SkillSpec`) to the FE `SkillCatalogEntry` shape. Adding a skill dir surfaces it in the Store
+  with no FE edit. `test_registry.py` pins the shape + completeness.
+- **Async jobs API.** `POST /skills/{id}/jobs` (enqueue) → `GET /jobs/{id}` (poll) / `/jobs/{id}/events` (SSE,
+  `text/event-stream`) / `/jobs/{id}/result` (`{figure}`, same shape as `/run`). New `config.py` (pydantic-settings),
+  `jobs/{store,queue,worker}.py`, `storage/results.py`. One `execute_job` is shared by the inline executor and the
+  arq worker so the modes can't drift. `test_jobs.py` covers the inline lifecycle + SSE + 404s.
+- **Infra off by default.** Jobs run **inline**, results land on the **local filesystem** — a fresh `uv sync` +
+  uvicorn runs the whole API with zero infra. `SELOM_QUEUE=arq` (+ Redis, DECISIONS #6) and `SELOM_R2_*` (+ Cloudflare
+  R2; boto3 with the RISKS #5 checksum fix) flip on the distributed/cloud path. New optional `[jobs]` extra; the
+  inline+local path needs none of it. `/run` stays **synchronous** (the proven light-skill path); only heavy skills use `/jobs`.
+- **Open B3 item (carries to next session):** arq cross-process job *status* needs a **Redis-backed JobStore**.
+  Today success propagates cross-process via the shared result store (`get_job` probes it), but queued/running/error
+  states live in each process's in-memory store — see the caveat in `jobs/worker.py`. Stand up Redis + a Redis JobStore
+  to make arq mode fully observable. (R2 + arq are otherwise wired; they just need real infra, a B7/B8 concern.)
+
+`pytest` = **21 passed** (14 base + 3 registry + 4 jobs); ruff clean; live uvicorn smoke (skills/submit/poll/result/SSE) green.
+
+## Integration backlog (owner-directed 2026-06-12) — see `../docs/integrations.md`
+
+Done this session: **heatmap hierarchical row-ordering** (item 2 below) + **`gseapy` dropped** from `[omics]` (item 1's
+SCA cleanup). Remaining:
 1. **OmicVerse as a 2nd Verified engine + Foundry source — isolated.** It pins `pandas<3.0`/
    `anndata<0.12` (RISKS #9), so it can't share this venv. Stand up an OmicVerse worker in its
    own env/container and call it out-of-process (subprocess JSON or its MCP server — `ov.*` over
    `adata_id`, `omicverse/docs/mcp_quickstart.md`). Optionally route `cluster`/`deg`/`enrichment`/
    `heatmap` through `ov.pp.leiden`/`ov.bulk.pyDEG`/`ov.bulk.pyGSEA`/`ov.pl`; then trajectory/
-   annotation/deconvolution. SCA-gate the 50 transitive deps; **drop the now-unused `gseapy`** from
-   `[omics]` (enrichment uses an in-house ORA, DECISIONS #9).
-2. **heatmap hierarchical row-ordering** via sklearn/scipy linkage (+ optional dendrogram). [sklearn now in core]
+   annotation/deconvolution. SCA-gate the 50 transitive deps. (`gseapy` already dropped from `[omics]` — DECISIONS #9.)
+2. ✅ **heatmap hierarchical row-ordering** DONE — scipy correlation-distance + average-linkage leaf order
+   (`skills/heatmap/run_real.py`, real-engine only; stub/golden unchanged). Optional dendrogram trace is a later add.
 3. **R4DS/Quarto + ggplot2 reference set for B4** — methods-text + reproducibility-bundle shape
    (mirror Hermes `commands.sh + environment.yml`), journal figure defaults, and the **R validation
    oracle** harness (limma/DESeq2/ggplot2 golden references; RISKS #7).

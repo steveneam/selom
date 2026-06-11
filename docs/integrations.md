@@ -81,7 +81,9 @@ catalog numbers via the live ingest job.
 
 ## 3. Queued for next session (owner-approved 2026-06-12)
 
-In addition to **B3** (arq+Redis async, R2 store, live `GET /skills`):
+**Update 2026-06-12 (B3 landed):** `GET /skills` is live + the FE Store is registry-driven;
+the async jobs API is in (inline+local active, arq+R2 wired/dormant). Items **2 (heatmap
+row-ordering)** and the **`gseapy` drop** (part of 1) are **DONE**. Remaining below.
 
 1. **OmicVerse as a second Verified engine + Foundry source — isolated.** Stand up an
    OmicVerse worker in its own env/container (pinned `pandas<3`/`anndata<0.12`) and call it
@@ -89,8 +91,9 @@ In addition to **B3** (arq+Redis async, R2 store, live `GET /skills`):
    per `omicverse/docs/mcp_quickstart.md`). First port targets: route `cluster`/`deg`/
    `enrichment`/`heatmap` optionally through `ov.pp.leiden`/`ov.bulk.pyDEG`/`ov.bulk.pyGSEA`/
    `ov.pl`, then fan out to trajectory/annotation/deconvolution. Each port: SkillSpec +
-   golden test + provenance. **SCA-gate the 50 transitive deps; drop `gseapy` from `[omics]`.**
-2. **heatmap hierarchical row-ordering** via sklearn/scipy linkage (+ optional dendrogram).
+   golden test + provenance. **SCA-gate the 50 transitive deps.** (`gseapy` already dropped from `[omics]`.)
+2. ✅ **DONE (B3) — heatmap hierarchical row-ordering** via scipy correlation-distance + average
+   linkage (`skills/heatmap/run_real.py`, real-engine only). Optional dendrogram trace is a later add.
 3. **R4DS/Quarto + ggplot2 reference set for B4** — methods-text + reproducibility-bundle
    shape (mirror Hermes' `commands.sh + environment.yml`), journal-quality figure defaults,
    and the **R validation oracle** harness (limma/DESeq2/ggplot2 golden references; RISKS #7).

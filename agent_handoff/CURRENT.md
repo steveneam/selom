@@ -4,7 +4,7 @@
 > each agent's rolling log, not here. This file is **replaced, never stacked** —
 > update at MAJOR boundaries only (rule 9 in `agent_handoff/README.md`).
 
-_Last updated: 2026-06-12 01:10 +10:00 · Claude (acting FE+BE) — **B2 COMPLETE (local); FRONTEND AUDIT done + fixed; INTEGRATION RESEARCH filed.** All 6 B2 wedge skills built (cluster · violin · DEG · volcano · heatmap · GSEA/enrichment) — each `skills/<slug>/{skill.json, run.py (stub) + run_real.py}`, editable plain-array Plotly spec via the shared `_plotly.jsonable`, golden-image snapshot tests green (`python -m pytest` = 14 passed) + real engines smoke-verified on synthetic h5ad/CSV. GSEA via in-house hypergeometric ORA against a bundled GO/Reactome sample — NO gseapy/MSigDB (DECISIONS #9). `main.py` generalized: `POST /skills/{id}/run` now runs ANY Verified skill (query-string params + preserved upload suffix). FE: `selom.violin` catalog entry added (coverage meter → 14/628). **Frontend audit** (ui-ux-pro-max + frontend-design + impeccable; `/impeccable init` wrote DESIGN.md + sidecar) browser-verified on the live app, fixes applied (banned side-stripe removed, skill-card keyboard-a11y, modal focus mgmt, contrast, friendlier run-error copy, graceful narrow-window shell). Commits: docs `abe6fe4`, FE-audit `506d1e6`, BE-B2 `eded0db`, FE-violin `d1b9533`, handoff `18131b6`. **Integration research (owner-directed):** evaluated OmicVerse / scikit-learn / R4DS+Quarto / Hermes → **`docs/integrations.md`**. Done now: sklearn → core + **silhouette guardrail in `cluster`** (publish-confidence); RISKS #9 filed (OmicVerse pins `pandas<3` → can't share venv + GPL/SCA surface). Queued next session: OmicVerse as an isolated 2nd engine/Foundry source, heatmap row-ordering, R4DS/Quarto for B4 + R-oracle, catalog true-up, OmicVerse/JARVIS MCP (context7 MCP already in `.mcp.json`, working). **NOT yet pushed.** Owner steer: Selom is **desktop-only**. Next: B3 + the integration backlog (`plans/v2-backend.md`)._
+_Last updated: 2026-06-12 01:48 +10:00 · Claude (acting FE+BE) — **B3 (skills-as-a-service) LANDED + integration-backlog quick wins; ALL PUSHED.** `main` ↔ `origin/main` @ `5138aec` (the 7 prior B2/audit/integration commits were pushed first). **B3 = 4 commits:** (1) live **`GET /skills`** registry — `skills/registry.py` maps each `skill.json` + a new optional `catalog` block to the FE `SkillCatalogEntry` shape, so adding a skill dir shows it in the Store with no FE edit; (2) **async jobs API** — `POST /skills/{id}/jobs` → `GET /jobs/{id}` (poll) / `/jobs/{id}/events` (SSE) / `/jobs/{id}/result`; one `execute_job` shared by the inline executor and the arq worker. Infra is **OFF by default** (jobs run **inline**, results on the **local filesystem**) so a fresh `uv sync` + uvicorn runs the whole job API with zero infra; `SELOM_QUEUE=arq`+Redis (DECISIONS #6) and `SELOM_R2_*`+Cloudflare R2 (boto3 with the RISKS #5 checksum fix) flip on the distributed/cloud path — **wired but dormant** pending infra (arq cross-process *status* is a documented follow-up in `jobs/worker.py`); new optional `[jobs]` extra. (3) **FE registry-driven Store** — `lib/catalog/registry.ts` fetches `/api/skills`, merges the live Verified slice over the static seed's Community tail, falls back to the seed offline; `CoverageMeter` shows the **live** runnable count; MSW mocks `/api/skills`. (4) **Integration backlog quick wins:** heatmap **hierarchical row-ordering** (scipy correlation-distance linkage, real-engine only) + **dropped `gseapy`** from `[omics]` (DECISIONS #9 / RISKS #6/#9; `uv` re-locked). **Verified:** backend `pytest` = **21 passed** (14 base + 3 registry + 4 jobs); ruff clean; live uvicorn smoke (skills/submit/poll/result/SSE) green; FE `tsc` + `next build` clean; **browser-verified** (mock :3010) — `/api/skills` 200, meter live 13/~628, 32 shown, phantom `proteomics_volcano` correctly dropped from Verified, console clean. Selom is **DESKTOP-ONLY**. Next: **B4 publish-confidence** + the remaining integration backlog (OmicVerse isolated worker, R4DS/Quarto + R-oracle, full GO/Reactome GMT, catalog-count true-up, OmicVerse/JARVIS MCP)._
 
 **Model:** stay on **Fable 5** for all Selom work — Selom carries no biology/security
 flag. Only *reading the EAMOS build repo* escalates a session to Opus, and that
@@ -14,7 +14,7 @@ source is not needed here. Do not switch to Opus for Selom.
 
 | Agent | Role | Lane | Status |
 |---|---|---|---|
-| Claude | **Frontend + Backend (acting)** — UI/design/product copy **and** APIs/skill runners/data/tests | `app/frontend` + `app/backend` + both plans | IDLE (clear-safe) — **B2 DONE locally + FRONTEND AUDIT done/fixed; NOT pushed.** 6 wedge skills built + golden-tested (14 passed) + real engines smoke-verified; `main.py` run-endpoint generalized; FE `selom.violin` added; audit fixes applied + browser-verified. 4 scoped commits ahead of `origin/main` (@ `7d58e92`). Decisions #5–#9 locked. Selom is **desktop-only** (owner steer 2026-06-12). |
+| Claude | **Frontend + Backend (acting)** — UI/design/product copy **and** APIs/skill runners/data/tests | `app/frontend` + `app/backend` + both plans | IDLE (clear-safe) — **B3 LANDED + integration quick wins; ALL PUSHED** (`main` ↔ `origin/main` @ `5138aec`). Live `GET /skills` registry; async jobs API (inline+local active, arq+R2 wired/dormant); FE registry-driven Store; heatmap row-ordering; `gseapy` dropped. `pytest` 21 passed; FE `next build` clean; browser-verified. Decisions #5–#9 locked. Selom is **desktop-only**. |
 | Codex | Backend (APIs/skill runners/data/tests) | `app/backend` + `plans/v2-backend.md` | **AWAY** (busy on another project). Backend role **temporarily covered by Claude** as of 2026-06-11 22:10. B1 + **B2 backend done by Claude** in the interim (see `## Codex` section). May reclaim at any time — state is drop-in-ready; review the arq #6 lock + the B1/B2 commits on return. |
 
 Roles are explicit; any swap is written here before work proceeds.
@@ -185,22 +185,37 @@ None held.
     via `tests/regen_golden.py`) — `python -m pytest` = **14 passed**; real engines smoke-verified on synthetic
     h5ad/CSV (all 8 paths). `main.py` generalized: run-endpoint takes any Verified skill (query-string params +
     preserved upload suffix). FE `selom.violin` entry added (`feat(frontend:)` `d1b9533`; coverage → 14/628).
-- **Next (B3 — jobs + storage, BE-led — + integration backlog):** generalize toward async (arq+Redis per
-  DECISIONS #6) for heavy skills; R2 result store; SSE/poll; serve live **`GET /skills`** so the FE Store becomes
-  registry-driven (drop the seed). Then B4 publish-confidence (reproducibility bundle, guardrails, methods-text,
-  Kaleido export). **First: `git push`** the local commits, then pick up B3 **+ the integration backlog**
-  (`plans/v2-backend.md` → `docs/integrations.md`): OmicVerse as an **isolated** 2nd engine/Foundry source
-  (RISKS #9 — pins `pandas<3`, run out-of-process; drop unused `gseapy`); heatmap hierarchical row-ordering;
-  R4DS/Quarto for B4 + the R-oracle harness (RISKS #7); full GO/Reactome GMT; catalog-count true-up (≈418);
-  OmicVerse/JARVIS MCP (context7 already wired). `plans/v2-frontend.md` P0 still says two-step upload.
+- **Last (2026-06-12 01:48) — B3 DONE + integration quick wins; ALL PUSHED (`main` @ `5138aec`).** Pushed
+  the 7 prior commits first, then landed B3 in 4 scoped commits:
+  - **`021af8c` `feat(backend)` — live `GET /skills` + async jobs API.** Registry: `skills/registry.py` maps each
+    `skill.json` (+ a new optional `catalog` block on `SkillSpec`) to the FE `SkillCatalogEntry` shape; `GET /skills`
+    returns the live Verified set. Jobs: `POST /skills/{id}/jobs` → `GET /jobs/{id}` (poll) / `/events` (SSE,
+    `text/event-stream`) / `/result` ({figure}, same shape as `/run`). New modules `config.py` (pydantic-settings),
+    `jobs/{store,queue,worker}.py`, `storage/results.py`. **One `execute_job`** is shared by the inline executor and
+    the arq worker. Default = **inline + local filesystem result store** (zero infra); `SELOM_QUEUE=arq`+Redis and
+    `SELOM_R2_*`+R2 (boto3 + RISKS #5 checksum fix) are **wired but dormant**. New optional `[jobs]` extra.
+  - **`5b38f9e` `feat(backend)` — heatmap hierarchical row-ordering** (scipy correlation-distance + average linkage,
+    real-engine only; stub/golden unchanged) **+ dropped `gseapy`** from `[omics]` (DECISIONS #9 / RISKS #6/#9; uv re-locked).
+  - **`5138aec` `feat(frontend)` — registry-driven Store.** `lib/catalog/registry.ts` fetches `/api/skills`, merges live
+    Verified over the seed's Community tail, falls back to seed offline; `CoverageMeter` shows the live count; MSW mocks
+    `/api/skills`; seed `enrichment` relabelled MIT (DECISIONS #9).
+  - **Verified:** `pytest` 21 passed; ruff clean; live uvicorn smoke (skills/submit/poll/result/SSE) green; FE `tsc` +
+    `next build` clean; browser (mock :3010) — `/api/skills` 200, meter live **13/~628**, 32 shown, `proteomics_volcano`
+    dropped, console clean (only an unrelated favicon 404).
+- **Next (B4 publish-confidence + integration backlog).** B4 = per-figure reproducibility bundle, statistical
+  guardrails, auto methods-text, Kaleido journal export (RISKS #2/#5). Integration backlog (`plans/v2-backend.md` →
+  `docs/integrations.md`): **OmicVerse isolated worker** (RISKS #9 — own env/container, call its MCP/RPC out-of-process;
+  SCA-gate its 50 deps), **arq cross-process job *status*** (Redis-backed JobStore — see `jobs/worker.py` caveat),
+  R4DS/Quarto for B4 + the R-oracle harness (RISKS #7), full GO/Reactome GMT, catalog-count true-up (≈418 via a live
+  ingest job), OmicVerse/JARVIS MCP (add only AFTER its isolated env exists). `plans/v2-frontend.md` P0 still says two-step upload.
 - **Resume:**
   ```
-  # Resume · 2026-06-12 00:44 +10:00 · Selom · Claude (frontend + backend, acting)
-  Selom build repo D:/selom. CLAUDE.md auto-loads. Read agent_handoff/README.md + CURRENT.md (this) + DECISIONS.md + RISKS.md + docs/build-charter.md + DESIGN.md + plans/v2-backend.md + plans/v2-frontend.md.
-  ROLE: Codex away → Claude owns BOTH lanes. Keep BE drop-in-ready: accurate `## Codex` section, explicit per-lane scoped commits (never git add -A). Selom is DESKTOP-ONLY (owner steer).
-  Delta: FRONTEND AUDIT done + fixed (DESIGN.md written; side-stripe/a11y/contrast/error-copy/narrow-shell). B2 DONE locally — all 6 wedge skills + golden tests (14 passed) + real-engine smoke OK; main.py run-endpoint generalized; FE selom.violin added. 4 commits NOT pushed (abe6fe4 docs, 506d1e6 FE-audit, eded0db BE-B2, d1b9533 FE-violin) ahead of origin @ 7d58e92.
-  Env: backend on user-managed py3.12 (uv at C:/Users/seamegdool/.local/bin/uv.exe); system py3.10 IT-locked. Run via `uv run --directory app/backend python -m pytest` / `-m uvicorn`. Skills stub vs real via SELOM_SKILLS_ENGINE (auto|stub|real); golden tests pin stub. FE dev `npm run dev:mock -- --port 3010` (mock mode; 3000/3001 are other projects). demo.h5ad gitignored — regen via scripts/make_demo.py.
-  Next: PUSH the 4 commits, then START B3 (arq+Redis async, R2 store, live GET /skills → registry-driven Store). Stay on Fable 5 (xhigh). End clear-safe.
+  # Resume · 2026-06-12 01:48 +10:00 · Selom · Claude (frontend + backend, acting)
+  Selom build repo D:/selom. CLAUDE.md auto-loads. Read agent_handoff/README.md + CURRENT.md (this) + DECISIONS.md + RISKS.md + docs/build-charter.md + DESIGN.md + plans/v2-backend.md + plans/v2-frontend.md + docs/integrations.md.
+  ROLE: Codex away → Claude owns BOTH lanes. Keep BE drop-in-ready: accurate `## Codex` section, explicit per-lane scoped commits (never git add -A). Selom is DESKTOP-ONLY.
+  Delta: B3 DONE + pushed (main @ 5138aec). Live GET /skills registry (skills/registry.py + catalog block on skill.json); async jobs API (POST /skills/{id}/jobs, GET /jobs/{id}|/events|/result; inline+local active, arq+R2 wired/dormant; [jobs] extra). FE registry-driven Store (lib/catalog/registry.ts + CoverageMeter, seed fallback). heatmap scipy row-ordering; gseapy dropped from [omics]. pytest 21 passed; FE next build clean; browser-verified (mock :3010).
+  Env: backend on user-managed py3.12 (uv at C:/Users/seamegdool/.local/bin/uv.exe); system py3.10 IT-locked. Run via `uv run --directory app/backend python -m pytest` / `-m uvicorn`. Jobs default inline+local (no infra); SELOM_QUEUE=arq + SELOM_R2_* + the [jobs] extra flip on Redis/R2. Skills stub vs real via SELOM_SKILLS_ENGINE; golden tests pin stub. FE dev `npm run dev:mock -- --port 3010` (mock; 3000/3001 are other projects). demo.h5ad gitignored — regen via scripts/make_demo.py.
+  Next: B4 publish-confidence (repro bundle, guardrails, methods-text, Kaleido) + integration backlog (OmicVerse isolated worker, arq Redis status store, R-oracle, full GMT, catalog true-up). Stay on Fable 5 (xhigh). End clear-safe.
   ```
 
 ## Codex — Last Task & Resume
@@ -218,21 +233,28 @@ None held.
   (CPM fallback). **Enrichment: in-house hypergeometric ORA + BH FDR vs a bundled GO/Reactome `gene_sets.json` —
   NO gseapy/MSigDB (DECISIONS #9).** `main.py` run-endpoint generalized to ANY Verified skill (query params +
   preserved upload suffix). Tests `tests/test_skills_golden.py` + `tests/golden/*.json` (regen `tests/regen_golden.py`)
-  → `python -m pytest` = 14 passed; real engines smoke-verified on synthetic data. **arq #6 still locked in your
-  absence — review on return. NOTE: commits are LOCAL, not yet pushed.**
-- **Next (B3 → B4):** **B3** generalize to async — **arq+Redis** (DECISIONS #6) for heavy skills, R2 result store +
-  presigned URLs, SSE/poll status, and serve live **`GET /skills`** so the FE Store drops its seed and reads the
-  registry. Then **B4** publish-confidence — reproducibility bundle, statistical guardrails, auto methods-text,
-  Kaleido journal export (RISKS #2/#5). Full spec in `docs/build-charter.md`. **Integration backlog (owner-directed
-  2026-06-12 — `docs/integrations.md` + `plans/v2-backend.md`):** OmicVerse as an **isolated** 2nd engine/Foundry
-  source — it pins `pandas<3` so it CANNOT share this venv (RISKS #9); run out-of-process (its MCP server / a worker)
-  and **drop the now-unused `gseapy`** from `[omics]`. Plus heatmap hierarchical row-ordering, R4DS/Quarto for B4 +
-  the R-oracle harness (RISKS #7), full GO/Reactome GMT, catalog-count true-up (≈418). sklearn is now a core dep
-  (silhouette guardrail landed in `cluster`). Explicit staging only (never `git add -A`); `feat(backend:)` scope.
+  → `python -m pytest` = 14 passed; real engines smoke-verified on synthetic data.
+- **Last (done by Claude, acting BE, 2026-06-12) — B3 backend DONE + integration quick wins; ALL PUSHED (`main` @ `5138aec`).**
+  **Registry:** `skills/registry.py` maps each `skill.json` (+ a new optional `catalog` block on `SkillSpec`) to the FE
+  `SkillCatalogEntry` shape; `GET /skills` returns the live Verified set. **Async jobs API:** `POST /skills/{id}/jobs` →
+  `GET /jobs/{id}` (poll) / `/events` (SSE) / `/result`; new `config.py`, `jobs/{store,queue,worker}.py`,
+  `storage/results.py`; one `execute_job` shared by the inline executor and the arq worker. **Default = inline + local
+  filesystem result store (ZERO infra).** `SELOM_QUEUE=arq`+Redis (DECISIONS #6) and `SELOM_R2_*`+R2 (boto3 + the RISKS #5
+  checksum fix) are **wired but DORMANT**; new optional `[jobs]` extra. **heatmap** got scipy hierarchical row-ordering
+  (real-engine only); **`gseapy` DROPPED** from `[omics]` (DECISIONS #9 / RISKS #6/#9; uv re-locked). `pytest` = **21 passed**.
+  arq #6 confirmed in your absence — review on return. **`/run` stays synchronous** (the proven light-skill path); only
+  heavy skills use `/jobs`. The one open BE item: **arq cross-process job *status*** needs a Redis-backed JobStore
+  (`jobs/worker.py` documents the caveat — success propagates via the shared result store, but queued/running/error states don't yet).
+- **Next (B4 + integration backlog):** **B4** publish-confidence — reproducibility bundle, statistical guardrails, auto
+  methods-text, Kaleido journal export (RISKS #2/#5). **Integration backlog (`docs/integrations.md` + `plans/v2-backend.md`):**
+  OmicVerse as an **isolated** 2nd engine/Foundry source — pins `pandas<3` so it CANNOT share this venv (RISKS #9); run
+  out-of-process (its MCP server / a worker), SCA-gate its 50 deps; the **arq Redis status store**; R4DS/Quarto for B4 +
+  the R-oracle harness (RISKS #7); full GO/Reactome GMT; catalog-count true-up (≈418 via a live ingest job). sklearn is a
+  core dep (silhouette in `cluster`). Explicit staging only (never `git add -A`); `feat(backend:)` scope.
 - **Resume:**
   ```
-  # Resume · 2026-06-12 00:44 +10:00 · Selom · Codex (backend) — reclaiming from Claude
-  Selom build repo D:/selom. CODEX.md auto-loads. Read agent_handoff/README.md + CURRENT.md + DECISIONS.md + RISKS.md + docs/build-charter.md + plans/v2-backend.md + git status.
-  Delta: B1 + B2 backend DONE by Claude. B2 = 6 wedge skills (cluster/violin/deg/volcano/heatmap/enrichment) each stub+real behind SELOM_SKILLS_ENGINE, golden tests green (14 passed), real engines smoke-verified; main.py run-endpoint generalized to any skill. Enrichment = in-house hypergeometric ORA vs bundled GO/Reactome (NO gseapy/MSigDB, DECISIONS #9). Commits LOCAL not pushed (eded0db BE) ahead of origin @ 7d58e92. arq #6 locked in your absence — review it.
-  Next: B3 — arq+Redis async, R2 store + presigned URLs, SSE/poll, live GET /skills (registry-driven Store). Env: user-managed py3.12 (uv); system 3.10 IT-locked; use `uv run --directory app/backend python -m pytest`/`-m uvicorn`. Stay on Fable 5. End clear-safe.
+  # Resume · 2026-06-12 01:48 +10:00 · Selom · Codex (backend) — reclaiming from Claude
+  Selom build repo D:/selom. CODEX.md auto-loads. Read agent_handoff/README.md + CURRENT.md + DECISIONS.md + RISKS.md + docs/build-charter.md + plans/v2-backend.md + docs/integrations.md + git status.
+  Delta: B1 + B2 + B3 backend DONE by Claude; ALL PUSHED (main @ 5138aec). B3 = live GET /skills registry (skills/registry.py + a catalog block on skill.json) + async jobs API (POST /skills/{id}/jobs, GET /jobs/{id}|/events|/result; config.py + jobs/ + storage/; one execute_job for inline+arq). Default inline + local filesystem result store (zero infra); arq+Redis (DECISIONS #6) and R2 (boto3 + RISKS #5 fix) wired but dormant; new [jobs] extra. heatmap scipy row-ordering; gseapy dropped from [omics]. pytest 21 passed.
+  Open BE item: arq cross-process job STATUS needs a Redis-backed JobStore (jobs/worker.py caveat). Next: B4 publish-confidence + integration backlog (OmicVerse isolated worker, R-oracle, full GMT, catalog true-up). Env: user-managed py3.12 (uv); system 3.10 IT-locked; `uv run --directory app/backend python -m pytest`/`-m uvicorn`. Stay on Fable 5. End clear-safe.
   ```

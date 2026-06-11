@@ -69,9 +69,9 @@ Built all 6 backend runners (UMAP done in B1): **cluster · violin (new) · DEG 
 *Integration research (owner-directed 2026-06-12):* OmicVerse · scikit-learn (now core) · R4DS/Quarto+ggplot2 (B4 reference) · Hermes (pattern + catalog-count true-up 540/88→≈385/33). Full assessment: `docs/integrations.md`.
 *Forj:* meat (the skills) · bones (golden-image harness + stub/real engine split). *Forces:* DECISIONS.md **#9** (GSEA source). Demo-data `[GAP]` resolved → public proxies.
 
-**B3 · Skills as a service (jobs + storage)** 🟡 `[BE-led, FE swaps mocks→live]` `⟵P2`
-Generalize the run endpoint to all Verified skills; async **arq+Redis** for heavy jobs; R2 result store + presigned URLs; SSE/poll status; FE Store becomes **registry-driven from real `GET /skills`**.
-*Forj:* **bones** (job/queue substrate = EAMOS spine). *Forces:* DECISIONS.md **#6** (arq) goes load-bearing — Codex confirms.
+**B3 · Skills as a service (jobs + storage)** ✅ *(core landed 2026-06-12, pushed)* `[BE-led, FE swaps mocks→live]` `⟵P2`
+Done: live **`GET /skills`** registry (`skills/registry.py` + a `catalog` block on `skill.json`) → FE Store is **registry-driven** (`lib/catalog/registry.ts` merges live Verified over the seed's Community tail, seed fallback offline); **async jobs API** (`POST /skills/{id}/jobs` → `GET /jobs/{id}` poll / `/events` SSE / `/result`) with one `execute_job` shared by the inline executor and the arq worker. Default = **inline + local filesystem result store (zero infra)**; **arq+Redis** (DECISIONS #6) + **R2 presigned URLs** (boto3 + RISKS #5 fix) are **wired but dormant** behind `SELOM_QUEUE=arq` / `SELOM_R2_*` + the optional `[jobs]` extra. 🟡 *Remaining:* stand up Redis/R2 for real + a **Redis-backed JobStore** so arq cross-process job *status* (not just success) is visible (`jobs/worker.py` caveat).
+*Forj:* **bones** (job/queue substrate = EAMOS spine). *Forces:* DECISIONS.md **#6** (arq) confirmed; goes fully load-bearing when the infra lands (B7/B8).
 
 **B4 · The publish-confidence layer** 🔴 *(core decision, made tangible)* `[FE+BE]` `⟵P5 + P3-export, RISEN into Stage 1`
 Per-figure **reproducibility bundle** (skill id+version+params+data-hash+env) · **statistical guardrails** (batch-effect / normalisation / multiple-testing / low-cell) · **auto methods-text** · **journal-preset export** (Kaleido PNG/SVG/PDF).
@@ -118,7 +118,12 @@ Two agents, disjoint lanes (`agent_handoff/README.md`): **Claude = FE** (`app/fr
 
 ## Active bucket
 
-**B2 — DONE (2026-06-12), local (not yet pushed). Active-next = B3.** B0/B1 done; **B2 complete**: all 6 wedge skills built + golden-tested (14 passed) + real engines smoke-verified, run-endpoint generalized, `selom.violin` added, GSEA via Reactome/GO (DECISIONS #9). A **frontend audit** (ui-ux-pro-max + frontend-design + impeccable; `DESIGN.md` written) was run alongside and its fixes applied + browser-verified. **Next = B3** (jobs/queue: arq+Redis async, R2 store, live `GET /skills` → registry-driven Store) after pushing the local commits. Owner steer: Selom is **desktop-only** (no mobile target).
+**B3 — core LANDED + pushed (2026-06-12). Active-next = B4.** B0/B1/B2 done; **B3 core complete**: live `GET /skills`
+registry → registry-driven FE Store; async jobs API (submit/poll/SSE/result) on the inline+local-filesystem path (arq+Redis
++ R2 wired but dormant pending infra). Integration quick wins alongside: heatmap hierarchical row-ordering, `gseapy` dropped.
+`pytest` 21 passed; FE `next build` clean; browser-verified. **Next = B4** (publish-confidence: per-figure reproducibility
+bundle, statistical guardrails, auto methods-text, Kaleido journal export) + the remaining integration backlog (OmicVerse
+isolated worker, arq Redis status store, R-oracle, full GMT, catalog true-up). Owner steer: Selom is **desktop-only**.
 
 ---
 
