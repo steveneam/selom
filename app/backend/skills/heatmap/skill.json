@@ -1,0 +1,16 @@
+{
+  "id": "heatmap",
+  "version": "0.1.0",
+  "title": "Expression heatmap",
+  "engine": "python",
+  "omics": "scrna-seq|bulk-rna-seq",
+  "entrypoint": "skills.heatmap.run:run",
+  "inputs": [{ "name": "matrix", "kind": "anndata|h5ad|csv", "required": true }],
+  "param_spec": {
+    "n_genes": { "type": "int", "default": 20, "min": 5, "max": 100 },
+    "groupby": { "type": "str", "default": "leiden" }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "violin",
+  "version": "0.1.0",
+  "title": "Marker-gene violins",
+  "engine": "python",
+  "omics": "scrna-seq",
+  "entrypoint": "skills.violin.run:run",
+  "inputs": [{ "name": "matrix", "kind": "anndata|h5ad", "required": true }],
+  "param_spec": {
+    "gene":       { "type": "str",   "default": "" },
+    "groupby":    { "type": "str",   "default": "leiden" },
+    "resolution": { "type": "float", "default": 1.0, "min": 0.1, "max": 4.0 }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ]
+}

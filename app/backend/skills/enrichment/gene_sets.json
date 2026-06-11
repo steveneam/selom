@@ -1,0 +1,13 @@
+{
+  "_note": "Small openly-licensed GO/Reactome gene-set SAMPLE (human symbols) for the over-representation proxy. Pathway names + member symbols are facts from the GO and Reactome resources (license-clean per DECISIONS.md #9). Full GO/Reactome GMT ingestion is a follow-up bucket; this sample is sized for the pbmc3k immune-cell demo.",
+  "Reactome: Interferon signaling": ["STAT1", "STAT2", "IRF1", "IRF7", "IRF9", "ISG15", "MX1", "MX2", "OAS1", "OAS2", "IFI6", "IFITM1", "IFITM3", "GBP1", "GBP2"],
+  "GO: NK cell mediated cytotoxicity": ["GNLY", "NKG7", "GZMB", "GZMA", "GZMH", "PRF1", "KLRD1", "KLRF1", "KLRB1", "NCAM1", "FCGR3A"],
+  "Reactome: Neutrophil degranulation": ["LYZ", "S100A8", "S100A9", "S100A12", "FTL", "FCN1", "CST3", "MNDA", "CSF3R", "ITGAM", "FPR1"],
+  "GO: T cell receptor signaling": ["CD3D", "CD3E", "CD3G", "CD8A", "CD8B", "LCK", "ZAP70", "IL7R", "CD2", "CD7", "LAT", "CD28"],
+  "Reactome: Antigen processing": ["HLA-A", "HLA-B", "HLA-C", "B2M", "TAP1", "TAP2", "PSMB8", "PSMB9", "CALR", "CANX"],
+  "GO: MHC class II protein complex": ["HLA-DRA", "HLA-DRB1", "HLA-DQA1", "HLA-DQB1", "HLA-DPA1", "HLA-DPB1", "CD74"],
+  "GO: B cell receptor signaling": ["MS4A1", "CD79A", "CD79B", "CD19", "BANK1", "BLK", "CD22", "HLA-DRA", "TCL1A"],
+  "Reactome: Platelet activation": ["PPBP", "PF4", "GP9", "ITGA2B", "GP1BA", "TUBB1", "NRGN", "SDPR", "CLU"],
+  "GO: Inflammatory response": ["IL1B", "TNF", "CXCL8", "CCL2", "CCL3", "NFKB1", "PTGS2", "IL6", "CXCL10"],
+  "Reactome: Cell Cycle": ["MKI67", "PCNA", "TOP2A", "CCNB1", "CDK1", "CDC20", "BUB1", "AURKB", "CENPF", "UBE2C"]
+}

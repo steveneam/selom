@@ -9,9 +9,10 @@ never a baked PNG.
 
 
 def run(data_path: str, params: dict) -> dict:
-    import numpy as np
     import scanpy as sc
     import plotly.express as px
+
+    from skills._plotly import jsonable
 
     adata = sc.read_h5ad(data_path)
 
@@ -44,31 +45,4 @@ def run(data_path: str, params: dict) -> dict:
     # typed-array encoding). FastAPI's encoder needs JSON-safe primitives, and the
     # frontend/MSW mock are built against the stub's plain-array shape — keeping the
     # live engine identical means mock and live render byte-for-byte the same spec.
-    return _jsonable(fig.to_plotly_json(), np)
-
-
-def _jsonable(obj, np):
-    """Convert numpy arrays/scalars AND Plotly's base64 typed-array encoding into
-    native Python lists/numbers, so the spec is plain JSON (matches the stub shape).
-
-    Plotly 6 serialises numpy arrays as ``{"dtype": "f8", "bdata": <base64>, "shape"?}``
-    even via ``to_plotly_json()``; decode those back to lists so the wire spec carries
-    real coordinate arrays the frontend renders identically to the mock.
-    """
-    import base64
-
-    if isinstance(obj, dict):
-        if "bdata" in obj and "dtype" in obj:
-            arr = np.frombuffer(base64.b64decode(obj["bdata"]), dtype=np.dtype(obj["dtype"]))
-            shape = obj.get("shape")
-            if shape is not None:
-                arr = arr.reshape([int(s) for s in str(shape).split(",")])
-            return arr.tolist()
-        return {k: _jsonable(v, np) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        return [_jsonable(v, np) for v in obj]
-    if isinstance(obj, np.ndarray):
-        return obj.tolist()
-    if isinstance(obj, np.generic):
-        return obj.item()
-    return obj
+    return jsonable(fig.to_plotly_json())

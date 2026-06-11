@@ -1,0 +1,95 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "markers",
+      "name": "pathways",
+      "x": [
+        1.02,
+        1.44,
+        1.86,
+        2.28,
+        2.7,
+        3.12,
+        3.54,
+        3.96,
+        4.38,
+        4.8
+      ],
+      "y": [
+        "Reactome: Cell Cycle",
+        "GO: Inflammatory response",
+        "Reactome: Platelet activation",
+        "GO: B cell receptor signaling",
+        "GO: MHC class II protein complex",
+        "Reactome: Antigen processing",
+        "GO: T cell receptor signaling",
+        "Reactome: Neutrophil degranulation",
+        "GO: NK cell mediated cytotoxicity",
+        "Reactome: Interferon signaling"
+      ],
+      "text": [
+        "4 genes",
+        "6 genes",
+        "8 genes",
+        "10 genes",
+        "12 genes",
+        "14 genes",
+        "16 genes",
+        "18 genes",
+        "20 genes",
+        "22 genes"
+      ],
+      "marker": {
+        "size": [
+          4,
+          6,
+          8,
+          10,
+          12,
+          14,
+          16,
+          18,
+          20,
+          22
+        ],
+        "sizemode": "diameter",
+        "color": [
+          1.02,
+          1.44,
+          1.86,
+          2.28,
+          2.7,
+          3.12,
+          3.54,
+          3.96,
+          4.38,
+          4.8
+        ],
+        "colorscale": "Viridis",
+        "showscale": true,
+        "colorbar": {
+          "title": {
+            "text": "-log10 padj"
+          }
+        }
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Pathway enrichment (stub)"
+    },
+    "xaxis": {
+      "title": {
+        "text": "-log10 adjusted p"
+      }
+    },
+    "yaxis": {
+      "title": {
+        "text": "pathway"
+      },
+      "automargin": true
+    }
+  }
+}

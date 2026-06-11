@@ -1,0 +1,69 @@
+{
+  "data": [
+    {
+      "type": "bar",
+      "orientation": "h",
+      "x": [
+        -3.1,
+        -2.4,
+        -1.6,
+        2.0,
+        2.4,
+        2.9,
+        3.3,
+        3.8,
+        4.2,
+        4.7,
+        5.1,
+        5.8
+      ],
+      "y": [
+        "CST3",
+        "FTL",
+        "LYZ",
+        "S100A9",
+        "NKG7",
+        "GZMB",
+        "CD3D",
+        "IL7R",
+        "MS4A1",
+        "CD79A",
+        "GNLY",
+        "PPBP"
+      ],
+      "marker": {
+        "color": [
+          "#f43f5e",
+          "#f43f5e",
+          "#f43f5e",
+          "#22d3ee",
+          "#22d3ee",
+          "#22d3ee",
+          "#22d3ee",
+          "#22d3ee",
+          "#22d3ee",
+          "#22d3ee",
+          "#22d3ee",
+          "#22d3ee"
+        ]
+      },
+      "name": "score"
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Top differential genes (stub)"
+    },
+    "xaxis": {
+      "title": {
+        "text": "score (signed)"
+      }
+    },
+    "yaxis": {
+      "title": {
+        "text": "gene"
+      }
+    },
+    "bargap": 0.3
+  }
+}

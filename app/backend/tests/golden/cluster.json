@@ -1,0 +1,43 @@
+{
+  "data": [
+    {
+      "type": "bar",
+      "name": "cells",
+      "x": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5"
+      ],
+      "y": [
+        812,
+        533,
+        421,
+        318,
+        274,
+        142
+      ],
+      "marker": {
+        "color": "#22d3ee"
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Leiden clusters (stub)"
+    },
+    "xaxis": {
+      "title": {
+        "text": "cluster"
+      }
+    },
+    "yaxis": {
+      "title": {
+        "text": "cells"
+      }
+    },
+    "bargap": 0.25
+  }
+}

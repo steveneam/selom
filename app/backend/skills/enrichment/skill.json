@@ -1,0 +1,17 @@
+{
+  "id": "enrichment",
+  "version": "0.1.0",
+  "title": "Pathway enrichment",
+  "engine": "python",
+  "omics": "bulk-rna-seq|scrna-seq|proteomics",
+  "entrypoint": "skills.enrichment.run:run",
+  "inputs": [{ "name": "matrix", "kind": "csv", "required": true }],
+  "param_spec": {
+    "top_n":     { "type": "int", "default": 12, "min": 3, "max": 40 },
+    "gene_sets": { "type": "str", "default": "GO_Reactome" }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table",  "kind": "csv" }
+  ]
+}

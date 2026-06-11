@@ -1,0 +1,17 @@
+{
+  "id": "cluster",
+  "version": "0.1.0",
+  "title": "Leiden clustering",
+  "engine": "python",
+  "omics": "scrna-seq",
+  "entrypoint": "skills.cluster.run:run",
+  "inputs": [{ "name": "matrix", "kind": "anndata|h5ad", "required": true }],
+  "param_spec": {
+    "resolution":  { "type": "float", "default": 1.0, "min": 0.1, "max": 4.0 },
+    "n_neighbors": { "type": "int",   "default": 15,  "min": 2,   "max": 100 },
+    "n_pcs":       { "type": "int",   "default": 50,  "min": 2,   "max": 200 }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ]
+}

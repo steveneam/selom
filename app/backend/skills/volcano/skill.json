@@ -1,0 +1,17 @@
+{
+  "id": "volcano",
+  "version": "0.1.0",
+  "title": "Volcano plot",
+  "engine": "python",
+  "omics": "bulk-rna-seq|proteomics",
+  "entrypoint": "skills.volcano.run:run",
+  "inputs": [{ "name": "matrix", "kind": "csv", "required": true }],
+  "param_spec": {
+    "fc_threshold":  { "type": "float", "default": 1.0,  "min": 0.0, "max": 5.0 },
+    "fdr_threshold": { "type": "float", "default": 0.05, "min": 0.0, "max": 1.0 },
+    "top_n":         { "type": "int",   "default": 10,   "min": 0,   "max": 50 }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ]
+}
