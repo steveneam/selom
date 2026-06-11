@@ -7,6 +7,18 @@ export interface SkillRunResponse {
 export type SkillParams = Record<string, string | number | boolean>;
 
 /**
+ * Resolve a Skill Store catalog id to the backend's runnable skill id.
+ *
+ * Catalog ids are namespaced `<source>.<slug>` (lib/catalog/types.ts) for provenance,
+ * but the backend registry is keyed by the bare slug — `skills/<slug>/skill.json`
+ * (e.g. `selom.umap_scrna` → `umap_scrna`). Strip the known source prefix so the
+ * `/api/skills/{id}/run` route resolves. Ids without a source prefix pass through.
+ */
+export function runtimeSkillId(catalogId: string): string {
+  return catalogId.replace(/^(?:selom|clawbio|bioskills)\./, "");
+}
+
+/**
  * Run a skill on an uploaded file and return the editable figure spec.
  *
  * Matches the live contract (app/backend/main.py): a one-shot multipart POST with

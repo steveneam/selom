@@ -13,7 +13,7 @@ import { useFigureStore } from "@/hooks/use-figure-store";
 import { getSkill } from "@/lib/catalog/seed";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 import { projectStore, select, useProjects } from "@/lib/projects/store";
-import { runSkill } from "@/lib/skills-api";
+import { runSkill, runtimeSkillId } from "@/lib/skills-api";
 
 type Tab = "overview" | "data" | "workbench" | "figure";
 
@@ -54,7 +54,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       setError(null);
       try {
         const file = lastFile ?? new File(["mock"], datasets.find((d) => d.id === datasetId)?.filename ?? "data.csv");
-        const spec = await runSkill(step.skillId, file, step.params);
+        const spec = await runSkill(runtimeSkillId(step.skillId), file, step.params);
         figure.init(spec);
         const name = getSkill(step.skillId)?.name ?? step.skillId;
         projectStore.addFigure(projectId, { title: `${name} — figure`, datasetId, skillId: step.skillId });
