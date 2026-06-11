@@ -43,6 +43,16 @@ export const CATALOG: SkillCatalogEntry[] = [
     provenance: { repo: "selom/skills", path: "cluster" }, version: "1.0.0", popularity: 81,
   }),
   e({
+    id: "selom.violin",
+    name: "Marker-gene violins",
+    summary: "Per-cluster expression violins for a marker gene (log1p).",
+    source: "selom", category: "single-cell", omics: ["scRNA-seq"],
+    tier: "verified", status: "production", engine: "python",
+    inputFormats: [".h5ad"], chainsWith: ["selom.cluster", "selom.deg"],
+    outputs: ["figure"], license: "MIT",
+    provenance: { repo: "selom/skills", path: "violin" }, version: "1.0.0", popularity: 79,
+  }),
+  e({
     id: "selom.deg",
     name: "Differential expression",
     summary: "Bulk DE (pyDESeq2) or marker ranking (Wilcoxon) per contrast.",
