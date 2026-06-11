@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-11T14:09:46Z",
+  "title": "Design System: Selom",
+  "extensions": {
+    "colorMeta": {
+      "background": { "role": "neutral", "displayName": "Deep Blue-Black Bench", "canonical": "#0a0e16", "tonalRamp": ["#05070c", "#0a0e16", "#111824", "#141c28", "#1a2433", "#233044", "#3a4a60", "#5a6b82"] },
+      "card": { "role": "neutral", "displayName": "Panel Slate", "canonical": "#111824", "tonalRamp": ["#0a0e16", "#111824", "#141c28", "#1a2433", "#233044", "#2c3a4f", "#3a4a60", "#4c5f78"] },
+      "primary": { "role": "primary", "displayName": "Luminous Cyan", "canonical": "#22d3ee", "tonalRamp": ["#06343c", "#0a4a55", "#0e6573", "#138296", "#19a3bb", "#22d3ee", "#67e3f5", "#a5f3fc"] },
+      "foreground": { "role": "neutral", "displayName": "Near-White Ink", "canonical": "#e6edf3", "tonalRamp": ["#8b98a9", "#9aa7b7", "#aab6c4", "#bcc6d2", "#cdd9e5", "#dbe4ec", "#e6edf3", "#f3f7fa"] },
+      "destructive": { "role": "tertiary", "displayName": "Rose Destructive", "canonical": "#f43f5e", "tonalRamp": ["#4c0f1c", "#6e1628", "#931e36", "#b82645", "#d63354", "#f43f5e", "#f87489", "#fbb0bd"] },
+      "artboard": { "role": "tertiary", "displayName": "Artboard White", "canonical": "#ffffff", "tonalRamp": ["#0f172a", "#334155", "#64748b", "#94a3b8", "#cbd5e1", "#e2e8f0", "#f1f5f9", "#ffffff"] }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Headline", "purpose": "One page title per screen." },
+      "body": { "displayName": "Body", "purpose": "Default text, descriptions; cap prose at 65-75ch." },
+      "label": { "displayName": "Section Label", "purpose": "Uppercase tracked section headers and group labels." },
+      "mono": { "displayName": "Tabular Mono", "purpose": "Every numeric value: params, counts, axis ticks, kbd hints." }
+    },
+    "shadows": [
+      { "name": "card-rest", "value": "0 1px 2px rgba(0,0,0,0.20)", "purpose": "The only ambient shadow; keeps cards off the bench." },
+      { "name": "primary-glow-rest", "value": "0 0 0 1px color-mix(in oklab, var(--primary) 40%, transparent)", "purpose": "1px cyan inset ring on the primary button at rest." },
+      { "name": "primary-glow-hover", "value": "0 0 18px -2px color-mix(in oklab, var(--primary) 60%, transparent)", "purpose": "Cyan halo on primary-button hover; signals the action is live." },
+      { "name": "mark-glow", "value": "drop-shadow(0 0 6px color-mix(in oklab, var(--primary) 55%, transparent))", "purpose": "Luminous halo on the Selom hex mark." }
+    ],
+    "motion": [
+      { "name": "color-150", "value": "150ms ease", "purpose": "Default color/background transition on buttons, links, nav." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one loud control: primary action with a cyan glow.",
+      "html": "<button class=\"ds-btn-primary\">Open a project</button>",
+      "css": ".ds-btn-primary { display:inline-flex; align-items:center; gap:8px; height:36px; padding:0 16px; border:none; border-radius:8px; background:var(--primary,#22d3ee); color:var(--primary-foreground,#04161b); font:600 14px/1 'Geist Sans',system-ui,sans-serif; box-shadow:0 0 0 1px color-mix(in oklab,#22d3ee 40%,transparent); cursor:pointer; transition:background .15s,box-shadow .15s; } .ds-btn-primary:hover { background:color-mix(in oklab,#22d3ee 88%,white); box-shadow:0 0 18px -2px color-mix(in oklab,#22d3ee 60%,transparent); } .ds-btn-primary:focus-visible { outline:none; box-shadow:0 0 0 2px var(--background,#0a0e16),0 0 0 4px #22d3ee; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Default non-primary action.",
+      "html": "<button class=\"ds-btn-secondary\">Open Store</button>",
+      "css": ".ds-btn-secondary { display:inline-flex; align-items:center; gap:8px; height:36px; padding:0 16px; border:none; border-radius:8px; background:#1a2433; color:#cdd9e5; font:500 14px/1 'Geist Sans',system-ui,sans-serif; cursor:pointer; transition:background .15s; } .ds-btn-secondary:hover { background:color-mix(in oklab,#1a2433 80%,white); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Hairline-bordered panel on the dark bench; never nested.",
+      "html": "<div class=\"ds-card\"><p class=\"ds-card-title\">Recent projects</p><p class=\"ds-card-body\">Drop data into a project and run a skill.</p></div>",
+      "css": ".ds-card { border:1px solid #1e2a3a; border-radius:14px; background:#111824; box-shadow:0 1px 2px rgba(0,0,0,.2); padding:20px; } .ds-card-title { color:#e6edf3; font:600 16px/1.3 'Geist Sans',system-ui,sans-serif; } .ds-card-body { margin-top:6px; color:#8b98a9; font:400 14px/1.5 'Geist Sans',system-ui,sans-serif; }"
+    },
+    {
+      "name": "Search Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Header command field with leading icon and trailing kbd hint.",
+      "html": "<label class=\"ds-field\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"#8b98a9\" stroke-width=\"2\"><circle cx=\"11\" cy=\"11\" r=\"7\"/><line x1=\"21\" y1=\"21\" x2=\"16.65\" y2=\"16.65\"/></svg><input class=\"ds-input\" placeholder=\"Search projects, datasets, skills…\"/><kbd class=\"ds-kbd\">⌘K</kbd></label>",
+      "css": ".ds-field { position:relative; display:inline-flex; align-items:center; width:320px; } .ds-field svg { position:absolute; left:10px; pointer-events:none; } .ds-input { height:36px; width:100%; padding:0 44px 0 32px; border:1px solid #233044; border-radius:8px; background:color-mix(in oklab,#0a0e16 60%,transparent); color:#e6edf3; font:400 14px 'Geist Sans',system-ui,sans-serif; outline:none; } .ds-input::placeholder { color:color-mix(in oklab,#8b98a9 70%,transparent); } .ds-input:focus-visible { border-color:color-mix(in oklab,#22d3ee 60%,transparent); box-shadow:0 0 0 2px color-mix(in oklab,#22d3ee 30%,transparent); } .ds-kbd { position:absolute; right:8px; border:1px solid #1e2a3a; border-radius:4px; background:#161f2c; padding:2px 6px; color:#8b98a9; font:400 10px 'Geist Mono',monospace; }"
+    },
+    {
+      "name": "Verified Badge",
+      "kind": "chip",
+      "refersTo": "badge-verified",
+      "description": "Tier chip — Verified runs now; Community is queued. Tier honesty is a product rule.",
+      "html": "<span class=\"ds-badge-verified\">Verified</span> <span class=\"ds-badge-community\">Community</span>",
+      "css": ".ds-badge-verified,.ds-badge-community { display:inline-flex; align-items:center; gap:4px; border-radius:8px; border:1px solid; padding:2px 6px; font:500 10px 'Geist Sans',system-ui,sans-serif; text-transform:uppercase; letter-spacing:.06em; } .ds-badge-verified { border-color:color-mix(in oklab,#22d3ee 35%,transparent); background:color-mix(in oklab,#22d3ee 12%,transparent); color:color-mix(in oklab,#22d3ee 85%,white); } .ds-badge-community { border-color:#1e2a3a; background:#161f2c; color:#8b98a9; }"
+    },
+    {
+      "name": "Rail Link",
+      "kind": "nav",
+      "refersTo": "nav",
+      "description": "Sidebar nav item; active state carried by the cyan-tinted accent.",
+      "html": "<a class=\"ds-rail-link ds-rail-active\">Home</a><a class=\"ds-rail-link\">Skill Store</a>",
+      "css": ".ds-rail-link { display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:8px; color:color-mix(in oklab,#e6edf3 85%,transparent); font:400 14px 'Geist Sans',system-ui,sans-serif; text-decoration:none; transition:background .15s,color .15s; } .ds-rail-link:hover { background:color-mix(in oklab,#16404a 50%,transparent); color:#e6edf3; } .ds-rail-active { background:#16404a; color:#a5f3fc; font-weight:500; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Lit Lab Bench",
+    "overview": "Selom is a dark multi-omics IDE built so a bench scientist can turn raw data into a publication-quality figure. The whole interface is a dark, calm workspace on which one thing glows: the figure, rendered on a light #ffffff artboard floating in the dark shell. The single accent is a luminous cyan that behaves like a status light on lab equipment — it marks what is live, selected, or actionable, and nothing else. It explicitly rejects the AI bio-tool reflex: purple-on-black gradients, neon glassmorphism, hero-metric templates.",
+    "keyCharacteristics": [
+      "Dark blue-black shell; the figure is the only bright surface, always on a light artboard.",
+      "One accent — cyan — used as a status light, never as decoration.",
+      "Depth from hairline borders + tonal layering, not shadows.",
+      "Tabular mono numerals wherever a number is shown.",
+      "Confident product density: small type, calm spacing, no choreography."
+    ],
+    "rules": [
+      { "name": "The Status-Light Rule", "body": "Cyan is a signal, not a paint. It appears on ≤10% of any screen — primary action, current selection, focus, live state. If cyan is making something 'pop,' remove it.", "section": "colors" },
+      { "name": "The Light-Artboard Rule", "body": "A figure is always rendered on the #ffffff artboard with #0f172a ink, even though the app is dark. Never render publication data on a dark surface.", "section": "colors" },
+      { "name": "The Hairline-First Rule", "body": "Reach for a #1e2a3a hairline or a tonal step before a shadow. A drop-shadow on a panel is almost always wrong here.", "section": "elevation" },
+      { "name": "The Glow-Is-Earned Rule", "body": "The cyan glow belongs to primary actions and the brand mark only. Never glow a card or secondary button for atmosphere.", "section": "elevation" },
+      { "name": "The Tabular-Numbers Rule", "body": "Any digit a user might compare or watch change is set in Geist Mono with tabular-nums.", "section": "typography" },
+      { "name": "The One-Sans Rule", "body": "Geist Sans owns all prose and UI; the only permitted second family is Geist Mono, for data only.", "section": "typography" }
+    ],
+    "dos": [
+      "Do keep cyan to ≤10% of any screen — primary action, current selection, focus, live state.",
+      "Do render every figure on the light #ffffff artboard with #0f172a ink, even in the dark app.",
+      "Do separate surfaces with a hairline or tonal step before reaching for a shadow.",
+      "Do set every number in Geist Mono tabular-nums.",
+      "Do use near-white ink for body copy; reserve slate for secondary/label text and verify ≥4.5:1 contrast.",
+      "Do surface statistical guardrails as amber warn badges before a figure."
+    ],
+    "donts": [
+      "Don't use cyan as decoration or glow static containers for atmosphere.",
+      "Don't render publication data on a dark surface.",
+      "Don't ship the AI bio-tool reflex: purple-on-black gradients, neon glassmorphism, gradient text, hero-metric templates.",
+      "Don't use border-left/right > 1px as a colored accent stripe.",
+      "Don't introduce a display or serif font.",
+      "Don't nest cards or default to a modal."
+    ]
+  }
+}
