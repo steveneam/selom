@@ -49,4 +49,8 @@ This is the default split, not a hard wall: cross the line only when a contract 
 
 - This repo stays on **Fable 5**.
 - Commercial/licensing gates are **deferred** — build now, gate before launch (see `LAUNCH-GATES.md`).
-- For frontend work invoke the **ui-ux-pro-max** + **frontend-design** skills.
+- For frontend work — and **always for a frontend audit/review** — invoke the design
+  skills: **ui-ux-pro-max**, **frontend-design**, and **impeccable** (`/impeccable audit`,
+  `critique`, `polish`, …). `impeccable` is installed locally under `.claude/skills/`
+  (gitignored; reinstall via `npx impeccable skills install --providers=claude`); on a
+  fresh clone, run `/impeccable init` once to write its design context.

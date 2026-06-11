@@ -38,6 +38,9 @@ data/
 # ── Assistant-local (tracked .claude/ otherwise) ────────
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+# impeccable — 3rd-party design skill, vendored locally; reinstall with
+# `npx impeccable skills install --providers=claude` (do not commit the tool).
+.claude/skills/impeccable/
 
 # ── Graphify volatile outputs ───────────────────────────
 graphify-out/cache/
