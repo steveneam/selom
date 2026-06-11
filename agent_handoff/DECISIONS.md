@@ -4,7 +4,7 @@
 > Supersede by append (with a new stamp), never silently overwrite. Deep ADRs
 > live in the research vault; this file is the build-side quick reference.
 
-_Last updated: 2026-06-11 21:56 +10:00 — ratified the 5 pending vault [DECISION]s (Claude, owner-directed). #5–#8 newly locked; the "repo = `D:/selom`" [DECISION] was already locked as #2._
+_Last updated: 2026-06-11 23:40 +10:00 — added #9 (GSEA gene-set source = Reactome/GO) at B2 sign-off (Claude, owner-approved)._
 
 | # | Decision | Rationale | Source |
 |---|---|---|---|
@@ -16,6 +16,7 @@ _Last updated: 2026-06-11 21:56 +10:00 — ratified the 5 pending vault [DECISIO
 | 6 | **Async job queue = arq + Redis** (not Dramatiq). | arq is asyncio-native and matches the FastAPI async stack + every vault manifest/schematic; Dramatiq (heavier, broker-flexible) was considered and is not needed. **Backend-lane (Codex-owned)** — locked to the vault's recommended default under the owner's "ratify all 5" directive; Codex confirms, or supersede-by-appends if a Dramatiq-specific need surfaces. See `CURRENT.md → Cross-Agent Requests`. | build-ledger §3 · selom-build-kickoff §2 |
 | 7 | **Distribution = web-first SaaS for v1.** No consumer desktop (Electron/Tauri); on-prem / BYO-cloud is reserved as a later enterprise tier (pharma data-residency). | The only model where the GPL SaaS-gap holds (server-side use ≠ distribution → no copyleft re-trigger), compute is metered, and there's nothing to pirate; bundling copyleft into a desktop app would re-trigger GPL. | distribution-web-vs-desktop · ADR 0002 |
 | 8 | **IP strategy = trade-secret + copyright, NOT patents.** | The Extract-Skills method is best kept secret (patents force disclosure and are hard to enforce on a method); the durable moat is curation / UX / verified-reproducibility — protected by copyright (compilation) + trade-secret, with an open-core boundary for public parts. | commercialisation-ip-trademark §B |
+| 9 | **GSEA / pathway-enrichment gene-set source = Reactome / GO** (license-clean), NOT gseapy + MSigDB. | MSigDB and gseapy carry AGPL / restrictive-license constraints (`RISKS.md` #6) that would have to clear the pre-launch SCA gate; Reactome + GO are openly licensed, so the `selom.enrichment` skill stays launch-safe with no copyleft cleanup. Owner-approved at B2 sign-off. Lane: Codex (BE). | Owner directive · `RISKS.md` #6 · build-charter B2/B4 |
 
 ## Notes
 
