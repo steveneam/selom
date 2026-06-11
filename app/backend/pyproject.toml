@@ -44,14 +44,14 @@ scrna = [
 # Integration path: run OmicVerse in an ISOLATED worker/env (its own venv or container, the
 # §6.5C/E per-skill-env model) and call it out-of-process; do NOT downgrade the main stack.
 # Tracked: RISKS #9, plans/v2-backend.md backlog, docs/integrations.md.
-# SCA: also drop `gseapy` here at the pre-launch gate — enrichment now uses an in-house ORA
-# (DECISIONS #9), so gseapy is unused AGPL surface (RISKS #6).
+# SCA: `gseapy` was DROPPED — enrichment uses an in-house hypergeometric ORA
+# (DECISIONS #9), so gseapy was unused AGPL surface (RISKS #6 / #9). `decoupler` is still
+# listed for later pathway work; re-check its license at the pre-launch SCA gate.
 omics = [
   "selom-backend[scrna]",
   "scvi-tools>=1.4.3",
   "decoupler",
   "pydeseq2>=0.5.4",
-  "gseapy",
   "alphastats",
   "pyteomics",
   "statsmodels",

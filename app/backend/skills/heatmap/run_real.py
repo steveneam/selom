@@ -53,6 +53,7 @@ def _scrna(data_path: str, params: dict) -> dict:
     expr["__g"] = sub.obs[groupby].astype(str).to_numpy()
     means = expr.groupby("__g")[genes].mean().T  # genes x groups
     z = _row_zscore(means, np)
+    z, genes = _order_rows(z, genes)
     return jsonable(heatmap_spec(z.tolist(), list(means.columns), genes, "Marker heatmap", "cluster"))
 
 
@@ -65,8 +66,8 @@ def _bulk(data_path: str, params: dict) -> dict:
     top = df.var(axis=1).sort_values(ascending=False).head(n_genes).index
     sub = df.loc[top]
     z = _row_zscore(sub, np)
-    return jsonable(heatmap_spec(z.tolist(), list(sub.columns), [str(g) for g in sub.index],
-                                 "Top-variable genes", "sample"))
+    z, ylabels = _order_rows(z, [str(g) for g in sub.index])
+    return jsonable(heatmap_spec(z.tolist(), list(sub.columns), ylabels, "Top-variable genes", "sample"))
 
 
 def _row_zscore(frame, np):
@@ -76,3 +77,26 @@ def _row_zscore(frame, np):
     std = values.std(axis=1, keepdims=True)
     std[std == 0] = 1.0
     return np.round((values - mean) / std, 4)
+
+
+def _order_rows(z, labels):
+    """Reorder rows by hierarchical-clustering leaf order so co-varying genes sit
+    together — the standard *clustered* heatmap layout (vs. raw input order). Rows are
+    already z-scored, so correlation distance groups by expression *pattern*, not
+    magnitude; average linkage. Falls back to euclidean when correlation is undefined
+    (a constant row), and no-ops for trivially small matrices.
+    """
+    import numpy as np
+
+    z = np.asarray(z, dtype=float)
+    if z.shape[0] < 3 or z.shape[1] < 2:
+        return z, labels
+
+    from scipy.cluster.hierarchy import leaves_list, linkage
+    from scipy.spatial.distance import pdist
+
+    dist = pdist(z, metric="correlation")
+    if not np.all(np.isfinite(dist)):
+        dist = pdist(z, metric="euclidean")
+    order = leaves_list(linkage(dist, method="average"))
+    return z[order], [labels[i] for i in order]
