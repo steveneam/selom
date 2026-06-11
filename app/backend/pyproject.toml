@@ -1,7 +1,10 @@
 # Selom backend dependencies.
 # Default `uv sync` installs the LIGHT core only (FastAPI + Plotly + numeric base) so
 # the skeleton runs the offline stub skills with zero heavy deps.
-# Run `uv sync --extra omics` to pull the heavy scverse stack and enable the REAL scanpy skills.
+# Run `uv sync --extra scrna` for the scRNA path (scanpy + leiden) — enough for the P0
+#   hello-UMAP and the scRNA/bulk skills, WITHOUT pulling scvi-tools/PyTorch.
+# Run `uv sync --extra omics` for the full heavy stack (adds scvi-tools, proteomics,
+#   Kaleido export) needed by later buckets (trajectory, proteomics, journal export).
 
 [project]
 name = "selom-backend"
@@ -19,9 +22,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-omics = [
+# Light scRNA path — enough for the P0 hello-UMAP (UMAP / cluster / DEG). No scvi-tools/torch.
+# scanpy already pulls umap-learn, pynndescent, numba and scikit-learn; leiden needs leidenalg+igraph.
+scrna = [
   "scanpy>=1.12",
   "anndata>=0.12,<0.13",
+  "leidenalg>=0.10",
+  "igraph>=0.11",
+]
+# Full heavy stack (superset of scrna): adds scvi-tools/PyTorch, proteomics, and Kaleido export
+# for later buckets (trajectory, proteomics volcano, journal-preset export). Multi-GB install.
+omics = [
+  "selom-backend[scrna]",
   "scvi-tools>=1.4.3",
   "decoupler",
   "pydeseq2>=0.5.4",
