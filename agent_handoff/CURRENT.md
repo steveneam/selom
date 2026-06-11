@@ -4,7 +4,9 @@
 > each agent's rolling log, not here. This file is **replaced, never stacked** —
 > update at MAJOR boundaries only (rule 9 in `agent_handoff/README.md`).
 
-_Last updated: 2026-06-12 01:48 +10:00 · Claude (acting FE+BE) — **B3 (skills-as-a-service) LANDED + integration-backlog quick wins; ALL PUSHED.** `main` ↔ `origin/main` @ `5138aec` (the 7 prior B2/audit/integration commits were pushed first). **B3 = 4 commits:** (1) live **`GET /skills`** registry — `skills/registry.py` maps each `skill.json` + a new optional `catalog` block to the FE `SkillCatalogEntry` shape, so adding a skill dir shows it in the Store with no FE edit; (2) **async jobs API** — `POST /skills/{id}/jobs` → `GET /jobs/{id}` (poll) / `/jobs/{id}/events` (SSE) / `/jobs/{id}/result`; one `execute_job` shared by the inline executor and the arq worker. Infra is **OFF by default** (jobs run **inline**, results on the **local filesystem**) so a fresh `uv sync` + uvicorn runs the whole job API with zero infra; `SELOM_QUEUE=arq`+Redis (DECISIONS #6) and `SELOM_R2_*`+Cloudflare R2 (boto3 with the RISKS #5 checksum fix) flip on the distributed/cloud path — **wired but dormant** pending infra (arq cross-process *status* is a documented follow-up in `jobs/worker.py`); new optional `[jobs]` extra. (3) **FE registry-driven Store** — `lib/catalog/registry.ts` fetches `/api/skills`, merges the live Verified slice over the static seed's Community tail, falls back to the seed offline; `CoverageMeter` shows the **live** runnable count; MSW mocks `/api/skills`. (4) **Integration backlog quick wins:** heatmap **hierarchical row-ordering** (scipy correlation-distance linkage, real-engine only) + **dropped `gseapy`** from `[omics]` (DECISIONS #9 / RISKS #6/#9; `uv` re-locked). **Verified:** backend `pytest` = **21 passed** (14 base + 3 registry + 4 jobs); ruff clean; live uvicorn smoke (skills/submit/poll/result/SSE) green; FE `tsc` + `next build` clean; **browser-verified** (mock :3010) — `/api/skills` 200, meter live 13/~628, 32 shown, phantom `proteomics_volcano` correctly dropped from Verified, console clean. Selom is **DESKTOP-ONLY**. Next: **B4 publish-confidence** + the remaining integration backlog (OmicVerse isolated worker, R4DS/Quarto + R-oracle, full GO/Reactome GMT, catalog-count true-up, OmicVerse/JARVIS MCP)._
+_Last updated: 2026-06-12 02:45 +10:00 · Claude (acting FE+BE) — **B4 publish-confidence slice-1 DONE (both lanes), COMMITTED locally — NOT yet pushed.** `main` is **ahead 2** of `origin/main` (@ `4216935`): backend `2ab7c43` + frontend `84ae54e`. **What landed:** every figure now ships a **per-figure reproducibility bundle** (`provenance.py` — skill+version, resolved+typed params, input SHA-256+size, environment = python/platform/engine-policy + scientific-stack versions) and **auto methods-text** (`methods.py` — deterministic per-skill templates quoting the exact params + canonical citations Scanpy/Leiden/UMAP/PyDESeq2/DESeq2/BH/GO/Reactome/SciPy; generic fallback). Additive wire change: `POST /skills/{id}/run` + `GET /jobs/{id}/result` now return `{figure, provenance, methods}` (FE still reads `.figure`); jobs thread the upload filename + store the full bundle via the shared `execute_job`. New `contract.resolved_params()` (typed param coercion; runners untouched). FE: a collapsed **"Publish confidence"** panel (`components/project/publish-confidence.tsx`) in the Figure tab — Methods (copyable + citations) + Reproducibility (params chips / input hash / env chips); `runSkill` returns the bundle; MSW mock serves a representative bundle (`mocks/stub-bundle.ts`). **Verified:** backend `pytest` = **28 passed** (21 base + 7 new: provenance + methods + jobs-bundle); ruff clean; live uvicorn smoke (`/run` + job submit/result) returns the full bundle. FE `tsc` + `next build` clean (4 routes); **browser-verified** (mock :3010) — ran umap_scrna, panel expands with methods + repro record, Copy present, `POST /run` 200, console clean (only the pre-existing favicon 404). **Deferred B4 follow-ups:** statistical-guardrail expansion (silhouette already on `cluster`), **Kaleido journal export** (needs Docker+Chromium — RISKS #2), plus the standing integration backlog. Selom is **DESKTOP-ONLY**. **Push pending owner's word.**_
+
+<!-- prior live-state: B3 (skills-as-a-service) @ `5138aec`, pushed (2026-06-12 01:48). Full history in git log + the Claude/Codex resume sections below. -->
 
 **Model:** stay on **Fable 5** for all Selom work — Selom carries no biology/security
 flag. Only *reading the EAMOS build repo* escalates a session to Opus, and that
@@ -14,7 +16,7 @@ source is not needed here. Do not switch to Opus for Selom.
 
 | Agent | Role | Lane | Status |
 |---|---|---|---|
-| Claude | **Frontend + Backend (acting)** — UI/design/product copy **and** APIs/skill runners/data/tests | `app/frontend` + `app/backend` + both plans | IDLE (clear-safe) — **B3 LANDED + integration quick wins; ALL PUSHED** (`main` ↔ `origin/main` @ `5138aec`). Live `GET /skills` registry; async jobs API (inline+local active, arq+R2 wired/dormant); FE registry-driven Store; heatmap row-ordering; `gseapy` dropped. `pytest` 21 passed; FE `next build` clean; browser-verified. Decisions #5–#9 locked. Selom is **desktop-only**. |
+| Claude | **Frontend + Backend (acting)** — UI/design/product copy **and** APIs/skill runners/data/tests | `app/frontend` + `app/backend` + both plans | IDLE (clear-safe) — **B4 publish-confidence slice-1 DONE (both lanes); COMMITTED, NOT pushed** (`main` ahead 2 of `origin/main` @ `4216935`: BE `2ab7c43` + FE `84ae54e`). Per-figure reproducibility bundle (`provenance.py`) + auto methods-text (`methods.py`); `/run` + `/jobs/{id}/result` now return `{figure, provenance, methods}`; FE "Publish confidence" panel. `pytest` 28 passed; FE `next build` clean; browser-verified (mock :3010). **Push pending owner's word.** Decisions #5–#9 locked. Selom is **desktop-only**. |
 | Codex | Backend (APIs/skill runners/data/tests) | `app/backend` + `plans/v2-backend.md` | **AWAY** (busy on another project). Backend role **temporarily covered by Claude** as of 2026-06-11 22:10. B1 + **B2 backend done by Claude** in the interim (see `## Codex` section). May reclaim at any time — state is drop-in-ready; review the arq #6 lock + the B1/B2 commits on return. |
 
 Roles are explicit; any swap is written here before work proceeds.
@@ -202,20 +204,37 @@ None held.
   - **Verified:** `pytest` 21 passed; ruff clean; live uvicorn smoke (skills/submit/poll/result/SSE) green; FE `tsc` +
     `next build` clean; browser (mock :3010) — `/api/skills` 200, meter live **13/~628**, 32 shown, `proteomics_volcano`
     dropped, console clean (only an unrelated favicon 404).
-- **Next (B4 publish-confidence + integration backlog).** B4 = per-figure reproducibility bundle, statistical
-  guardrails, auto methods-text, Kaleido journal export (RISKS #2/#5). Integration backlog (`plans/v2-backend.md` →
-  `docs/integrations.md`): **OmicVerse isolated worker** (RISKS #9 — own env/container, call its MCP/RPC out-of-process;
-  SCA-gate its 50 deps), **arq cross-process job *status*** (Redis-backed JobStore — see `jobs/worker.py` caveat),
-  R4DS/Quarto for B4 + the R-oracle harness (RISKS #7), full GO/Reactome GMT, catalog-count true-up (≈418 via a live
-  ingest job), OmicVerse/JARVIS MCP (add only AFTER its isolated env exists). `plans/v2-frontend.md` P0 still says two-step upload.
+- **Last (2026-06-12 02:45) — B4 publish-confidence slice-1 DONE (both lanes); COMMITTED locally, NOT pushed** (`main`
+  ahead 2 of `origin/main` @ `4216935`). Two scoped commits:
+  - **`2ab7c43` `feat(backend)` — reproducibility bundle + auto methods-text.** New `provenance.py` (per-figure bundle:
+    skill+version, resolved+typed params, input **SHA-256**+size, environment = python/platform/engine-policy + scientific-stack
+    versions via `importlib.metadata`) + `methods.py` (deterministic per-skill templates quoting the exact params + canonical
+    citations — Scanpy/Leiden/UMAP/PyDESeq2/DESeq2/BH/GO/Reactome/SciPy; generic fallback). `contract.resolved_params()` does
+    typed coercion (runners untouched). **Additive wire change:** `POST /skills/{id}/run` + `GET /jobs/{id}/result` now return
+    `{figure, provenance, methods}` (same shape both paths); jobs thread the upload `filename` (new `Job.filename`) + store the
+    full bundle via the shared `execute_job`; `result_store.put` param renamed figure→payload. `pytest` **28 passed** (21 + new
+    `test_provenance.py` + `test_methods.py` + jobs-bundle asserts); ruff clean; live uvicorn smoke green.
+  - **`84ae54e` `feat(frontend)` — "Publish confidence" panel.** `components/project/publish-confidence.tsx` (collapsed by
+    default, in the Figure tab between toolbar + editor): **Methods** (prose + Copy[text+numbered citations] + citation list) +
+    **Reproducibility** (skill v, param chips, input filename/size/sha, env Python + package chips). `runSkill` now returns the
+    full bundle (`SkillProvenance`/`SkillMethods`, both optional); `project-workspace` captures it on run + clears on "New figure";
+    MSW mock serves a representative bundle (`mocks/stub-bundle.ts`). `tsc` + `next build` clean (4 routes); **browser-verified**
+    (mock :3010) — ran umap_scrna, panel expands with methods + repro record, Copy present, `POST /run` 200, console clean (only the pre-existing favicon 404).
+- **Next (finish B4, then integration backlog). B4 remaining:** (a) **statistical-guardrail expansion** — silhouette already on
+  `cluster`; add batch-effect / normalization / multiple-testing / low-cell warnings surfaced in the bundle (a `guardrails` field
+  or figure subtitle), (b) **Kaleido journal export** — PNG/SVG/PDF presets; needs **Docker + system Chromium** (RISKS #2 / DECISIONS #7),
+  so it lands with the deploy image (B8-adjacent) — scope a CPU-Docker path or defer. Integration backlog (`plans/v2-backend.md` →
+  `docs/integrations.md`): **OmicVerse isolated worker** (RISKS #9), **arq cross-process job *status*** (Redis-backed JobStore — `jobs/worker.py`
+  caveat), R4DS/Quarto + R-oracle (RISKS #7), full GO/Reactome GMT, catalog-count true-up (≈418 via a live ingest job), OmicVerse/JARVIS MCP
+  (only AFTER its isolated env). `plans/v2-frontend.md` P0 still says two-step upload. **Open: push the 2 local commits on owner's word.**
 - **Resume:**
   ```
-  # Resume · 2026-06-12 01:48 +10:00 · Selom · Claude (frontend + backend, acting)
+  # Resume · 2026-06-12 02:45 +10:00 · Selom · Claude (frontend + backend, acting)
   Selom build repo D:/selom. CLAUDE.md auto-loads. Read agent_handoff/README.md + CURRENT.md (this) + DECISIONS.md + RISKS.md + docs/build-charter.md + DESIGN.md + plans/v2-backend.md + plans/v2-frontend.md + docs/integrations.md.
   ROLE: Codex away → Claude owns BOTH lanes. Keep BE drop-in-ready: accurate `## Codex` section, explicit per-lane scoped commits (never git add -A). Selom is DESKTOP-ONLY.
-  Delta: B3 DONE + pushed (main @ 5138aec). Live GET /skills registry (skills/registry.py + catalog block on skill.json); async jobs API (POST /skills/{id}/jobs, GET /jobs/{id}|/events|/result; inline+local active, arq+R2 wired/dormant; [jobs] extra). FE registry-driven Store (lib/catalog/registry.ts + CoverageMeter, seed fallback). heatmap scipy row-ordering; gseapy dropped from [omics]. pytest 21 passed; FE next build clean; browser-verified (mock :3010).
-  Env: backend on user-managed py3.12 (uv at C:/Users/seamegdool/.local/bin/uv.exe); system py3.10 IT-locked. Run via `uv run --directory app/backend python -m pytest` / `-m uvicorn`. Jobs default inline+local (no infra); SELOM_QUEUE=arq + SELOM_R2_* + the [jobs] extra flip on Redis/R2. Skills stub vs real via SELOM_SKILLS_ENGINE; golden tests pin stub. FE dev `npm run dev:mock -- --port 3010` (mock; 3000/3001 are other projects). demo.h5ad gitignored — regen via scripts/make_demo.py.
-  Next: B4 publish-confidence (repro bundle, guardrails, methods-text, Kaleido) + integration backlog (OmicVerse isolated worker, arq Redis status store, R-oracle, full GMT, catalog true-up). Stay on Fable 5 (xhigh). End clear-safe.
+  Delta: B4 publish-confidence slice-1 DONE (both lanes), COMMITTED, NOT pushed — main ahead 2 of origin/main @ 4216935 (BE 2ab7c43 + FE 84ae54e). Per-figure reproducibility bundle (provenance.py: skill+ver, resolved+typed params, input SHA-256+size, env=python/platform/engine-policy+pkg versions) + auto methods-text (methods.py: per-skill templates + canonical citations; generic fallback) + contract.resolved_params(). /run + /jobs/{id}/result now return {figure, provenance, methods} (jobs thread filename + store full bundle via execute_job). FE: collapsed "Publish confidence" panel (components/project/publish-confidence.tsx) — Methods (Copy+citations) + Reproducibility; runSkill returns the bundle; MSW mock serves it (mocks/stub-bundle.ts). pytest 28 passed; ruff clean; uvicorn smoke green; FE tsc+next build clean; browser-verified (mock :3010, POST /run 200, console clean bar favicon 404).
+  FIRST: push the 2 local commits on owner's word (global rule = push only when asked). Env: backend on user-managed py3.12 (uv at C:/Users/seamegdool/.local/bin/uv.exe); system py3.10 IT-locked. Run via `uv run --directory app/backend python -m pytest` / `-m uvicorn`. Jobs default inline+local; SELOM_QUEUE=arq + R2_* + [jobs] extra flip on Redis/R2. Skills stub vs real via SELOM_SKILLS_ENGINE; golden tests pin stub. FE dev `npm run dev:mock -- --port 3010`. demo.h5ad gitignored — regen via scripts/make_demo.py.
+  Next: finish B4 — (a) statistical-guardrail expansion (silhouette already on cluster), (b) Kaleido journal export (needs Docker+Chromium, RISKS #2 → lands with deploy image). Then integration backlog (OmicVerse isolated worker, arq Redis status store, R-oracle, full GMT, catalog true-up). Stay on Fable 5 (xhigh). End clear-safe.
   ```
 
 ## Codex — Last Task & Resume
@@ -245,16 +264,26 @@ None held.
   arq #6 confirmed in your absence — review on return. **`/run` stays synchronous** (the proven light-skill path); only
   heavy skills use `/jobs`. The one open BE item: **arq cross-process job *status*** needs a Redis-backed JobStore
   (`jobs/worker.py` documents the caveat — success propagates via the shared result store, but queued/running/error states don't yet).
-- **Next (B4 + integration backlog):** **B4** publish-confidence — reproducibility bundle, statistical guardrails, auto
-  methods-text, Kaleido journal export (RISKS #2/#5). **Integration backlog (`docs/integrations.md` + `plans/v2-backend.md`):**
-  OmicVerse as an **isolated** 2nd engine/Foundry source — pins `pandas<3` so it CANNOT share this venv (RISKS #9); run
-  out-of-process (its MCP server / a worker), SCA-gate its 50 deps; the **arq Redis status store**; R4DS/Quarto for B4 +
-  the R-oracle harness (RISKS #7); full GO/Reactome GMT; catalog-count true-up (≈418 via a live ingest job). sklearn is a
-  core dep (silhouette in `cluster`). Explicit staging only (never `git add -A`); `feat(backend:)` scope.
+- **Last (done by Claude, acting BE, 2026-06-12 02:45) — B4 publish-confidence backend slice-1 DONE; COMMITTED `2ab7c43`, NOT pushed**
+  (`main` ahead 2 of `origin/main`). New `provenance.py` = per-figure reproducibility bundle (skill+version, resolved+typed params,
+  input **SHA-256**+size, environment = python/platform/engine-policy + scientific-stack versions via `importlib.metadata`). New
+  `methods.py` = auto methods-text (deterministic per-skill templates quoting params + canonical citations; generic fallback).
+  `contract.resolved_params()` = typed param coercion (runners untouched). **Additive wire change:** `POST /skills/{id}/run` +
+  `GET /jobs/{id}/result` now return `{figure, provenance, methods}` (same shape both paths); `Job` gained `filename`, `submit`/
+  `execute_job` thread it, the shared `execute_job` stores the full bundle (`result_store.put` param figure→payload). `pytest` =
+  **28 passed** (21 + `test_provenance.py` + `test_methods.py` + jobs-bundle asserts); ruff clean; live uvicorn smoke green.
+  **No new deps** (stdlib hashlib/platform/importlib.metadata). FE half is committed separately (`84ae54e`).
+- **Next (finish B4, then integration backlog):** **B4 remaining** — (a) **statistical-guardrail expansion** (silhouette already on
+  `cluster`; add batch-effect/normalization/multiple-testing/low-cell warnings into the bundle, e.g. a `guardrails` field), (b)
+  **Kaleido journal export** PNG/SVG/PDF — needs **Docker + system Chromium** (RISKS #2 / DECISIONS #7), so it lands with the deploy
+  image (B8-adjacent); scope a CPU-Docker path or defer. **Integration backlog (`docs/integrations.md` + `plans/v2-backend.md`):**
+  OmicVerse **isolated** 2nd engine/Foundry source — pins `pandas<3`, CANNOT share this venv (RISKS #9); run out-of-process (its MCP
+  server / a worker), SCA-gate 50 deps; the **arq Redis status store**; R4DS/Quarto + R-oracle (RISKS #7); full GO/Reactome GMT;
+  catalog-count true-up (≈418). sklearn is core (silhouette in `cluster`). Explicit staging only (never `git add -A`); `feat(backend:)` scope.
 - **Resume:**
   ```
-  # Resume · 2026-06-12 01:48 +10:00 · Selom · Codex (backend) — reclaiming from Claude
+  # Resume · 2026-06-12 02:45 +10:00 · Selom · Codex (backend) — reclaiming from Claude
   Selom build repo D:/selom. CODEX.md auto-loads. Read agent_handoff/README.md + CURRENT.md + DECISIONS.md + RISKS.md + docs/build-charter.md + plans/v2-backend.md + docs/integrations.md + git status.
-  Delta: B1 + B2 + B3 backend DONE by Claude; ALL PUSHED (main @ 5138aec). B3 = live GET /skills registry (skills/registry.py + a catalog block on skill.json) + async jobs API (POST /skills/{id}/jobs, GET /jobs/{id}|/events|/result; config.py + jobs/ + storage/; one execute_job for inline+arq). Default inline + local filesystem result store (zero infra); arq+Redis (DECISIONS #6) and R2 (boto3 + RISKS #5 fix) wired but dormant; new [jobs] extra. heatmap scipy row-ordering; gseapy dropped from [omics]. pytest 21 passed.
-  Open BE item: arq cross-process job STATUS needs a Redis-backed JobStore (jobs/worker.py caveat). Next: B4 publish-confidence + integration backlog (OmicVerse isolated worker, R-oracle, full GMT, catalog true-up). Env: user-managed py3.12 (uv); system 3.10 IT-locked; `uv run --directory app/backend python -m pytest`/`-m uvicorn`. Stay on Fable 5. End clear-safe.
+  Delta: B1 + B2 + B3 + B4-slice-1 backend DONE by Claude. B1/B2/B3 PUSHED (origin @ 4216935); B4 backend COMMITTED 2ab7c43 but NOT pushed (main ahead 2; FE half 84ae54e). B4 = provenance.py (per-figure reproducibility bundle: skill+ver, resolved+typed params, input SHA-256+size, env=python/platform/engine-policy+pkg versions) + methods.py (auto methods-text, per-skill templates + citations) + contract.resolved_params(). /run + /jobs/{id}/result now return {figure, provenance, methods}; Job.filename added; shared execute_job stores the full bundle; result_store.put param figure→payload. No new deps. pytest 28 passed; ruff clean; uvicorn smoke green.
+  Open BE items: (1) push the 2 local commits on owner's word; (2) arq cross-process job STATUS needs a Redis-backed JobStore (jobs/worker.py caveat). Next: finish B4 — guardrail expansion (silhouette already on cluster) + Kaleido export (needs Docker+Chromium, RISKS #2) — then integration backlog (OmicVerse isolated worker, R-oracle, full GMT, catalog true-up). Env: user-managed py3.12 (uv); system 3.10 IT-locked; `uv run --directory app/backend python -m pytest`/`-m uvicorn`. Stay on Fable 5. End clear-safe.
   ```

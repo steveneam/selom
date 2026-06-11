@@ -67,6 +67,18 @@ the figure editor (P1) is **reused unchanged** as the Project ▸ Figure view.
 - Mock `POST /intake` (deterministic stub keyed off modality) + mock ingest/QC report
   with guardrail flags; swap for B2 when live. **LLM proposes, user approves.**
 
+## B4 (charter) — publish-confidence panel · 🟡 SLICE-1 DONE 2026-06-12 (committed `84ae54e`, not pushed)
+- `runSkill` (`lib/skills-api.ts`) now returns the full `{figure, provenance, methods}` bundle
+  (typed `SkillProvenance`/`SkillMethods`, both optional so the figure still renders without them).
+- `components/project/publish-confidence.tsx` — collapsed-by-default panel in the Figure tab
+  (between the editor toolbar and the figure): **Methods** (prose + Copy[text+numbered citations] +
+  citation list) + **Reproducibility** (skill+version, param chips, input filename/size/SHA-256, env
+  Python + scientific-stack chips). `project-workspace` captures the bundle on run, clears on "New figure".
+- MSW mock serves a representative bundle (`mocks/stub-bundle.ts`) so the panel renders offline.
+- Verified: `tsc` + `next build` clean; browser-verified (mock :3010) — panel expands with methods + repro record.
+- **Next (FE half of B4 remaining):** surface statistical guardrails when the bundle carries them; a
+  journal-preset **Export** affordance once the backend Kaleido path exists.
+
 ## Notes
 - Tailwind **v4** = CSS-first config (`@theme`, no `tailwind.config.js`).
 - React Compiler auto-memoizes — don't over-hand-roll `useMemo`.

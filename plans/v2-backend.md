@@ -91,6 +91,30 @@ golden tests vs an R oracle (RISKS #7). Out of B2 scope: async queue (B3), repro
 
 `pytest` = **21 passed** (14 base + 3 registry + 4 jobs); ruff clean; live uvicorn smoke (skills/submit/poll/result/SSE) green.
 
+## B4 (charter) — publish-confidence · 🟡 SLICE-1 DONE 2026-06-12 (committed `2ab7c43`, not pushed)
+
+The product's core decision made tangible: *"is THIS the right, trustworthy, reproducible figure?"*. Slice-1 = the
+two machine-+human halves of the answer; both ride on every `/run` and job result.
+
+- **Reproducibility bundle** — `provenance.py`. `build(spec, data_path, filename, params)` returns
+  `{skill{id,version,title,engine}, params (resolved+typed), input{filename,sha256,n_bytes}, environment{python,platform,
+  engine_policy,packages}}`. SHA-256 streams the upload; `packages` reads installed dist versions via `importlib.metadata`
+  for the tracked scientific stack (absent ones omitted). Pure-Python, deterministic, **no new deps**.
+- **Auto methods-text** — `methods.py`. `build(spec, params)` → `{text, citations}` from deterministic per-skill templates
+  that quote the exact (resolved) params + canonical tool citations (Scanpy/Leiden/UMAP/PyDESeq2/DESeq2/BH/GO/Reactome/SciPy);
+  generic fallback for unknown ids; every text closes with the Selom attribution sentence.
+- **Typed param resolution** — `contract.resolved_params(spec, params)` overlays defaults + coerces to `param_spec` types
+  (the runners still coerce their own inputs — the proven path is untouched).
+- **Wire-up (additive).** `POST /skills/{id}/run` + `GET /jobs/{id}/result` now return `{figure, provenance, methods}`
+  (same shape both paths; the FE still reads `.figure`). `Job` gained `filename`; `submit`/`execute_job` thread it; the shared
+  `execute_job` builds + stores the **full bundle** (so inline + arq stay identical); `result_store.put` param figure→payload.
+- **Verified:** `pytest` = **28 passed** (21 + `tests/test_provenance.py` + `tests/test_methods.py` + jobs-bundle asserts);
+  ruff clean; live uvicorn smoke (`/run` + job submit/result) returns the full bundle with typed params, SHA-256, env, cited methods.
+- **B4 remaining (next):** (a) **statistical-guardrail expansion** — `cluster` already carries a silhouette subtitle; add
+  batch-effect / normalization / multiple-testing / low-cell warnings into the bundle (a `guardrails` field or figure subtitle);
+  (b) **Kaleido journal export** PNG/SVG/PDF — kaleido≥1.3 + plotly≥6.1.1 + **system Chromium** in a Docker image
+  (`KALEIDO_CHROME_PATH`; RISKS #2 / DECISIONS #7) — lands with the deploy image (B8-adjacent); scope a CPU-Docker path or defer.
+
 ## Integration backlog (owner-directed 2026-06-12) — see `../docs/integrations.md`
 
 Done this session: **heatmap hierarchical row-ordering** (item 2 below) + **`gseapy` dropped** from `[omics]` (item 1's
