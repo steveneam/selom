@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Database, FileBarChart, LayoutGrid, Redo2, Sparkles, Trash2, Undo2, Wrench } from "lucide-react";
 import { DataPanel, type AnalyzeArgs } from "./data-panel";
 import { WorkbenchPanel } from "./workbench-panel";
+import { PublishConfidence } from "./publish-confidence";
 import { EditorWorkspace } from "@/components/figure/editor-workspace";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,7 +14,7 @@ import { useFigureStore } from "@/hooks/use-figure-store";
 import { getSkill } from "@/lib/catalog/seed";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 import { projectStore, select, useProjects } from "@/lib/projects/store";
-import { runSkill, runtimeSkillId } from "@/lib/skills-api";
+import { runSkill, runtimeSkillId, type SkillMethods, type SkillProvenance } from "@/lib/skills-api";
 
 type Tab = "overview" | "data" | "workbench" | "figure";
 
@@ -32,6 +33,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [lastFile, setLastFile] = React.useState<File | null>(null);
   const [running, setRunning] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  // Publish-confidence bundle for the current figure (B4): methods-text + repro record.
+  const [bundle, setBundle] = React.useState<{ provenance?: SkillProvenance; methods?: SkillMethods } | null>(null);
 
   // Undo / redo while editing a figure.
   React.useEffect(() => {
@@ -54,8 +57,9 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       setError(null);
       try {
         const file = lastFile ?? new File(["mock"], datasets.find((d) => d.id === datasetId)?.filename ?? "data.csv");
-        const spec = await runSkill(runtimeSkillId(step.skillId), file, step.params);
-        figure.init(spec);
+        const res = await runSkill(runtimeSkillId(step.skillId), file, step.params);
+        figure.init(res.figure);
+        setBundle({ provenance: res.provenance, methods: res.methods });
         const name = getSkill(step.skillId)?.name ?? step.skillId;
         projectStore.addFigure(projectId, { title: `${name} — figure`, datasetId, skillId: step.skillId });
         setTab("figure");
@@ -185,10 +189,11 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     <Redo2 />
                   </Button>
                   <span className="ml-2 text-xs text-muted-foreground">Editing live — every change is a JSON-Patch.</span>
-                  <Button variant="ghost" size="sm" className="ml-auto" onClick={() => { figure.reset(); setTab("workbench"); }}>
+                  <Button variant="ghost" size="sm" className="ml-auto" onClick={() => { figure.reset(); setBundle(null); setTab("workbench"); }}>
                     New figure
                   </Button>
                 </div>
+                <PublishConfidence provenance={bundle?.provenance} methods={bundle?.methods} />
                 <div className="flex min-h-[520px] flex-1 overflow-hidden rounded-xl border border-border bg-background">
                   <EditorWorkspace store={figure} />
                 </div>

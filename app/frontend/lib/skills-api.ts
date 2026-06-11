@@ -1,7 +1,30 @@
 import type { FigureSpec } from "./figure-spec";
 
+/** Per-figure reproducibility bundle (backend provenance.py — charter B4). */
+export interface SkillProvenance {
+  skill: { id: string; version: string; title: string; engine: string };
+  params: Record<string, string | number | boolean>;
+  input: { filename: string | null; sha256: string; n_bytes: number };
+  environment: {
+    python: string;
+    platform: string;
+    engine_policy: string;
+    packages: Record<string, string>;
+  };
+}
+
+/** Auto methods-text (backend methods.py — charter B4). */
+export interface SkillMethods {
+  text: string;
+  citations: string[];
+}
+
 export interface SkillRunResponse {
   figure: FigureSpec;
+  // Publish-confidence bundle (B4). Optional so an older backend / a mock without it
+  // still renders the figure; the panel just hides when absent.
+  provenance?: SkillProvenance;
+  methods?: SkillMethods;
 }
 
 export type SkillParams = Record<string, string | number | boolean>;
@@ -19,18 +42,18 @@ export function runtimeSkillId(catalogId: string): string {
 }
 
 /**
- * Run a skill on an uploaded file and return the editable figure spec.
+ * Run a skill on an uploaded file and return the figure + its publish-confidence bundle.
  *
  * Matches the live contract (app/backend/main.py): a one-shot multipart POST with
  * the file in field `matrix` and tuning params as query string, responding with
- * `{ figure: { data, layout } }`. The MSW mock (mocks/handlers.ts) mirrors it, so
+ * `{ figure, provenance, methods }`. The MSW mock (mocks/handlers.ts) mirrors it, so
  * this path works with the backend down (`npm run dev:mock`).
  */
 export async function runSkill(
   skillId: string,
   file: File,
   params: SkillParams = {},
-): Promise<FigureSpec> {
+): Promise<SkillRunResponse> {
   const fd = new FormData();
   fd.append("matrix", file);
 
@@ -59,5 +82,5 @@ export async function runSkill(
   if (!json.figure || !Array.isArray(json.figure.data)) {
     throw new Error("Server returned a malformed figure spec.");
   }
-  return json.figure;
+  return { figure: json.figure, provenance: json.provenance, methods: json.methods };
 }
