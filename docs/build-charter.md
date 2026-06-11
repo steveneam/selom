@@ -58,9 +58,9 @@ Repo, GitHub push, BE skeleton, editable-spec editor, command-center shell — *
 *Forj:* **bones** (project-first IDE shell + editable-spec/JSON-Patch editor + skill-contract) · meat (catalog seed).
 *Decisions realized here:* DECISIONS.md **#5** (custom editor) + **#2** (repo) — ratified.
 
-**B1 · Close the P0 gate — real hello-UMAP end-to-end** 🔴 `[BE-led, FE conforms]` `⟵P0-exit+P3-gate`
-Install deps; wire `run_scanpy.py` behind the run endpoint; resolve the one-shot-vs-upload contract; `demo.h5ad` → real Scanpy UMAP → editable Plotly spec → client-side recolour, no recompute. FE: browser-verify the shell so "done" is truly done.
-*Forj:* bones (skill-contract round-trip) · meat (umap). *Forces:* confirm the canonical P0 contract (open Codex ask).
+**B1 · Close the P0 gate — real hello-UMAP end-to-end** ✅ `[BE-led, FE conforms]` `⟵P0-exit+P3-gate`
+Done 2026-06-11 (Claude, acting both lanes). `uv sync --extra scrna` + `run_scanpy.py` wired behind the one-shot `POST /skills/umap_scrna/run`; `demo.h5ad` (pbmc3k) → real Scanpy UMAP → editable Plotly spec; browser-verified end-to-end (upload → run → editable figure renders, live :8000, MSW off). One-shot contract confirmed. Fixed Plotly-6 base64 typed-arrays + Next-16 proxy 10MB body cap (RISKS #8). Commits `6e37829`/`396ca66`.
+*Forj:* bones (skill-contract round-trip) · meat (umap). *Forces:* canonical P0 contract = **one-shot** (resolved).
 
 **B2 · Steven's Stage-1 skills (his real figure types)** 🟡 `[BE-led, FE registry exists]` `⟵P1 (reprioritized)`
 scRNA UMAP/cluster/violin/DEG (retinal atlas) + bulk DEG/volcano/heatmap + **GSEA** (RPGRIP1 organoid) — each a pure-Python skill emitting an editable spec + **golden-image snapshot test**.
@@ -115,7 +115,7 @@ Two agents, disjoint lanes (`agent_handoff/README.md`): **Claude = FE** (`app/fr
 
 ## Active bucket
 
-**B1 — close the P0 gate.** Per-bucket plan presented for owner review (2026-06-11); not yet started.
+**B1 — DONE (2026-06-11).** P0 hello-UMAP gate closed end-to-end + browser-verified. **B2 is next** — per-bucket plan to be presented for owner sign-off before it starts (no bucket starts without sign-off).
 
 ---
 
