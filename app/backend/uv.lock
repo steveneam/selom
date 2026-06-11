@@ -3757,6 +3757,7 @@ dependencies = [
     { name = "plotly" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "scikit-learn" },
     { name = "scipy" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -3778,7 +3779,6 @@ omics = [
     { name = "pydeseq2" },
     { name = "pyteomics" },
     { name = "scanpy" },
-    { name = "scikit-learn" },
     { name = "scvi-tools" },
     { name = "statsmodels" },
 ]
@@ -3810,7 +3810,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "scanpy", marker = "extra == 'scrna'", specifier = ">=1.12" },
-    { name = "scikit-learn", marker = "extra == 'omics'" },
+    { name = "scikit-learn" },
     { name = "scipy" },
     { name = "scvi-tools", marker = "extra == 'omics'", specifier = ">=1.4.3" },
     { name = "selom-backend", extras = ["scrna"], marker = "extra == 'omics'" },

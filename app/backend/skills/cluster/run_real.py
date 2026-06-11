@@ -31,11 +31,36 @@ def run(data_path: str, params: dict) -> dict:
     )
 
     counts = adata.obs["leiden"].value_counts().sort_index()
+    subtitle = _silhouette_subtitle(adata, n_pcs)
     fig = px.bar(
         x=[str(c) for c in counts.index],
         y=counts.to_numpy(),
-        title=f"Leiden clusters (resolution {params['resolution']})",
     )
     fig.update_traces(marker={"color": "#22d3ee"}, name="cells")
-    fig.update_layout(xaxis_title="cluster", yaxis_title="cells", bargap=0.25)
+    fig.update_layout(
+        title={
+            "text": f"Leiden clusters (resolution {params['resolution']})",
+            "subtitle": {"text": subtitle},
+        },
+        xaxis_title="cluster",
+        yaxis_title="cells",
+        bargap=0.25,
+    )
     return jsonable(fig.to_plotly_json())
+
+
+def _silhouette_subtitle(adata, n_pcs: int) -> str:
+    """Publish-confidence guardrail: silhouette of the clustering on the PCA
+    embedding (sklearn, BSD). Higher = cleaner separation; flags over/under-clustering.
+    """
+    from sklearn.metrics import silhouette_score
+
+    labels = adata.obs["leiden"].to_numpy()
+    n_clusters = len(set(labels))
+    if n_clusters < 2:
+        return f"{n_clusters} cluster · silhouette n/a (need ≥2 clusters)"
+    emb = adata.obsm["X_pca"][:, :n_pcs]
+    score = float(
+        silhouette_score(emb, labels, sample_size=min(2000, adata.n_obs), random_state=0)
+    )
+    return f"{n_clusters} clusters · silhouette {score:.2f} — higher = cleaner separation"

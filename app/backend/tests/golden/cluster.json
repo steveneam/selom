@@ -26,7 +26,10 @@
   ],
   "layout": {
     "title": {
-      "text": "Leiden clusters (stub)"
+      "text": "Leiden clusters (stub)",
+      "subtitle": {
+        "text": "6 clusters \u00b7 silhouette 0.50 \u2014 higher = cleaner separation"
+      }
     },
     "xaxis": {
       "title": {

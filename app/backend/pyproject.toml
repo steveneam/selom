@@ -19,6 +19,10 @@ dependencies = [
   "numpy>=2.4",
   "pandas>=3.0",
   "scipy",
+  # BSD, already pulled transitively by scanpy. Explicit here for the license-clean
+  # primitives the skills use directly: clustering-quality guardrails (silhouette),
+  # hierarchical linkage (heatmap row-ordering), PCA/NMF/t-SNE.
+  "scikit-learn",
 ]
 
 [project.optional-dependencies]
@@ -32,6 +36,16 @@ scrna = [
 ]
 # Full heavy stack (superset of scrna): adds scvi-tools/PyTorch, proteomics, and Kaleido export
 # for later buckets (trajectory, proteomics volcano, journal-preset export). Multi-GB install.
+#
+# NOTE — OmicVerse is intentionally NOT here. It's a high-value target (a second Verified
+# engine + the primary Skill-Foundry source: ov.pp / ov.bulk / ov.single / ov.pl over
+# AnnData), but its pins (pandas<3.0, scipy<1.12, anndata<0.12) are INCOMPATIBLE with this
+# backend's deliberate pandas>=3.0 + anndata>=0.12 stack — adding it makes `uv` unsolvable.
+# Integration path: run OmicVerse in an ISOLATED worker/env (its own venv or container, the
+# §6.5C/E per-skill-env model) and call it out-of-process; do NOT downgrade the main stack.
+# Tracked: RISKS #9, plans/v2-backend.md backlog, docs/integrations.md.
+# SCA: also drop `gseapy` here at the pre-launch gate — enrichment now uses an in-house ORA
+# (DECISIONS #9), so gseapy is unused AGPL surface (RISKS #6).
 omics = [
   "selom-backend[scrna]",
   "scvi-tools>=1.4.3",
@@ -41,7 +55,6 @@ omics = [
   "alphastats",
   "pyteomics",
   "statsmodels",
-  "scikit-learn",
   "kaleido>=1.3",
 ]
 dev = [

@@ -31,7 +31,10 @@ def _stub_figure() -> dict:
             }
         ],
         "layout": {
-            "title": {"text": "Leiden clusters (stub)"},
+            "title": {
+                "text": "Leiden clusters (stub)",
+                "subtitle": {"text": "6 clusters · silhouette 0.50 — higher = cleaner separation"},
+            },
             "xaxis": {"title": {"text": "cluster"}},
             "yaxis": {"title": {"text": "cells"}},
             "bargap": 0.25,
