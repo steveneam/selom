@@ -12,5 +12,15 @@
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" }
-  ]
+  ],
+  "catalog": {
+    "summary": "Clustered heatmap of marker / top-variable genes, row z-scored.",
+    "category": "data-visualization",
+    "tier": "verified",
+    "status": "production",
+    "input_formats": [".h5ad", ".csv"],
+    "chains_with": ["deg"],
+    "license": "MIT",
+    "popularity": 76
+  }
 }

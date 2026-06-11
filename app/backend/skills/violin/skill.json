@@ -13,5 +13,15 @@
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" }
-  ]
+  ],
+  "catalog": {
+    "summary": "Per-cluster expression violins for a marker gene (log1p).",
+    "category": "single-cell",
+    "tier": "verified",
+    "status": "production",
+    "input_formats": [".h5ad"],
+    "chains_with": ["cluster", "deg"],
+    "license": "MIT",
+    "popularity": 79
+  }
 }

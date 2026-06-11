@@ -57,6 +57,15 @@ omics = [
   "statsmodels",
   "kaleido>=1.3",
 ]
+# Async job path (B3): arq + Redis queue (DECISIONS #6) + boto3 for the R2 result
+# store. OPTIONAL — the default inline executor + local-filesystem result store need
+# NONE of these, so `uv sync` (core) runs the full job API offline. boto3 >=1.36 needs
+# the R2 checksum workaround, applied in storage/results.py (RISKS #5).
+jobs = [
+  "arq>=0.25",
+  "redis>=5",
+  "boto3>=1.36",
+]
 dev = [
   "pytest",
   "httpx",

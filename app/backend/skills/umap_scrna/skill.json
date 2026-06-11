@@ -11,5 +11,15 @@
     "n_pcs":       { "type": "int", "default": 50, "min": 2, "max": 200 },
     "color_by":    { "type": "str", "default": "leiden" }
   },
-  "outputs": [{ "name": "figure", "kind": "plotly_spec" }]
+  "outputs": [{ "name": "figure", "kind": "plotly_spec" }],
+  "catalog": {
+    "summary": "QC → normalize → PCA → neighbors → UMAP, coloured by Leiden cluster.",
+    "category": "single-cell",
+    "tier": "verified",
+    "status": "production",
+    "input_formats": [".h5ad", ".csv"],
+    "chains_with": ["deg", "heatmap"],
+    "license": "MIT",
+    "popularity": 98
+  }
 }

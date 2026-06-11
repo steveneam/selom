@@ -15,5 +15,15 @@
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" },
     { "name": "table",  "kind": "csv" }
-  ]
+  ],
+  "catalog": {
+    "summary": "Bulk DE (pyDESeq2) or marker ranking (Wilcoxon) per contrast.",
+    "category": "differential-expression",
+    "tier": "verified",
+    "status": "production",
+    "input_formats": [".h5ad", ".csv"],
+    "chains_with": ["volcano", "enrichment"],
+    "license": "MIT",
+    "popularity": 90
+  }
 }

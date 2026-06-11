@@ -1,8 +1,16 @@
-from fastapi import FastAPI, Request, UploadFile
-from skills.contract import run_skill, load_skill
+import asyncio
+import json
 import pathlib
-import tempfile
 import shutil
+import tempfile
+
+from fastapi import FastAPI, HTTPException, Request, UploadFile
+from fastapi.responses import StreamingResponse
+
+from jobs.queue import get_job, result_store, submit
+from jobs.store import TERMINAL
+from skills.contract import load_skill, run_skill
+from skills.registry import list_catalog, list_skill_ids
 
 app = FastAPI(title="Selom API")
 
@@ -12,20 +20,78 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/skills")
+def list_skills():
+    # Live Skill-Store registry: every on-disk skill as a SkillCatalogEntry. The FE
+    # Store reads this and drops its hard-coded Verified seed (B3 — registry-driven).
+    return list_catalog()
+
+
 @app.get("/skills/{skill_id}")
 def describe(skill_id: str):
     return load_skill(skill_id).model_dump()        # registry-driven UI reads this
 
 
-@app.post("/skills/{skill_id}/run")
-async def run(skill_id: str, request: Request, matrix: UploadFile):
+def _save_upload(matrix: UploadFile) -> str:
     # Preserve the upload's extension so skills can tell .h5ad (scRNA) from .csv (bulk).
     suffix = pathlib.Path(matrix.filename or "").suffix or ".h5ad"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
         shutil.copyfileobj(matrix.file, f)
-        path = f.name
-    # Tuning params arrive as the query string; the contract fills skill defaults and
-    # each runner coerces types. This is skill-agnostic — every Verified skill runs here.
+        return f.name
+
+
+@app.post("/skills/{skill_id}/run")
+async def run(skill_id: str, request: Request, matrix: UploadFile):
+    # Synchronous one-shot — the proven fast path for light skills (B1). Heavy skills
+    # should use POST /skills/{id}/jobs (below). Tuning params arrive as the query
+    # string; the contract fills skill defaults and each runner coerces types.
+    path = _save_upload(matrix)
     params = dict(request.query_params)
     spec = run_skill(skill_id, path, params)
     return {"figure": spec}                          # Plotly JSON -> frontend
+
+
+@app.post("/skills/{skill_id}/jobs")
+async def submit_job(skill_id: str, request: Request, matrix: UploadFile):
+    # Async job path (B3): enqueue a run, return a job handle the FE polls. In inline
+    # mode the job completes before this returns; arq mode runs it off-request.
+    if skill_id not in set(list_skill_ids()):
+        raise HTTPException(status_code=404, detail=f"unknown skill '{skill_id}'")
+    path = _save_upload(matrix)
+    params = dict(request.query_params)
+    job = submit(skill_id, path, params)
+    return job.public()
+
+
+@app.get("/jobs/{job_id}")
+def job_status(job_id: str):
+    job = get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="unknown job")
+    return job.public()
+
+
+@app.get("/jobs/{job_id}/events")
+async def job_events(job_id: str):
+    # Server-Sent Events: emit current state, then poll until terminal. Inline jobs are
+    # already terminal, so this resolves in one event; arq jobs stream the transitions.
+    async def stream():
+        for _ in range(600):  # ~5 min ceiling at 0.5s/tick
+            job = get_job(job_id)
+            if job is None:
+                yield f"event: error\ndata: {json.dumps({'detail': 'unknown job'})}\n\n"
+                return
+            yield f"data: {json.dumps(job.public())}\n\n"
+            if job.status in TERMINAL:
+                return
+            await asyncio.sleep(0.5)
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@app.get("/jobs/{job_id}/result")
+def job_result(job_id: str):
+    figure = result_store.get(job_id)
+    if figure is None:
+        raise HTTPException(status_code=404, detail="result not available")
+    return {"figure": figure}                         # same shape as /run -> FE reuses it

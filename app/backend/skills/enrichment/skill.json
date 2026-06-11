@@ -13,5 +13,15 @@
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" },
     { "name": "table",  "kind": "csv" }
-  ]
+  ],
+  "catalog": {
+    "summary": "In-house hypergeometric ORA + BH-FDR over GO & Reactome; dotplot output.",
+    "category": "pathway-analysis",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".csv"],
+    "chains_with": ["deg", "volcano"],
+    "license": "MIT",
+    "popularity": 72
+  }
 }

@@ -15,6 +15,10 @@ class SkillSpec(BaseModel):
     inputs: list[dict]
     param_spec: dict
     outputs: list[dict]
+    # Optional Skill-Store display metadata (summary/category/tier/status/license/…).
+    # Presentation only — the execution contract above is what the runner needs.
+    # The registry (skills/registry.py) reads this to serve GET /skills.
+    catalog: dict | None = None
 
 
 def load_skill(skill_id: str) -> SkillSpec:
