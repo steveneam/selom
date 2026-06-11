@@ -31,6 +31,7 @@ class Job:
     params: dict
     created_at: float
     updated_at: float
+    filename: str | None = None  # original upload name, for the B4 provenance bundle
     result_url: str | None = None
     error: str | None = None
 
@@ -51,7 +52,7 @@ class JobStore:
     def __init__(self) -> None:
         self._jobs: dict[str, Job] = {}
 
-    def create(self, skill_id: str, params: dict) -> Job:
+    def create(self, skill_id: str, params: dict, filename: str | None = None) -> Job:
         now = time.time()
         job = Job(
             id=uuid.uuid4().hex,
@@ -60,6 +61,7 @@ class JobStore:
             params=params,
             created_at=now,
             updated_at=now,
+            filename=filename,
         )
         self._jobs[job.id] = job
         return job

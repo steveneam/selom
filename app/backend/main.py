@@ -7,6 +7,8 @@ import tempfile
 from fastapi import FastAPI, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
+import methods
+import provenance
 from jobs.queue import get_job, result_store, submit
 from jobs.store import TERMINAL
 from skills.contract import load_skill, run_skill
@@ -47,8 +49,15 @@ async def run(skill_id: str, request: Request, matrix: UploadFile):
     # string; the contract fills skill defaults and each runner coerces types.
     path = _save_upload(matrix)
     params = dict(request.query_params)
-    spec = run_skill(skill_id, path, params)
-    return {"figure": spec}                          # Plotly JSON -> frontend
+    spec = load_skill(skill_id)
+    figure = run_skill(skill_id, path, params)
+    # B4 publish-confidence: every figure ships with its reproducibility bundle +
+    # auto methods-text. Additive — the FE still reads `.figure`.
+    return {
+        "figure": figure,                            # Plotly JSON -> frontend
+        "provenance": provenance.build(spec, path, matrix.filename, params),
+        "methods": methods.build(spec, params),
+    }
 
 
 @app.post("/skills/{skill_id}/jobs")
@@ -59,7 +68,7 @@ async def submit_job(skill_id: str, request: Request, matrix: UploadFile):
         raise HTTPException(status_code=404, detail=f"unknown skill '{skill_id}'")
     path = _save_upload(matrix)
     params = dict(request.query_params)
-    job = submit(skill_id, path, params)
+    job = submit(skill_id, path, params, matrix.filename)
     return job.public()
 
 
@@ -91,7 +100,7 @@ async def job_events(job_id: str):
 
 @app.get("/jobs/{job_id}/result")
 def job_result(job_id: str):
-    figure = result_store.get(job_id)
-    if figure is None:
+    bundle = result_store.get(job_id)
+    if bundle is None:
         raise HTTPException(status_code=404, detail="result not available")
-    return {"figure": figure}                         # same shape as /run -> FE reuses it
+    return bundle                                     # {figure, provenance, methods} — same shape as /run

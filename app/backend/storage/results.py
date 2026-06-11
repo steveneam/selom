@@ -22,12 +22,12 @@ from typing import Protocol
 
 
 class ResultStore(Protocol):
-    def put(self, key: str, figure: dict) -> str:
-        """Persist a figure spec; return a URL the client can fetch it from."""
+    def put(self, key: str, payload: dict) -> str:
+        """Persist a result bundle ({figure, provenance, methods}); return a fetch URL."""
         ...
 
     def get(self, key: str) -> dict | None:
-        """Return the stored figure spec, or None if absent."""
+        """Return the stored result bundle, or None if absent."""
         ...
 
     def url_if_exists(self, key: str) -> str | None:
@@ -43,8 +43,8 @@ class LocalResultStore:
     def _path(self, key: str) -> pathlib.Path:
         return self.root / f"{key}.json"
 
-    def put(self, key: str, figure: dict) -> str:
-        self._path(key).write_text(json.dumps(figure))
+    def put(self, key: str, payload: dict) -> str:
+        self._path(key).write_text(json.dumps(payload))
         return f"/jobs/{key}/result"
 
     def get(self, key: str) -> dict | None:
@@ -76,11 +76,11 @@ class R2ResultStore:
     def _obj(self, key: str) -> str:
         return f"results/{key}.json"
 
-    def put(self, key: str, figure: dict) -> str:
+    def put(self, key: str, payload: dict) -> str:
         self.client.put_object(
             Bucket=self.bucket,
             Key=self._obj(key),
-            Body=json.dumps(figure).encode(),
+            Body=json.dumps(payload).encode(),
             ContentType="application/json",
         )
         return self._presign(key)

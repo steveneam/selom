@@ -35,3 +35,25 @@ def run_skill(skill_id: str, data_path: str, params: dict) -> dict:
 
 def defaults(spec: SkillSpec) -> dict:
     return {k: v["default"] for k, v in spec.param_spec.items()}
+
+
+_CASTS = {"int": int, "float": float, "str": str}
+
+
+def resolved_params(spec: SkillSpec, params: dict) -> dict:
+    """Skill defaults overlaid with caller params, coerced to the param_spec types.
+
+    Query-string params arrive as strings; this yields the exact *effective* config
+    (typed) that ran — what the reproducibility bundle records and the methods text
+    quotes. Unknown keys / failed casts pass through unchanged. The runners still
+    coerce their own inputs; this never feeds them, so the proven path is untouched.
+    """
+    merged = {**defaults(spec), **params}
+    out: dict = {}
+    for key, value in merged.items():
+        cast = _CASTS.get(spec.param_spec.get(key, {}).get("type"))
+        try:
+            out[key] = cast(value) if cast else value
+        except (ValueError, TypeError):
+            out[key] = value
+    return out

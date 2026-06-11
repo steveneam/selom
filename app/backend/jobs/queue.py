@@ -26,15 +26,25 @@ result_store: ResultStore = make_result_store(settings)
 
 def execute_job(job_id: str, data_path: str, params: dict) -> None:
     """Run the job's skill to completion, updating the store. Never raises."""
-    from skills.contract import run_skill  # lazy: keeps import graph light
+    import methods
+    import provenance
+    from skills.contract import load_skill, run_skill  # lazy: keeps import graph light
 
     job = job_store.get(job_id)
     if job is None:
         return
     job_store.update(job_id, status=JobStatus.RUNNING)
     try:
+        spec = load_skill(job.skill_id)
         figure = run_skill(job.skill_id, data_path, params)
-        url = result_store.put(job_id, figure)
+        # Store the full B4 bundle (same shape /run returns) so /jobs/{id}/result
+        # carries the reproducibility record + methods, not just the figure.
+        bundle = {
+            "figure": figure,
+            "provenance": provenance.build(spec, data_path, job.filename, params),
+            "methods": methods.build(spec, params),
+        }
+        url = result_store.put(job_id, bundle)
         job_store.update(job_id, status=JobStatus.SUCCEEDED, result_url=url)
     except Exception as exc:  # surface a clean message; never leak a 500 stack to the job
         job_store.update(job_id, status=JobStatus.FAILED, error=str(exc))
@@ -45,9 +55,9 @@ def execute_job(job_id: str, data_path: str, params: dict) -> None:
             pass
 
 
-def submit(skill_id: str, data_path: str, params: dict) -> Job:
+def submit(skill_id: str, data_path: str, params: dict, filename: str | None = None) -> Job:
     """Create a job and either run it inline or hand it to the arq worker."""
-    job = job_store.create(skill_id, params)
+    job = job_store.create(skill_id, params, filename)
     if settings.queue == "arq":
         _enqueue_arq(job.id, skill_id, data_path, params)
     else:

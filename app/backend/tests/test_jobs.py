@@ -34,12 +34,18 @@ def test_inline_job_completes_and_stores_result():
     # The poll endpoint agrees with the submit response.
     assert client.get(f"/jobs/{job['id']}").json()["status"] == "succeeded"
 
-    # The stored result is an editable Plotly spec, fetchable like /run's output.
+    # The stored result is the full B4 bundle, fetchable like /run's output.
     res = client.get(f"/jobs/{job['id']}/result")
     assert res.status_code == 200
-    fig = res.json()["figure"]
+    bundle = res.json()
+    fig = bundle["figure"]
     assert isinstance(fig["data"], list) and fig["data"]
     assert isinstance(fig["layout"], dict)
+    # Reproducibility bundle + methods-text ride along (publish-confidence).
+    assert bundle["provenance"]["skill"]["id"] == "cluster"
+    assert bundle["provenance"]["input"]["sha256"]
+    assert "Leiden" in bundle["methods"]["text"]
+    assert bundle["methods"]["citations"]
 
 
 def test_sse_emits_terminal_state():
