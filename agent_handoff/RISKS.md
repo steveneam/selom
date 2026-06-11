@@ -5,7 +5,7 @@
 > fix. Add new risks as they surface; do not delete — supersede with a resolution
 > note.
 
-_Last updated: 2026-06-11 23:20 +10:00 — added #8 (Next proxy body cap), surfaced closing the B1 P0 gate._
+_Last updated: 2026-06-12 01:10 +10:00 — added #9 (OmicVerse pandas-3 conflict + GPL/SCA surface), surfaced evaluating it for the Skill Foundry._
 
 | # | Risk | Impact | Fix / mitigation | Owner |
 |---|---|---|---|---|
@@ -17,6 +17,7 @@ _Last updated: 2026-06-11 23:20 +10:00 — added #8 (Next proxy body cap), surfa
 | 6 | **AGPL transitive-dep risk** (gseapy / MSigDB, decoupler) | SaaS gap covers GPL but AGPL requires source disclosure for network-served apps | **DEFERRED per owner** (build-for-self now) but FLAGGED for the **pre-launch SCA gate**: run `pip-audit`/`safety`, quarantine AGPL, prefer Reactome/GO over MSigDB. Do not ship to external users until cleared. | Codex (BE) / pre-launch |
 | 7 | **pyDESeq2 != DESeq2 bit-for-bit** | Gene-set overlap is very high but not numerically identical to R DESeq2 | Golden-image tests catch divergence; use R-in-a-box (limma) for small-n / microarray designs | Codex (BE) |
 | 8 | **Next 16 proxy buffers request bodies at 10MB** (rewrites/`/api/*` → :8000) | Real `.h5ad` uploads (pbmc3k demo is ~21MB) are truncated → broken multipart → ECONNRESET → 500. Found closing the P0 gate. | **Dev/P0 fix applied:** `experimental.proxyClientMaxBodySize: "512mb"` in `next.config.ts`. But Next buffers the body in memory per request, so this won't scale to large datasets. **Production must move large uploads off the in-memory proxy** — direct-to-backend (CORS) or chunked/presigned upload. | Claude (FE) |
+| 9 | **OmicVerse can't share the backend venv** + **GPL-3.0 / 50-tool SCA surface** | OmicVerse (the prime Skill-Foundry source) pins `pandas<3.0, scipy<1.12, anndata<0.12`; Selom deliberately runs `pandas>=3.0` + `anndata>=0.12`, so adding `omicverse` makes `uv` **unsolvable** (breaks even core `uv run`). Separately, it's GPL-3.0 and pulls 50+ tools transitively. | **Do NOT add `omicverse` to a shared extra** (left out of `[omics]`). Integrate it **out-of-process in an isolated env/container** (the §6.5C/E per-skill-env model) and call it over a thin RPC/MCP boundary; do not downgrade the main stack. GPL is fine server-side (DECISIONS #7), but SCA-gate the 50 transitive deps before launch and **drop the now-unused `gseapy`** from `[omics]` (enrichment uses an in-house ORA, DECISIONS #9). | Codex (BE) / pre-launch |
 
 ## Notes
 

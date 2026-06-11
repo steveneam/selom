@@ -71,6 +71,25 @@ uploaded file; no bulk dataset bundled — golden tests use the stub), **GSEA = 
 B2 follow-ups (later): full GO/Reactome GMT ingestion to replace the bundled sample; real-engine numerical
 golden tests vs an R oracle (RISKS #7). Out of B2 scope: async queue (B3), reproducibility/guardrails/methods/Kaleido (B4).
 
+## Integration backlog (owner-directed 2026-06-12 · do next session) — see `../docs/integrations.md`
+
+In addition to B3 (arq+Redis async, R2 store, live `GET /skills`):
+1. **OmicVerse as a 2nd Verified engine + Foundry source — isolated.** It pins `pandas<3.0`/
+   `anndata<0.12` (RISKS #9), so it can't share this venv. Stand up an OmicVerse worker in its
+   own env/container and call it out-of-process (subprocess JSON or its MCP server — `ov.*` over
+   `adata_id`, `omicverse/docs/mcp_quickstart.md`). Optionally route `cluster`/`deg`/`enrichment`/
+   `heatmap` through `ov.pp.leiden`/`ov.bulk.pyDEG`/`ov.bulk.pyGSEA`/`ov.pl`; then trajectory/
+   annotation/deconvolution. SCA-gate the 50 transitive deps; **drop the now-unused `gseapy`** from
+   `[omics]` (enrichment uses an in-house ORA, DECISIONS #9).
+2. **heatmap hierarchical row-ordering** via sklearn/scipy linkage (+ optional dendrogram). [sklearn now in core]
+3. **R4DS/Quarto + ggplot2 reference set for B4** — methods-text + reproducibility-bundle shape
+   (mirror Hermes `commands.sh + environment.yml`), journal figure defaults, and the **R validation
+   oracle** harness (limma/DESeq2/ggplot2 golden references; RISKS #7).
+4. **Catalog-count true-up** — `scripts/ingest-catalog` pulls live bioSkills/ClawBio; replace the FE
+   seed's 540/88→628 with real numbers (≈385/33→418).
+5. **MCP:** context7 already in `.mcp.json` (set `CONTEXT7_API_KEY`); add the OmicVerse/JARVIS MCP
+   server once its isolated env exists (don't add a broken entry before then).
+
 ## Notes / landmines
 - Don't pin `numpy<2`. pandas 3.0 = Copy-on-Write default (no in-place slice
   mutation). scvi-tools pulls PyTorch — install the **CPU** torch wheel first in

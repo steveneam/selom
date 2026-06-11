@@ -4,7 +4,7 @@
 > each agent's rolling log, not here. This file is **replaced, never stacked** —
 > update at MAJOR boundaries only (rule 9 in `agent_handoff/README.md`).
 
-_Last updated: 2026-06-12 00:44 +10:00 · Claude (acting FE+BE) — **B2 COMPLETE (local); FRONTEND AUDIT done + fixed.** All 6 B2 wedge skills built (cluster · violin · DEG · volcano · heatmap · GSEA/enrichment) — each `skills/<slug>/{skill.json, run.py (stub) + run_real.py}`, editable plain-array Plotly spec via the shared `_plotly.jsonable`, golden-image snapshot tests green (`python -m pytest` = 14 passed) + real engines smoke-verified on synthetic h5ad/CSV. GSEA via in-house hypergeometric ORA against a bundled GO/Reactome sample — NO gseapy/MSigDB (DECISIONS #9). `main.py` generalized: `POST /skills/{id}/run` now runs ANY Verified skill (query-string params + preserved upload suffix). FE: `selom.violin` catalog entry added (coverage meter → 14/628). **Frontend audit** (ui-ux-pro-max + frontend-design + impeccable; `/impeccable init` wrote DESIGN.md + sidecar) browser-verified on the live app, fixes applied (banned side-stripe removed, skill-card keyboard-a11y, modal focus mgmt, contrast, friendlier run-error copy, graceful narrow-window shell). Commits: docs `abe6fe4`, FE-audit `506d1e6`, BE-B2 `eded0db`, FE-violin `d1b9533`. **NOT yet pushed.** Owner steer: Selom is **desktop-only** (no mobile target). Next: B3 (jobs/queue + live `GET /skills`)._
+_Last updated: 2026-06-12 01:10 +10:00 · Claude (acting FE+BE) — **B2 COMPLETE (local); FRONTEND AUDIT done + fixed; INTEGRATION RESEARCH filed.** All 6 B2 wedge skills built (cluster · violin · DEG · volcano · heatmap · GSEA/enrichment) — each `skills/<slug>/{skill.json, run.py (stub) + run_real.py}`, editable plain-array Plotly spec via the shared `_plotly.jsonable`, golden-image snapshot tests green (`python -m pytest` = 14 passed) + real engines smoke-verified on synthetic h5ad/CSV. GSEA via in-house hypergeometric ORA against a bundled GO/Reactome sample — NO gseapy/MSigDB (DECISIONS #9). `main.py` generalized: `POST /skills/{id}/run` now runs ANY Verified skill (query-string params + preserved upload suffix). FE: `selom.violin` catalog entry added (coverage meter → 14/628). **Frontend audit** (ui-ux-pro-max + frontend-design + impeccable; `/impeccable init` wrote DESIGN.md + sidecar) browser-verified on the live app, fixes applied (banned side-stripe removed, skill-card keyboard-a11y, modal focus mgmt, contrast, friendlier run-error copy, graceful narrow-window shell). Commits: docs `abe6fe4`, FE-audit `506d1e6`, BE-B2 `eded0db`, FE-violin `d1b9533`, handoff `18131b6`. **Integration research (owner-directed):** evaluated OmicVerse / scikit-learn / R4DS+Quarto / Hermes → **`docs/integrations.md`**. Done now: sklearn → core + **silhouette guardrail in `cluster`** (publish-confidence); RISKS #9 filed (OmicVerse pins `pandas<3` → can't share venv + GPL/SCA surface). Queued next session: OmicVerse as an isolated 2nd engine/Foundry source, heatmap row-ordering, R4DS/Quarto for B4 + R-oracle, catalog true-up, OmicVerse/JARVIS MCP (context7 MCP already in `.mcp.json`, working). **NOT yet pushed.** Owner steer: Selom is **desktop-only**. Next: B3 + the integration backlog (`plans/v2-backend.md`)._
 
 **Model:** stay on **Fable 5** for all Selom work — Selom carries no biology/security
 flag. Only *reading the EAMOS build repo* escalates a session to Opus, and that
@@ -185,11 +185,14 @@ None held.
     via `tests/regen_golden.py`) — `python -m pytest` = **14 passed**; real engines smoke-verified on synthetic
     h5ad/CSV (all 8 paths). `main.py` generalized: run-endpoint takes any Verified skill (query-string params +
     preserved upload suffix). FE `selom.violin` entry added (`feat(frontend:)` `d1b9533`; coverage → 14/628).
-- **Next (B3 — jobs + storage, BE-led):** generalize toward async (arq+Redis per DECISIONS #6) for heavy skills;
-  R2 result store; SSE/poll; serve live **`GET /skills`** so the FE Store becomes registry-driven (drop the seed).
-  Then B4 publish-confidence (reproducibility bundle, guardrails, methods-text, Kaleido export). **First: `git push`**
-  the 4 local commits, then pick up B3. Optional: full GO/Reactome GMT ingestion to replace the enrichment sample;
-  real-engine numerical golden tests vs an R oracle (RISKS #7); `plans/v2-frontend.md` P0 still says two-step upload.
+- **Next (B3 — jobs + storage, BE-led — + integration backlog):** generalize toward async (arq+Redis per
+  DECISIONS #6) for heavy skills; R2 result store; SSE/poll; serve live **`GET /skills`** so the FE Store becomes
+  registry-driven (drop the seed). Then B4 publish-confidence (reproducibility bundle, guardrails, methods-text,
+  Kaleido export). **First: `git push`** the local commits, then pick up B3 **+ the integration backlog**
+  (`plans/v2-backend.md` → `docs/integrations.md`): OmicVerse as an **isolated** 2nd engine/Foundry source
+  (RISKS #9 — pins `pandas<3`, run out-of-process; drop unused `gseapy`); heatmap hierarchical row-ordering;
+  R4DS/Quarto for B4 + the R-oracle harness (RISKS #7); full GO/Reactome GMT; catalog-count true-up (≈418);
+  OmicVerse/JARVIS MCP (context7 already wired). `plans/v2-frontend.md` P0 still says two-step upload.
 - **Resume:**
   ```
   # Resume · 2026-06-12 00:44 +10:00 · Selom · Claude (frontend + backend, acting)
@@ -220,9 +223,12 @@ None held.
 - **Next (B3 → B4):** **B3** generalize to async — **arq+Redis** (DECISIONS #6) for heavy skills, R2 result store +
   presigned URLs, SSE/poll status, and serve live **`GET /skills`** so the FE Store drops its seed and reads the
   registry. Then **B4** publish-confidence — reproducibility bundle, statistical guardrails, auto methods-text,
-  Kaleido journal export (RISKS #2/#5). Full spec in `docs/build-charter.md`. Optional B2 follow-ups: full GO/Reactome
-  GMT ingestion (replace the sample); real-engine golden tests vs an R oracle (RISKS #7). Explicit staging only
-  (never `git add -A`); `feat(backend:)` scope.
+  Kaleido journal export (RISKS #2/#5). Full spec in `docs/build-charter.md`. **Integration backlog (owner-directed
+  2026-06-12 — `docs/integrations.md` + `plans/v2-backend.md`):** OmicVerse as an **isolated** 2nd engine/Foundry
+  source — it pins `pandas<3` so it CANNOT share this venv (RISKS #9); run out-of-process (its MCP server / a worker)
+  and **drop the now-unused `gseapy`** from `[omics]`. Plus heatmap hierarchical row-ordering, R4DS/Quarto for B4 +
+  the R-oracle harness (RISKS #7), full GO/Reactome GMT, catalog-count true-up (≈418). sklearn is now a core dep
+  (silhouette guardrail landed in `cluster`). Explicit staging only (never `git add -A`); `feat(backend:)` scope.
 - **Resume:**
   ```
   # Resume · 2026-06-12 00:44 +10:00 · Selom · Codex (backend) — reclaiming from Claude

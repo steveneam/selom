@@ -65,7 +65,8 @@ Done 2026-06-11 (Claude, acting both lanes). `uv sync --extra scrna` + `run_scan
 **B2 · Steven's Stage-1 skills (his real figure types)** ✅ *(DONE 2026-06-12, local — not yet pushed)* `[BE-led, FE registry exists]` `⟵P1 (reprioritized)`
 Built all 6 backend runners (UMAP done in B1): **cluster · violin (new) · DEG (scRNA + bulk) · volcano · heatmap · GSEA/enrichment** — each `skills/<slug>/{skill.json, run.py (dep-free stub) + run_real.py}`, dispatched by `SELOM_SKILLS_ENGINE`, emitting an editable plain-array Plotly spec via the shared `skills/_plotly.jsonable`, with a **golden-image snapshot test** (`tests/test_skills_golden.py` + `tests/golden/`, `python -m pytest` = 14 passed; real engines smoke-verified). `main.py` run-endpoint generalized to any Verified skill. FE conformed with the one new `selom.violin` catalog entry. GSEA via in-house hypergeometric ORA over a bundled GO/Reactome sample (DECISIONS #9 — no gseapy/MSigDB). Commits `eded0db` (BE) / `d1b9533` (FE).
 *Owner sign-off (2026-06-11):* (1) **all 6** approved; (2) **public proxy datasets now** (pbmc3k scRNA + a public bulk set + a sample ranked list), real retinal-atlas/RPGRIP1 data dropped in later for hardening/validation; (3) **GSEA = Reactome/GO** (license-clean) — see DECISIONS.md **#9**.
-*Follow-ups (later):* full GO/Reactome GMT ingestion to replace the bundled sample; real-engine numerical golden tests vs an R oracle (RISKS #7).
+*Follow-ups (later):* full GO/Reactome GMT ingestion to replace the bundled sample; real-engine numerical golden tests vs an R oracle (RISKS #7); **OmicVerse as a second Verified engine + the primary Skill-Foundry source — run out-of-process in an isolated env** (`pandas<3` conflict, RISKS #9; see `docs/integrations.md`); sklearn cluster-quality guardrails landed (silhouette in `cluster`), heatmap hierarchical row-ordering next.
+*Integration research (owner-directed 2026-06-12):* OmicVerse · scikit-learn (now core) · R4DS/Quarto+ggplot2 (B4 reference) · Hermes (pattern + catalog-count true-up 540/88→≈385/33). Full assessment: `docs/integrations.md`.
 *Forj:* meat (the skills) · bones (golden-image harness + stub/real engine split). *Forces:* DECISIONS.md **#9** (GSEA source). Demo-data `[GAP]` resolved → public proxies.
 
 **B3 · Skills as a service (jobs + storage)** 🟡 `[BE-led, FE swaps mocks→live]` `⟵P2`
@@ -99,7 +100,7 @@ Deploy (Render CPU + Modal GPU + Vercel); freemium + academic tiers; broaden cur
 *Forj:* bones (deploy pattern) · meat (tiers). *Forces:* #7 ratified; the licensing gate.
 
 **B9 · Extract-Skills beta + Skill Foundry** ⚪ *(the v2 moat)* `[BE-led, FE foundry UI]` `⟵P7 + design north-star`
-Paper/repo → reproducible custom skill; Firecracker/gVisor sandbox; grow runnable coverage toward the full 500+ (manual Foundry now → LLM-assisted = the moat).
+Paper/repo → reproducible custom skill; Firecracker/gVisor sandbox; grow runnable coverage toward the full 500+ (manual Foundry now → LLM-assisted = the moat). **OmicVerse (isolated worker) is the prime manual-Foundry source** — ~1000 `ov.*` functions map ≈1:1 onto SkillSpec runners (`docs/integrations.md`).
 *Forj:* meat now / BONES-pattern later. *Forces:* DECISIONS.md **#8** (trade-secret IP).
 
 ---
