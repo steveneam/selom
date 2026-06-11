@@ -4,7 +4,7 @@
 > each agent's rolling log, not here. This file is **replaced, never stacked** —
 > update at MAJOR boundaries only (rule 9 in `agent_handoff/README.md`).
 
-_Last updated: 2026-06-11 23:40 +10:00 · Claude (acting FE+BE) — **B1 COMPLETE + PUSHED; B2 SIGNED OFF (not started).** B1 P0 hello-UMAP gate CLOSED end-to-end (real scanpy UMAP renders in-browser from an uploaded `.h5ad`, live :8000); all work pushed (`main` ↔ `origin/main`, HEAD `7d58e92`). **B2 plan owner-approved:** all 6 wedge skills (cluster · violin · DEG · volcano · heatmap · GSEA), **public proxy datasets now** (real retinal-atlas/RPGRIP1 data later for hardening), **GSEA = Reactome/GO** (DECISIONS #9, license-clean). Also: 3 design skills (ui-ux-pro-max + frontend-design + impeccable) now wired in CLAUDE.md for frontend audits. New RISKS #8 (Next proxy 10MB body cap, fixed). Wiki agent still to mirror the charter + file deep ADRs 0004–0007._
+_Last updated: 2026-06-12 00:44 +10:00 · Claude (acting FE+BE) — **B2 COMPLETE (local); FRONTEND AUDIT done + fixed.** All 6 B2 wedge skills built (cluster · violin · DEG · volcano · heatmap · GSEA/enrichment) — each `skills/<slug>/{skill.json, run.py (stub) + run_real.py}`, editable plain-array Plotly spec via the shared `_plotly.jsonable`, golden-image snapshot tests green (`python -m pytest` = 14 passed) + real engines smoke-verified on synthetic h5ad/CSV. GSEA via in-house hypergeometric ORA against a bundled GO/Reactome sample — NO gseapy/MSigDB (DECISIONS #9). `main.py` generalized: `POST /skills/{id}/run` now runs ANY Verified skill (query-string params + preserved upload suffix). FE: `selom.violin` catalog entry added (coverage meter → 14/628). **Frontend audit** (ui-ux-pro-max + frontend-design + impeccable; `/impeccable init` wrote DESIGN.md + sidecar) browser-verified on the live app, fixes applied (banned side-stripe removed, skill-card keyboard-a11y, modal focus mgmt, contrast, friendlier run-error copy, graceful narrow-window shell). Commits: docs `abe6fe4`, FE-audit `506d1e6`, BE-B2 `eded0db`, FE-violin `d1b9533`. **NOT yet pushed.** Owner steer: Selom is **desktop-only** (no mobile target). Next: B3 (jobs/queue + live `GET /skills`)._
 
 **Model:** stay on **Fable 5** for all Selom work — Selom carries no biology/security
 flag. Only *reading the EAMOS build repo* escalates a session to Opus, and that
@@ -14,8 +14,8 @@ source is not needed here. Do not switch to Opus for Selom.
 
 | Agent | Role | Lane | Status |
 |---|---|---|---|
-| Claude | **Frontend + Backend (acting)** — UI/design/product copy **and** APIs/skill runners/data/tests | `app/frontend` + `app/backend` + both plans | IDLE (clear-safe) — **B1 DONE + PUSHED** (P0 hello-UMAP closed end-to-end, `main` ↔ `origin/main` @ `7d58e92`). **B2 SIGNED OFF, not started** — all 6 wedge skills, public proxy data now, GSEA via Reactome/GO (DECISIONS #9). Charter `docs/build-charter.md`; decisions #5–#9 locked. |
-| Codex | Backend (APIs/skill runners/data/tests) | `app/backend` + `plans/v2-backend.md` | **AWAY** (busy on another project). Backend role **temporarily covered by Claude** as of 2026-06-11 22:10. B1 backend done by Claude in the interim (see `## Codex` section). May reclaim at any time — state is drop-in-ready; review the arq #6 lock + the B1 commit on return. |
+| Claude | **Frontend + Backend (acting)** — UI/design/product copy **and** APIs/skill runners/data/tests | `app/frontend` + `app/backend` + both plans | IDLE (clear-safe) — **B2 DONE locally + FRONTEND AUDIT done/fixed; NOT pushed.** 6 wedge skills built + golden-tested (14 passed) + real engines smoke-verified; `main.py` run-endpoint generalized; FE `selom.violin` added; audit fixes applied + browser-verified. 4 scoped commits ahead of `origin/main` (@ `7d58e92`). Decisions #5–#9 locked. Selom is **desktop-only** (owner steer 2026-06-12). |
+| Codex | Backend (APIs/skill runners/data/tests) | `app/backend` + `plans/v2-backend.md` | **AWAY** (busy on another project). Backend role **temporarily covered by Claude** as of 2026-06-11 22:10. B1 + **B2 backend done by Claude** in the interim (see `## Codex` section). May reclaim at any time — state is drop-in-ready; review the arq #6 lock + the B1/B2 commits on return. |
 
 Roles are explicit; any swap is written here before work proceeds.
 
@@ -164,32 +164,40 @@ None held.
   on **:3001** (`npm run dev:mock`; :3000 already in use). **Committed `afaafd2` + pushed**; `main` ↔
   `origin/main` in sync (the push also carried `e63f38b`/`5c4a1fd`). Removed orphaned
   `components/app/top-bar.tsx` + `components/upload/upload-hero.tsx` (superseded by the new shell).
-- **Last (2026-06-11 23:25) — B1 DONE, P0 gate CLOSED.** Built BOTH lanes: (BE) `uv sync --extra scrna` on
-  user-managed py3.12 + wired `run_scanpy.py` (real filter→normalize→PCA→neighbors→Leiden→UMAP) behind the
-  one-shot `POST /skills/umap_scrna/run`; `scripts/make_demo.py` writes the pbmc3k `demo.h5ad`. Fixed two real
-  bugs en route: Plotly 6 base64 typed-array encoding (decode → plain JSON arrays so live matches the stub
-  shape) and the Next 16 proxy 10MB body cap (RISKS #8 → 512mb). (FE) added `runtimeSkillId()` to map catalog
-  ids `selom.umap_scrna` → backend `umap_scrna`. Browser-verified the full flow on :3010 (killed an orphan MCP
-  Chrome from the crash to unblock). Committed scoped: BE `6e37829`, FE `396ca66`, docs `680557a`. Resolved
-  FE→Codex asks #1/#2 (one-shot contract confirmed).
-- **Next (B2 — SIGNED OFF, start the build):** build 6 backend runners — **cluster · violin (new) · DEG (scRNA
-  + bulk) · volcano · heatmap · GSEA/enrichment** — each a pure-Python skill in `skills/<slug>/` (`skill.json` +
-  `run.py`, entrypoint `<slug>.run:run`), emitting an editable plain-array Plotly spec (reuse the `_jsonable`
-  decoder from `run_scanpy.py`) + a **golden-image snapshot test** on a fixed demo input. Locked decisions:
-  **public proxy datasets now** (pbmc3k scRNA + a public bulk set + a sample ranked list; real retinal-atlas /
-  RPGRIP1 data later for hardening), **GSEA = Reactome/GO** (DECISIONS #9). Catalog already lists these as
-  Verified `selom.*` and `runtimeSkillId()` routes them, so FE conforms with no change (except adding a
-  `selom.violin` catalog entry). Build dependency order: cluster → violin → DEG → volcano → heatmap → GSEA.
-  Keep BE drop-in-ready for Codex (scoped `feat(backend:)` commits). Wiki agent still to mirror the charter +
-  file ADRs 0004–0007. (Optional cleanup: `plans/v2-frontend.md` P0 still says two-step upload — make one-shot.)
+- **B1 (done 2026-06-11):** P0 hello-UMAP closed end-to-end — real scanpy UMAP behind the one-shot
+  `POST /skills/umap_scrna/run`, browser-verified; pushed (`main` @ `7d58e92`). See git history `6e37829`/`396ca66`.
+- **Last (2026-06-12 00:44) — FRONTEND AUDIT + B2 DONE locally (NOT pushed).**
+  - **Frontend audit** (all 3 skills): ran `/impeccable init` → wrote **`DESIGN.md`** + `.impeccable/design.json`
+    sidecar (captured the existing dark-IDE token system). Audited Home / Store / project tabs / intake /
+    figure editor across ui-ux-pro-max + frontend-design + impeccable, **browser-verified on the live app**
+    (mock mode, :3010). Fixes applied (commit `506d1e6`): removed the banned skill-card left side-stripe; made
+    the skill-card detail keyboard-operable (`role=button` + Enter/Space + focus ring); skill-detail modal focus
+    management; bumped a low-contrast meta line; friendlier run-error copy (no raw "HTTP 500"); rail collapses
+    to a drawer below `lg` so the **desktop** app degrades gracefully in narrow/split windows. The FE was already
+    strong (landmarks, focus rings, role=dialog/alert, tabular nums, guardrails-first IA, light artboard).
+  - **B2 — all 6 wedge skills** (`feat(backend:)` `eded0db`): `cluster · violin · deg · volcano · heatmap ·
+    enrichment`, each `skills/<slug>/{skill.json, run.py (dep-free stub) + run_real.py}`, dispatched by
+    `SELOM_SKILLS_ENGINE` (auto/stub/real) via new `skills/_engine.py`; all emit the editable plain-array Plotly
+    spec via the shared **`skills/_plotly.jsonable`** (factored out of run_scanpy; umap now reuses it). DEG does
+    scRNA `rank_genes_groups` + bulk pyDESeq2 (CPM-log2FC fallback when pydeseq2 absent). **Enrichment = in-house
+    hypergeometric ORA + BH FDR** against a bundled GO/Reactome gene-set sample (`gene_sets.json`) — NO
+    gseapy/MSigDB (DECISIONS #9). Golden-image tests `tests/test_skills_golden.py` (+ `tests/golden/*.json`, regen
+    via `tests/regen_golden.py`) — `python -m pytest` = **14 passed**; real engines smoke-verified on synthetic
+    h5ad/CSV (all 8 paths). `main.py` generalized: run-endpoint takes any Verified skill (query-string params +
+    preserved upload suffix). FE `selom.violin` entry added (`feat(frontend:)` `d1b9533`; coverage → 14/628).
+- **Next (B3 — jobs + storage, BE-led):** generalize toward async (arq+Redis per DECISIONS #6) for heavy skills;
+  R2 result store; SSE/poll; serve live **`GET /skills`** so the FE Store becomes registry-driven (drop the seed).
+  Then B4 publish-confidence (reproducibility bundle, guardrails, methods-text, Kaleido export). **First: `git push`**
+  the 4 local commits, then pick up B3. Optional: full GO/Reactome GMT ingestion to replace the enrichment sample;
+  real-engine numerical golden tests vs an R oracle (RISKS #7); `plans/v2-frontend.md` P0 still says two-step upload.
 - **Resume:**
   ```
-  # Resume · 2026-06-11 23:40 +10:00 · Selom · Claude (frontend + backend, acting)
-  Selom build repo D:/selom. CLAUDE.md auto-loads. Read agent_handoff/README.md + CURRENT.md (this) + DECISIONS.md + RISKS.md + docs/build-charter.md + docs/command-center/design.md + plans/v2-backend.md + plans/v2-frontend.md.
-  ROLE: Codex is away → Claude owns BOTH lanes. Keep BE drop-in-ready: accurate `## Codex` section, explicit per-lane scoped commits (never git add -A).
-  Delta: B1 DONE + PUSHED (P0 hello-UMAP closed end-to-end, browser-verified; main ↔ origin/main @ 7d58e92). B2 SIGNED OFF (not started): all 6 wedge skills, public proxy data now, GSEA via Reactome/GO (DECISIONS #9). 3 design skills (ui-ux-pro-max + frontend-design + impeccable) wired in CLAUDE.md for frontend audits — run /impeccable init once.
-  Env notes: backend on user-managed py3.12 (uv), system py3.10 IT-locked — do not use. demo.h5ad gitignored (~21MB), regenerate via `uv run --directory app/backend python scripts/make_demo.py`. Use `python -m pytest`/`python -m uvicorn` (Windows blocks fresh .exe shims). FE dev port 3010 (3000/3001 used by other projects). Real engine: SELOM_UMAP_ENGINE=scanpy (auto works when scanpy installed).
-  Next: START B2 — build cluster/violin/DEG/volcano/heatmap/GSEA runners (SkillSpec + golden-image tests), public-proxy data, Reactome/GO for GSEA. Stay on Fable 5 (xhigh). End clear-safe.
+  # Resume · 2026-06-12 00:44 +10:00 · Selom · Claude (frontend + backend, acting)
+  Selom build repo D:/selom. CLAUDE.md auto-loads. Read agent_handoff/README.md + CURRENT.md (this) + DECISIONS.md + RISKS.md + docs/build-charter.md + DESIGN.md + plans/v2-backend.md + plans/v2-frontend.md.
+  ROLE: Codex away → Claude owns BOTH lanes. Keep BE drop-in-ready: accurate `## Codex` section, explicit per-lane scoped commits (never git add -A). Selom is DESKTOP-ONLY (owner steer).
+  Delta: FRONTEND AUDIT done + fixed (DESIGN.md written; side-stripe/a11y/contrast/error-copy/narrow-shell). B2 DONE locally — all 6 wedge skills + golden tests (14 passed) + real-engine smoke OK; main.py run-endpoint generalized; FE selom.violin added. 4 commits NOT pushed (abe6fe4 docs, 506d1e6 FE-audit, eded0db BE-B2, d1b9533 FE-violin) ahead of origin @ 7d58e92.
+  Env: backend on user-managed py3.12 (uv at C:/Users/seamegdool/.local/bin/uv.exe); system py3.10 IT-locked. Run via `uv run --directory app/backend python -m pytest` / `-m uvicorn`. Skills stub vs real via SELOM_SKILLS_ENGINE (auto|stub|real); golden tests pin stub. FE dev `npm run dev:mock -- --port 3010` (mock mode; 3000/3001 are other projects). demo.h5ad gitignored — regen via scripts/make_demo.py.
+  Next: PUSH the 4 commits, then START B3 (arq+Redis async, R2 store, live GET /skills → registry-driven Store). Stay on Fable 5 (xhigh). End clear-safe.
   ```
 
 ## Codex — Last Task & Resume
@@ -199,22 +207,26 @@ None held.
 > any agent) can drop in and take over from the `**Next**` line below with zero re-derivation. When Codex
 > returns, take this section back and review the backend-lane decisions locked in the interim (arq #6).
 
-- **Last (done by Claude, acting BE, 2026-06-11):** **B1 backend complete — P0 gate closed.** venv built via
-  `uv sync --extra scrna` (new light scRNA extra in `pyproject.toml`; `[omics]` now supersets it) on the
-  user-managed py3.12; `run_scanpy.py` wired as the real engine behind the one-shot
-  `POST /skills/umap_scrna/run`; `run.py` dispatches stub vs. real via `SELOM_UMAP_ENGINE`; `scripts/make_demo.py`
-  + `uv.lock` added; contract test pinned to the stub. Committed `feat(backend:)` `6e37829`. **arq #6 was locked
-  in your absence — review on return.**
-- **Next (B2 → B3 → B4) — B2 is SIGNED OFF:** **B2** build Steven's wedge skills — cluster · violin · DEG (scRNA
-  + bulk) · volcano · heatmap · GSEA/enrichment — into the SkillSpec contract, each emitting an editable Plotly
-  spec + a golden-image test. Locked: **public proxy datasets now** (real data later), **GSEA = Reactome/GO**
-  (DECISIONS #9, license-clean — do NOT use gseapy/MSigDB). Then **B3** Supabase + arq async queue; **B4**
-  publish-confidence — guardrails / methods-text / Kaleido export (RISKS #2/#5). Full spec in `docs/build-charter.md`.
-  Explicit staging only (never `git add -A`); `feat(backend:)` scope.
+- **Last (done by Claude, acting BE, 2026-06-12):** **B1 + B2 backend complete.** B1 = real scanpy UMAP behind
+  the one-shot `POST /skills/umap_scrna/run` (`6e37829`). **B2 = all 6 wedge skills** (`eded0db`):
+  `cluster · violin · deg · volcano · heatmap · enrichment`, each `skills/<slug>/{skill.json, run.py (stub) +
+  run_real.py}`, dispatched by `SELOM_SKILLS_ENGINE` (auto/stub/real) via `skills/_engine.py`; output via the
+  shared `skills/_plotly.jsonable` (factored out of `run_scanpy`). DEG: scRNA `rank_genes_groups` + bulk pyDESeq2
+  (CPM fallback). **Enrichment: in-house hypergeometric ORA + BH FDR vs a bundled GO/Reactome `gene_sets.json` —
+  NO gseapy/MSigDB (DECISIONS #9).** `main.py` run-endpoint generalized to ANY Verified skill (query params +
+  preserved upload suffix). Tests `tests/test_skills_golden.py` + `tests/golden/*.json` (regen `tests/regen_golden.py`)
+  → `python -m pytest` = 14 passed; real engines smoke-verified on synthetic data. **arq #6 still locked in your
+  absence — review on return. NOTE: commits are LOCAL, not yet pushed.**
+- **Next (B3 → B4):** **B3** generalize to async — **arq+Redis** (DECISIONS #6) for heavy skills, R2 result store +
+  presigned URLs, SSE/poll status, and serve live **`GET /skills`** so the FE Store drops its seed and reads the
+  registry. Then **B4** publish-confidence — reproducibility bundle, statistical guardrails, auto methods-text,
+  Kaleido journal export (RISKS #2/#5). Full spec in `docs/build-charter.md`. Optional B2 follow-ups: full GO/Reactome
+  GMT ingestion (replace the sample); real-engine golden tests vs an R oracle (RISKS #7). Explicit staging only
+  (never `git add -A`); `feat(backend:)` scope.
 - **Resume:**
   ```
-  # Resume · 2026-06-11 23:40 +10:00 · Selom · Codex (backend) — reclaiming from Claude
+  # Resume · 2026-06-12 00:44 +10:00 · Selom · Codex (backend) — reclaiming from Claude
   Selom build repo D:/selom. CODEX.md auto-loads. Read agent_handoff/README.md + CURRENT.md + DECISIONS.md + RISKS.md + docs/build-charter.md + plans/v2-backend.md + git status.
-  Delta: B1 backend DONE by Claude — real scanpy UMAP wired behind one-shot POST /skills/umap_scrna/run, verified end-to-end in-browser; PUSHED (main @ 7d58e92). New light [scrna] extra; demo.h5ad gitignored. arq #6 locked in your absence — review it.
-  Next: B2 (SIGNED OFF) — build cluster/violin/DEG/volcano/heatmap/GSEA into SkillSpec + golden-image tests; public-proxy data now; GSEA via Reactome/GO (DECISIONS #9). Env: user-managed py3.12 (system 3.10 IT-locked); use `python -m pytest`/`-m uvicorn`. Stay on Fable 5. End clear-safe.
+  Delta: B1 + B2 backend DONE by Claude. B2 = 6 wedge skills (cluster/violin/deg/volcano/heatmap/enrichment) each stub+real behind SELOM_SKILLS_ENGINE, golden tests green (14 passed), real engines smoke-verified; main.py run-endpoint generalized to any skill. Enrichment = in-house hypergeometric ORA vs bundled GO/Reactome (NO gseapy/MSigDB, DECISIONS #9). Commits LOCAL not pushed (eded0db BE) ahead of origin @ 7d58e92. arq #6 locked in your absence — review it.
+  Next: B3 — arq+Redis async, R2 store + presigned URLs, SSE/poll, live GET /skills (registry-driven Store). Env: user-managed py3.12 (uv); system 3.10 IT-locked; use `uv run --directory app/backend python -m pytest`/`-m uvicorn`. Stay on Fable 5. End clear-safe.
   ```

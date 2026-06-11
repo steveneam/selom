@@ -62,10 +62,11 @@ Repo, GitHub push, BE skeleton, editable-spec editor, command-center shell — *
 Done 2026-06-11 (Claude, acting both lanes). `uv sync --extra scrna` + `run_scanpy.py` wired behind the one-shot `POST /skills/umap_scrna/run`; `demo.h5ad` (pbmc3k) → real Scanpy UMAP → editable Plotly spec; browser-verified end-to-end (upload → run → editable figure renders, live :8000, MSW off). One-shot contract confirmed. Fixed Plotly-6 base64 typed-arrays + Next-16 proxy 10MB body cap (RISKS #8). Commits `6e37829`/`396ca66`.
 *Forj:* bones (skill-contract round-trip) · meat (umap). *Forces:* canonical P0 contract = **one-shot** (resolved).
 
-**B2 · Steven's Stage-1 skills (his real figure types)** 🔴 *(SIGNED OFF 2026-06-11, not started)* `[BE-led, FE registry exists]` `⟵P1 (reprioritized)`
-Build 6 backend runners (UMAP done in B1): **cluster · violin (new) · DEG (scRNA + bulk) · volcano · heatmap · GSEA/enrichment** — each a pure-Python skill emitting an editable Plotly spec + **golden-image snapshot test**. FE already lists these as Verified `selom.*` entries and B1's `runtimeSkillId()` routes them, so B2 is backend runners + tests; FE conforms.
+**B2 · Steven's Stage-1 skills (his real figure types)** ✅ *(DONE 2026-06-12, local — not yet pushed)* `[BE-led, FE registry exists]` `⟵P1 (reprioritized)`
+Built all 6 backend runners (UMAP done in B1): **cluster · violin (new) · DEG (scRNA + bulk) · volcano · heatmap · GSEA/enrichment** — each `skills/<slug>/{skill.json, run.py (dep-free stub) + run_real.py}`, dispatched by `SELOM_SKILLS_ENGINE`, emitting an editable plain-array Plotly spec via the shared `skills/_plotly.jsonable`, with a **golden-image snapshot test** (`tests/test_skills_golden.py` + `tests/golden/`, `python -m pytest` = 14 passed; real engines smoke-verified). `main.py` run-endpoint generalized to any Verified skill. FE conformed with the one new `selom.violin` catalog entry. GSEA via in-house hypergeometric ORA over a bundled GO/Reactome sample (DECISIONS #9 — no gseapy/MSigDB). Commits `eded0db` (BE) / `d1b9533` (FE).
 *Owner sign-off (2026-06-11):* (1) **all 6** approved; (2) **public proxy datasets now** (pbmc3k scRNA + a public bulk set + a sample ranked list), real retinal-atlas/RPGRIP1 data dropped in later for hardening/validation; (3) **GSEA = Reactome/GO** (license-clean) — see DECISIONS.md **#9**.
-*Forj:* meat (the skills) · bones (golden-image harness). *Forces:* DECISIONS.md **#9** (GSEA source). Demo-data `[GAP]` resolved → public proxies.
+*Follow-ups (later):* full GO/Reactome GMT ingestion to replace the bundled sample; real-engine numerical golden tests vs an R oracle (RISKS #7).
+*Forj:* meat (the skills) · bones (golden-image harness + stub/real engine split). *Forces:* DECISIONS.md **#9** (GSEA source). Demo-data `[GAP]` resolved → public proxies.
 
 **B3 · Skills as a service (jobs + storage)** 🟡 `[BE-led, FE swaps mocks→live]` `⟵P2`
 Generalize the run endpoint to all Verified skills; async **arq+Redis** for heavy jobs; R2 result store + presigned URLs; SSE/poll status; FE Store becomes **registry-driven from real `GET /skills`**.
@@ -116,7 +117,7 @@ Two agents, disjoint lanes (`agent_handoff/README.md`): **Claude = FE** (`app/fr
 
 ## Active bucket
 
-**B2 — SIGNED OFF (2026-06-11), not started.** B1 (P0 hello-UMAP) done + browser-verified. B2 plan approved: all 6 wedge skills (cluster · violin · DEG · volcano · heatmap · GSEA), public proxy datasets now (real data later), GSEA via Reactome/GO (DECISIONS #9). Next session starts the build.
+**B2 — DONE (2026-06-12), local (not yet pushed). Active-next = B3.** B0/B1 done; **B2 complete**: all 6 wedge skills built + golden-tested (14 passed) + real engines smoke-verified, run-endpoint generalized, `selom.violin` added, GSEA via Reactome/GO (DECISIONS #9). A **frontend audit** (ui-ux-pro-max + frontend-design + impeccable; `DESIGN.md` written) was run alongside and its fixes applied + browser-verified. **Next = B3** (jobs/queue: arq+Redis async, R2 store, live `GET /skills` → registry-driven Store) after pushing the local commits. Owner steer: Selom is **desktop-only** (no mobile target).
 
 ---
 
