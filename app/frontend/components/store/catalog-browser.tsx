@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
-import { CATALOG, CATEGORIES, OMICS } from "@/lib/catalog/seed";
+import { useCatalog } from "@/lib/catalog/registry";
 import type { SkillCatalogEntry, SkillSource, SkillTier } from "@/lib/catalog/types";
 import { projectStore, select, useProjects } from "@/lib/projects/store";
 
@@ -22,6 +22,17 @@ type SourceFilter = "all" | SkillSource;
 export function CatalogBrowser() {
   const state = useProjects();
   const { projects } = state;
+  const { catalog } = useCatalog();
+
+  // Filter facets follow the live catalog, not a fixed seed list.
+  const categories = React.useMemo(
+    () => Array.from(new Set(catalog.map((s) => s.category))).sort(),
+    [catalog],
+  );
+  const omicsFacets = React.useMemo(
+    () => Array.from(new Set(catalog.flatMap((s) => s.omics))).sort(),
+    [catalog],
+  );
 
   const [query, setQuery] = React.useState("");
   const [tier, setTier] = React.useState<TierFilter>("all");
@@ -40,7 +51,7 @@ export function CatalogBrowser() {
 
   const results = React.useMemo(() => {
     const q = query.trim().toLowerCase();
-    return CATALOG.filter((s) => {
+    return catalog.filter((s) => {
       if (tier !== "all" && s.tier !== tier) return false;
       if (source !== "all" && s.source !== source) return false;
       if (omics !== "all" && !s.omics.includes(omics)) return false;
@@ -48,7 +59,7 @@ export function CatalogBrowser() {
       if (q && !(`${s.name} ${s.summary} ${s.category}`.toLowerCase().includes(q))) return false;
       return true;
     }).sort((a, b) => b.popularity - a.popularity);
-  }, [query, tier, source, omics, category]);
+  }, [catalog, query, tier, source, omics, category]);
 
   function toggleInstall(skill: SkillCatalogEntry) {
     let projectId = target;
@@ -123,7 +134,7 @@ export function CatalogBrowser() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All omics</SelectItem>
-              {OMICS.map((o) => (
+              {omicsFacets.map((o) => (
                 <SelectItem key={o} value={o}>
                   {o}
                 </SelectItem>
@@ -138,7 +149,7 @@ export function CatalogBrowser() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All categories</SelectItem>
-              {CATEGORIES.map((c) => (
+              {categories.map((c) => (
                 <SelectItem key={c} value={c}>
                   {c}
                 </SelectItem>

@@ -85,11 +85,12 @@ export const CATALOG: SkillCatalogEntry[] = [
   e({
     id: "selom.enrichment",
     name: "Pathway enrichment",
-    summary: "Over-representation / GSEA against GO & Reactome; dotplot output.",
+    summary: "In-house hypergeometric ORA against GO & Reactome; dotplot output.",
     source: "selom", category: "pathway-analysis", omics: ["bulk RNA-seq", "scRNA-seq", "proteomics"],
     tier: "verified", status: "beta", engine: "python",
     inputFormats: [".csv"], chainsWith: ["selom.deg", "selom.volcano"],
-    outputs: ["figure", "tables"], license: "GPL-2.0",
+    // MIT, not GPL: enrichment is an in-house ORA, not a gseapy wrapper (DECISIONS #9).
+    outputs: ["figure", "tables"], license: "MIT",
     provenance: { repo: "selom/skills", path: "enrichment" }, version: "0.9.0", popularity: 72,
   }),
   e({

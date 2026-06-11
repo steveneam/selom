@@ -1,11 +1,10 @@
 import { CatalogBrowser } from "@/components/store/catalog-browser";
-import { CATALOG_TOTAL_ESTIMATE, VERIFIED_SEEDED } from "@/lib/catalog/seed";
+import { CoverageMeter } from "@/components/store/coverage-meter";
+import { CATALOG_TOTAL_ESTIMATE } from "@/lib/catalog/seed";
 
 export const metadata = { title: "Skill Store — Selom" };
 
 export default function StorePage() {
-  const pct = Math.round((VERIFIED_SEEDED / CATALOG_TOTAL_ESTIMATE) * 100);
-
   return (
     <div className="mx-auto max-w-6xl px-6 py-8 lg:px-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -20,27 +19,8 @@ export default function StorePage() {
           </p>
         </div>
 
-        {/* honest coverage meter (design §6.4) */}
-        <div className="w-56 shrink-0 rounded-lg border border-border bg-card/50 p-3">
-          <div className="flex items-baseline justify-between">
-            <span className="tabular text-sm font-semibold text-foreground">
-              {VERIFIED_SEEDED}
-              <span className="text-muted-foreground"> / ~{CATALOG_TOTAL_ESTIMATE}</span>
-            </span>
-            <span className="text-[10px] font-medium uppercase tracking-wider text-primary/80">
-              runnable
-            </span>
-          </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary"
-              style={{ width: `${Math.max(2, pct)}%` }}
-            />
-          </div>
-          <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
-            Coverage grows via the Skill Foundry — browsable ≠ runnable, shown honestly.
-          </p>
-        </div>
+        {/* honest coverage meter (design §6.4) — runnable count is live from GET /skills */}
+        <CoverageMeter />
       </div>
 
       <div className="mt-7">
