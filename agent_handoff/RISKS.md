@@ -5,7 +5,7 @@
 > fix. Add new risks as they surface; do not delete — supersede with a resolution
 > note.
 
-_Last updated: 2026-06-10 20:46 +10:00_
+_Last updated: 2026-06-11 23:20 +10:00 — added #8 (Next proxy body cap), surfaced closing the B1 P0 gate._
 
 | # | Risk | Impact | Fix / mitigation | Owner |
 |---|---|---|---|---|
@@ -16,6 +16,7 @@ _Last updated: 2026-06-10 20:46 +10:00_
 | 5 | **boto3 >=1.36 breaks Cloudflare R2 checksums** | Uploads silently fail or error | Set `request_checksum_calculation='when_required'` (and `response_checksum_validation='when_supported'`) on the boto3 client `Config` | Codex (BE) |
 | 6 | **AGPL transitive-dep risk** (gseapy / MSigDB, decoupler) | SaaS gap covers GPL but AGPL requires source disclosure for network-served apps | **DEFERRED per owner** (build-for-self now) but FLAGGED for the **pre-launch SCA gate**: run `pip-audit`/`safety`, quarantine AGPL, prefer Reactome/GO over MSigDB. Do not ship to external users until cleared. | Codex (BE) / pre-launch |
 | 7 | **pyDESeq2 != DESeq2 bit-for-bit** | Gene-set overlap is very high but not numerically identical to R DESeq2 | Golden-image tests catch divergence; use R-in-a-box (limma) for small-n / microarray designs | Codex (BE) |
+| 8 | **Next 16 proxy buffers request bodies at 10MB** (rewrites/`/api/*` → :8000) | Real `.h5ad` uploads (pbmc3k demo is ~21MB) are truncated → broken multipart → ECONNRESET → 500. Found closing the P0 gate. | **Dev/P0 fix applied:** `experimental.proxyClientMaxBodySize: "512mb"` in `next.config.ts`. But Next buffers the body in memory per request, so this won't scale to large datasets. **Production must move large uploads off the in-memory proxy** — direct-to-backend (CORS) or chunked/presigned upload. | Claude (FE) |
 
 ## Notes
 
