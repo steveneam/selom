@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Search } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Menu, Search } from "lucide-react";
 import { Sidebar } from "./sidebar";
 import { projectStore } from "@/lib/projects/store";
 
@@ -9,18 +10,46 @@ import { projectStore } from "@/lib/projects/store";
  * The persistent command-center frame: project rail + header + main stage.
  * Wraps every route (mounted from the root layout) so navigation never remounts
  * the sidebar — scroll and selection state persist (nav `state-preservation`).
+ *
+ * Below `lg` the rail is an off-canvas drawer toggled from the header; at desktop
+ * it's a static column. The drawer closes on any navigation (route change).
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const [navOpen, setNavOpen] = React.useState(false);
+
   // Load persisted projects on the client, once, after hydration.
   React.useEffect(() => {
     projectStore.hydrate();
   }, []);
 
+  // Close the mobile drawer whenever the route changes.
+  React.useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
+
   return (
     <div className="flex h-dvh overflow-hidden">
-      <Sidebar />
+      {/* Scrim behind the mobile drawer (desktop never shows it). */}
+      {navOpen && (
+        <div
+          aria-hidden
+          onClick={() => setNavOpen(false)}
+          className="fixed inset-0 z-30 bg-black/55 lg:hidden"
+        />
+      )}
+      <Sidebar open={navOpen} onNavigate={() => setNavOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card/30 px-5 backdrop-blur-sm">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card/30 px-4 backdrop-blur-sm sm:px-5">
+          <button
+            type="button"
+            onClick={() => setNavOpen(true)}
+            aria-label="Open navigation"
+            aria-expanded={navOpen}
+            className="grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 lg:hidden"
+          >
+            <Menu className="size-5" />
+          </button>
           <label className="relative w-full max-w-sm">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <input

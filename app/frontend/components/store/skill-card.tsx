@@ -29,22 +29,30 @@ export function SkillCard({
 
   return (
     <Card
+      role="button"
+      tabIndex={0}
+      aria-label={`${skill.name} — view details`}
       onClick={onOpen}
+      onKeyDown={(e) => {
+        // Only the card itself opens details — let the inner Install button
+        // handle its own keys without also firing this.
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
       className={cn(
         "group relative flex cursor-pointer flex-col gap-3 p-4 transition-colors hover:border-primary/40 hover:bg-card/80",
+        "focus-visible:outline-none focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring/40",
       )}
     >
-      <span
-        aria-hidden
-        className="absolute inset-y-3 left-0 w-0.5 rounded-full opacity-50"
-        style={{ backgroundColor: src.dot }}
-      />
-      <div className="flex items-start justify-between gap-2 pl-1.5">
+      <div className="flex items-start justify-between gap-2">
         <h3 className="min-w-0 truncate text-sm font-semibold text-foreground">{skill.name}</h3>
         <Badge variant={verified ? "verified" : "community"}>{verified ? "Verified" : "Community"}</Badge>
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5 pl-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
           <span aria-hidden className="size-1.5 rounded-full" style={{ backgroundColor: src.dot }} />
           {src.label}
@@ -59,10 +67,10 @@ export function SkillCard({
         ))}
       </div>
 
-      <p className="line-clamp-2 pl-1.5 text-xs leading-relaxed text-muted-foreground">{skill.summary}</p>
+      <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{skill.summary}</p>
 
-      <div className="mt-auto flex items-center justify-between gap-2 pl-1.5 pt-1">
-        <span className="tabular truncate text-[10px] text-muted-foreground/70">
+      <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+        <span className="tabular truncate text-[10px] text-muted-foreground">
           {skill.inputFormats.join(" · ")}
         </span>
         <Button

@@ -20,13 +20,21 @@ export function SkillDetail({
   onClose: () => void;
   onToggleInstall: () => void;
 }) {
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+
   React.useEffect(() => {
     if (!skill) return;
+    // Move focus into the dialog on open; restore it to the trigger on close.
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      previouslyFocused?.focus?.();
+    };
   }, [skill, onClose]);
 
   if (!skill) return null;
@@ -40,10 +48,12 @@ export function SkillDetail({
         className="absolute inset-0 bg-black/55 backdrop-blur-sm"
       />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={`${skill.name} details`}
-        className="relative z-10 w-full max-w-lg overflow-hidden rounded-xl border border-border bg-popover shadow-2xl"
+        tabIndex={-1}
+        className="relative z-10 w-full max-w-lg overflow-hidden rounded-xl border border-border bg-popover shadow-2xl outline-none"
       >
         <div className="flex items-start justify-between gap-3 border-b border-border p-5">
           <div className="min-w-0">

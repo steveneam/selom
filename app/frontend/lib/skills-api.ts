@@ -40,14 +40,19 @@ export async function runSkill(
 
   const res = await fetch(url, { method: "POST", body: fd });
   if (!res.ok) {
-    let detail = `HTTP ${res.status}`;
+    // Prefer the backend's own explanation; otherwise speak plainly (the user is
+    // a bench scientist, not an ops engineer) and always point at a next step.
+    let detail =
+      res.status >= 500
+        ? "the analysis service is temporarily unavailable"
+        : `the request was rejected (${res.status})`;
     try {
       const body = await res.json();
-      detail = body?.detail ?? detail;
+      if (body?.detail) detail = body.detail;
     } catch {
       /* non-JSON error body */
     }
-    throw new Error(`Skill run failed (${detail}).`);
+    throw new Error(`Couldn't run this skill — ${detail}. Please try again.`);
   }
 
   const json = (await res.json()) as Partial<SkillRunResponse>;
