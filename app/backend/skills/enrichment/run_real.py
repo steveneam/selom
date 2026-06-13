@@ -13,7 +13,7 @@ import pathlib
 
 from skills.enrichment.run import dotplot_spec
 
-_GENE_COLS = ["gene", "genes", "symbol", "names", "gene_id", "id"]
+_GENE_COLS = ["gene", "genes", "symbol", "gene_name", "gene_symbol", "geneid", "gene_id", "feature", "names", "id"]
 
 
 def run(data_path: str, params: dict) -> dict:
