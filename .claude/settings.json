@@ -1,5 +1,5 @@
 {
-  "model": "claude-fable-5",
+  "model": "claude-opus-4-8",
   "permissions": {
     "defaultMode": "bypassPermissions"
   },
@@ -8,6 +8,6 @@
     "frontend-design@claude-plugins-official": true,
     "vercel@claude-plugins-official": true
   },
-  "effortLevel": "high",
+  "effortLevel": "xhigh",
   "theme": "dark"
 }
