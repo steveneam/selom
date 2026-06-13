@@ -96,6 +96,60 @@ def test_batch_column_warns():
     assert batch and "sample" in batch[0]["detail"]
 
 
+# --- CSV data guardrails (bulk DEG replication / counts; enrichment gene-list) --
+
+def test_deg_csv_few_samples_warns():
+    profile = {"kind": "csv", "n_cols": 5,
+               "header": ["gene", "ctrl_1", "ctrl_2", "treat_1", "treat_2"],
+               "numeric_is_integer": True}
+    out = guardrails._csv_data_guardrails(load_skill("deg"), profile)
+    assert "low-replication" in _codes(out)
+
+
+def test_deg_csv_imbalanced_group_warns():
+    # 6 samples but 4 vs 2 — the per-group check (not the <6 total) should fire.
+    profile = {"kind": "csv", "n_cols": 7,
+               "header": ["gene", "ctrl_1", "ctrl_2", "ctrl_3", "ctrl_4", "treat_1", "treat_2"],
+               "numeric_is_integer": True}
+    out = guardrails._csv_data_guardrails(load_skill("deg"), profile)
+    warn = [x for x in out if x["code"] == "low-replication"]
+    assert warn and "treat" in warn[0]["detail"]
+
+
+def test_deg_csv_ample_balanced_no_warn():
+    profile = {"kind": "csv", "n_cols": 7,
+               "header": ["gene", "ctrl_1", "ctrl_2", "ctrl_3", "treat_1", "treat_2", "treat_3"],
+               "numeric_is_integer": True}
+    assert "low-replication" not in _codes(guardrails._csv_data_guardrails(load_skill("deg"), profile))
+
+
+def test_deg_csv_non_integer_counts_warns():
+    profile = {"kind": "csv", "n_cols": 7,
+               "header": ["gene", "ctrl_1", "ctrl_2", "ctrl_3", "treat_1", "treat_2", "treat_3"],
+               "numeric_is_integer": False}
+    assert "non-integer-counts" in _codes(guardrails._csv_data_guardrails(load_skill("deg"), profile))
+
+
+def test_enrichment_csv_small_gene_list_warns():
+    out = guardrails._csv_data_guardrails(load_skill("enrichment"), {"kind": "csv", "n_rows": 5})
+    assert "small-gene-list" in _codes(out)
+
+
+def test_enrichment_csv_ample_gene_list_no_warn():
+    out = guardrails._csv_data_guardrails(load_skill("enrichment"), {"kind": "csv", "n_rows": 50})
+    assert "small-gene-list" not in _codes(out)
+
+
+def test_profile_csv_and_build_on_real_file(tmp_path):
+    # 4 samples (2 vs 2), integer counts -> low-replication; multiple-testing rides along.
+    csv = tmp_path / "counts.csv"
+    csv.write_text("genes,ctrl_1,ctrl_2,treat_1,treat_2\nG1,5,6,30,28\nG2,100,90,10,12\n")
+    prof = guardrails._profile_csv(str(csv))
+    assert prof["n_cols"] == 5 and prof["n_rows"] == 2 and prof["numeric_is_integer"] is True
+    codes = _codes(guardrails.build(load_skill("deg"), str(csv), {}))
+    assert "low-replication" in codes and "multiple-testing" in codes
+
+
 # --- the /run bundle carries guardrails -----------------------------------------
 
 def test_run_endpoint_includes_guardrails():

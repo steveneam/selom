@@ -10,10 +10,11 @@ Two kinds of check:
 
   * method/param guardrails — derived from the skill + its resolved parameters; always
     available, deterministic, no data read.
-  * data guardrails — derived from a light profile of the input (cell count, value
-    scale, candidate batch columns). Best-effort: built only for ``.h5ad`` inputs when
-    ``anndata`` is importable (the real-engine path); silently skipped otherwise so the
-    light/stub path and CSV inputs never error.
+  * data guardrails — derived from a light profile of the input. For ``.h5ad`` (needs
+    ``anndata``, the real-engine path): cell count, value scale, candidate batch columns.
+    For ``.csv``/``.tsv`` (stdlib, always): bulk-DE replication + raw-count check (deg),
+    and gene-list size (enrichment). Best-effort and never-raising, so the light/stub
+    path and unrecognized inputs simply skip the data checks.
 
 Cluster-separation quality (silhouette) is emitted separately by the cluster runner as
 the figure subtitle — it needs the computed embedding, so it lives with the analysis.
@@ -119,8 +120,123 @@ def _data_guardrails(spec: SkillSpec, profile: dict) -> list[dict]:
     return out
 
 
+_MIN_REPLICATES = 3   # bulk DE wants >= 3 per group for stable dispersion estimates
+_MIN_GENES = 10       # over-representation analysis is unstable on tiny gene lists
+
+
+def _csv_data_guardrails(spec: SkillSpec, profile: dict) -> list[dict]:
+    out: list[dict] = []
+
+    if spec.id == "deg":
+        # Bulk count matrix: column 0 = gene id, the rest are samples; the 2-level
+        # design is the column-name prefix before the first '_' (matches the runner).
+        n_samples = max(0, profile.get("n_cols", 0) - 1)
+        groups = _column_groups(profile.get("header") or [])
+        if 0 < n_samples < 2 * _MIN_REPLICATES:
+            out.append(
+                _g(
+                    "warn",
+                    "low-replication",
+                    "Few samples for bulk DE",
+                    f"{n_samples} samples in the count matrix; bulk differential expression needs "
+                    f"replication (≥{_MIN_REPLICATES} per group) for stable dispersion estimates.",
+                )
+            )
+        elif groups and min(groups.values()) < _MIN_REPLICATES:
+            small = ", ".join(f"{k} (n={v})" for k, v in groups.items() if v < _MIN_REPLICATES)
+            out.append(
+                _g(
+                    "warn",
+                    "low-replication",
+                    "Few replicates in a group",
+                    f"group {small}: bulk DE is unstable below {_MIN_REPLICATES} replicates per group.",
+                )
+            )
+        if profile.get("numeric_is_integer") is False:
+            out.append(
+                _g(
+                    "warn",
+                    "non-integer-counts",
+                    "Counts are not integers",
+                    "pyDESeq2 expects raw integer counts; the matrix has non-integer values "
+                    "(normalized/transformed), which biases the dispersion model. Provide raw counts.",
+                )
+            )
+
+    elif spec.id == "enrichment":
+        n_genes = profile.get("n_rows", 0)
+        if 0 < n_genes < _MIN_GENES:
+            out.append(
+                _g(
+                    "warn",
+                    "small-gene-list",
+                    "Small gene list",
+                    f"{n_genes} genes in the query; over-representation analysis is underpowered and "
+                    f"unstable below ~{_MIN_GENES} genes.",
+                )
+            )
+
+    return out
+
+
+def _column_groups(header: list) -> dict:
+    """Sample-column counts per design group (prefix before the first '_'), matching
+    the bulk-DEG runner's design inference. Column 0 is the gene id, so it's skipped."""
+    groups: dict[str, int] = {}
+    for name in header[1:]:
+        prefix = str(name).split("_", 1)[0]
+        groups[prefix] = groups.get(prefix, 0) + 1
+    return groups
+
+
+def _to_float(cell: str):
+    try:
+        return float(cell)
+    except (TypeError, ValueError):
+        return None
+
+
+def _profile_csv(data_path: str) -> dict | None:
+    """Light, best-effort CSV/TSV profile (stdlib). Dimensions + a value-scale sample
+    from the first rows (data columns only). None on any read error."""
+    import csv
+
+    delimiter = "\t" if data_path.lower().endswith(".tsv") else ","
+    try:
+        with open(data_path, newline="", encoding="utf-8-sig") as handle:
+            reader = csv.reader(handle, delimiter=delimiter)
+            header = next(reader, None)
+            if header is None:
+                return None
+            n_rows = 0
+            saw_numeric = False
+            is_integer = True
+            max_val = 0.0
+            for row in reader:
+                n_rows += 1
+                if n_rows <= 50:  # sample value scale from the first data rows only
+                    for cell in row[1:]:
+                        value = _to_float(cell)
+                        if value is None:
+                            continue
+                        saw_numeric = True
+                        max_val = max(max_val, value)
+                        if value != round(value):
+                            is_integer = False
+            return {
+                "kind": "csv",
+                "n_rows": n_rows,
+                "n_cols": len(header),
+                "header": [str(h) for h in header],
+                "numeric_is_integer": is_integer if saw_numeric else None,
+                "numeric_max": max_val if saw_numeric else None,
+            }
+    except Exception:
+        return None
+
+
 def _profile(data_path: str) -> dict | None:
-    """Light, best-effort profile of the input. None unless it's a parseable .h5ad."""
+    """Light, best-effort h5ad profile. None unless it's a parseable .h5ad."""
     if not data_path.lower().endswith(".h5ad"):
         return None
     try:
@@ -172,10 +288,16 @@ def build(spec: SkillSpec, data_path: str, params: dict) -> list[dict]:
         out = _method_guardrails(spec, resolved_params(spec, params))
     except Exception:
         out = []
+    low = data_path.lower()
     try:
-        profile = _profile(data_path)
-        if profile:
-            out += _data_guardrails(spec, profile)
+        if low.endswith(".h5ad"):
+            profile = _profile(data_path)
+            if profile:
+                out += _data_guardrails(spec, profile)
+        elif low.endswith((".csv", ".tsv")):
+            profile = _profile_csv(data_path)
+            if profile:
+                out += _csv_data_guardrails(spec, profile)
     except Exception:
         pass
     return out
