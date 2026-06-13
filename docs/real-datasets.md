@@ -18,18 +18,19 @@ Selom ingest paths: scRNA `.h5ad`/AnnData (UMAP/cluster/violin/DEG); bulk **raw 
 
 ## ALPK1 bulk — the standout (verified)
 `…\ALPK1\Amin's Files\RNA-seq`. Clean edgeR+RUV outputs across studies; the **155 GB of BAMs are NOT ingestable** (skip).
-- **Mouse P14/P30/P90 (2021)** — *verified directly*: `…_RUV_rawCounts.xlsx` = **32,285 genes × 77 samples, integer raw counts**; `…_RUV_all_genes.xlsx` = `Comparison/GeneID/…/logFC/AveExpr/t/P.Value/B/FDR`, **18 contrasts = NR+RPE × P14/P30/P90 × DA/MG/WT**. **The one dataset pairing a true time-course with raw counts → unblocks `deg` time-course (P1) AND raw-count pyDESeq2 `deg`.**
+- **Mouse P14/P30/P90 (2021)** — *verified directly*: `…_RUV_rawCounts.xlsx` = **32,285 genes × 77 samples, integer raw counts**; `…_RUV_all_genes.xlsx` = `Comparison/GeneID/…/logFC/AveExpr/t/P.Value/B/FDR`, **18 contrasts = NR+RPE × P14/P30/P90 × DA/MG/WT**. **The one dataset pairing a true time-course with raw counts → unblocks `deg` time-course (P1) AND raw-count pyDESeq2 `deg`.** ✅ **DONE 2026-06-14** — both validated.
+  - **Design sheet (the missing piece, now found):** the rawCounts columns are opaque `S1…S80` with no embedded labels. The sample→condition map lives in the analysis `output/` folder as **`20220104_Amin_mm10RUV_K2_variates.tsv`** (comma-delimited despite `.tsv`): per-sample `SampleID,SampleName,Genotype,Age,Tissue,Strain,W_1,W_2` — `Age`=P14/P30/P90 is the time axis; `W_1/W_2` are the RUV covariates. Joins cleanly to all 72 design samples (count cols `S76–S80` are QC-dropped extras, excluded). Staged at `mouse_P14P30P90/sample_design_RUV_K2_variates.csv`. Path on the share: `…\2021_Genewiz_Mg,Da_P14,P30,P90\Results\From Nader\Batch2_…\20211121_RNASeq_mouse_Batch2\output\`.
+  - Validated: pyDESeq2 contrast NR_P90 Homo-vs-WT (MG, n=4v3); time-course over P14/P30/P90 within NR adjusting for Genotype → 10,458 genes FDR<0.05.
 - **EYG21 human iRPE (2024)** — clean CSV raw counts (ALPK1 = 30 samples) + DGE → end-to-end DEG→volcano→GO.
 - **EYG29 (2025)** — cleanest small CSV pairs: `*_rawCounts.csv` (18 samples) + `*_DEGs_All_merged.csv` (logFC/FDR/GeneID).
 - **Gene lists** (`Gene lists\*.xlsx`: MitoCarta, CiliaCarta, RD_GeneList, retinal markers) → drop-in `enrichment`/`go_graph` inputs.
 
 ## Recommended next dogfooding
-1. **Mouse P14/P30/P90** → build/validate `deg` raw-count pyDESeq2 + the time-course mode (now data-backed).
-2. **EYG29 / EYG21 CSV raw-count pairs** → quick end-to-end DEG → volcano → enrichment/go_graph.
+1. ✅ **Mouse P14/P30/P90** → `deg` raw-count pyDESeq2 + time-course mode validated (2026-06-14, commit `8700937`).
+2. **EYG29 / EYG21 CSV raw-count pairs** → quick end-to-end DEG → volcano → enrichment/go_graph (EYG29 AK1-vs-SCR done).
 3. **ALPK1 gene lists** → enrichment/go_graph sanity checks.
 
 ## Tooling note
-Real bulk data here is **`.xlsx`** (counts + DE). The skills currently read **CSV** only; `openpyxl` is
-installed in the backend venv for inspection, but **xlsx ingestion in the skills is a follow-up** (add
-`openpyxl` as a dep + `pd.read_excel` fallback, or convert xlsx→CSV in a prep step). EYG29 offers CSV pairs
-that work today without that.
+Real bulk data here is **`.xlsx`** (counts + DE). **Resolved 2026-06-14:** `openpyxl` is now a core dep and
+`deg` reads `.xlsx` directly (`pd.read_excel` in `_read_counts`/`_load_design`), so the mouse xlsx ingests
+without conversion. EYG29 CSV pairs also work as before.

@@ -43,10 +43,13 @@ replaces the 102-gene sample with real coverage. Use **C** (live API) only for t
    Reactome ContentService (open) first; KEGG behind the licence gate. `reactome2py` or REST.
 3. **`go-graph`** (new skill) — GO BP/MF/CC DAG for a set of annotated terms; `obonet` + `networkx`
    (+ graphviz layout) over the GO OBO / QuickGO. Editable Plotly node-link output.
-4. **`deg` time-course + no-replicate** — maSigPro-style (polynomial-over-time) and NOISeq-style
-   (no-rep) modes. **Blocked on data:** neither current dataset fits — EYG_28 is results-only (no
-   raw counts), rpgrip1 is genotype not time-series. Build against a synthetic/public proxy and
-   flag for real validation when a raw-count time-course arrives. **Lower priority.**
+4. **`deg` time-course + no-replicate** — maSigPro-style (linear-trend-over-time) mode. ✅ **DONE
+   2026-06-14** (commit `8700937`) — UNBLOCKED by the ALPK1 mouse P14/P30/P90 set once its design
+   sheet was recovered (`RUV_K2_variates`; see `real-datasets.md`). `mode=timecourse` fits time as a
+   continuous covariate in pyDESeq2 and Wald-tests the time coefficient (0.5.4 has no LRT), optionally
+   covariate-adjusted; validated on 39 NR mouse samples (10,458 genes FDR<0.05). Also landed: robust
+   bulk group inference + explicit `reference`/`treatment` contrast selection + a design-sheet input.
+   *Still TODO:* NOISeq-style **no-replicate** mode (no fitting dataset yet) — deferred.
 5. **Niceties surfaced by dogfooding** (small, decision-free, can do anytime):
    - **DE-table import** — point `volcano`/`enrichment` at a multi-contrast DE folder (EYG_28),
      pick a contrast, derive the gene list by FDR/FC cutoff.
