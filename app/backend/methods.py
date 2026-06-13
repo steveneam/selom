@@ -70,10 +70,23 @@ def _violin(p: dict):
 
 
 def _deg(p: dict):
+    mode = str(p.get("mode") or "auto").lower()
+    if mode in ("timecourse", "time-course", "time_course"):
+        text = (
+            "Time-course differential expression was assessed by modelling raw counts against the "
+            f"sampling time as a continuous covariate in PyDESeq2 (a Python reimplementation of DESeq2) "
+            "and Wald-testing the time coefficient, identifying genes with a significant linear "
+            f"expression trend over time. The top {p['top_n']} trending genes are shown as mean "
+            "log2-CPM trajectories, with p-values corrected by the Benjamini-Hochberg procedure."
+        )
+        return text, [PYDESEQ2, DESEQ2, BH]
+    reference, treatment = str(p.get("reference") or "").strip(), str(p.get("treatment") or "").strip()
+    contrast = f" for the {treatment}-versus-{reference} contrast" if reference and treatment else ""
     text = (
-        f"Differential expression was assessed per {p['groupby']} group. For single-cell data, "
-        "marker genes were ranked with the Wilcoxon rank-sum test (Scanpy rank_genes_groups); for "
-        "bulk RNA-seq, counts were modelled with PyDESeq2, a Python reimplementation of DESeq2. The "
+        f"Differential expression was assessed{contrast}. For single-cell data, marker genes were "
+        f"ranked per {p['groupby']} group with the Wilcoxon rank-sum test (Scanpy rank_genes_groups); "
+        "for bulk RNA-seq, raw counts were modelled with PyDESeq2 (a Python reimplementation of DESeq2) "
+        "and tested with the Wald test. The "
         f"top {p['top_n']} genes per contrast are reported, with p-values corrected for multiple "
         "testing by the Benjamini-Hochberg procedure."
     )

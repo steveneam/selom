@@ -1,11 +1,16 @@
-"""Differential expression — top-gene ranking, scRNA or bulk.
+"""Differential expression — top-gene ranking, scRNA / bulk / time-course.
 
-Two real paths (``run_real.py``):
-  * scRNA  — scanpy ``rank_genes_groups`` (Wilcoxon by default) per cluster.
-  * bulk   — pyDESeq2 on a counts table with a 2-level design inferred from the
-             sample-column prefixes.
-The figure is a horizontal bar of the top-N genes by signed score, coloured by
-direction (up = cyan, down = rose). The stub is a deterministic version of that.
+Three real paths (``run_real.py``), chosen by ``mode``:
+  * scRNA       — scanpy ``rank_genes_groups`` (Wilcoxon by default) per cluster.
+  * bulk        — pyDESeq2 Wald on a raw-count table; the sample->group design comes
+                  from a design sheet (joined on sample id) or from the column names
+                  (trailing replicate suffix stripped); ``reference``/``treatment``
+                  pick the contrast.
+  * time-course — pyDESeq2 with time as a continuous covariate, Wald-testing the time
+                  coefficient (maSigPro-style linear trend); needs a design sheet.
+The scRNA + bulk figures are a horizontal bar of the top-N genes by signed score
+(up = cyan, down = rose); time-course is per-gene expression trajectories over time.
+The stub is a deterministic version of the bar.
 """
 
 from skills._engine import use_real_engine

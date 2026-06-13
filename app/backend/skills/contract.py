@@ -53,6 +53,8 @@ def resolved_params(spec: SkillSpec, params: dict) -> dict:
     merged = {**defaults(spec), **params}
     out: dict = {}
     for key, value in merged.items():
+        if str(key).startswith("_"):
+            continue  # reserved runtime keys (e.g. _design_path) — not part of the recorded config
         cast = _CASTS.get(spec.param_spec.get(key, {}).get("type"))
         try:
             out[key] = cast(value) if cast else value

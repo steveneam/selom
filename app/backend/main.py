@@ -4,7 +4,7 @@ import pathlib
 import shutil
 import tempfile
 
-from fastapi import FastAPI, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 import guardrails
@@ -44,22 +44,31 @@ def _save_upload(matrix: UploadFile) -> str:
 
 
 @app.post("/skills/{skill_id}/run")
-async def run(skill_id: str, request: Request, matrix: UploadFile):
+async def run(skill_id: str, request: Request, matrix: UploadFile, design: UploadFile | None = File(None)):
     # Synchronous one-shot — the proven fast path for light skills (B1). Heavy skills
     # should use POST /skills/{id}/jobs (below). Tuning params arrive as the query
     # string; the contract fills skill defaults and each runner coerces types.
+    # An optional `design` sheet (sample->condition/time) feeds bulk + time-course DE;
+    # it is threaded as a reserved param and kept out of the provenance record.
     path = _save_upload(matrix)
     params = dict(request.query_params)
+    design_path = _save_upload(design) if design is not None else None
+    if design_path:
+        params["_design_path"] = design_path
     spec = load_skill(skill_id)
-    figure = run_skill(skill_id, path, params)
-    # B4 publish-confidence: every figure ships with its reproducibility bundle +
-    # auto methods-text. Additive — the FE still reads `.figure`.
-    return {
-        "figure": figure,                            # Plotly JSON -> frontend
-        "provenance": provenance.build(spec, path, matrix.filename, params),
-        "methods": methods.build(spec, params),
-        "guardrails": guardrails.build(spec, path, params),
-    }
+    try:
+        figure = run_skill(skill_id, path, params)
+        # B4 publish-confidence: every figure ships with its reproducibility bundle +
+        # auto methods-text. Additive — the FE still reads `.figure`.
+        return {
+            "figure": figure,                            # Plotly JSON -> frontend
+            "provenance": provenance.build(spec, path, matrix.filename, params),
+            "methods": methods.build(spec, params),
+            "guardrails": guardrails.build(spec, path, params),
+        }
+    finally:
+        if design_path:
+            pathlib.Path(design_path).unlink(missing_ok=True)
 
 
 @app.post("/skills/{skill_id}/jobs")

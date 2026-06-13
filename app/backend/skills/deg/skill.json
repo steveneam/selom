@@ -7,12 +7,22 @@
   "entrypoint": "skills.deg.run:run",
   "inputs": [{ "name": "matrix", "kind": "anndata|h5ad|csv", "required": true }],
   "param_spec": {
-    "mode":    { "type": "str", "default": "auto" },
-    "groupby": { "type": "str", "default": "leiden" },
-    "method":  { "type": "str", "default": "wilcoxon" },
-    "top_n":   { "type": "int", "default": 15, "min": 5, "max": 50 },
-    "normalize": { "type": "bool", "default": true }
+    "mode":      { "type": "str", "default": "auto" },
+    "groupby":   { "type": "str", "default": "leiden" },
+    "method":    { "type": "str", "default": "wilcoxon" },
+    "top_n":     { "type": "int", "default": 15, "min": 5, "max": 50 },
+    "normalize": { "type": "bool", "default": true },
+    "reference": { "type": "str", "default": "" },
+    "treatment": { "type": "str", "default": "" },
+    "group_col": { "type": "str", "default": "" },
+    "group_val": { "type": "str", "default": "" },
+    "time_col":  { "type": "str", "default": "time" },
+    "covariate_col": { "type": "str", "default": "" },
+    "min_count": { "type": "int", "default": 10, "min": 0, "max": 1000 }
   },
+  "inputs_optional": [
+    { "name": "design", "kind": "csv", "required": false, "note": "sample id + condition/time columns; bulk + time-course" }
+  ],
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" },
     { "name": "table",  "kind": "csv" }

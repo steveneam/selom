@@ -180,12 +180,15 @@ def _csv_data_guardrails(spec: SkillSpec, profile: dict) -> list[dict]:
 
 
 def _column_groups(header: list) -> dict:
-    """Sample-column counts per design group (prefix before the first '_'), matching
-    the bulk-DEG runner's design inference. Column 0 is the gene id, so it's skipped."""
+    """Sample-column counts per design group, matching the bulk-DEG runner's name-based
+    inference (strip the trailing replicate suffix: ctrl_1 -> ctrl). Column 0 is the
+    gene id, so it's skipped. (A supplied design sheet overrides this in the runner.)"""
+    import re
+
     groups: dict[str, int] = {}
     for name in header[1:]:
-        prefix = str(name).split("_", 1)[0]
-        groups[prefix] = groups.get(prefix, 0) + 1
+        label = re.sub(r"_\d+$", "", str(name))
+        groups[label] = groups.get(label, 0) + 1
     return groups
 
 

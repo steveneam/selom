@@ -23,6 +23,9 @@ dependencies = [
   # primitives the skills use directly: clustering-quality guardrails (silhouette),
   # hierarchical linkage (heatmap row-ordering), PCA/NMF/t-SNE.
   "scikit-learn",
+  # MIT — pandas' .xlsx reader. Real bulk omics tables (counts, DE results, gene lists)
+  # ship as Excel as often as CSV; this lets every skill read .xlsx without the heavy stack.
+  "openpyxl",
 ]
 
 [project.optional-dependencies]
