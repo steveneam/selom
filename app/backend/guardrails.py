@@ -248,17 +248,23 @@ def _profile(data_path: str) -> dict | None:
 def _profile_h5ad(data_path: str) -> dict:
     import anndata  # only present with the omics extra (real-engine path)
     import numpy as np
+    from scipy import sparse
 
     adata = anndata.read_h5ad(data_path, backed="r")
     try:
         n_obs = int(adata.n_obs)
 
-        # Sample up to 200 cells to gauge the value scale without loading the whole matrix.
-        sample = adata.X[: min(200, n_obs)]
-        arr = sample.toarray() if hasattr(sample, "toarray") else np.asarray(sample)
-        arr = arr[np.isfinite(arr)]
-        x_max = float(arr.max()) if arr.size else 0.0
-        x_is_integer = bool(arr.size) and bool(np.all(arr == np.round(arr)))
+        # Read up to 200 cells into memory to gauge the value scale without loading the
+        # whole matrix. Slice the AnnData (not adata.X) + to_memory so this works for both
+        # backed dense and backed sparse h5ad — real scRNA matrices are sparse.
+        sample = adata[: min(200, n_obs)].to_memory().X
+        if sparse.issparse(sample):
+            vals = np.asarray(sample.data, dtype="float64")  # stored (nonzero) values
+        else:
+            vals = np.asarray(sample, dtype="float64").ravel()
+        vals = vals[np.isfinite(vals)]
+        x_max = float(vals.max()) if vals.size else 0.0
+        x_is_integer = bool(vals.size) and bool(np.all(vals == np.round(vals)))
 
         batch_columns: dict[str, int] = {}
         for col in adata.obs.columns:
