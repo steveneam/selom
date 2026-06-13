@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Boxes, Check, Database, ShieldCheck, Sparkles, type LucideIcon } from "lucide-react";
+import { Boxes, CheckCircle2, Database, ShieldCheck, Sparkles, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Stagger, StaggerItem } from "@/components/ui/motion";
 
@@ -152,11 +152,10 @@ function Stage({
       >
         <Icon />
         {state === "done" && variant === "progress" && (
-          <span
-            className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full border border-card text-[var(--background)]"
-            style={{ background: "var(--stage-publish)" }}
-          >
-            <Check className="size-3" strokeWidth={3} />
+          // A single designer-aligned glyph (circle + tick), on a card-coloured
+          // backing so it reads as a crisp badge on the node corner.
+          <span className="absolute -right-1.5 -top-1.5 inline-grid place-items-center rounded-full bg-card">
+            <CheckCircle2 aria-hidden className="size-[18px] text-stage-publish" strokeWidth={2.25} />
           </span>
         )}
       </div>
