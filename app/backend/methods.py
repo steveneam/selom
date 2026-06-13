@@ -29,9 +29,13 @@ SCIPY = "Virtanen, P. et al. SciPy 1.0: fundamental algorithms for scientific co
 
 
 def _umap(p: dict):
+    if p.get("normalize", True):
+        prep = "Gene counts were normalized to 10,000 counts per cell and log1p-transformed, "
+    else:
+        prep = "The provided log-normalized expression was used directly, and "
     text = (
-        "Single-cell RNA-seq data were processed with Scanpy. Gene counts were "
-        "normalized to 10,000 counts per cell and log1p-transformed, principal-component "
+        "Single-cell RNA-seq data were processed with Scanpy. "
+        f"{prep}principal-component "
         f"analysis was computed, and a nearest-neighbour graph was built on the top {p['n_pcs']} "
         f"principal components using {p['n_neighbors']} neighbours. The graph was embedded in two "
         f"dimensions with UMAP, and cells were coloured by {p['color_by']} cluster."

@@ -9,7 +9,8 @@
   "param_spec": {
     "gene":       { "type": "str",   "default": "" },
     "groupby":    { "type": "str",   "default": "leiden" },
-    "resolution": { "type": "float", "default": 1.0, "min": 0.1, "max": 4.0 }
+    "resolution": { "type": "float", "default": 1.0, "min": 0.1, "max": 4.0 },
+    "normalize":  { "type": "bool",  "default": true }
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" }

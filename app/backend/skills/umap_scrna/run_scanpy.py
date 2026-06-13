@@ -12,15 +12,18 @@ def run(data_path: str, params: dict) -> dict:
     import scanpy as sc
     import plotly.express as px
 
+    from skills._engine import to_bool
     from skills._plotly import jsonable
 
     adata = sc.read_h5ad(data_path)
 
-    # Minimal, honest scRNA pipeline: drop all-zero genes -> normalize -> log1p ->
-    # PCA -> kNN graph -> Leiden clusters -> UMAP embedding.
+    # Minimal, honest scRNA pipeline: drop all-zero genes -> (normalize -> log1p) ->
+    # PCA -> kNN graph -> Leiden clusters -> UMAP embedding. Skip normalization when the
+    # input is already log-normalized (normalize=false) to avoid double-normalizing.
     sc.pp.filter_genes(adata, min_cells=3)
-    sc.pp.normalize_total(adata, target_sum=1e4)
-    sc.pp.log1p(adata)
+    if to_bool(params.get("normalize", True)):
+        sc.pp.normalize_total(adata, target_sum=1e4)
+        sc.pp.log1p(adata)
 
     # Guard n_comps so PCA never exceeds the data's rank (small inputs / tiny demos).
     n_pcs = max(2, min(int(params["n_pcs"]), adata.n_obs - 1, adata.n_vars - 1))

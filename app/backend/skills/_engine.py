@@ -24,3 +24,11 @@ def use_real_engine(*required_modules: str) -> bool:
     if engine in ("real", "scanpy"):
         return True
     return all(find_spec(m) is not None for m in required_modules)
+
+
+def to_bool(value) -> bool:
+    """Coerce a param to bool. Query-string params arrive as strings, so plain
+    ``bool("false")`` (truthy) is wrong — interpret the usual truthy spellings."""
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ("1", "true", "yes", "on")

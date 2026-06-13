@@ -10,7 +10,8 @@
     "mode":    { "type": "str", "default": "auto" },
     "groupby": { "type": "str", "default": "leiden" },
     "method":  { "type": "str", "default": "wilcoxon" },
-    "top_n":   { "type": "int", "default": 15, "min": 5, "max": 50 }
+    "top_n":   { "type": "int", "default": 15, "min": 5, "max": 50 },
+    "normalize": { "type": "bool", "default": true }
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" },

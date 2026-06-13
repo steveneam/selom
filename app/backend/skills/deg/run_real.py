@@ -26,12 +26,14 @@ def run(data_path: str, params: dict) -> dict:
 def _scrna(data_path: str, params: dict) -> dict:
     import scanpy as sc
 
+    from skills._engine import to_bool
     from skills._plotly import jsonable
 
     adata = sc.read_h5ad(data_path)
     sc.pp.filter_genes(adata, min_cells=3)
-    sc.pp.normalize_total(adata, target_sum=1e4)
-    sc.pp.log1p(adata)
+    if to_bool(params.get("normalize", True)):  # skip if input is already normalized
+        sc.pp.normalize_total(adata, target_sum=1e4)
+        sc.pp.log1p(adata)
 
     groupby = params.get("groupby") or "leiden"
     if groupby not in adata.obs.columns:

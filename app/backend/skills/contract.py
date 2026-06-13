@@ -4,6 +4,8 @@ import pathlib
 
 from pydantic import BaseModel
 
+from skills._engine import to_bool
+
 
 class SkillSpec(BaseModel):
     id: str
@@ -37,7 +39,7 @@ def defaults(spec: SkillSpec) -> dict:
     return {k: v["default"] for k, v in spec.param_spec.items()}
 
 
-_CASTS = {"int": int, "float": float, "str": str}
+_CASTS = {"int": int, "float": float, "str": str, "bool": to_bool}
 
 
 def resolved_params(spec: SkillSpec, params: dict) -> dict:
