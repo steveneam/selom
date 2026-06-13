@@ -6,16 +6,16 @@ export const metadata = { title: "Skill Store — Selom" };
 
 export default function StorePage() {
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8 lg:px-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="mx-auto max-w-7xl px-6 py-12 lg:px-10 lg:py-14">
+      <div className="flex flex-wrap items-end justify-between gap-6">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-primary/80">Skill Store</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
-            Browse &amp; install bioinformatics skills
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-primary/80">Skill Store</p>
+          <h1 className="text-display mt-3 max-w-2xl text-3xl text-foreground sm:text-4xl">
+            Install a skill, <span className="accent-keyword">light up</span> your data
           </h1>
-          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            ~{CATALOG_TOTAL_ESTIMATE} skills from bioSkills + ClawBio. Install one into a project and
-            apply it to your data — Verified skills run now; the rest run as we port them.
+          <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">
+            ~{CATALOG_TOTAL_ESTIMATE} skills from bioSkills + ClawBio. Drop one into a project and apply it to
+            your data — Verified skills run now; the rest run as we port them.
           </p>
         </div>
 
@@ -23,7 +23,7 @@ export default function StorePage() {
         <CoverageMeter />
       </div>
 
-      <div className="mt-7">
+      <div className="mt-10">
         <CatalogBrowser />
       </div>
     </div>

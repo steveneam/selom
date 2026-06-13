@@ -2,10 +2,11 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Database, FileBarChart, LayoutGrid, Redo2, Sparkles, Trash2, Undo2, Wrench } from "lucide-react";
+import { ArrowRight, Database, LayoutGrid, Redo2, Sparkles, Trash2, Undo2, Wrench } from "lucide-react";
 import { DataPanel, type AnalyzeArgs } from "./data-panel";
 import { WorkbenchPanel } from "./workbench-panel";
 import { PublishConfidence } from "./publish-confidence";
+import { Pipeline, type StageKey, type StageState } from "@/components/pipeline";
 import { EditorWorkspace } from "@/components/figure/editor-workspace";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -96,8 +97,15 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     );
   }
 
+  const stageStates: Partial<Record<StageKey, StageState>> = {
+    data: datasets.length > 0 ? "done" : "active",
+    skill: installs.length > 0 ? "done" : datasets.length > 0 ? "active" : "todo",
+    figure: figures.length > 0 ? "done" : installs.length > 0 ? "active" : "todo",
+    publish: figures.length > 0 ? "active" : "todo",
+  };
+
   return (
-    <div className="mx-auto flex h-full max-w-6xl flex-col px-6 py-6 lg:px-8">
+    <div className="mx-auto flex h-full max-w-7xl flex-col px-6 py-8 lg:px-10">
       {/* header */}
       <div className="flex flex-wrap items-center gap-3">
         <span
@@ -146,31 +154,59 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 
         <div className="mt-5 min-h-0 flex-1">
           <TabsContent value="overview">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <OverviewStat icon={<Database />} label="Datasets" value={datasets.length} />
-              <OverviewStat icon={<LayoutGrid />} label="Installed skills" value={installs.length} />
-              <OverviewStat icon={<FileBarChart />} label="Figures" value={figures.length} />
-            </div>
-            <Card className="mt-4 p-5">
-              <p className="text-sm font-medium text-foreground">Next steps</p>
-              <ol className="mt-2 space-y-1.5 text-xs text-muted-foreground">
-                <li>1. Drop a dataset in <button className="text-primary hover:underline" onClick={() => setTab("data")}>Data</button> — Selom cleans it and asks a few questions.</li>
-                <li>2. Review the proposed pipeline in <button className="text-primary hover:underline" onClick={() => setTab("workbench")}>Workbench</button> and run a skill.</li>
-                <li>3. Edit the result in <button className="text-primary hover:underline" onClick={() => setTab("figure")}>Figure</button> — no code.</li>
-              </ol>
+            {/* Live pipeline tracker — the project's place in the Selom loop. */}
+            <Card className="p-6 lg:p-8">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold tracking-tight text-foreground">Project pipeline</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {figures.length > 0
+                      ? "Keep editing, or publish with the methods text and provenance attached."
+                      : datasets.length > 0
+                        ? "Next: review the proposed pipeline in the Workbench and run a skill."
+                        : "Start by dropping a dataset — Selom cleans it and asks a few questions."}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant={figures.length > 0 ? "outline" : "default"}
+                  onClick={() => setTab(datasets.length === 0 ? "data" : figures.length > 0 ? "figure" : "workbench")}
+                >
+                  {datasets.length === 0 ? "Drop data" : figures.length > 0 ? "Open figure" : "Open Workbench"}
+                  <ArrowRight />
+                </Button>
+              </div>
+              <Pipeline variant="progress" states={stageStates} className="mt-10" />
             </Card>
+
+            {/* Counts — a quiet strip, not a hero-metric grid. */}
+            <Card className="mt-5 grid grid-cols-3 divide-x divide-border p-0">
+              <OverviewStat label="Datasets" value={datasets.length} />
+              <OverviewStat label="Installed skills" value={installs.length} />
+              <OverviewStat label="Figures" value={figures.length} />
+            </Card>
+
             {figures.length > 0 && (
-              <Card className="mt-4 divide-y divide-border p-0">
-                {figures.slice(0, 5).map((f) => (
-                  <div key={f.id} className="flex items-center gap-3 px-4 py-2.5">
-                    <Sparkles className="size-4 text-primary" />
-                    <span className="truncate text-sm text-foreground">{f.title}</span>
-                    <span className="tabular ml-auto text-[11px] text-muted-foreground">
-                      {getSkill(f.skillId ?? "")?.name ?? "figure"}
-                    </span>
-                  </div>
-                ))}
-              </Card>
+              <div className="mt-8">
+                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  Figures in this project
+                </h3>
+                <Card className="divide-y divide-border p-0">
+                  {figures.slice(0, 6).map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => setTab("figure")}
+                      className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-accent/40"
+                    >
+                      <Sparkles className="size-4 shrink-0 text-primary" />
+                      <span className="truncate text-sm text-foreground">{f.title}</span>
+                      <span className="tabular ml-auto text-[11px] text-muted-foreground">
+                        {getSkill(f.skillId ?? "")?.name ?? "figure"}
+                      </span>
+                    </button>
+                  ))}
+                </Card>
+              </div>
             )}
           </TabsContent>
 
@@ -223,16 +259,11 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   );
 }
 
-function OverviewStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+function OverviewStat({ label, value }: { label: string; value: number }) {
   return (
-    <Card className="flex items-center gap-3 p-4">
-      <span className="grid size-9 place-items-center rounded-lg border border-border bg-background/60 text-primary [&_svg]:size-4">
-        {icon}
-      </span>
-      <div>
-        <p className="tabular text-lg font-semibold leading-none text-foreground">{value}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{label}</p>
-      </div>
-    </Card>
+    <div className="px-5 py-4">
+      <p className="tabular text-2xl font-semibold leading-none text-foreground">{value}</p>
+      <p className="mt-1.5 text-sm text-muted-foreground">{label}</p>
+    </div>
   );
 }

@@ -12,12 +12,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
+import { CATEGORY_GROUPS, humanizeCategory } from "@/lib/catalog/modality";
 import { useCatalog } from "@/lib/catalog/registry";
 import type { SkillCatalogEntry, SkillSource, SkillTier } from "@/lib/catalog/types";
 import { projectStore, select, useProjects } from "@/lib/projects/store";
 
 type TierFilter = "all" | SkillTier;
 type SourceFilter = "all" | SkillSource;
+
+// Editorial App-Store shelves come from CATEGORY_GROUPS (single source of truth,
+// shared with the per-card category colour in lib/catalog/modality).
+const GROUPS = CATEGORY_GROUPS;
 
 export function CatalogBrowser() {
   const state = useProjects();
@@ -61,6 +66,31 @@ export function CatalogBrowser() {
     }).sort((a, b) => b.popularity - a.popularity);
   }, [catalog, query, tier, source, omics, category]);
 
+  // App-Store shelves only when browsing (no active search/filter); otherwise a
+  // single flat results grid keeps "find" mode focused.
+  const isFiltering =
+    query.trim() !== "" || tier !== "all" || source !== "all" || omics !== "all" || category !== "all";
+
+  const shelves = React.useMemo(() => {
+    const claimed = new Set<string>();
+    const out = GROUPS.map((g) => {
+      const items = results.filter((s) => g.categories.includes(s.category));
+      items.forEach((s) => claimed.add(s.id));
+      return { ...g, items };
+    }).filter((g) => g.items.length > 0);
+    const rest = results.filter((s) => !claimed.has(s.id));
+    if (rest.length > 0) {
+      out.push({
+        title: "More tools",
+        subtitle: "Everything else in the catalog.",
+        color: "#8b98a9",
+        categories: [],
+        items: rest,
+      });
+    }
+    return out;
+  }, [results]);
+
   function toggleInstall(skill: SkillCatalogEntry) {
     let projectId = target;
     if (!projectId) {
@@ -73,7 +103,7 @@ export function CatalogBrowser() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* target project + search */}
       <div className="flex flex-wrap items-center gap-3">
         <label className="relative w-full max-w-xs">
@@ -151,7 +181,7 @@ export function CatalogBrowser() {
               <SelectItem value="all">All categories</SelectItem>
               {categories.map((c) => (
                 <SelectItem key={c} value={c}>
-                  {c}
+                  {humanizeCategory(c)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -168,8 +198,8 @@ export function CatalogBrowser() {
           <p className="text-sm font-medium text-foreground">No skills match those filters</p>
           <p className="mt-1 text-xs text-muted-foreground">Clear a filter or try another search.</p>
         </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      ) : isFiltering ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {results.map((skill) => (
             <SkillCard
               key={skill.id}
@@ -178,6 +208,36 @@ export function CatalogBrowser() {
               onOpen={() => setOpen(skill)}
               onToggleInstall={() => toggleInstall(skill)}
             />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-12">
+          {shelves.map((shelf) => (
+            <section key={shelf.title}>
+              <div className="mb-5 flex items-end justify-between gap-3 border-b border-border pb-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2.5">
+                    <span aria-hidden className="size-2.5 rounded-full" style={{ background: shelf.color }} />
+                    <h2 className="text-xl font-semibold tracking-tight text-foreground">{shelf.title}</h2>
+                  </div>
+                  <p className="mt-1.5 text-sm text-muted-foreground">{shelf.subtitle}</p>
+                </div>
+                <span className="tabular shrink-0 text-xs text-muted-foreground">
+                  {shelf.items.length} skill{shelf.items.length === 1 ? "" : "s"}
+                </span>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {shelf.items.map((skill) => (
+                  <SkillCard
+                    key={skill.id}
+                    skill={skill}
+                    installed={installedIds.has(skill.id)}
+                    onOpen={() => setOpen(skill)}
+                    onToggleInstall={() => toggleInstall(skill)}
+                  />
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}

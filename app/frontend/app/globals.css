@@ -50,6 +50,21 @@
   --chart-7: #60a5fa;
   --chart-8: #f87171;
 
+  /* Warn signal — guardrails are a first-class product feature, not an error. */
+  --warn: #f59e0b;
+  --warn-foreground: #fffbeb;
+
+  /*
+    Pipeline stage colours — Selom's core loop reads as a coloured flow:
+    Data (ingest) → Skill (analysis) → Figure (the cyan centerpiece) → Publish (trust).
+    Drawn from the chart colourway so stage chrome and figure data stay one family.
+    These tint chips/icons/borders only; cyan remains the single live/action signal.
+  */
+  --stage-data: #60a5fa; /* blue — ingest */
+  --stage-skill: #a78bfa; /* violet — analysis */
+  --stage-figure: #22d3ee; /* cyan — the figure (brand) */
+  --stage-publish: #34d399; /* green — reproducible / publish */
+
   --radius: 0.625rem;
 }
 
@@ -84,6 +99,14 @@
   --color-chart-7: var(--chart-7);
   --color-chart-8: var(--chart-8);
 
+  --color-warn: var(--warn);
+  --color-warn-foreground: var(--warn-foreground);
+
+  --color-stage-data: var(--stage-data);
+  --color-stage-skill: var(--stage-skill);
+  --color-stage-figure: var(--stage-figure);
+  --color-stage-publish: var(--stage-publish);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -93,11 +116,18 @@
   --font-mono: var(--font-geist-mono);
 }
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-  border-color: var(--border);
+/*
+  Default every border to the hairline token. This MUST live in @layer base so
+  Tailwind's utilities (in the later `utilities` layer) still win — an unlayered
+  `*` rule would beat layered utilities regardless of specificity and silently
+  zero out `px-*`, `border-primary/*`, etc. Margin/padding resets come from
+  Tailwind's preflight; we don't re-zero them here.
+*/
+@layer base {
+  * {
+    box-sizing: border-box;
+    border-color: var(--border);
+  }
 }
 
 html,
@@ -143,11 +173,103 @@ body {
   background-clip: content-box;
 }
 
+/*
+  Expressive display type — the one place the UI raises its voice (hub heroes,
+  big empty states). Heavy Geist weight + tight tracking + balanced wrap. The
+  One-Sans Rule still holds: this is Geist louder, not a new family.
+*/
+.text-display {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+/* Accent keyword: a luminous cyan word with a soft underline glow (the
+   "take your research to the next level" move), used on ≤1 word per headline. */
+.accent-keyword {
+  position: relative;
+  color: var(--primary);
+  white-space: nowrap;
+}
+.accent-keyword::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.08em;
+  height: 0.09em;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--primary) 90%, transparent),
+    color-mix(in oklab, var(--primary) 35%, transparent)
+  );
+  box-shadow: 0 0 12px -1px color-mix(in oklab, var(--primary) 60%, transparent);
+}
+
+/* Faint graph-paper texture — atmosphere behind hub heroes (masked, never loud). */
+.bg-grid {
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 38px 38px;
+}
+
+/* Earned cyan glow — a single soft radial light source, the "lit lab bench". */
+.glow-orb {
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--primary) 22%, transparent),
+    transparent 78%
+  );
+  filter: blur(2px);
+}
+
+/* Pipeline connector: a flowing dashed line between stage nodes. */
+.flow-line {
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--primary) 55%, transparent) 0 46%,
+    transparent 46% 100%
+  );
+  background-size: 14px 100%;
+  background-repeat: repeat-x;
+  animation: flow-march 900ms linear infinite;
+}
+@keyframes flow-march {
+  to {
+    background-position: 14px 0;
+  }
+}
+
+/* Live node pulse — a calm breathing halo on the active stage. */
+.node-pulse {
+  animation: node-pulse 2.6s ease-in-out infinite;
+}
+@keyframes node-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in oklab, var(--primary) 0%, transparent);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+  .flow-line {
+    animation: none;
+    background-image: linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--primary) 45%, transparent),
+      color-mix(in oklab, var(--primary) 12%, transparent)
+    );
   }
 }

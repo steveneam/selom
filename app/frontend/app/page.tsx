@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Boxes, FileBarChart, FolderPlus, LayoutGrid, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, Boxes, FileCheck2, FolderPlus, ScrollText, ShieldCheck, Sparkles } from "lucide-react";
+import { Pipeline } from "@/components/pipeline";
+import { HoverLift, Reveal, Stagger, StaggerItem } from "@/components/ui/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CATALOG_TOTAL_ESTIMATE, getSkill, VERIFIED_SEEDED } from "@/lib/catalog/seed";
-import { select, useProjects } from "@/lib/projects/store";
+import { projectStore, select, useProjects } from "@/lib/projects/store";
 
 function timeAgo(t: number): string {
   const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
@@ -16,114 +19,129 @@ function timeAgo(t: number): string {
 }
 
 export default function HomePage() {
+  const router = useRouter();
   const state = useProjects();
   const { projects, datasets, figures } = state;
   const recentFigures = [...figures].sort((a, b) => b.createdAt - a.createdAt).slice(0, 4);
 
-  const stats = [
-    { label: "Projects", value: projects.length, icon: <LayoutGrid /> },
-    { label: "Datasets", value: datasets.length, icon: <FileBarChart /> },
-    { label: "Figures", value: figures.length, icon: <Sparkles /> },
-    { label: "Skills runnable", value: `${VERIFIED_SEEDED} / ${CATALOG_TOTAL_ESTIMATE}`, icon: <Boxes /> },
+  const workspace = [
+    { label: "Projects", value: projects.length },
+    { label: "Datasets", value: datasets.length },
+    { label: "Figures", value: figures.length },
+    { label: "Skills runnable", value: `${VERIFIED_SEEDED}/${CATALOG_TOTAL_ESTIMATE}` },
   ];
+
+  function newProject() {
+    const p = projectStore.createProject("Untitled project");
+    router.push(`/p/${p.id}`);
+  }
 
   return (
     <div className="relative">
-      {/* atmosphere: faint graph-paper, masked, behind the header band */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-72 opacity-[0.16]"
-        style={{
-          backgroundImage:
-            "linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
-          maskImage: "radial-gradient(40rem 18rem at 20% 0%, black, transparent 75%)",
-        }}
-      />
+      {/* Atmosphere — one soft cyan light source over a masked graph-paper grid. */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[460px] overflow-hidden">
+        <div className="absolute left-1/2 top-[-160px] h-[400px] w-[760px] -translate-x-1/2 glow-orb opacity-70" />
+        <div
+          className="absolute inset-0 bg-grid opacity-[0.13]"
+          style={{ maskImage: "radial-gradient(58% 58% at 50% 0%, black, transparent 76%)" }}
+        />
+      </div>
 
-      <div className="relative mx-auto max-w-6xl px-6 py-8 lg:px-8">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-primary/80">Command center</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
-              Welcome back, Steven
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Drop data into a project, install skills, and let Selom propose the analysis.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button asChild variant="outline" size="sm">
+      <div className="relative mx-auto max-w-7xl px-6 py-12 lg:px-10 lg:py-16">
+        {/* Hero */}
+        <Reveal>
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-primary/80">Command center</p>
+          <h1 className="text-display mt-3 max-w-3xl text-4xl text-foreground sm:text-5xl lg:text-[3.5rem]">
+            Your data. Your figures. <span className="accent-keyword">No code.</span>
+          </h1>
+          <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted-foreground">
+            Welcome back, Steven. Drop a dataset, apply a skill, and get a publication-ready figure —
+            with the methods text written for you.
+          </p>
+          <div className="mt-7 flex flex-wrap items-center gap-3">
+            <Button size="lg" onClick={newProject}>
+              <FolderPlus /> New project
+            </Button>
+            <Button asChild variant="outline" size="lg">
               <Link href="/store">
-                <Boxes /> Skill Store
-              </Link>
-            </Button>
-            <Button asChild size="sm">
-              <Link href="/p/demo-pbmc">
-                <FolderPlus /> Open a project
+                <Boxes /> Browse Skill Store
               </Link>
             </Button>
           </div>
-        </div>
+        </Reveal>
 
-        {/* stat tiles */}
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {stats.map((s) => (
-            <Card key={s.label} className="flex items-center gap-3 p-4">
-              <span className="grid size-9 place-items-center rounded-lg border border-border bg-background/60 text-primary [&_svg]:size-4">
-                {s.icon}
-              </span>
-              <div className="min-w-0">
-                <p className="tabular text-lg font-semibold leading-none text-foreground">{s.value}</p>
-                <p className="mt-1 truncate text-xs text-muted-foreground">{s.label}</p>
+        {/* Workspace strip — counts as a single quiet band, not a hero-metric grid. */}
+        <Reveal delay={0.08}>
+          <Card className="mt-10 grid grid-cols-2 divide-border p-0 sm:grid-cols-4 sm:divide-x">
+            {workspace.map((w) => (
+              <div key={w.label} className="px-5 py-4">
+                <p className="tabular text-2xl font-semibold leading-none text-foreground">{w.value}</p>
+                <p className="mt-1.5 text-sm text-muted-foreground">{w.label}</p>
               </div>
-            </Card>
-          ))}
-        </div>
+            ))}
+          </Card>
+        </Reveal>
 
-        {/* recent projects */}
-        <section className="mt-9">
-          <SectionHeader title="Recent projects" href="/p/demo-pbmc" cta="Open" />
+        {/* The loop — Selom's pipeline, the no-code value prop made legible. */}
+        <section className="mt-16 lg:mt-20">
+          <Reveal>
+            <div className="max-w-2xl">
+              <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+                From file to figure, in four steps
+              </h2>
+              <p className="mt-2 text-base text-muted-foreground">
+                Every figure is traceable to a versioned, citable recipe — not a black-box button.
+              </p>
+            </div>
+          </Reveal>
+          <Reveal delay={0.06}>
+            <Pipeline variant="feature" className="mt-12" />
+          </Reveal>
+        </section>
+
+        {/* Recent projects */}
+        <section className="mt-16 lg:mt-20">
+          <SectionHeader title="Recent projects" sub="Pick up where you left off." />
           {projects.length === 0 ? (
-            <EmptyProjects />
+            <EmptyProjects onCreate={newProject} />
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {projects.slice(0, 6).map((p) => {
                 const dCount = select.datasets(state, p.id).length;
                 const iCount = select.installs(state, p.id).length;
                 const fCount = select.figures(state, p.id).length;
                 return (
-                  <Link key={p.id} href={`/p/${p.id}`} className="group">
-                    <Card className="h-full p-4 transition-colors group-hover:border-primary/40 group-hover:bg-card/80">
-                      <div className="flex items-center gap-2.5">
-                        <span
-                          aria-hidden
-                          className="size-3 rounded-[4px] ring-1 ring-inset ring-black/20"
-                          style={{ backgroundColor: p.color }}
-                        />
-                        <span className="min-w-0 truncate font-medium text-foreground">{p.name}</span>
-                        <ArrowRight className="ml-auto size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                      </div>
-                      <p className="tabular mt-3 text-xs text-muted-foreground">
-                        {dCount} dataset{dCount === 1 ? "" : "s"} · {iCount} skill
-                        {iCount === 1 ? "" : "s"} · {fCount} figure{fCount === 1 ? "" : "s"}
-                      </p>
-                    </Card>
-                  </Link>
+                  <StaggerItem key={p.id}>
+                    <HoverLift>
+                      <Link href={`/p/${p.id}`} className="group block">
+                        <Card className="h-full p-5 transition-colors group-hover:border-primary/40 group-hover:bg-card/80">
+                          <div className="flex items-center gap-3">
+                            <span
+                              aria-hidden
+                              className="size-3.5 rounded-[5px] ring-1 ring-inset ring-black/20"
+                              style={{ backgroundColor: p.color }}
+                            />
+                            <span className="min-w-0 truncate font-medium text-foreground">{p.name}</span>
+                            <ArrowRight className="ml-auto size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                          </div>
+                          <p className="tabular mt-4 text-sm text-muted-foreground">
+                            {dCount} dataset{dCount === 1 ? "" : "s"} · {iCount} skill{iCount === 1 ? "" : "s"} ·{" "}
+                            {fCount} figure{fCount === 1 ? "" : "s"}
+                          </p>
+                        </Card>
+                      </Link>
+                    </HoverLift>
+                  </StaggerItem>
                 );
               })}
-            </div>
+            </Stagger>
           )}
         </section>
 
-        {/* recent figures */}
-        <section className="mt-9">
-          <SectionHeader title="Jump back in" />
-          {recentFigures.length === 0 ? (
-            <Card className="p-6 text-sm text-muted-foreground">
-              No figures yet — open a project, run a skill, and your figures land here.
-            </Card>
-          ) : (
+        {/* Recent figures */}
+        {recentFigures.length > 0 && (
+          <section className="mt-16 lg:mt-20">
+            <SectionHeader title="Jump back in" sub="Your most recent figures." />
             <Card className="divide-y divide-border p-0">
               {recentFigures.map((f) => {
                 const skill = f.skillId ? getSkill(f.skillId) : undefined;
@@ -131,9 +149,9 @@ export default function HomePage() {
                   <Link
                     key={f.id}
                     href={`/p/${f.projectId}`}
-                    className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/40"
+                    className="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-accent/40"
                   >
-                    <span className="grid size-8 place-items-center rounded-md border border-border bg-background/60 text-primary [&_svg]:size-4">
+                    <span className="grid size-9 place-items-center rounded-lg border border-border bg-background/60 text-primary [&_svg]:size-4">
                       <Sparkles />
                     </span>
                     <div className="min-w-0">
@@ -147,59 +165,108 @@ export default function HomePage() {
                 );
               })}
             </Card>
-          )}
+          </section>
+        )}
+
+        {/* Trust band — the "no black box" promise, told as three concrete guarantees. */}
+        <section className="mt-16 lg:mt-20">
+          <SectionHeader title="Built for serious science" sub="Trust is the product — every figure ships its receipts." />
+          <Stagger className="grid gap-4 sm:grid-cols-3">
+            {[
+              {
+                icon: <ScrollText />,
+                title: "Auto methods text",
+                body: "Every run writes a methods paragraph with the exact parameters and canonical citations.",
+                color: "var(--stage-data)",
+              },
+              {
+                icon: <FileCheck2 />,
+                title: "Full provenance",
+                body: "Skill version, typed params, input checksum and environment — captured on every figure.",
+                color: "var(--stage-skill)",
+              },
+              {
+                icon: <ShieldCheck />,
+                title: "Statistical guardrails",
+                body: "Batch effects, low cell counts and multiple-testing risks surface before you publish.",
+                color: "var(--stage-publish)",
+              },
+            ].map((t) => (
+              <StaggerItem key={t.title}>
+                <Card className="h-full p-5">
+                  <span
+                    className="grid size-10 place-items-center rounded-xl border [&_svg]:size-5"
+                    style={{
+                      borderColor: `color-mix(in oklab, ${t.color} 50%, transparent)`,
+                      background: `color-mix(in oklab, ${t.color} 12%, var(--card))`,
+                      color: t.color,
+                    }}
+                  >
+                    {t.icon}
+                  </span>
+                  <p className="mt-4 font-medium text-foreground">{t.title}</p>
+                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{t.body}</p>
+                </Card>
+              </StaggerItem>
+            ))}
+          </Stagger>
         </section>
 
-        {/* store promo */}
-        <section className="mt-9 mb-4">
-          <Card className="flex flex-wrap items-center gap-4 p-5">
-            <span className="grid size-10 place-items-center rounded-lg border border-primary/30 bg-[color-mix(in_oklab,var(--primary)_10%,transparent)] text-primary [&_svg]:size-5">
-              <Boxes />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="font-medium text-foreground">Browse the Skill Store</p>
-                <Badge variant="verified">Verified runs now</Badge>
-              </div>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                ~{CATALOG_TOTAL_ESTIMATE} bioinformatics skills from bioSkills + ClawBio. Install one
-                into a project and apply it to your data.
-              </p>
-            </div>
-            <Button asChild variant="secondary" size="sm">
-              <Link href="/store">
-                Open Store <ArrowRight />
-              </Link>
-            </Button>
-          </Card>
+        {/* Skill Store promo */}
+        <section className="mt-16 lg:mb-4 lg:mt-20">
+          <HoverLift>
+            <Link href="/store" className="group block">
+              <Card className="flex flex-wrap items-center gap-5 p-6 transition-colors group-hover:border-primary/40 group-hover:bg-card/80">
+                <span className="grid size-12 place-items-center rounded-xl border border-primary/30 bg-[color-mix(in_oklab,var(--primary)_10%,transparent)] text-primary [&_svg]:size-6">
+                  <Boxes />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <p className="text-lg font-semibold tracking-tight text-foreground">Browse the Skill Store</p>
+                    <Badge variant="verified">Verified runs now</Badge>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    ~{CATALOG_TOTAL_ESTIMATE} bioinformatics skills from bioSkills + ClawBio. Install one into a
+                    project and apply it to your data.
+                  </p>
+                </div>
+                <span className="flex items-center gap-1.5 text-sm font-medium text-primary">
+                  Open Store <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+                </span>
+              </Card>
+            </Link>
+          </HoverLift>
         </section>
       </div>
     </div>
   );
 }
 
-function SectionHeader({ title, href, cta }: { title: string; href?: string; cta?: string }) {
+function SectionHeader({ title, sub }: { title: string; sub?: string }) {
   return (
-    <div className="mb-3 flex items-center justify-between">
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
-      {href && cta && (
-        <Link href={href} className="text-xs font-medium text-primary hover:underline">
-          {cta}
-        </Link>
-      )}
-    </div>
+    <Reveal>
+      <div className="mb-6">
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h2>
+        {sub && <p className="mt-1.5 text-base text-muted-foreground">{sub}</p>}
+      </div>
+    </Reveal>
   );
 }
 
-function EmptyProjects() {
+function EmptyProjects({ onCreate }: { onCreate: () => void }) {
   return (
-    <Card className="grid place-items-center gap-2 p-10 text-center">
-      <FolderPlus className="size-6 text-muted-foreground" />
-      <p className="text-sm font-medium text-foreground">No projects yet</p>
-      <p className="max-w-sm text-xs text-muted-foreground">
-        Use the <span className="text-foreground">+</span> in the sidebar to create your first
-        project, then drop in a dataset.
+    <Card className="flex flex-col items-center gap-3 px-6 py-14 text-center">
+      <span className="grid size-12 place-items-center rounded-2xl border border-border bg-background/60 text-primary [&_svg]:size-6">
+        <FolderPlus />
+      </span>
+      <p className="text-base font-medium text-foreground">No projects yet</p>
+      <p className="max-w-sm text-sm text-muted-foreground">
+        A project holds your datasets, the skills you install, and the figures you make. Create your first one to
+        get going.
       </p>
+      <Button className="mt-2" onClick={onCreate}>
+        <FolderPlus /> New project
+      </Button>
     </Card>
   );
 }
