@@ -32,6 +32,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [proposal, setProposal] = React.useState<IntakeProposal | null>(null);
   const [datasetId, setDatasetId] = React.useState<string | undefined>(undefined);
   const [lastFile, setLastFile] = React.useState<File | null>(null);
+  const [designFile, setDesignFile] = React.useState<File | null>(null);
   const [running, setRunning] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   // Publish-confidence bundle for the current figure (B4): methods-text + repro record + guardrails.
@@ -62,7 +63,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       setError(null);
       try {
         const file = lastFile ?? new File(["mock"], datasets.find((d) => d.id === datasetId)?.filename ?? "data.csv");
-        const res = await runSkill(runtimeSkillId(step.skillId), file, step.params);
+        const res = await runSkill(runtimeSkillId(step.skillId), file, step.params, designFile);
         figure.init(res.figure);
         setBundle({ provenance: res.provenance, methods: res.methods, guardrails: res.guardrails });
         const name = getSkill(step.skillId)?.name ?? step.skillId;
@@ -74,12 +75,13 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         setRunning(null);
       }
     },
-    [datasetId, datasets, figure, lastFile, projectId],
+    [datasetId, datasets, figure, lastFile, designFile, projectId],
   );
 
-  function onAnalyze({ datasetId: id, file, proposal: p }: AnalyzeArgs) {
+  function onAnalyze({ datasetId: id, file, proposal: p, designFile: df }: AnalyzeArgs) {
     setDatasetId(id);
     setLastFile(file);
+    setDesignFile(df ?? null);
     setProposal(p);
     setTab("workbench");
   }

@@ -62,9 +62,16 @@ export async function runSkill(
   skillId: string,
   file: File,
   params: SkillParams = {},
+  /**
+   * Optional design / sample sheet for bulk + time-course DE. The backend joins
+   * it on sample id (overrides column-name inference) and keeps it out of
+   * provenance (reserved `_design_path`). Sent as the multipart field `design`.
+   */
+  design?: File | null,
 ): Promise<SkillRunResponse> {
   const fd = new FormData();
   fd.append("matrix", file);
+  if (design) fd.append("design", design);
 
   const entries = Object.entries(params).map(([k, v]) => [k, String(v)] as [string, string]);
   const qs = new URLSearchParams(entries).toString();
