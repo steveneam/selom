@@ -29,10 +29,15 @@ export function DataPanel({
   projectId,
   datasets,
   onAnalyze,
+  incomingFile,
+  onIncomingConsumed,
 }: {
   projectId: string;
   datasets: Dataset[];
   onAnalyze: (args: AnalyzeArgs) => void;
+  /** A file dropped on the Overview hub — ingest it here on arrival. */
+  incomingFile?: File | null;
+  onIncomingConsumed?: () => void;
 }) {
   const [active, setActive] = React.useState<Active | null>(null);
   const [designFile, setDesignFile] = React.useState<File | null>(null);
@@ -42,6 +47,18 @@ export function DataPanel({
     const dataset = projectStore.addDataset(projectId, file.name, modality);
     setActive({ dataset, file });
   }
+
+  // Consume a file handed over from the Overview drop. Guard with a ref so a given
+  // File is ingested exactly once (StrictMode double-invokes effects in dev, and the
+  // parent's clear hasn't propagated yet on the second pass).
+  const ingestedRef = React.useRef<File | null>(null);
+  React.useEffect(() => {
+    if (!incomingFile || ingestedRef.current === incomingFile) return;
+    ingestedRef.current = incomingFile;
+    ingest(incomingFile);
+    onIncomingConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incomingFile]);
 
   function analyzeExisting(dataset: Dataset) {
     // Seeded datasets have no File object — synthesize one (the mock ignores bytes).

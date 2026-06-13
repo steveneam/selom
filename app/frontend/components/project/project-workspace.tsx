@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Database, LayoutGrid, Redo2, Sparkles, Trash2, Undo2, Wrench } from "lucide-react";
 import { DataPanel, type AnalyzeArgs } from "./data-panel";
+import { Dropzone } from "./dropzone";
 import { WorkbenchPanel } from "./workbench-panel";
 import { PublishConfidence } from "./publish-confidence";
 import { Pipeline, type StageKey, type StageState } from "@/components/pipeline";
@@ -33,6 +34,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [datasetId, setDatasetId] = React.useState<string | undefined>(undefined);
   const [lastFile, setLastFile] = React.useState<File | null>(null);
   const [designFile, setDesignFile] = React.useState<File | null>(null);
+  // A file dropped on the Overview hub — handed to the Data tab to ingest + intake.
+  const [incomingFile, setIncomingFile] = React.useState<File | null>(null);
   const [running, setRunning] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   // Publish-confidence bundle for the current figure (B4): methods-text + repro record + guardrails.
@@ -106,6 +109,17 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     publish: figures.length > 0 ? "active" : "todo",
   };
 
+  function goToStage(key: StageKey) {
+    setTab(key === "skill" ? "workbench" : key === "publish" ? "figure" : (key as Tab));
+  }
+
+  // Drop a file straight onto the Overview hub: hand it to the Data tab, which
+  // ingests it and opens the intake — so the first thing in a new project just works.
+  function dropOnOverview(file: File) {
+    setIncomingFile(file);
+    setTab("data");
+  }
+
   return (
     <div className="mx-auto flex h-full max-w-7xl flex-col px-6 py-8 lg:px-10">
       {/* header */}
@@ -156,29 +170,56 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 
         <div className="mt-5 min-h-0 flex-1">
           <TabsContent value="overview">
-            {/* Live pipeline tracker — the project's place in the Selom loop. */}
+            {/* The pipeline box IS the command surface. Empty project → drop here to
+                start; in-progress → a live, clickable tracker of where you are. */}
             <Card className="p-6 lg:p-8">
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold tracking-tight text-foreground">Project pipeline</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {figures.length > 0
-                      ? "Keep editing, or publish with the methods text and provenance attached."
-                      : datasets.length > 0
-                        ? "Next: review the proposed pipeline in the Workbench and run a skill."
-                        : "Start by dropping a dataset — Selom cleans it and asks a few questions."}
+              {datasets.length === 0 ? (
+                <>
+                  <div className="text-center">
+                    <h2 className="text-xl font-semibold tracking-tight text-foreground">
+                      Let&apos;s make your first figure
+                    </h2>
+                    <p className="mx-auto mt-1.5 max-w-md text-sm text-muted-foreground">
+                      Drop a dataset to get started — Selom detects the type, cleans it, and walks you
+                      through the rest.
+                    </p>
+                  </div>
+                  <Dropzone
+                    onFile={dropOnOverview}
+                    accept=".h5ad,.csv,.tsv,.mzML"
+                    title="Drop your data here"
+                    hint="or click to browse — this is step one"
+                    formats=".h5ad · .csv · .tsv · .mzML"
+                    className="mx-auto mt-6 max-w-2xl"
+                  />
+                  <p className="mt-8 text-center text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80">
+                    What happens next
                   </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant={figures.length > 0 ? "outline" : "default"}
-                  onClick={() => setTab(datasets.length === 0 ? "data" : figures.length > 0 ? "figure" : "workbench")}
-                >
-                  {datasets.length === 0 ? "Drop data" : figures.length > 0 ? "Open figure" : "Open Workbench"}
-                  <ArrowRight />
-                </Button>
-              </div>
-              <Pipeline variant="progress" states={stageStates} className="mt-10" />
+                  <Pipeline variant="progress" states={stageStates} onStageClick={goToStage} className="mt-4" />
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <h2 className="text-lg font-semibold tracking-tight text-foreground">Project pipeline</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {figures.length > 0
+                          ? "Keep editing, or publish with the methods text and provenance attached."
+                          : "Next: apply a skill in the Workbench to make your first figure."}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={figures.length > 0 ? "outline" : "default"}
+                      onClick={() => setTab(figures.length > 0 ? "figure" : "workbench")}
+                    >
+                      {figures.length > 0 ? "Open figure" : "Apply a skill"}
+                      <ArrowRight />
+                    </Button>
+                  </div>
+                  <Pipeline variant="progress" states={stageStates} onStageClick={goToStage} className="mt-10" />
+                </>
+              )}
             </Card>
 
             {/* Counts — a quiet strip, not a hero-metric grid. */}
@@ -213,7 +254,13 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           </TabsContent>
 
           <TabsContent value="data">
-            <DataPanel projectId={project.id} datasets={datasets} onAnalyze={onAnalyze} />
+            <DataPanel
+              projectId={project.id}
+              datasets={datasets}
+              onAnalyze={onAnalyze}
+              incomingFile={incomingFile}
+              onIncomingConsumed={() => setIncomingFile(null)}
+            />
           </TabsContent>
 
           <TabsContent value="workbench">

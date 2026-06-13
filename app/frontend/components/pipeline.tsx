@@ -66,10 +66,13 @@ const STAGES: StageDef[] = [
 export function Pipeline({
   variant = "feature",
   states,
+  onStageClick,
   className,
 }: {
   variant?: "feature" | "progress";
   states?: Partial<Record<StageKey, StageState>>;
+  /** Progress mode only: makes each stage a button that jumps to that step. */
+  onStageClick?: (key: StageKey) => void;
   className?: string;
 }) {
   return (
@@ -81,7 +84,14 @@ export function Pipeline({
           variant === "feature" ? (stage.key === "figure" ? "active" : "done") : states?.[stage.key] ?? "todo";
         return (
           <StaggerItem key={stage.key}>
-            <Stage stage={stage} state={state} isLast={i === STAGES.length - 1} variant={variant} index={i} />
+            <Stage
+              stage={stage}
+              state={state}
+              isLast={i === STAGES.length - 1}
+              variant={variant}
+              index={i}
+              onClick={onStageClick ? () => onStageClick(stage.key) : undefined}
+            />
           </StaggerItem>
         );
       })}
@@ -95,26 +105,28 @@ function Stage({
   isLast,
   variant,
   index,
+  onClick,
 }: {
   stage: StageDef;
   state: StageState;
   isLast: boolean;
   variant: "feature" | "progress";
   index: number;
+  onClick?: () => void;
 }) {
   const Icon = stage.icon;
   const lit = state !== "todo";
   const pulsing = state === "active";
 
-  return (
-    <div className="relative flex flex-col items-center px-3 text-center">
+  const inner = (
+    <>
       {/* connector to the next node, drawn from this node's center rightward,
           sitting behind the node. Hidden on the stacked (sub-lg) layout. */}
       {!isLast && (
         <span
           aria-hidden
           className={cn(
-            "absolute left-1/2 top-7 hidden h-px w-full lg:block",
+            "absolute left-1/2 top-9 hidden h-px w-full lg:block",
             lit ? "flow-line" : "bg-border",
           )}
         />
@@ -124,8 +136,9 @@ function Stage({
       <div
         aria-hidden
         className={cn(
-          "relative z-10 grid size-14 place-items-center rounded-2xl border bg-card transition-colors [&_svg]:size-6",
+          "relative z-10 grid size-14 place-items-center rounded-2xl border bg-card transition-transform [&_svg]:size-6",
           pulsing && "node-pulse",
+          onClick && "group-hover/stage:scale-105",
         )}
         style={
           lit
@@ -140,7 +153,7 @@ function Stage({
         <Icon />
         {state === "done" && variant === "progress" && (
           <span
-            className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full border border-card bg-stage-publish text-[var(--background)]"
+            className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full border border-card text-[var(--background)]"
             style={{ background: "var(--stage-publish)" }}
           >
             <Check className="size-3" strokeWidth={3} />
@@ -154,6 +167,20 @@ function Stage({
       </span>
       <h3 className="mt-1 text-base font-semibold tracking-tight text-foreground">{stage.label}</h3>
       <p className="mx-auto mt-1.5 max-w-[26ch] text-sm leading-relaxed text-muted-foreground">{stage.blurb}</p>
-    </div>
+    </>
   );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="group/stage relative flex w-full flex-col items-center rounded-2xl px-3 py-3 text-center transition-colors hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return <div className="relative flex flex-col items-center px-3 text-center">{inner}</div>;
 }
