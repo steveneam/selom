@@ -7,6 +7,7 @@ import tempfile
 from fastapi import FastAPI, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
+import guardrails
 import methods
 import provenance
 from jobs.queue import get_job, result_store, submit
@@ -57,6 +58,7 @@ async def run(skill_id: str, request: Request, matrix: UploadFile):
         "figure": figure,                            # Plotly JSON -> frontend
         "provenance": provenance.build(spec, path, matrix.filename, params),
         "methods": methods.build(spec, params),
+        "guardrails": guardrails.build(spec, path, params),
     }
 
 

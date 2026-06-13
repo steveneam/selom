@@ -26,6 +26,7 @@ result_store: ResultStore = make_result_store(settings)
 
 def execute_job(job_id: str, data_path: str, params: dict) -> None:
     """Run the job's skill to completion, updating the store. Never raises."""
+    import guardrails
     import methods
     import provenance
     from skills.contract import load_skill, run_skill  # lazy: keeps import graph light
@@ -43,6 +44,7 @@ def execute_job(job_id: str, data_path: str, params: dict) -> None:
             "figure": figure,
             "provenance": provenance.build(spec, data_path, job.filename, params),
             "methods": methods.build(spec, params),
+            "guardrails": guardrails.build(spec, data_path, params),
         }
         url = result_store.put(job_id, bundle)
         job_store.update(job_id, status=JobStatus.SUCCEEDED, result_url=url)
