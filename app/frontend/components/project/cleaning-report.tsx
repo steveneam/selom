@@ -56,9 +56,9 @@ export function CleaningReport({
       </div>
 
       {/* raw → cleaned */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
         <ShapeCard tone="raw" title="As you dropped it" obs={rawObs} vars={rawVar} L={L} />
-        <ArrowRight className="size-4 text-muted-foreground" aria-hidden />
+        <ArrowRight className="size-4 self-center text-muted-foreground" aria-hidden />
         <ShapeCard
           tone="clean"
           title="After cleaning"
@@ -159,13 +159,21 @@ function ShapeCard({
       <p className="tabular mt-1 text-sm text-muted-foreground">
         {vars.toLocaleString()} {L.var}
       </p>
-      {tone === "clean" && changed && (
-        <p className="tabular mt-1.5 text-[11px] text-warn">
-          {obsDelta !== 0 && `${fmt(obsDelta)} ${L.obs}`}
-          {obsDelta !== 0 && varDelta !== 0 && " · "}
-          {varDelta !== 0 && `${fmt(varDelta)} ${L.var}`}
-        </p>
-      )}
+      {/* Delta line is ALWAYS reserved (even when empty) so toggling a step never
+          changes the card height and reflows the panel. */}
+      <p className="tabular mt-1.5 min-h-4 text-[11px] text-warn">
+        {tone === "clean" ? (
+          changed ? (
+            <>
+              {obsDelta !== 0 && `${fmt(obsDelta)} ${L.obs}`}
+              {obsDelta !== 0 && varDelta !== 0 && " · "}
+              {varDelta !== 0 && `${fmt(varDelta)} ${L.var}`}
+            </>
+          ) : (
+            <span className="text-muted-foreground">no rows removed</span>
+          )
+        ) : null}
+      </p>
     </div>
   );
 }
