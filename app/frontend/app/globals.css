@@ -227,45 +227,12 @@ body {
 }
 
 /*
-  Pipeline connector: a single SOLID faint line with one small dot gliding
-  left→right, like data being handed between steps. Deliberately slow + faint —
-  one travelling dot per active link, not constant marching motion.
+  Pipeline connector: a clean solid line — no motion. An active (completed) link
+  is cyan-tinted; inactive links are a visible neutral (set on the element) so the
+  whole track always reads as connected.
 */
 .flow-line {
-  position: relative;
-  background: color-mix(in oklab, var(--primary) 20%, transparent);
-}
-.flow-line::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 0;
-  height: 6px;
-  width: 6px;
-  margin-top: -3px;
-  margin-left: -3px;
-  border-radius: 9999px;
-  background: var(--primary);
-  box-shadow: 0 0 8px -1px color-mix(in oklab, var(--primary) 75%, transparent);
-  opacity: 0;
-  animation: flow-dot 3.4s linear infinite;
-  animation-delay: var(--flow-delay, 0s);
-}
-@keyframes flow-dot {
-  0% {
-    left: 0%;
-    opacity: 0;
-  }
-  12% {
-    opacity: 0.9;
-  }
-  88% {
-    opacity: 0.9;
-  }
-  100% {
-    left: 100%;
-    opacity: 0;
-  }
+  background: color-mix(in oklab, var(--primary) 42%, transparent);
 }
 
 /* Live node pulse — a calm breathing halo on the active stage. */
@@ -288,11 +255,5 @@ body {
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
-  }
-  .flow-line {
-    background: color-mix(in oklab, var(--primary) 28%, transparent);
-  }
-  .flow-line::after {
-    display: none;
   }
 }
