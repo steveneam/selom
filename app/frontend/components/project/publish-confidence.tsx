@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { BadgeCheck, Check, ChevronDown, Copy, FileText, FlaskConical } from "lucide-react";
+import { AlertTriangle, BadgeCheck, Check, ChevronDown, Copy, FileText, FlaskConical, Info, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { SkillMethods, SkillProvenance } from "@/lib/skills-api";
+import type { SkillGuardrail, SkillMethods, SkillProvenance } from "@/lib/skills-api";
 
 /**
  * Publish-confidence panel (charter B4) — the answer to "is THIS the right,
@@ -16,12 +16,16 @@ import type { SkillMethods, SkillProvenance } from "@/lib/skills-api";
 export function PublishConfidence({
   provenance,
   methods,
+  guardrails = [],
 }: {
   provenance?: SkillProvenance;
   methods?: SkillMethods;
+  guardrails?: SkillGuardrail[];
 }) {
   const [open, setOpen] = React.useState(false);
-  if (!provenance && !methods) return null;
+  if (!provenance && !methods && guardrails.length === 0) return null;
+
+  const warnCount = guardrails.filter((g) => g.level === "warn").length;
 
   return (
     <div className="rounded-xl border border-border bg-card/60">
@@ -34,20 +38,59 @@ export function PublishConfidence({
         <BadgeCheck className="size-4 text-primary" />
         <span className="text-sm font-medium text-foreground">Publish confidence</span>
         <span className="hidden text-xs text-muted-foreground sm:inline">
-          Methods text &amp; reproducibility bundle
+          Quality checks, methods text &amp; reproducibility
         </span>
+        {warnCount > 0 && (
+          <span className="ml-auto flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400">
+            <AlertTriangle className="size-3" />
+            {warnCount} to review
+          </span>
+        )}
         <ChevronDown
-          className={`ml-auto size-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+          className={`${warnCount > 0 ? "ml-1.5" : "ml-auto"} size-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
 
       {open && (
-        <div className="grid gap-4 border-t border-border px-4 py-4 lg:grid-cols-2">
-          {methods && <Methods methods={methods} />}
-          {provenance && <Reproducibility provenance={provenance} />}
+        <div className="space-y-4 border-t border-border px-4 py-4">
+          {guardrails.length > 0 && <Guardrails items={guardrails} />}
+          <div className="grid gap-4 lg:grid-cols-2">
+            {methods && <Methods methods={methods} />}
+            {provenance && <Reproducibility provenance={provenance} />}
+          </div>
         </div>
       )}
     </div>
+  );
+}
+
+function Guardrails({ items }: { items: SkillGuardrail[] }) {
+  // Warnings first — they're the publish-confidence caveats; info notes reassure.
+  const sorted = [...items].sort((a, b) => (a.level === b.level ? 0 : a.level === "warn" ? -1 : 1));
+  return (
+    <section aria-labelledby="pc-checks" className="min-w-0">
+      <div className="flex items-center gap-2">
+        <ShieldCheck className="size-3.5 text-muted-foreground" />
+        <h3 id="pc-checks" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Quality checks
+        </h3>
+      </div>
+      <ul className="mt-2 space-y-2">
+        {sorted.map((g, i) => {
+          const warn = g.level === "warn";
+          const Icon = warn ? AlertTriangle : Info;
+          return (
+            <li key={`${g.code}-${i}`} className="flex gap-2.5">
+              <Icon className={`mt-0.5 size-4 shrink-0 ${warn ? "text-amber-400" : "text-primary/80"}`} />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground/90">{g.title}</p>
+                <p className="text-xs leading-relaxed text-muted-foreground">{g.detail}</p>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

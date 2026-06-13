@@ -19,12 +19,21 @@ export interface SkillMethods {
   citations: string[];
 }
 
+/** Statistical / data-quality guardrail (backend guardrails.py — charter B4). */
+export interface SkillGuardrail {
+  level: "info" | "warn";
+  code: string;
+  title: string;
+  detail: string;
+}
+
 export interface SkillRunResponse {
   figure: FigureSpec;
   // Publish-confidence bundle (B4). Optional so an older backend / a mock without it
   // still renders the figure; the panel just hides when absent.
   provenance?: SkillProvenance;
   methods?: SkillMethods;
+  guardrails?: SkillGuardrail[];
 }
 
 export type SkillParams = Record<string, string | number | boolean>;
@@ -82,5 +91,10 @@ export async function runSkill(
   if (!json.figure || !Array.isArray(json.figure.data)) {
     throw new Error("Server returned a malformed figure spec.");
   }
-  return { figure: json.figure, provenance: json.provenance, methods: json.methods };
+  return {
+    figure: json.figure,
+    provenance: json.provenance,
+    methods: json.methods,
+    guardrails: json.guardrails,
+  };
 }
