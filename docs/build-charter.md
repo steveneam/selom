@@ -106,6 +106,32 @@ Paper/repo → reproducible custom skill; Firecracker/gVisor sandbox; grow runna
 
 ---
 
+## Competitor-driven skill priorities (OmicsBox teardown, 2026-06-12)
+
+The OmicsBox (BioBam) teardown — `docs/competitors/omicsbox.md` — reverse-engineers the
+incumbent no-code suite to the tool/format level and yields a prioritized last-mile skill
+backlog (§7). It is a **prioritization lens on the existing skill scope, not a new bucket** —
+every item lands inside **B2** (broaden), **B8** (broaden curated skills) or **B9** (Skill
+Foundry). The binding strategic call is drafted as **DECISIONS.md #10** (pending owner
+ratification — *not yet locked*).
+
+**Strategic bet:** win the **analysis→editable-figure last mile** (Selom starts from the count
+matrix / AnnData / feature table; `h5ad`-native is their Seurat weakness) and own the
+**proteomics / metabolomics whitespace** (OmicsBox is NGS-only, zero mzML). **Do not** get drawn
+upstream into alignment / assembly / variant-calling — heavy, commodity, compute-metered even for them.
+
+| Pri | What | Maps to | Note |
+|---|---|---|---|
+| **P1** | broaden `deg` (no-rep + time-course) + `enrichment` (ORA); new `pathway` (KEGG/Reactome) + `go-graph` figure skills | broadens **B2** + 2 new Verified skills | nearest gap; `pathway`/`go-graph` need the **KEGG · Reactome · GO/QuickGO · STRING** APIs eamos lacks → **printing-press CLI candidates** |
+| **P2** | single-cell depth — `markers` · `annotate` · `trajectory` | **B8 / B9** library growth | `h5ad`-native = their Seurat weakness |
+| **P3** | `coexpression` (WGCNA) · `venn` · `pcoa` | **B8 / B9** | leapfrogs their 4.0 WGCNA |
+| **P4** 🆕 | proteomics + metabolomics (mzML) | **B9** Foundry + new-modality ingest | the long-term moat — OmicsBox can't match |
+
+**API reuse (don't rebuild):** eamos already ships VEP · UniProt · NCBI E-utilities · PubMed ·
+LitVar2 · gnomAD as live tools — NCBI + PubMed feed **B4** auto-methods citations; UniProt feeds
+the **P4** proteomics module. The genuine new-API gaps (→ printing-press CLIs) are the
+pathway/enrichment ones above. Full tool→skill→porting-source mapping: `docs/competitors/omicsbox.md §7–§8`.
+
 ## What changed vs the raw P0–P8 ledger (the reorder rationale)
 
 - **P5 (guardrails/methods-text) rose into Stage 1 (B4)** — forced by the publish-confidence core decision.
