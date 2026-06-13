@@ -52,11 +52,17 @@ def run(data_path: str, params: dict) -> dict:
     pathways = [r["pathway"] for r in rows]
     nlp = [round(-math.log10(max(r["padj"], 1e-300)), 3) for r in rows]
     overlap = [r["overlap"] for r in rows]
-    return dotplot_spec(pathways, nlp, overlap, "Pathway enrichment (GO / Reactome)")
+    return dotplot_spec(pathways, nlp, overlap, "Pathway enrichment (GO)")
 
 
 def _load_gene_sets() -> dict:
-    raw = json.loads((pathlib.Path(__file__).parent / "gene_sets.json").read_text())
+    # Prefer the full GO library (scripts/build_gene_sets.py) when present; otherwise
+    # fall back to the small committed sample so the skill still runs out of the box.
+    here = pathlib.Path(__file__).parent
+    path = here / "gene_sets_go.json"
+    if not path.exists():
+        path = here / "gene_sets.json"
+    raw = json.loads(path.read_text())
     return {k: [g.upper() for g in v] for k, v in raw.items() if not k.startswith("_")}
 
 
