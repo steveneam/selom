@@ -17,6 +17,21 @@ def run(data_path: str, params: dict) -> dict:
 
     adata = sc.read_h5ad(data_path)
 
+    # Fast path: plot a precomputed embedding (e.g. a ShinyCell/Seurat UMAP or t-SNE in
+    # obsm) coloured by an obs column — no normalize / PCA / neighbours / recompute.
+    embedding = (params.get("embedding") or "").strip()
+    if embedding and embedding in adata.obsm:
+        coords = adata.obsm[embedding]
+        edf = adata.obs.copy()
+        edf["DIM1"], edf["DIM2"] = coords[:, 0], coords[:, 1]
+        cb = params.get("color_by", "leiden")
+        if cb not in edf.columns:
+            cb = edf.columns[0]
+        efig = px.scatter(edf, x="DIM1", y="DIM2", color=cb, title=f"scRNA — {embedding}")
+        efig.update_traces(marker={"size": 4})
+        efig.update_layout(legend_title_text=cb)
+        return jsonable(efig.to_plotly_json())
+
     # Minimal, honest scRNA pipeline: drop all-zero genes -> (normalize -> log1p) ->
     # PCA -> kNN graph -> Leiden clusters -> UMAP embedding. Skip normalization when the
     # input is already log-normalized (normalize=false) to avoid double-normalizing.

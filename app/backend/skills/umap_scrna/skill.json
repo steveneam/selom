@@ -10,7 +10,8 @@
     "n_neighbors": { "type": "int", "default": 15, "min": 2, "max": 100 },
     "n_pcs":       { "type": "int", "default": 50, "min": 2, "max": 200 },
     "color_by":    { "type": "str", "default": "leiden" },
-    "normalize":   { "type": "bool", "default": true }
+    "normalize":   { "type": "bool", "default": true },
+    "embedding":   { "type": "str", "default": "" }
   },
   "outputs": [{ "name": "figure", "kind": "plotly_spec" }],
   "catalog": {

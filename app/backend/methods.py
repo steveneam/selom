@@ -29,6 +29,13 @@ SCIPY = "Virtanen, P. et al. SciPy 1.0: fundamental algorithms for scientific co
 
 
 def _umap(p: dict):
+    emb = (p.get("embedding") or "").strip()
+    if emb:
+        text = (
+            f"Cells were displayed on a precomputed {emb} embedding provided with the dataset "
+            f"and coloured by {p['color_by']} (Scanpy for I/O); no re-embedding was performed."
+        )
+        return text, [SCANPY]
     if p.get("normalize", True):
         prep = "Gene counts were normalized to 10,000 counts per cell and log1p-transformed, "
     else:

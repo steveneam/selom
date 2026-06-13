@@ -14,6 +14,8 @@ import pathlib
 from skills.enrichment.run import dotplot_spec
 
 _GENE_COLS = ["gene", "genes", "symbol", "gene_name", "gene_symbol", "geneid", "gene_id", "feature", "names", "id"]
+_FC_COLS = ["log2foldchange", "log2fc", "logfc", "log2_fold_change", "avg_log2fc"]
+_P_COLS = ["padj", "adj.p.val", "fdr", "qvalue", "q.value", "pvals_adj", "pvalue", "pval", "p.value"]
 
 
 def run(data_path: str, params: dict) -> dict:
@@ -25,8 +27,19 @@ def run(data_path: str, params: dict) -> dict:
     bg_size = len(background)
 
     df = pd.read_csv(data_path)
+    cols = {c.lower(): c for c in df.columns}
     gene_col = next((c for c in df.columns if c.lower() in _GENE_COLS), None)
-    query_series = df[gene_col] if gene_col is not None else df.iloc[:, 0]
+    # If the input is a full DE table (has an FDR column), derive the query from the
+    # SIGNIFICANT rows; a bare/pre-filtered gene list (no FDR column) is used as-is.
+    fdr_col = next((cols[c] for c in _P_COLS if c in cols), None)
+    fc_col = next((cols[c] for c in _FC_COLS if c in cols), None)
+    sub = df
+    if fdr_col is not None:
+        sub = sub[pd.to_numeric(sub[fdr_col], errors="coerce") <= float(params.get("fdr_threshold", 0.05))]
+        fc_t = float(params.get("fc_threshold", 0.0))
+        if fc_col is not None and fc_t > 0:
+            sub = sub[pd.to_numeric(sub[fc_col], errors="coerce").abs() >= fc_t]
+    query_series = sub[gene_col] if gene_col is not None else sub.iloc[:, 0]
     query = {str(g).upper() for g in query_series} & background
     n_query = len(query)
 
