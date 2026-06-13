@@ -11,7 +11,7 @@ from skills.volcano.run import _assemble
 
 _FC_COLS = ["log2foldchange", "log2fc", "logfc", "log2_fold_change", "avg_log2fc"]
 _P_COLS = ["padj", "adj.p.val", "fdr", "qvalue", "q.value", "pvals_adj", "pvalue", "pval", "p.value"]
-_GENE_COLS = ["gene", "genes", "symbol", "names", "gene_id", "id"]
+_GENE_COLS = ["gene", "genes", "symbol", "gene_name", "gene_symbol", "geneid", "gene_id", "feature", "names", "id"]
 
 
 def run(data_path: str, params: dict) -> dict:
