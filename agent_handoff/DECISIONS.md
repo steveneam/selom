@@ -4,7 +4,7 @@
 > Supersede by append (with a new stamp), never silently overwrite. Deep ADRs
 > live in the research vault; this file is the build-side quick reference.
 
-_Last updated: 2026-06-11 23:40 +10:00 — added #9 (GSEA gene-set source = Reactome/GO) at B2 sign-off (Claude, owner-approved)._
+_Last updated: 2026-06-13 — added #10 (skill-scope bet: win the editable-figure last mile + own the proteomics/metabolomics whitespace, don't chase upstream NGS) from the OmicsBox teardown (Claude, owner-approved)._
 
 | # | Decision | Rationale | Source |
 |---|---|---|---|
@@ -17,6 +17,7 @@ _Last updated: 2026-06-11 23:40 +10:00 — added #9 (GSEA gene-set source = Reac
 | 7 | **Distribution = web-first SaaS for v1.** No consumer desktop (Electron/Tauri); on-prem / BYO-cloud is reserved as a later enterprise tier (pharma data-residency). | The only model where the GPL SaaS-gap holds (server-side use ≠ distribution → no copyleft re-trigger), compute is metered, and there's nothing to pirate; bundling copyleft into a desktop app would re-trigger GPL. | distribution-web-vs-desktop · ADR 0002 |
 | 8 | **IP strategy = trade-secret + copyright, NOT patents.** | The Extract-Skills method is best kept secret (patents force disclosure and are hard to enforce on a method); the durable moat is curation / UX / verified-reproducibility — protected by copyright (compilation) + trade-secret, with an open-core boundary for public parts. | commercialisation-ip-trademark §B |
 | 9 | **GSEA / pathway-enrichment gene-set source = Reactome / GO** (license-clean), NOT gseapy + MSigDB. | MSigDB and gseapy carry AGPL / restrictive-license constraints (`RISKS.md` #6) that would have to clear the pre-launch SCA gate; Reactome + GO are openly licensed, so the `selom.enrichment` skill stays launch-safe with no copyleft cleanup. Owner-approved at B2 sign-off. Lane: Codex (BE). | Owner directive · `RISKS.md` #6 · build-charter B2/B4 |
+| 10 | **Skill scope = win the analysis→editable-figure last mile + own the proteomics/metabolomics whitespace; do NOT chase upstream NGS** (alignment/assembly/variant-calling). Backlog sequence: **P1** (broaden `deg`/`enrichment` + new `pathway`/`go-graph` figure skills) → **P2** (single-cell depth: `markers`/`annotate`/`trajectory`) → **P3** (WGCNA/venn/pcoa) → **P4** (proteomics/metabolomics — the long-term moat). | OmicsBox is NGS-only, desktop-first, raster-figure, and compute-metered on exactly the heavy upstream tools → the durable wedge is the editable-vector last mile (Selom starts from the count matrix / AnnData / feature table; `h5ad`-native = their Seurat weakness) plus the mass-spec whitespace they don't play in. Reuse eamos's live annotation APIs (NCBI/PubMed/UniProt/VEP); the only genuine new-API gaps are the pathway/enrichment ones (KEGG/Reactome/GO/QuickGO/STRING) backing P1. Owner-approved 2026-06-13. | `docs/competitors/omicsbox.md` · `docs/build-charter.md` (Competitor-driven skill priorities) |
 
 ## Notes
 
