@@ -8,9 +8,9 @@ _Last updated: 2026-06-12 02:45 +10:00 · Claude (acting FE+BE) — **B4 publish
 
 <!-- prior live-state: B3 (skills-as-a-service) @ `5138aec`, pushed (2026-06-12 01:48). Full history in git log + the Claude/Codex resume sections below. -->
 
-**Model:** stay on **Fable 5** for all Selom work — Selom carries no biology/security
-flag. Only *reading the EAMOS build repo* escalates a session to Opus, and that
-source is not needed here. Do not switch to Opus for Selom.
+**Model:** **Opus 4.8 (xhigh effort)** for all Selom work — owner-directed 2026-06-13,
+pinned in `.claude/settings.json` (`model=claude-opus-4-8`, `effortLevel=xhigh`); applies on
+session restart. Supersedes the prior Fable-5 default.
 
 ## Active Status
 
@@ -234,7 +234,7 @@ None held.
   ROLE: Codex away → Claude owns BOTH lanes. Keep BE drop-in-ready: accurate `## Codex` section, explicit per-lane scoped commits (never git add -A). Selom is DESKTOP-ONLY.
   Delta: B4 publish-confidence slice-1 DONE (both lanes), COMMITTED, NOT pushed — main ahead 2 of origin/main @ 4216935 (BE 2ab7c43 + FE 84ae54e). Per-figure reproducibility bundle (provenance.py: skill+ver, resolved+typed params, input SHA-256+size, env=python/platform/engine-policy+pkg versions) + auto methods-text (methods.py: per-skill templates + canonical citations; generic fallback) + contract.resolved_params(). /run + /jobs/{id}/result now return {figure, provenance, methods} (jobs thread filename + store full bundle via execute_job). FE: collapsed "Publish confidence" panel (components/project/publish-confidence.tsx) — Methods (Copy+citations) + Reproducibility; runSkill returns the bundle; MSW mock serves it (mocks/stub-bundle.ts). pytest 28 passed; ruff clean; uvicorn smoke green; FE tsc+next build clean; browser-verified (mock :3010, POST /run 200, console clean bar favicon 404).
   FIRST: push the 2 local commits on owner's word (global rule = push only when asked). Env: backend on user-managed py3.12 (uv at C:/Users/seamegdool/.local/bin/uv.exe); system py3.10 IT-locked. Run via `uv run --directory app/backend python -m pytest` / `-m uvicorn`. Jobs default inline+local; SELOM_QUEUE=arq + R2_* + [jobs] extra flip on Redis/R2. Skills stub vs real via SELOM_SKILLS_ENGINE; golden tests pin stub. FE dev `npm run dev:mock -- --port 3010`. demo.h5ad gitignored — regen via scripts/make_demo.py.
-  Next: finish B4 — (a) statistical-guardrail expansion (silhouette already on cluster), (b) Kaleido journal export (needs Docker+Chromium, RISKS #2 → lands with deploy image). Then integration backlog (OmicVerse isolated worker, arq Redis status store, R-oracle, full GMT, catalog true-up). Stay on Fable 5 (xhigh). End clear-safe.
+  Next: finish B4 — (a) statistical-guardrail expansion (silhouette already on cluster), (b) Kaleido journal export (needs Docker+Chromium, RISKS #2 → lands with deploy image). Then integration backlog (OmicVerse isolated worker, arq Redis status store, R-oracle, full GMT, catalog true-up). Stay on Opus 4.8 (xhigh). End clear-safe.
   ```
 
 ## Codex — Last Task & Resume
@@ -285,5 +285,5 @@ None held.
   # Resume · 2026-06-12 02:45 +10:00 · Selom · Codex (backend) — reclaiming from Claude
   Selom build repo D:/selom. CODEX.md auto-loads. Read agent_handoff/README.md + CURRENT.md + DECISIONS.md + RISKS.md + docs/build-charter.md + plans/v2-backend.md + docs/integrations.md + git status.
   Delta: B1 + B2 + B3 + B4-slice-1 backend DONE by Claude. B1/B2/B3 PUSHED (origin @ 4216935); B4 backend COMMITTED 2ab7c43 but NOT pushed (main ahead 2; FE half 84ae54e). B4 = provenance.py (per-figure reproducibility bundle: skill+ver, resolved+typed params, input SHA-256+size, env=python/platform/engine-policy+pkg versions) + methods.py (auto methods-text, per-skill templates + citations) + contract.resolved_params(). /run + /jobs/{id}/result now return {figure, provenance, methods}; Job.filename added; shared execute_job stores the full bundle; result_store.put param figure→payload. No new deps. pytest 28 passed; ruff clean; uvicorn smoke green.
-  Open BE items: (1) push the 2 local commits on owner's word; (2) arq cross-process job STATUS needs a Redis-backed JobStore (jobs/worker.py caveat). Next: finish B4 — guardrail expansion (silhouette already on cluster) + Kaleido export (needs Docker+Chromium, RISKS #2) — then integration backlog (OmicVerse isolated worker, R-oracle, full GMT, catalog true-up). Env: user-managed py3.12 (uv); system 3.10 IT-locked; `uv run --directory app/backend python -m pytest`/`-m uvicorn`. Stay on Fable 5. End clear-safe.
+  Open BE items: (1) push the 2 local commits on owner's word; (2) arq cross-process job STATUS needs a Redis-backed JobStore (jobs/worker.py caveat). Next: finish B4 — guardrail expansion (silhouette already on cluster) + Kaleido export (needs Docker+Chromium, RISKS #2) — then integration backlog (OmicVerse isolated worker, R-oracle, full GMT, catalog true-up). Env: user-managed py3.12 (uv); system 3.10 IT-locked; `uv run --directory app/backend python -m pytest`/`-m uvicorn`. Stay on Opus 4.8 (xhigh). End clear-safe.
   ```

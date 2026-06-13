@@ -47,7 +47,7 @@ This is the default split, not a hard wall: cross the line only when a contract 
 
 ## Notes
 
-- This repo stays on **Fable 5**.
+- This repo runs on **Opus 4.8** (xhigh effort) — owner-directed 2026-06-13, pinned in `.claude/settings.json` (`model=claude-opus-4-8`, `effortLevel=xhigh`); superseded the prior Fable 5 default.
 - Commercial/licensing gates are **deferred** — build now, gate before launch (see `LAUNCH-GATES.md`).
 - For frontend work — and **always for a frontend audit/review** — invoke the design
   skills: **ui-ux-pro-max**, **frontend-design**, and **impeccable** (`/impeccable audit`,
