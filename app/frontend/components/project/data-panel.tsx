@@ -1,12 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { Database, FileSpreadsheet, ShieldAlert, X } from "lucide-react";
+import { Database, FileSpreadsheet, Plus, ShieldAlert, X } from "lucide-react";
 import { IntakeQuestionnaire } from "@/components/intake/intake-questionnaire";
 import { Dropzone } from "./dropzone";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/cn";
+import { modalityColor } from "@/lib/catalog/modality";
 import { detectModality, proposeForModality, type IntakeProposal } from "@/lib/intake/mock";
 import { projectStore } from "@/lib/projects/store";
 import type { Dataset } from "@/lib/projects/types";
@@ -69,13 +71,27 @@ export function DataPanel({
     <div className="grid gap-5 lg:grid-cols-2">
       {/* left: upload + dataset list */}
       <div className="space-y-5">
-        <Dropzone
-          onFile={ingest}
-          accept=".h5ad,.csv,.tsv,.mzML"
-          title="Drop your data here"
-          hint="or click to browse — Selom detects the type, cleans it, and asks a few questions"
-          formats=".h5ad · .csv · .tsv · .mzML"
-        />
+        {/* Big box only when there's nothing yet; once you have data it shrinks to a
+            compact "+ Add data" so the datasets (below) are the focus. A project can
+            hold several datasets, so an add-affordance always lives here. */}
+        {datasets.length === 0 ? (
+          <Dropzone
+            onFile={ingest}
+            accept=".h5ad,.csv,.tsv,.mzML"
+            title="Drop your data here"
+            hint="or click to browse — Selom detects the type, cleans it, and asks a few questions"
+            formats=".h5ad · .csv · .tsv · .mzML"
+          />
+        ) : (
+          <Dropzone
+            onFile={ingest}
+            accept=".h5ad,.csv,.tsv,.mzML"
+            title="Add another dataset"
+            hint="Drop a file or click to browse"
+            icon={Plus}
+            variant="secondary"
+          />
+        )}
 
         {/* Optional design / sample sheet (item b) — for bulk & time-course DE. */}
         {designFile ? (
@@ -110,33 +126,57 @@ export function DataPanel({
 
         <div className="space-y-2">
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
-            Datasets
+            Your data
           </p>
           {datasets.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No datasets yet — drop a file to begin.</p>
+            <p className="text-xs text-muted-foreground">No datasets yet — drop a file above to begin.</p>
           ) : (
-            datasets.map((d) => (
-              <Card key={d.id} className="flex items-center gap-3 p-3">
-                <span className="grid size-8 place-items-center rounded-md border border-border bg-background/60 text-muted-foreground">
-                  <Database className="size-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground">{d.filename}</p>
-                  <p className="tabular text-xs text-muted-foreground">
-                    {d.modality}
-                    {d.qc ? ` · ${d.qc.nObs.toLocaleString()} × ${d.qc.nVar.toLocaleString()}` : ""}
-                  </p>
-                </div>
-                {d.qc && d.qc.guardrails.some((g) => g.level !== "info") && (
-                  <span title="Guardrail flags" className="text-amber-400">
-                    <ShieldAlert className="size-4" />
+            datasets.map((d) => {
+              const color = modalityColor(d.modality);
+              const isActive = active?.dataset.id === d.id;
+              const warns = d.qc?.guardrails.filter((g) => g.level !== "info").length ?? 0;
+              return (
+                <button
+                  key={d.id}
+                  onClick={() => analyzeExisting(d)}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors",
+                    isActive
+                      ? "border-primary/50 bg-accent/30 ring-1 ring-ring/30"
+                      : "border-border bg-card hover:border-primary/40 hover:bg-card/80",
+                  )}
+                >
+                  <span
+                    aria-hidden
+                    className="grid size-9 shrink-0 place-items-center rounded-lg border [&_svg]:size-4"
+                    style={{
+                      borderColor: `color-mix(in oklab, ${color} 45%, transparent)`,
+                      background: `color-mix(in oklab, ${color} 12%, var(--card))`,
+                      color,
+                    }}
+                  >
+                    <Database />
                   </span>
-                )}
-                <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => analyzeExisting(d)}>
-                  Analyze
-                </Button>
-              </Card>
-            ))
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-foreground">{d.filename}</p>
+                    <p className="tabular text-xs text-muted-foreground">
+                      {d.modality}
+                      {d.qc ? ` · ${d.qc.nObs.toLocaleString()} × ${d.qc.nVar.toLocaleString()}` : ""}
+                      {d.qc?.cleaning.length ? ` · ${d.qc.cleaning.length} cleaning steps` : ""}
+                    </p>
+                  </div>
+                  {warns > 0 && (
+                    <span
+                      title={`${warns} guardrail flag${warns === 1 ? "" : "s"}`}
+                      className="tabular inline-flex items-center gap-1 rounded-md border border-warn/40 bg-warn/10 px-1.5 py-0.5 text-[10px] font-medium text-warn"
+                    >
+                      <ShieldAlert className="size-3.5" />
+                      {warns}
+                    </span>
+                  )}
+                </button>
+              );
+            })
           )}
         </div>
       </div>

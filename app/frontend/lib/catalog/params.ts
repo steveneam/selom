@@ -1,0 +1,48 @@
+import { runtimeSkillId } from "@/lib/skills-api";
+import type { SkillParams } from "@/lib/skills-api";
+
+/**
+ * Inline, tweak-before-run parameters for Verified skills — the few knobs a
+ * bench scientist actually reaches for, with smart defaults so a one-click
+ * "Apply" still does the right thing. Keyed by the backend runtime slug
+ * (`selom.umap_scrna` -> `umap_scrna`). Kept deliberately small and accurate to
+ * the real runners; skills without an entry simply run with their defaults.
+ */
+export interface ParamField {
+  key: string;
+  label: string;
+  type: "range" | "number" | "text" | "switch";
+  default: number | string | boolean;
+  min?: number;
+  max?: number;
+  step?: number;
+  placeholder?: string;
+  help?: string;
+}
+
+const SCHEMAS: Record<string, ParamField[]> = {
+  umap_scrna: [
+    { key: "resolution", label: "Cluster resolution", type: "range", default: 1.0, min: 0.1, max: 2.0, step: 0.1, help: "Higher = more, finer clusters." },
+    { key: "normalize", label: "Normalize input", type: "switch", default: true, help: "Off for already-normalized data." },
+  ],
+  cluster: [
+    { key: "resolution", label: "Cluster resolution", type: "range", default: 1.0, min: 0.1, max: 2.0, step: 0.1, help: "Higher = more, finer clusters." },
+    { key: "normalize", label: "Normalize input", type: "switch", default: true },
+  ],
+  deg: [
+    { key: "reference", label: "Reference group", type: "text", default: "", placeholder: "e.g. control", help: "Baseline condition for the contrast." },
+    { key: "treatment", label: "Treatment group", type: "text", default: "", placeholder: "e.g. treated" },
+  ],
+  violin: [{ key: "gene", label: "Marker gene", type: "text", default: "", placeholder: "e.g. MS4A1" }],
+};
+
+export function skillParamSchema(catalogOrRuntimeId: string): ParamField[] {
+  return SCHEMAS[runtimeSkillId(catalogOrRuntimeId)] ?? [];
+}
+
+/** Default param values for a skill (what a one-click Apply sends). */
+export function defaultParams(catalogOrRuntimeId: string): SkillParams {
+  const out: SkillParams = {};
+  for (const f of skillParamSchema(catalogOrRuntimeId)) out[f.key] = f.default;
+  return out;
+}
