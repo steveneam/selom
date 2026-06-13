@@ -1,0 +1,110 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "lines",
+      "name": "is_a / part_of",
+      "x": [
+        0.0,
+        0.0,
+        null,
+        1.0,
+        1.0,
+        null
+      ],
+      "y": [
+        0.0,
+        1.0,
+        null,
+        0.0,
+        1.0,
+        null
+      ],
+      "line": {
+        "color": "#5b6b80",
+        "width": 1
+      },
+      "hoverinfo": "none",
+      "showlegend": false
+    },
+    {
+      "type": "scatter",
+      "mode": "markers+text",
+      "name": "GO terms",
+      "x": [
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        2.0
+      ],
+      "y": [
+        1.0,
+        0.0,
+        1.0,
+        0.0,
+        0.5
+      ],
+      "text": [
+        "sensory perception",
+        "visual perception",
+        "cell projection",
+        "cilium",
+        "photoreceptor activity"
+      ],
+      "textposition": "top center",
+      "textfont": {
+        "size": 9
+      },
+      "hovertext": [
+        "GO:BP: sensory perception<br>40 genes, -log10 padj 3.1",
+        "GO:BP: visual perception<br>22 genes, -log10 padj 4.8",
+        "GO:CC: cell projection<br>35 genes, -log10 padj 2.6",
+        "GO:CC: cilium<br>18 genes, -log10 padj 4.2",
+        "GO:MF: photoreceptor activity<br>9 genes, -log10 padj 3.7"
+      ],
+      "hoverinfo": "text",
+      "marker": {
+        "size": [
+          26,
+          22,
+          24,
+          20,
+          14
+        ],
+        "sizemode": "diameter",
+        "color": [
+          3.1,
+          4.8,
+          2.6,
+          4.2,
+          3.7
+        ],
+        "colorscale": "Viridis",
+        "showscale": true,
+        "colorbar": {
+          "title": {
+            "text": "-log10 padj"
+          }
+        },
+        "line": {
+          "color": "#0b0f17",
+          "width": 1
+        }
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "GO enrichment graph (stub)"
+    },
+    "xaxis": {
+      "visible": false
+    },
+    "yaxis": {
+      "visible": false
+    },
+    "hovermode": "closest",
+    "showlegend": false
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "go_graph",
+  "version": "0.1.0",
+  "title": "GO enrichment graph",
+  "engine": "python",
+  "omics": "scrna-seq|bulk-rna-seq|proteomics",
+  "entrypoint": "skills.go_graph.run:run",
+  "inputs": [{ "name": "matrix", "kind": "csv", "required": true }],
+  "param_spec": {
+    "top_n":         { "type": "int",   "default": 20,   "min": 5, "max": 40 },
+    "namespace":     { "type": "str",   "default": "" },
+    "fdr_threshold": { "type": "float", "default": 0.05, "min": 0.0, "max": 1.0 },
+    "fc_threshold":  { "type": "float", "default": 0.0,  "min": 0.0, "max": 5.0 }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "summary": "Top enriched GO terms drawn in their is_a/part_of hierarchy as an editable node-link graph.",
+    "category": "pathway-analysis",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".csv"],
+    "chains_with": ["deg", "volcano", "enrichment"],
+    "license": "MIT",
+    "popularity": 60
+  }
+}

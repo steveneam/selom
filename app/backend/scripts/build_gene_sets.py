@@ -31,6 +31,7 @@ OBO_URL = "https://current.geneontology.org/ontology/go-basic.obo"
 GAF_URL = "https://current.geneontology.org/annotations/goa_human.gaf.gz"
 CACHE = pathlib.Path("D:/selom-data/genesets/raw")
 OUT = pathlib.Path(__file__).resolve().parent.parent / "skills" / "enrichment" / "gene_sets_go.json"
+DAG_OUT = OUT.parent.parent / "go_graph" / "go_dag.json"  # id -> {name, ns, ancestors, genes}
 
 MIN_SET, MAX_SET = 10, 500            # drop giant near-root terms + tiny noise
 _NS = {"biological_process": "BP", "molecular_function": "MF", "cellular_component": "CC"}
@@ -114,6 +115,26 @@ def main() -> None:
     copy = CACHE.parent / "gene_sets_go.json"
     copy.write_text(json.dumps(sets))
 
+    # GO DAG for the go_graph skill: kept terms keyed by GO id, with the ancestor closure
+    # (is_a+part_of) so the skill can draw the hierarchy among enriched terms + run ORA.
+    dag = {}
+    for term, genes in term_genes.items():
+        if not (MIN_SET <= len(genes) <= MAX_SET):
+            continue
+        node = graph.nodes.get(term, {})
+        ns = _NS.get(node.get("namespace", ""))
+        if not ns or not node.get("name"):
+            continue
+        dag[term] = {
+            "name": node["name"],
+            "ns": ns,
+            "ancestors": sorted(anc[term] - {term}),
+            "genes": sorted(genes),
+        }
+    DAG_OUT.parent.mkdir(parents=True, exist_ok=True)
+    DAG_OUT.write_text(json.dumps(dag))
+    (CACHE.parent / "go_dag.json").write_text(json.dumps(dag))
+
     n = len([k for k in sets if not k.startswith("_")])
     bg = {g for k, v in sets.items() if not k.startswith("_") for g in v}
     by_ns = {}
@@ -124,6 +145,7 @@ def main() -> None:
         by_ns[tag] = by_ns.get(tag, 0) + 1
     print(f"\nBUILT {n} GO sets ({by_ns}); {len(bg)} unique genes; {seen_ann} annotations propagated")
     print(f"  wrote -> {OUT} ({OUT.stat().st_size/1e6:.1f} MB)  + copy {copy}")
+    print(f"  wrote -> {DAG_OUT} ({DAG_OUT.stat().st_size/1e6:.1f} MB, {len(dag)} terms w/ hierarchy)")
 
 
 if __name__ == "__main__":

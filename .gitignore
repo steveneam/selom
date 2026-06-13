@@ -35,9 +35,11 @@ Thumbs.db
 app/backend/data/
 data/
 
-# Built GO gene-set library (~5MB, regenerate: scripts/build_gene_sets.py).
-# enrichment falls back to the committed gene_sets.json sample when absent.
+# Built GO gene-set library + DAG (~5-7MB, regenerate: scripts/build_gene_sets.py).
+# enrichment falls back to the committed gene_sets.json sample when absent;
+# go_graph falls back to its run.py stub when go_dag.json is absent.
 app/backend/skills/enrichment/gene_sets_go.json
+app/backend/skills/go_graph/go_dag.json
 
 # ── Assistant-local (tracked .claude/ otherwise) ────────
 .claude/settings.local.json
