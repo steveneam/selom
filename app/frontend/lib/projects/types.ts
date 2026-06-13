@@ -17,13 +17,31 @@ export interface Guardrail {
   msg: string;
 }
 
+/** One cleaning operation, with the effect it had on the matrix shape. */
+export interface CleaningStep {
+  id: string;
+  label: string;
+  detail?: string;
+  /** filter = drops rows/cols; transform = rescales values; selection = flags features. */
+  kind: "filter" | "transform" | "selection";
+  /** Signed change to observation/feature counts (negative = removed). */
+  obsDelta?: number;
+  varDelta?: number;
+}
+
 /** Ingest + QC report produced on upload (mock now → `POST /upload`, phase B2). */
 export interface QcReport {
   detectedModality: Modality;
+  /** Post-cleaning shape (analysis-ready baseline). */
   nObs: number;
   nVar: number;
-  /** The cleaning recipe applied to reach an analysis-ready baseline. */
+  /** Raw shape as dropped, before any cleaning (for the before/after view). */
+  nObsRaw?: number;
+  nVarRaw?: number;
+  /** The cleaning recipe applied to reach the baseline (display strings). */
   cleaning: string[];
+  /** Structured, toggleable cleaning steps (before/after + edit-before-proceed). */
+  cleaningSteps?: CleaningStep[];
   guardrails: Guardrail[];
 }
 

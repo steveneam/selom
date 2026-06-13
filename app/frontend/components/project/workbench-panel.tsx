@@ -319,14 +319,14 @@ function ParamControl({
           aria-checked={on}
           onClick={() => onChange(!on)}
           className={cn(
-            "relative h-5 w-9 shrink-0 rounded-full transition-colors",
+            "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-colors",
             on ? "bg-primary" : "bg-input",
           )}
         >
           <span
             className={cn(
-              "absolute top-0.5 size-4 rounded-full bg-white transition-transform",
-              on ? "translate-x-4" : "translate-x-0.5",
+              "block size-4 rounded-full bg-white shadow-sm transition-transform",
+              on ? "translate-x-4" : "translate-x-0",
             )}
           />
         </button>

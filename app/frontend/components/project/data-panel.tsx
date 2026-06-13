@@ -4,7 +4,7 @@ import * as React from "react";
 import { Database, FileSpreadsheet, Plus, ShieldAlert, X } from "lucide-react";
 import { IntakeQuestionnaire } from "@/components/intake/intake-questionnaire";
 import { Dropzone } from "./dropzone";
-import { Badge } from "@/components/ui/badge";
+import { CleaningReport } from "./cleaning-report";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
@@ -43,6 +43,12 @@ export function DataPanel({
 }) {
   const [active, setActive] = React.useState<Active | null>(null);
   const [designFile, setDesignFile] = React.useState<File | null>(null);
+  // Cleaning steps the user has switched off for the active dataset (before/after editor).
+  const [disabledSteps, setDisabledSteps] = React.useState<Set<string>>(new Set());
+
+  React.useEffect(() => {
+    setDisabledSteps(new Set());
+  }, [active?.dataset.id]);
 
   function ingest(file: File) {
     const modality = detectModality(file.name);
@@ -184,28 +190,21 @@ export function DataPanel({
       {/* right: intake questionnaire + QC for the active dataset */}
       <div>
         {active ? (
-          <Card className="space-y-4 p-5">
+          <Card className="space-y-5 p-5">
             {active.dataset.qc && (
-              <div className="rounded-lg border border-border bg-background/40 p-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
-                    Ingest &amp; QC
-                  </p>
-                  <span className="tabular text-[11px] text-muted-foreground">
-                    {active.dataset.qc.nObs.toLocaleString()} × {active.dataset.qc.nVar.toLocaleString()}
-                  </span>
-                </div>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {active.dataset.qc.guardrails.map((g, i) => (
-                    <Badge key={i} variant={g.level === "error" ? "danger" : g.level === "warn" ? "warn" : "outline"}>
-                      {g.level}
-                    </Badge>
-                  ))}
-                  <span className="text-[11px] text-muted-foreground">
-                    {active.dataset.qc.cleaning.length} cleaning steps applied
-                  </span>
-                </div>
-              </div>
+              <CleaningReport
+                qc={active.dataset.qc}
+                modality={active.dataset.modality}
+                disabledSteps={disabledSteps}
+                onToggleStep={(id) =>
+                  setDisabledSteps((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(id)) next.delete(id);
+                    else next.add(id);
+                    return next;
+                  })
+                }
+              />
             )}
             <IntakeQuestionnaire
               modality={active.dataset.modality}

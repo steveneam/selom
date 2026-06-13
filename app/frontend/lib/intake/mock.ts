@@ -97,35 +97,75 @@ export function questionsFor(modality: Modality): IntakeQuestion[] {
   return [...(BY_MODALITY[modality] ?? []), ...UNIVERSAL];
 }
 
+/** Build a QcReport from raw dims + structured steps (keeps display `cleaning` in sync). */
+function buildQc(
+  modality: Modality,
+  nObsRaw: number,
+  nVarRaw: number,
+  steps: import("@/lib/projects/types").CleaningStep[],
+  guardrails: QcReport["guardrails"],
+): QcReport {
+  const nObs = nObsRaw + steps.reduce((a, s) => a + (s.obsDelta ?? 0), 0);
+  const nVar = nVarRaw + steps.reduce((a, s) => a + (s.varDelta ?? 0), 0);
+  return {
+    detectedModality: modality,
+    nObs,
+    nVar,
+    nObsRaw,
+    nVarRaw,
+    cleaning: steps.map((s) => s.label),
+    cleaningSteps: steps,
+    guardrails,
+  };
+}
+
 /** Mock ingest + QC report (design §7). */
 export function mockQcReport(modality: Modality): QcReport {
   switch (modality) {
     case "scRNA-seq":
-      return {
-        detectedModality: modality, nObs: 2700, nVar: 13714,
-        cleaning: ["filter cells (<200 genes)", "filter genes (<3 cells)", "normalize (log1p)", "HVG (2000)", "scale"],
-        guardrails: [
+      return buildQc(
+        modality,
+        3000,
+        32738,
+        [
+          { id: "filter_cells", label: "Filter low-quality cells", detail: "Dropped cells with < 200 detected genes.", kind: "filter", obsDelta: -300 },
+          { id: "filter_genes", label: "Filter rarely-detected genes", detail: "Dropped genes seen in < 3 cells.", kind: "filter", varDelta: -19024 },
+          { id: "normalize", label: "Normalize (log1p)", detail: "Library-size normalize, then log1p.", kind: "transform" },
+          { id: "hvg", label: "Flag highly-variable genes (top 2,000)", detail: "Selected for embedding/clustering; full matrix kept.", kind: "selection" },
+          { id: "scale", label: "Scale to unit variance", detail: "Z-score per gene before PCA.", kind: "transform" },
+        ],
+        [
           { level: "warn", msg: "2 samples detected — batch effect likely; consider integration before clustering." },
           { level: "info", msg: "Mitochondrial fraction within normal range (median 4.1%)." },
         ],
-      };
+      );
     case "bulk RNA-seq":
-      return {
-        detectedModality: modality, nObs: 24, nVar: 18102,
-        cleaning: ["drop low-count genes (<10 reads)", "design-aware size-factor normalization"],
-        guardrails: [
+      return buildQc(
+        modality,
+        24,
+        22000,
+        [
+          { id: "drop_low", label: "Drop low-count genes", detail: "Removed genes with < 10 reads across samples.", kind: "filter", varDelta: -3898 },
+          { id: "size_factor", label: "Size-factor normalization", detail: "Design-aware library-size normalization.", kind: "transform" },
+        ],
+        [
           { level: "warn", msg: "n=4 per group — modest power; treat marginal genes cautiously." },
           { level: "info", msg: "No obvious library-size outliers." },
         ],
-      };
+      );
     case "proteomics":
-      return {
-        detectedModality: modality, nObs: 16, nVar: 6421,
-        cleaning: ["remove contaminants/reverse hits", "log2 transform", "median normalization", "impute (MinProb)"],
-        guardrails: [
-          { level: "warn", msg: "31% missing values — imputation choice affects volcano tails." },
+      return buildQc(
+        modality,
+        16,
+        7200,
+        [
+          { id: "contaminants", label: "Remove contaminants / reverse hits", detail: "Dropped decoy and common-contaminant rows.", kind: "filter", varDelta: -779 },
+          { id: "log2", label: "Log2 transform", kind: "transform" },
+          { id: "median_norm", label: "Median normalization", kind: "transform" },
+          { id: "impute", label: "Impute missing (MinProb)", detail: "Left-censored imputation for missing intensities.", kind: "transform" },
         ],
-      };
+        [{ level: "warn", msg: "31% missing values — imputation choice affects volcano tails." }],
+      );
     default:
       return {
         detectedModality: "unknown", nObs: 0, nVar: 0,
