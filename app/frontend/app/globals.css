@@ -226,20 +226,45 @@ body {
   filter: blur(2px);
 }
 
-/* Pipeline connector: a flowing dashed line between stage nodes. */
+/*
+  Pipeline connector: a single SOLID faint line with one small dot gliding
+  left→right, like data being handed between steps. Deliberately slow + faint —
+  one travelling dot per active link, not constant marching motion.
+*/
 .flow-line {
-  background-image: linear-gradient(
-    90deg,
-    color-mix(in oklab, var(--primary) 55%, transparent) 0 46%,
-    transparent 46% 100%
-  );
-  background-size: 14px 100%;
-  background-repeat: repeat-x;
-  animation: flow-march 900ms linear infinite;
+  position: relative;
+  background: color-mix(in oklab, var(--primary) 20%, transparent);
 }
-@keyframes flow-march {
-  to {
-    background-position: 14px 0;
+.flow-line::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  height: 6px;
+  width: 6px;
+  margin-top: -3px;
+  margin-left: -3px;
+  border-radius: 9999px;
+  background: var(--primary);
+  box-shadow: 0 0 8px -1px color-mix(in oklab, var(--primary) 75%, transparent);
+  opacity: 0;
+  animation: flow-dot 3.4s linear infinite;
+  animation-delay: var(--flow-delay, 0s);
+}
+@keyframes flow-dot {
+  0% {
+    left: 0%;
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.9;
+  }
+  88% {
+    opacity: 0.9;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
   }
 }
 
@@ -265,11 +290,9 @@ body {
     transition-duration: 0.01ms !important;
   }
   .flow-line {
-    animation: none;
-    background-image: linear-gradient(
-      90deg,
-      color-mix(in oklab, var(--primary) 45%, transparent),
-      color-mix(in oklab, var(--primary) 12%, transparent)
-    );
+    background: color-mix(in oklab, var(--primary) 28%, transparent);
+  }
+  .flow-line::after {
+    display: none;
   }
 }

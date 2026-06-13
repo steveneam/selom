@@ -125,6 +125,7 @@ function Stage({
       {!isLast && (
         <span
           aria-hidden
+          style={{ ["--flow-delay" as string]: `${index * 0.9}s` }}
           className={cn(
             "absolute left-1/2 top-9 hidden h-px w-full lg:block",
             lit ? "flow-line" : "bg-border",
