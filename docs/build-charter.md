@@ -73,9 +73,10 @@ Built all 6 backend runners (UMAP done in B1): **cluster · violin (new) · DEG 
 Done: live **`GET /skills`** registry (`skills/registry.py` + a `catalog` block on `skill.json`) → FE Store is **registry-driven** (`lib/catalog/registry.ts` merges live Verified over the seed's Community tail, seed fallback offline); **async jobs API** (`POST /skills/{id}/jobs` → `GET /jobs/{id}` poll / `/events` SSE / `/result`) with one `execute_job` shared by the inline executor and the arq worker. Default = **inline + local filesystem result store (zero infra)**; **arq+Redis** (DECISIONS #6) + **R2 presigned URLs** (boto3 + RISKS #5 fix) are **wired but dormant** behind `SELOM_QUEUE=arq` / `SELOM_R2_*` + the optional `[jobs]` extra. 🟡 *Remaining:* stand up Redis/R2 for real + a **Redis-backed JobStore** so arq cross-process job *status* (not just success) is visible (`jobs/worker.py` caveat).
 *Forj:* **bones** (job/queue substrate = EAMOS spine). *Forces:* DECISIONS.md **#6** (arq) confirmed; goes fully load-bearing when the infra lands (B7/B8).
 
-**B4 · The publish-confidence layer** 🟡 *(slice-1 DONE 2026-06-12, committed not pushed)* `[FE+BE]` `⟵P5 + P3-export, RISEN into Stage 1`
+**B4 · The publish-confidence layer** 🟡 *(slices 1–2 DONE; slice-1 pushed, slice-2 committed 2026-06-13)* `[FE+BE]` `⟵P5 + P3-export, RISEN into Stage 1`
 Per-figure **reproducibility bundle** (skill id+version+params+data-hash+env) · **statistical guardrails** (batch-effect / normalisation / multiple-testing / low-cell) · **auto methods-text** · **journal-preset export** (Kaleido PNG/SVG/PDF).
-**Slice-1 ✅:** the **reproducibility bundle** (`app/backend/provenance.py` — skill+version, resolved+typed params, input SHA-256+size, environment snapshot) + **auto methods-text** (`app/backend/methods.py` — per-skill templates + canonical citations) ride on every `/run` + job result as `{figure, provenance, methods}`; FE shows them in a collapsed **"Publish confidence"** panel (`components/project/publish-confidence.tsx`). `pytest` 28 passed; FE `next build` clean; browser-verified. Commits BE `2ab7c43` + FE `84ae54e` (push pending owner's word). 🟡 *Remaining:* statistical-guardrail expansion (silhouette already on `cluster`) + **journal-preset Kaleido export** (needs Docker+Chromium — RISKS #2; lands with the deploy image).
+**Slice-1 ✅:** the **reproducibility bundle** (`app/backend/provenance.py` — skill+version, resolved+typed params, input SHA-256+size, environment snapshot) + **auto methods-text** (`app/backend/methods.py` — per-skill templates + canonical citations) ride on every `/run` + job result as `{figure, provenance, methods}`; FE shows them in a collapsed **"Publish confidence"** panel (`components/project/publish-confidence.tsx`). `pytest` 28 passed; FE `next build` clean; browser-verified. Commits BE `2ab7c43` + FE `84ae54e` (pushed 2026-06-13).
+**Slice-2 ✅ (2026-06-13):** statistical guardrails — bundle-side `app/backend/guardrails.py` adds a `guardrails` list to every `/run` + job result (multiple-testing / FDR-threshold method checks + best-effort `.h5ad` data checks: low-cell, pre-normalized-input, uncorrected-batch; cluster-silhouette stays in the runner). FE shows them as a **"Quality checks"** section + a warn-count header chip in the panel. `pytest` 40 passed; `next build` clean; browser-verified. Commits BE `edd3615` + FE `56da2a6`. 🟡 *Remaining:* **journal-preset Kaleido export** only (needs Docker+Chromium — RISKS #2; lands with the deploy image; **ask owner before any Docker/WSL work**).
 *Forj:* **bones** (reproducibility-bundle + methods-text + export) · meat (omics guardrails). *Forces:* DECISIONS.md **#7** (web-first; Kaleido needs server-side Chromium) + the **AGPL SCA hard gate** begins to bite (gseapy/MSigDB → prefer Reactome/GO).
 
 > **Stage-1 exit = dogfood-complete:** Steven produces trustworthy, reproducible, paper-ready figures on his own data — single-user, no auth, no billing.
@@ -145,13 +146,14 @@ Two agents, disjoint lanes (`agent_handoff/README.md`): **Claude = FE** (`app/fr
 
 ## Active bucket
 
-**B4 — slice-1 DONE (2026-06-12), committed not pushed. Active.** B0–B3 done (B3 pushed @ `4216935`). **B4 slice-1**:
-per-figure **reproducibility bundle** (`provenance.py`) + **auto methods-text** (`methods.py`) on every `/run` + job result;
-FE **"Publish confidence"** panel surfaces both. `pytest` 28 passed; FE `next build` clean; browser-verified (mock :3010).
-Commits BE `2ab7c43` + FE `84ae54e` — `main` ahead 2 of `origin/main`; **push pending owner's word**. **Next (finish B4):**
-statistical-guardrail expansion (silhouette already on `cluster`) + **Kaleido journal export** (needs Docker+Chromium, RISKS #2 →
-lands with the deploy image). Then the remaining integration backlog (OmicVerse isolated worker, arq Redis status store, R-oracle,
-full GMT, catalog true-up). Owner steer: Selom is **desktop-only**.
+**B4 — slices 1–2 DONE (2026-06-13). Active.** B0–B3 done (B3 pushed @ `4216935`). **B4 so far:** per-figure
+**reproducibility bundle** (`provenance.py`) + **auto methods-text** (`methods.py`) + **statistical guardrails** (`guardrails.py`
+— multiple-testing/FDR checks + best-effort `.h5ad` data checks) on every `/run` + job result; the FE **"Publish confidence"**
+panel surfaces all three (Methods · Reproducibility · Quality checks + a warn-count chip). `pytest` 40 passed; FE `next build`
+clean; browser-verified (mock :3010). Slice-1 pushed; slice-2 commits BE `edd3615` + FE `56da2a6`. **Next (finish B4):**
+**journal-preset Kaleido export** only (needs Docker+Chromium, RISKS #2 → lands with the deploy image; **ask owner before any
+Docker/WSL work**). Then the integration backlog (OmicVerse isolated worker, arq Redis status store, R-oracle, full GMT,
+catalog true-up). Owner steer: Selom is **desktop-only**; model = **Opus 4.8 (xhigh)**.
 
 ---
 
