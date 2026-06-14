@@ -14,7 +14,11 @@ import pathlib
 
 from skills.go_graph.run import nodelink_spec
 
-_GENE_COLS = ["gene", "genes", "symbol", "gene_name", "gene_symbol", "geneid", "gene_id", "feature", "names", "id"]
+# Priority order: prefer a clean gene-symbol column over an id column, so a biomaRt-style
+# DE table (clean ``external_gene_name`` alongside a composite ``GeneID`` = ``ENSG…~SYMBOL``)
+# resolves to the mappable symbols rather than the unmappable composite id.
+_GENE_COLS = ["external_gene_name", "gene_symbol", "gene_name", "symbol", "gene", "genes",
+              "feature", "geneid", "gene_id", "ensembl_gene_id", "entrezgene_id", "names", "id"]
 _FC_COLS = ["log2foldchange", "log2fc", "logfc", "log2_fold_change", "avg_log2fc"]
 _P_COLS = ["padj", "adj.p.val", "fdr", "qvalue", "q.value", "pvals_adj", "pvalue", "pval", "p.value"]
 
@@ -28,7 +32,7 @@ def _query_genes(pd, data_path: str, params: dict, background: set) -> set:
     FDR column is present, else use every gene (same contract as the enrichment skill)."""
     df = pd.read_csv(data_path)
     cols = {c.lower(): c for c in df.columns}
-    gene_col = next((c for c in df.columns if c.lower() in _GENE_COLS), None)
+    gene_col = next((cols[name] for name in _GENE_COLS if name in cols), None)
     fdr_col = next((cols[c] for c in _P_COLS if c in cols), None)
     fc_col = next((cols[c] for c in _FC_COLS if c in cols), None)
     sub = df

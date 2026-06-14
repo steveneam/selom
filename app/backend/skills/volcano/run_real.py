@@ -11,7 +11,11 @@ from skills.volcano.run import _assemble
 
 _FC_COLS = ["log2foldchange", "log2fc", "logfc", "log2_fold_change", "avg_log2fc"]
 _P_COLS = ["padj", "adj.p.val", "fdr", "qvalue", "q.value", "pvals_adj", "pvalue", "pval", "p.value"]
-_GENE_COLS = ["gene", "genes", "symbol", "gene_name", "gene_symbol", "geneid", "gene_id", "feature", "names", "id"]
+# Priority order: prefer a clean gene-symbol column over an id column, so a biomaRt-style
+# DE table (clean ``external_gene_name`` alongside a composite ``GeneID`` = ``ENSG…~SYMBOL``)
+# resolves to the mappable symbols rather than the unmappable composite id.
+_GENE_COLS = ["external_gene_name", "gene_symbol", "gene_name", "symbol", "gene", "genes",
+              "feature", "geneid", "gene_id", "ensembl_gene_id", "entrezgene_id", "names", "id"]
 
 
 def run(data_path: str, params: dict) -> dict:
