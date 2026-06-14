@@ -36,6 +36,17 @@ const SCHEMAS: Record<string, ParamField[]> = {
     { key: "treatment", label: "Treatment group", type: "text", default: "", placeholder: "e.g. treated" },
   ],
   violin: [{ key: "gene", label: "Marker gene", type: "text", default: "", placeholder: "e.g. MS4A1" }],
+  heatmap: [
+    { key: "n_genes", label: "Genes shown", type: "range", default: 20, min: 5, max: 100, step: 5, help: "Top genes by variance (bulk) or markers per cluster (scRNA)." },
+    {
+      key: "dendrogram", label: "Dendrogram", type: "select", default: "none",
+      options: [
+        { value: "none", label: "None" },
+        { value: "row", label: "Row tree" },
+      ],
+      help: "Draw the row hierarchical-clustering tree alongside the heatmap.",
+    },
+  ],
   // Gene-set builder Phase A: apply a corpus source / a highlight panel from "Gene Sets".
   enrichment: [
     {
