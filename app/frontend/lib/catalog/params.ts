@@ -79,6 +79,18 @@ const SCHEMAS: Record<string, ParamField[]> = {
       help: "Comma-separated metrics where lower is better — inverted so higher always reads as better.",
     },
   ],
+  proteomics_de: [
+    { key: "group_a", label: "Group A", type: "text", default: "", placeholder: "e.g. infected", help: "Sample-name substring for the first group." },
+    { key: "group_b", label: "Group B", type: "text", default: "", placeholder: "e.g. control", help: "Sample-name substring for the second group." },
+    {
+      key: "stats", label: "Statistics", type: "select", default: "welch",
+      options: [
+        { value: "welch", label: "Welch t-test" },
+        { value: "moderated", label: "Moderated (limma-style)" },
+      ],
+      help: "Moderated borrows variance across proteins for better power at small N.",
+    },
+  ],
   annotate: [
     {
       key: "marker_set", label: "Marker panel", type: "select", default: "retinal",
