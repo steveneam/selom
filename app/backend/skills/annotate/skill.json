@@ -7,7 +7,7 @@
   "entrypoint": "skills.annotate.run:run",
   "inputs": [{ "name": "matrix", "kind": "anndata|h5ad", "required": true }],
   "param_spec": {
-    "marker_set": { "type": "str",  "default": "retinal" },
+    "marker_set": { "type": "str",  "default": "retinal", "options": ["retinal", "retinal_cepo"] },
     "groupby":    { "type": "str",  "default": "leiden" },
     "embedding":  { "type": "str",  "default": "X_umap" },
     "normalize":  { "type": "bool", "default": true }
@@ -16,7 +16,7 @@
     { "name": "figure", "kind": "plotly_spec" }
   ],
   "catalog": {
-    "summary": "Marker-based cell-type labelling — score curated marker sets per cluster (score_genes) and recolour the UMAP by assigned type.",
+    "summary": "Marker-based cell-type labelling — score curated marker sets per cluster (score_genes) and recolour the UMAP by assigned type. Panels: retinal (canonical) and retinal_cepo (Cepo, Kim et al. 2023).",
     "category": "single-cell",
     "tier": "verified",
     "status": "beta",
