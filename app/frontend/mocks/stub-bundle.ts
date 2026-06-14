@@ -28,6 +28,12 @@ const METHODS: Record<string, string> = {
     "Expression of the top genes was z-scored per gene and displayed as a heatmap with hierarchical row ordering (correlation distance, average linkage).",
   enrichment:
     "Pathway enrichment was computed by hypergeometric over-representation analysis against GO and Reactome gene sets, with Benjamini-Hochberg correction.",
+  markers:
+    "Marker genes were ranked per cluster with the Wilcoxon rank-sum test (Scanpy rank_genes_groups) and shown as a dotplot — colour = mean log1p expression, dot size = fraction of cells expressing.",
+  annotate:
+    "Cell types were assigned by scoring curated marker sets per cell (Scanpy score_genes), averaging per cluster, and labelling each cluster with its top-scoring type; the embedding is recoloured by assigned type.",
+  trajectory:
+    "A diffusion map was computed, the cluster graph abstracted with PAGA, and cells ordered along diffusion pseudotime (DPT); the embedding is coloured by pseudotime with the PAGA graph overlaid.",
 };
 
 // Mirrors backend guardrails.py for the canned demo input (a clean raw-count h5ad):
