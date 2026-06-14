@@ -155,3 +155,22 @@ build the Phase B builder over the open-core adapters.
   Notes (clarification to #11 #3).
 - **Next (Phase B):** the keyword→compile→union/intersect builder over the open-core adapters
   (+ HGNC dedup/normalization); then Phase C grounded free-text→genes.
+
+### 8.2 Phase B — SHIPPED 2026-06-14 (owner-approved focused scope: compile over the current corpus + attributed Fidelle)
+- **Backend** (`65cd120` + `4b8c8a8`): `gene_sets/normalize.py` (HGNC-style symbol
+  normalization from NCBI gene_info → `corpus/hgnc_symbols.json`, gitignored/regenerable;
+  remaps aliases e.g. HER2→ERBB2, keeps unrecognized, degrades to upper+dedup) +
+  `library.compile_sets` (union/intersect → normalize → provenance) + `POST /gene-sets/compile`.
+  **Attributed reference panels** (`scripts/build_reference_panels.py` → committed
+  `corpus/gene_sets_reference.json`): a new `reference` source using the **rich per-set format**
+  (`{genes, license, attribution}`) — 5 panels: Ciliopathy (CiliaCarta, cited van Dam 2013),
+  Cilium assembly, Proteostasis ×3 (CMRI Fidelle curated). The loader now accepts both flat and
+  rich shapes; per-set license/attribution flow into cards + provenance. pytest 91; ruff clean.
+- **Frontend** (`8b9b973`): multi-select compile on `/gene-sets` (per-card checkboxes + compile
+  bar: union/intersect, name, Compile & save → saved as a provenance-stamped GeneSet) + attribution
+  display on cards/dialog + the `reference` source filter. tsc + build clean; browser-verified.
+- **B.2 (future / owner-flagged "keep for later refinement / on-hold"):** **disease/phenotype
+  adapters — HPO (phenotype→gene) + Open Targets (gene–disease), both open** — for "genes for
+  disease X" discovery + compile across them. Owner likes this; parked as the next breadth step.
+- **Next:** Phase C (grounded LLM/literature free-text→genes; propose-user-confirms) OR P2
+  single-cell depth (markers/annotate/trajectory, DECISIONS #10).
