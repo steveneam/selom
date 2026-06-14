@@ -52,7 +52,7 @@ def _style_axis(orig, grid=True):
     """Restyle an axis, preserving its title text and any explicit range/type."""
     orig = dict(orig or {})
     title = orig.get("title")
-    keep = {k: orig[k] for k in ("range", "type", "scaleanchor", "scaleratio") if k in orig}
+    keep = {k: orig[k] for k in ("range", "type", "scaleanchor", "scaleratio", "domain", "anchor") if k in orig}
     new = _axis(grid=grid)
     new.update(keep)
     tfont = dict(size=13, color=INK_STRONG)

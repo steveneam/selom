@@ -1,0 +1,28 @@
+{
+  "id": "gsea",
+  "version": "0.1.0",
+  "title": "GSEA running enrichment",
+  "engine": "python",
+  "omics": "bulk-rna-seq|proteomics",
+  "entrypoint": "skills.gsea.run:run",
+  "inputs": [{ "name": "ranked", "kind": "csv", "required": true }],
+  "param_spec": {
+    "gene_set":  { "type": "str",   "default": "" },
+    "set_name":  { "type": "str",   "default": "Gene set" },
+    "weight":    { "type": "float", "default": 1.0, "min": 0.0, "max": 2.0 },
+    "n_perm":    { "type": "int",   "default": 1000, "min": 0, "max": 10000 }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "summary": "Gene Set Enrichment Analysis — running enrichment-score curve with leading-edge hits and permutation NES/p. In-house weighted-KS, no gseapy.",
+    "category": "pathway-analysis",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".csv"],
+    "chains_with": ["volcano", "enrichment"],
+    "license": "MIT",
+    "popularity": 64
+  }
+}
