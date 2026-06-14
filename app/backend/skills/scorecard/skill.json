@@ -7,6 +7,7 @@
   "entrypoint": "skills.scorecard.run:run",
   "inputs": [{ "name": "matrix", "kind": "csv|tsv|xlsx", "required": true }],
   "param_spec": {
+    "layout":    { "type": "str",  "default": "radar", "options": ["radar", "heatmap"] },
     "normalize": { "type": "bool", "default": true },
     "fill":      { "type": "bool", "default": true },
     "max_rows":  { "type": "int",  "default": 8, "min": 1, "max": 20 }
@@ -15,7 +16,7 @@
     { "name": "figure", "kind": "plotly_spec" }
   ],
   "catalog": {
-    "summary": "Radar / spider scorecard comparing conditions across many metrics — rank N models/protocols on M scores at a glance (per-metric min–max normalized). Paper Figs 6F/S6C.",
+    "summary": "Scorecard comparing conditions across many metrics — rank N models/protocols on M scores at a glance (per-metric min–max normalized). Radar (spider) or metrics×conditions heatmap layout. Paper Figs 6F/S6C.",
     "category": "data-visualization",
     "tier": "verified",
     "status": "production",

@@ -8,7 +8,7 @@ shared ``scorecard_spec``.
 
 from skills._engine import to_bool
 from skills._plotly import jsonable
-from skills.scorecard.run import scorecard_spec
+from skills.scorecard.run import scorecard_heatmap_spec, scorecard_spec
 
 
 def run(data_path: str, params: dict) -> dict:
@@ -37,6 +37,10 @@ def run(data_path: str, params: dict) -> dict:
 
     metrics = [str(c) for c in num.columns]
     series = {str(idx): num.loc[idx].tolist() for idx in num.index}
-    fill = to_bool(params.get("fill", True))
-    spec = scorecard_spec(metrics, series, fill, "Benchmark scorecard", radial_range)
+    if str(params.get("layout") or "radar").lower() == "heatmap":
+        # radial_range doubles as the colour-scale range: [0,1] when normalized, else None
+        spec = scorecard_heatmap_spec(metrics, series, "Benchmark scorecard", radial_range)
+    else:
+        fill = to_bool(params.get("fill", True))
+        spec = scorecard_spec(metrics, series, fill, "Benchmark scorecard", radial_range)
     return jsonable(spec)
