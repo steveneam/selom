@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 import guardrails
 import methods
 import provenance
+from gene_sets import library as gene_sets
 from jobs.queue import get_job, result_store, submit
 from jobs.store import TERMINAL
 from skills.contract import load_skill, run_skill
@@ -33,6 +34,22 @@ def list_skills():
 @app.get("/skills/{skill_id}")
 def describe(skill_id: str):
     return load_skill(skill_id).model_dump()        # registry-driven UI reads this
+
+
+@app.get("/gene-sets")
+def gene_sets_list(q: str = "", source: str | None = None, limit: int = 50):
+    # Gene-set builder Phase A (DECISIONS #11): a searchable, license-clean catalog over
+    # the corpus Selom owns or that is open (GO · WikiPathways · curated). The FE "Gene
+    # Sets" surface reads this; cards omit the full member list (fetched per set below).
+    return {"sources": gene_sets.list_sources(), "results": gene_sets.search(q, source, limit)}
+
+
+@app.get("/gene-sets/{set_id}")
+def gene_set_detail(set_id: str):
+    s = gene_sets.get_set(set_id)
+    if s is None:
+        raise HTTPException(status_code=404, detail=f"unknown gene set '{set_id}'")
+    return s                                            # card + member symbols + provenance
 
 
 def _save_upload(matrix: UploadFile) -> str:

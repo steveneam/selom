@@ -55,7 +55,24 @@ def run(data_path: str, params: dict) -> dict:
         order = sig[np.argsort(nlp[sig])[::-1]][:top_n]
         labels = [(round(float(lfc[i]), 4), round(float(nlp[i]), 4), str(genes.iloc[i])) for i in order]
 
-    return _assemble(up, down, ns, labels, fc_t, y_cut, "Volcano plot")
+    # Optional gene-set highlight (applied from the "Gene Sets" surface): mark + label
+    # every member of the panel that appears in this DE table, drawn on top.
+    highlight = []
+    panel = _parse_panel(params.get("highlight", ""))
+    if panel:
+        gene_upper = genes.str.upper()
+        for i in np.where(keep)[0]:
+            if str(gene_upper.iloc[i]) in panel:
+                highlight.append((round(float(lfc[i]), 4), round(float(nlp[i]), 4), str(genes.iloc[i])))
+
+    return _assemble(up, down, ns, labels, fc_t, y_cut, "Volcano plot", highlight=highlight)
+
+
+def _parse_panel(raw) -> set[str]:
+    """A gene-set highlight panel: comma/space/newline-separated symbols -> uppercased set."""
+    import re
+
+    return {tok.upper() for tok in re.split(r"[,\s]+", str(raw or "").strip()) if tok}
 
 
 def _pick(cols: dict, candidates: list[str]):

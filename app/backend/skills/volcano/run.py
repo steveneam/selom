@@ -13,6 +13,7 @@ from skills._engine import use_real_engine
 UP = "#22d3ee"
 DOWN = "#f43f5e"
 NS = "#5b6b80"
+HL = "#f59e0b"  # highlighted gene-set panel (amber, drawn on top)
 
 
 def run(data_path: str, params: dict) -> dict:
@@ -39,8 +40,13 @@ def _stub_figure(params: dict) -> dict:
     return _assemble(up, down, ns, [], fc_t, y_cut, "Volcano (stub)")
 
 
-def _assemble(up, down, ns, labels, fc_t, y_cut, title) -> dict:
-    """Build the volcano spec from up/down/ns (x,y) pairs + optional label points."""
+def _assemble(up, down, ns, labels, fc_t, y_cut, title, highlight=None) -> dict:
+    """Build the volcano spec from up/down/ns (x,y) pairs + optional label/highlight points.
+
+    ``highlight`` is an optional list of ``(x, y, gene)`` for a gene-set panel applied
+    from the "Gene Sets" surface — drawn on top in amber, with each member labelled.
+    Left ``None`` it adds nothing, so the stub/golden output is unchanged.
+    """
     data = [
         {"type": "scattergl", "mode": "markers", "name": "n.s.", "x": ns[0], "y": ns[1],
          "marker": {"color": NS, "size": 5, "opacity": 0.6}},
@@ -55,6 +61,14 @@ def _assemble(up, down, ns, labels, fc_t, y_cut, title) -> dict:
             "x": [p[0] for p in labels], "y": [p[1] for p in labels],
             "text": [p[2] for p in labels], "textposition": "top center",
             "textfont": {"size": 10},
+        })
+    if highlight:
+        data.append({
+            "type": "scatter", "mode": "markers+text", "name": "highlighted",
+            "x": [p[0] for p in highlight], "y": [p[1] for p in highlight],
+            "text": [p[2] for p in highlight], "textposition": "top center",
+            "textfont": {"size": 10, "color": HL},
+            "marker": {"color": HL, "size": 9, "line": {"color": "#ffffff", "width": 1.2}},
         })
     shapes = [
         {"type": "line", "x0": fc_t, "x1": fc_t, "yref": "paper", "y0": 0, "y1": 1,

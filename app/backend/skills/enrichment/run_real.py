@@ -8,10 +8,17 @@ Input: a CSV carrying a gene column (e.g. a DE gene list). The background is the
 union of all genes across the bundled sets. Emits the dotplot spec in ``run``.
 """
 
-import json
-import pathlib
-
 from skills.enrichment.run import dotplot_spec
+
+# The ``gene_sets`` param selects which license-clean library the ORA scores against
+# (gene-set builder Phase A · DECISIONS #11). Aliases keep the old default working:
+# the seed/default ``GO_Reactome`` still resolves to the full GO library.
+_SOURCE_ALIASES = {
+    "go": "go", "go_reactome": "go", "gene ontology": "go",
+    "wikipathways": "wikipathways", "wp": "wikipathways",
+    "curated": "curated", "selom": "curated",
+    "all": "all",
+}
 
 # Priority order: prefer a clean gene-symbol column over an id column, so a biomaRt-style
 # DE table (clean ``external_gene_name`` alongside a composite ``GeneID`` = ``ENSG…~SYMBOL``)
@@ -26,7 +33,7 @@ def run(data_path: str, params: dict) -> dict:
     import pandas as pd
     from scipy.stats import hypergeom
 
-    sets = _load_gene_sets()
+    sets = _load_gene_sets(params.get("gene_sets"))
     background = {g for genes in sets.values() for g in genes}
     bg_size = len(background)
 
@@ -72,15 +79,15 @@ def run(data_path: str, params: dict) -> dict:
     return dotplot_spec(pathways, nlp, overlap, "Pathway enrichment (GO)")
 
 
-def _load_gene_sets() -> dict:
-    # Prefer the full GO library (scripts/build_gene_sets.py) when present; otherwise
-    # fall back to the small committed sample so the skill still runs out of the box.
-    here = pathlib.Path(__file__).parent
-    path = here / "gene_sets_go.json"
-    if not path.exists():
-        path = here / "gene_sets.json"
-    raw = json.loads(path.read_text())
-    return {k: [g.upper() for g in v] for k, v in raw.items() if not k.startswith("_")}
+def _load_gene_sets(source_param=None) -> dict:
+    # Resolve the requested source ('go' default / 'wikipathways' / 'curated' / 'all') and
+    # load it from the unified gene-set library (gene_sets/library.py) — the same corpus
+    # the "Gene Sets" surface browses. GO still falls back to the committed sample when the
+    # full library has not been built, so the skill runs out of the box.
+    from gene_sets.library import load_collection
+
+    source = _SOURCE_ALIASES.get(str(source_param or "").strip().lower(), "go")
+    return load_collection(source)
 
 
 def _benjamini_hochberg(rows: list[dict]) -> list[dict]:
