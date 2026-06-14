@@ -34,6 +34,10 @@ const METHODS: Record<string, string> = {
     "Cell types were assigned by scoring curated marker sets per cell (Scanpy score_genes), averaging per cluster, and labelling each cluster with its top-scoring type; the embedding is recoloured by assigned type.",
   trajectory:
     "A diffusion map was computed, the cluster graph abstracted with PAGA, and cells ordered along diffusion pseudotime (DPT); the embedding is coloured by pseudotime with the PAGA graph overlaid.",
+  pca:
+    "Samples were projected onto their first two principal components (scikit-learn PCA) and coloured by group; variance explained is shown per axis.",
+  composition:
+    "Category proportions (e.g. cell-type deconvolution) were displayed as grouped bars across conditions.",
 };
 
 // Mirrors backend guardrails.py for the canned demo input (a clean raw-count h5ad):
