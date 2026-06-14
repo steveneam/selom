@@ -1,9 +1,11 @@
 # Gene-Set Builder — design & plan (for owner sign-off)
 
-> **Status: DRAFT for owner approval.** Owner idea (2026-06-14): *"a user types what kind of
+> **Status: APPROVED 2026-06-14 (DECISIONS #11).** Owner idea: *"a user types what kind of
 > list/features they want to include, Selom goes out to see what lists are available, compiles
-> it, and has it ready to use/apply to their data."* This doc proposes how to build that
-> license-cleanly on top of what Selom already has. _Filed · Claude (acting FE+BE)._
+> it, and has it ready to use/apply to their data."* This doc builds that license-cleanly on top
+> of what Selom already has; the four §7 decisions are ratified. **Approved next step: §8 — Phase A
+> + the WikiPathways (CC0) ingest.** Per-phase plans still presented before each phase is built
+> (charter rule). _Filed · Claude (acting FE+BE)._
 
 ## 1. What the user is really asking for
 
@@ -106,15 +108,24 @@ gene set ready to apply, with auto-methods text" is exactly Selom's publish-conf
 to gene sets. Competitors lean on MSigDB (license friction) or leave list-building to the user; an
 open-core, reproducible, apply-in-one-click builder is differentiated and launch-safe.
 
-## 7. Open questions for the owner
-1. **Primary job:** flat **list** (subset/plot) first, or reference **collection** (ORA) first? (I
-   recommend list-first, but build the shared machinery for both.)
-2. **Phase C (LLM/literature free-text→genes):** want it early as the headline UX, or after the
-   open-core builder (B) is solid? (I recommend B first, C as a grounded layer.)
-3. **The staged custom lists** (Ciliopathy / Proteostasis from the Fidelle data) — can we confirm
-   provenance/licensing to ship them as owned curated panels, or treat as dogfood-only for now?
-4. **Commercial sources (MSigDB / KEGG):** keep gated (recommended), or pursue licensing pre-launch
-   because users will expect Hallmark/KEGG by name?
+## 7. Decisions — ratified by owner 2026-06-14 (DECISIONS #11)
+1. **Primary job — RESOLVED: list-first UX, collection-capable architecture, built once.** The two
+   jobs share ~90% of the machinery (sources, search, dedup, provenance); the only difference is
+   presentation (one list vs many named sets). So we **don't choose** — we build the unified
+   `GeneSet` object + open-core adapters once, **lead the UX with list-building** (the tangible,
+   magical "type a topic → compile → apply" that matches the owner's framing), and expose the same
+   corpus as the `enrichment`/ORA library underneath. *Future-proofing:* every open-core source
+   added for the list-builder also expands the ORA library for free — they compound — and the
+   provenance-stamped `GeneSet` is the durable abstraction Supabase persistence, sharing, and the
+   Skill Foundry all build on. **(This is the recommended best-experience + future-proof path.)**
+2. **Build order — RESOLVED: open-core first.** Ship the open-core builder before the LLM/literature
+   free-text→genes layer (which lands later, grounded — propose, user confirms).
+3. **Custom lists — RESOLVED: ship as our own.** The Fidelle-derived Ciliopathy / Proteostasis sets
+   become **owned Selom curated panels** (no third party is claiming them).
+4. **MSigDB / KEGG — RESOLVED: validation/oracle use only, dropped pre-launch.** Keep using them to
+   validate Selom's ORA (the staged GSEA/GO oracle tables) **until our own open-core library reaches
+   parity/capacity**, then drop them at the pre-launch gate (clean, easy removal — never wired into
+   the shipped library).
 
 ## 8. Suggested first step (if approved)
 Phase A + the **WikiPathways (CC0) ingest** — it's mostly wiring assets we already own, ships the
