@@ -66,6 +66,16 @@ const SCHEMAS: Record<string, ParamField[]> = {
       help: "Two forms of the same benchmark (paper Fig 6F).",
     },
   ],
+  annotate: [
+    {
+      key: "marker_set", label: "Marker panel", type: "select", default: "retinal",
+      options: [
+        { value: "retinal", label: "Retinal (canonical)" },
+        { value: "retinal_cepo", label: "Retinal — Cepo (Kim 2023)" },
+      ],
+      help: "Curated marker panel scored per cluster to assign cell types.",
+    },
+  ],
 };
 
 export function skillParamSchema(catalogOrRuntimeId: string): ParamField[] {
