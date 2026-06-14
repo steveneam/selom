@@ -32,11 +32,14 @@ export function WorkbenchPanel({
   proposal,
   running,
   onRun,
+  preselect,
 }: {
   installs: SkillInstall[];
   proposal: IntakeProposal | null;
   running: string | null;
   onRun: (step: ProposedStep) => void;
+  /** A skill the command palette asked to select (nonce → re-selectable). */
+  preselect?: { id: string; n: number } | null;
 }) {
   const [selected, setSelected] = React.useState<string | null>(null);
   const [dragOver, setDragOver] = React.useState(false);
@@ -45,6 +48,11 @@ export function WorkbenchPanel({
   const isVerified = (id: string) => getSkill(id)?.tier === "verified";
   const apply = (skillId: string, p?: SkillParams) =>
     onRun({ skillId, rationale: "", params: p ?? defaultParams(skillId), confidence: 0 });
+
+  // Select a skill when the command palette deep-links one in (apply-a-skill).
+  React.useEffect(() => {
+    if (preselect?.id) setSelected(preselect.id);
+  }, [preselect]);
 
   // Reset the inline params whenever the selected skill changes.
   React.useEffect(() => {

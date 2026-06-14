@@ -4,6 +4,7 @@ import * as React from "react";
 import { usePathname } from "next/navigation";
 import { Menu, Search } from "lucide-react";
 import { Sidebar } from "./sidebar";
+import { CommandPalette } from "./command-palette";
 import { projectStore } from "@/lib/projects/store";
 
 /**
@@ -17,6 +18,7 @@ import { projectStore } from "@/lib/projects/store";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = React.useState(false);
+  const [paletteOpen, setPaletteOpen] = React.useState(false);
 
   // Load persisted projects on the client, once, after hydration.
   React.useEffect(() => {
@@ -27,6 +29,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     setNavOpen(false);
   }, [pathname]);
+
+  // ⌘K / Ctrl-K toggles the command palette from anywhere.
+  React.useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -50,24 +64,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             <Menu className="size-5" />
           </button>
-          <label className="relative w-full max-w-sm">
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            aria-label="Search and run commands"
+            aria-keyshortcuts="Meta+K Control+K"
+            className="group relative flex h-9 w-full max-w-sm items-center rounded-md border border-input bg-background/60 pl-8 pr-12 text-left text-sm text-muted-foreground/70 outline-none transition-colors hover:border-ring/40 hover:text-muted-foreground focus-visible:border-ring/60 focus-visible:ring-2 focus-visible:ring-ring/30"
+          >
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="search"
-              aria-label="Search projects and skills"
-              placeholder="Search projects, datasets, skills…"
-              className="h-9 w-full rounded-md border border-input bg-background/60 pl-8 pr-12 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring/60 focus-visible:ring-2 focus-visible:ring-ring/30"
-            />
+            Search projects, figures, skills…
             <kbd className="tabular pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
               ⌘K
             </kbd>
-          </label>
+          </button>
           <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
             <span className="hidden sm:inline">Non-code multi-omics IDE</span>
           </div>
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
       </div>
+      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
     </div>
   );
 }

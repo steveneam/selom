@@ -17,8 +17,9 @@ import { getSkill } from "@/lib/catalog/seed";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 import { projectStore, select, useProjects } from "@/lib/projects/store";
 import { runSkill, runtimeSkillId, type SkillGuardrail, type SkillMethods, type SkillProvenance } from "@/lib/skills-api";
+import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
 
-type Tab = "overview" | "data" | "workbench" | "figure";
+type Tab = WorkspaceTab;
 
 export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const router = useRouter();
@@ -30,6 +31,9 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 
   const figure = useFigureStore();
   const [tab, setTab] = React.useState<Tab>("overview");
+  // A skill the command palette asked to pre-select in the Workbench. The nonce
+  // makes a repeat request (same skill, again) a fresh prop for the panel.
+  const [preselect, setPreselect] = React.useState<{ id: string; n: number } | null>(null);
   const [proposal, setProposal] = React.useState<IntakeProposal | null>(null);
   const [datasetId, setDatasetId] = React.useState<string | undefined>(undefined);
   const [lastFile, setLastFile] = React.useState<File | null>(null);
@@ -44,6 +48,24 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     methods?: SkillMethods;
     guardrails?: SkillGuardrail[];
   } | null>(null);
+
+  // Consume a command-palette intent for this project: switch tab, and (when a
+  // skill was named) install it and pre-select it in the Workbench. Runs on
+  // mount (intent queued just before navigation) and on every later dispatch
+  // while this workspace stays mounted (same-project ⌘K actions).
+  React.useEffect(() => {
+    function consume() {
+      const intent = takeIntent(projectId);
+      if (!intent) return;
+      if (intent.skillId) {
+        projectStore.installSkill(projectId, intent.skillId);
+        setPreselect((p) => ({ id: intent.skillId!, n: (p?.n ?? 0) + 1 }));
+      }
+      if (intent.tab) setTab(intent.tab);
+    }
+    consume();
+    return subscribeIntent(consume);
+  }, [projectId]);
 
   // Undo / redo while editing a figure.
   React.useEffect(() => {
@@ -264,7 +286,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           </TabsContent>
 
           <TabsContent value="workbench">
-            <WorkbenchPanel installs={installs} proposal={proposal} running={running} onRun={runFlow} />
+            <WorkbenchPanel installs={installs} proposal={proposal} running={running} onRun={runFlow} preselect={preselect} />
           </TabsContent>
 
           <TabsContent value="figure" className="h-full">
