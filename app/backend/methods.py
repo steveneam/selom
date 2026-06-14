@@ -122,6 +122,17 @@ def _enrichment(p: dict):
     return text, [GO, REACTOME, BH]
 
 
+def _pathway(p: dict):
+    text = (
+        "Differentially expressed genes were mapped to Reactome pathways and tested for "
+        "over-representation with the Reactome Analysis Service (identifier projection to human "
+        "orthologs; pathway p-values corrected by the Benjamini-Hochberg procedure). The top "
+        f"{p['top_n']} enriched pathways are drawn in the Reactome event hierarchy as a node-link "
+        "graph, each pathway coloured by the mean log2 fold change of its member genes."
+    )
+    return text, [REACTOME, BH]
+
+
 _TEMPLATES = {
     "umap_scrna": _umap,
     "cluster": _cluster,
@@ -130,6 +141,7 @@ _TEMPLATES = {
     "volcano": _volcano,
     "heatmap": _heatmap,
     "enrichment": _enrichment,
+    "pathway": _pathway,
 }
 
 

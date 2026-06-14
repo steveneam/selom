@@ -1,0 +1,132 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "lines",
+      "name": "parent / child",
+      "x": [
+        0.0,
+        0.0,
+        null,
+        1.5,
+        1.5,
+        null,
+        1.5,
+        2.5,
+        null
+      ],
+      "y": [
+        0.0,
+        1.0,
+        null,
+        0.0,
+        1.0,
+        null,
+        0.0,
+        0.5,
+        null
+      ],
+      "line": {
+        "color": "#5b6b80",
+        "width": 1
+      },
+      "hoverinfo": "none",
+      "showlegend": false
+    },
+    {
+      "type": "scatter",
+      "mode": "markers+text",
+      "name": "Reactome pathways",
+      "x": [
+        0.0,
+        0.0,
+        1.5,
+        1.5,
+        2.5
+      ],
+      "y": [
+        1.0,
+        0.0,
+        1.0,
+        0.0,
+        0.5
+      ],
+      "text": [
+        "Cell Cycle, Mitotic",
+        "Mitotic G1 phase and G1/S t\u2026",
+        "Signal Transduction",
+        "Visual phototransduction",
+        "The phototransduction cascade"
+      ],
+      "textposition": "top center",
+      "textfont": {
+        "size": 9
+      },
+      "hovertext": [
+        "Cell Cycle, Mitotic<br>R-HSA-69278 \u00b7 6/587 genes<br>FDR 2.6e-04 \u00b7 mean log2FC +1.57",
+        "Mitotic G1 phase and G1/S transition<br>R-HSA-453279 \u00b7 5/164 genes<br>FDR 1.2e-05 \u00b7 mean log2FC +1.58",
+        "Signal Transduction<br>R-HSA-162582 \u00b7 8/2740 genes<br>FDR 9.0e-03 \u00b7 mean log2FC -1.50",
+        "Visual phototransduction<br>R-HSA-2187338 \u00b7 4/159 genes<br>FDR 3.0e-04 \u00b7 mean log2FC -1.98",
+        "The phototransduction cascade<br>R-HSA-2514856 \u00b7 4/59 genes<br>FDR 1.2e-05 \u00b7 mean log2FC -1.98"
+      ],
+      "hoverinfo": "text",
+      "marker": {
+        "size": [
+          16.9,
+          16.5,
+          17.7,
+          16.0,
+          16.0
+        ],
+        "sizemode": "diameter",
+        "color": [
+          1.57,
+          1.58,
+          -1.5,
+          -1.98,
+          -1.98
+        ],
+        "colorscale": [
+          [
+            0.0,
+            "#2166ac"
+          ],
+          [
+            0.5,
+            "#f7f7f7"
+          ],
+          [
+            1.0,
+            "#b2182b"
+          ]
+        ],
+        "cmin": -1.98,
+        "cmid": 0,
+        "cmax": 1.98,
+        "showscale": true,
+        "colorbar": {
+          "title": {
+            "text": "mean log2FC"
+          }
+        },
+        "line": {
+          "color": "#0b0f17",
+          "width": 1
+        }
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Reactome pathway enrichment (stub)"
+    },
+    "xaxis": {
+      "visible": false
+    },
+    "yaxis": {
+      "visible": false
+    },
+    "hovermode": "closest",
+    "showlegend": false
+  }
+}

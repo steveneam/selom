@@ -16,7 +16,7 @@ import pytest
 
 from skills.contract import load_skill, run_skill
 
-SKILLS = ["cluster", "violin", "deg", "volcano", "heatmap", "enrichment", "go_graph"]
+SKILLS = ["cluster", "violin", "deg", "volcano", "heatmap", "enrichment", "go_graph", "pathway"]
 GOLDEN_DIR = pathlib.Path(__file__).parent / "golden"
 
 

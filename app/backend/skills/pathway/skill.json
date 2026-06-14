@@ -1,0 +1,27 @@
+{
+  "id": "pathway",
+  "version": "0.1.0",
+  "title": "Pathway map",
+  "engine": "python",
+  "omics": "bulk-rna-seq|scrna-seq|proteomics",
+  "entrypoint": "skills.pathway.run:run",
+  "inputs": [{ "name": "matrix", "kind": "csv", "required": true }],
+  "param_spec": {
+    "top_n":         { "type": "int",   "default": 18,   "min": 5, "max": 40 },
+    "fdr_threshold": { "type": "float", "default": 0.05, "min": 0.0, "max": 1.0 },
+    "fc_threshold":  { "type": "float", "default": 0.0,  "min": 0.0, "max": 5.0 }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "summary": "Reactome pathway enrichment drawn in the event hierarchy as an editable node-link, coloured by fold change.",
+    "category": "pathway-analysis",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".csv"],
+    "chains_with": ["deg", "volcano", "enrichment"],
+    "license": "MIT",
+    "popularity": 65
+  }
+}
