@@ -246,6 +246,15 @@ def _normalization_qc(p: dict):
     return text, [SCANPY]
 
 
+def _sankey(p: dict):
+    text = (
+        "Quantities flowing between categories were displayed as a Sankey (alluvial) diagram, in "
+        "which node and link thickness are proportional to the flow value summed over the input "
+        "edge list."
+    )
+    return text, []
+
+
 _TEMPLATES = {
     "umap_scrna": _umap,
     "cluster": _cluster,
@@ -264,6 +273,7 @@ _TEMPLATES = {
     "upset": _upset,
     "scorecard": _scorecard,
     "normalization_qc": _normalization_qc,
+    "sankey": _sankey,
 }
 
 

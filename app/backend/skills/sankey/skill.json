@@ -1,0 +1,25 @@
+{
+  "id": "sankey",
+  "version": "0.1.0",
+  "title": "Sankey flow",
+  "engine": "python",
+  "omics": "bulk-rna-seq|scrna-seq|proteomics",
+  "entrypoint": "skills.sankey.run:run",
+  "inputs": [{ "name": "matrix", "kind": "csv|tsv|xlsx", "required": true }],
+  "param_spec": {
+    "max_links": { "type": "int", "default": 60, "min": 1, "max": 500 }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "summary": "Sankey / alluvial flow diagram — quantities flowing between stages or categories (cell-state transitions, QC-stage attrition, sample→cell-type composition). Consumes a long edge table (source, target, value).",
+    "category": "data-visualization",
+    "tier": "verified",
+    "status": "production",
+    "input_formats": [".csv", ".tsv", ".xlsx"],
+    "chains_with": ["composition", "cluster"],
+    "license": "MIT",
+    "popularity": 58
+  }
+}
