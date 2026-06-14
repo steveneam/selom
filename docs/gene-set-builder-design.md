@@ -131,3 +131,24 @@ open-core, reproducible, apply-in-one-click builder is differentiated and launch
 Phase A + the **WikiPathways (CC0) ingest** — it's mostly wiring assets we already own, ships the
 idea immediately, and de-risks Phase B by proving the GeneSet object + apply flow end-to-end. Then
 build the Phase B builder over the open-core adapters.
+
+### 8.1 Phase A — SHIPPED 2026-06-14 (owner sign-off: top-level surface + enrichment & volcano-highlight apply)
+- **Backend** (`c7ce724`): `gene_sets/library.py` (unified loader + tiered search over GO ·
+  WikiPathways · curated; `load_collection` resolves a source as an ORA library) + `GET /gene-sets`
+  & `GET /gene-sets/{id}`. **WikiPathways CC0 ingest** (`scripts/build_wikipathways.py`): GMT
+  Entrez → HGNC symbol via NCBI gene_info → committed `gene_sets_wikipathways.json` (**921 sets,
+  8,999 symbols, 0 unmapped**). Apply: `enrichment` `gene_sets` selects the source; `volcano`
+  `highlight` marks a panel. pytest 87, ruff clean; real-engine smoke verified.
+- **Frontend** (`c5f9fbe`): top-level **/gene-sets** surface (search · source filter · card grid ·
+  members dialog), first-class **`GeneSet`** in `ProjectStore`, intent-bus apply (Highlight in
+  volcano / Enrich against source) with param prefill, Save + saved strip. tsc + build clean;
+  browser-verified (mock :3010, desktop), both apply paths land prefilled.
+- **Owned curated panels — licensing finding (Decision #11 #3 nuance):** the staged Fidelle
+  `gene_lists` are **named third-party compilations** (CiliaCarta = van Dam 2013; RD_GeneList =
+  RetNet-style; the Proteostasis lists) — **not cleanly "ours to ship"** despite #11's wording.
+  So Phase A ships only **GO + WikiPathways** (unambiguously open) plus **two GO/textbook-derived
+  owned panels** (`gene_sets_curated.json`: phototransduction/visual-cycle, cilium/ciliopathy —
+  canonical *facts*, no third-party claim). The `curated` source slot is ready; **confirm provenance
+  before shipping the Fidelle lists** (memory `selom-real-datasets` flags them "licensing TBC").
+- **Next (Phase B):** the keyword→compile→union/intersect builder over the open-core adapters
+  (+ HGNC dedup/normalization); then Phase C grounded free-text→genes.
