@@ -52,6 +52,8 @@ const METHODS: Record<string, string> = {
     "Per-cell quality-control metrics — total counts, genes per cell, and mitochondrial-read percentage — were computed with Scanpy and shown as violin distributions split by sample.",
   sankey:
     "Quantities flowing between categories were displayed as a Sankey (alluvial) diagram; node and link thickness are proportional to the flow value summed over the input edge list.",
+  string_network:
+    "Protein-protein interactions among the input genes were retrieved from the STRING database and displayed as an editable network; nodes are coloured by log2 fold change (or degree) and edges are STRING interactions above a confidence cutoff.",
 };
 
 // Mirrors backend guardrails.py for the canned demo input (a clean raw-count h5ad):

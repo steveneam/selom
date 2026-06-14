@@ -213,6 +213,16 @@ export const CATALOG: SkillCatalogEntry[] = [
     outputs: ["figure"], license: "MIT",
     provenance: { repo: "selom/skills", path: "sankey" }, version: "0.1.0", popularity: 58,
   }),
+  e({
+    id: "selom.string_network",
+    name: "STRING interaction network",
+    summary: "STRING protein-protein interaction network for a gene list (or DE table) — live STRING API. Nodes coloured by log2 fold change (or degree), edges are STRING interactions above a confidence cutoff.",
+    source: "selom", category: "pathway-analysis", omics: ["bulk RNA-seq", "scRNA-seq", "proteomics"],
+    tier: "verified", status: "beta", engine: "python",
+    inputFormats: [".csv"], chainsWith: ["selom.deg", "selom.enrichment"],
+    outputs: ["figure"], license: "MIT",
+    provenance: { repo: "selom/skills", path: "string_network" }, version: "0.1.0", popularity: 62,
+  }),
 
   // ── ClawBio runnable (Verified — wrap the ~29 production pipelines) ────────
   e({
