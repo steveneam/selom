@@ -15,7 +15,9 @@ def run(data_path: str, params: dict) -> dict:
     from skills._engine import to_bool
     from skills._plotly import jsonable
 
-    adata = sc.read_h5ad(data_path)
+    from skills._genes import read_anndata
+
+    adata = read_anndata(data_path)
 
     # Fast path: plot a precomputed embedding (e.g. a ShinyCell/Seurat UMAP or t-SNE in
     # obsm) coloured by an obs column — no normalize / PCA / neighbours / recompute.

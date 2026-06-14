@@ -31,7 +31,9 @@ def run(data_path: str, params: dict) -> dict:
     panel = _load_panel(params.get("marker_set") or "retinal")
     markers = panel["markers"]
 
-    adata = sc.read_h5ad(data_path)
+    from skills._genes import read_anndata
+
+    adata = read_anndata(data_path)
     sc.pp.filter_genes(adata, min_cells=3)
     if to_bool(params.get("normalize", True)):  # skip if input is already normalized
         sc.pp.normalize_total(adata, target_sum=1e4)

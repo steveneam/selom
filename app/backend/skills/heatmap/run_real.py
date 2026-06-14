@@ -21,7 +21,9 @@ def _scrna(data_path: str, params: dict) -> dict:
     import scanpy as sc
 
     n_genes = int(params["n_genes"])
-    adata = sc.read_h5ad(data_path)
+    from skills._genes import read_anndata
+
+    adata = read_anndata(data_path)
     sc.pp.filter_genes(adata, min_cells=3)
     sc.pp.normalize_total(adata, target_sum=1e4)
     sc.pp.log1p(adata)
