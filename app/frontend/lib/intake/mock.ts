@@ -212,7 +212,7 @@ export function proposeForModality(modality: Modality, answers: IntakeAnswers): 
         summary: `Mass-spec proteomics (${qc.nObs} samples). You want: ${want}.`,
         cleaning: qc.cleaning, guardrails: qc.guardrails,
         steps: [
-          { skillId: "selom.proteomics_volcano", rationale: "Differential abundance across your condition.",
+          { skillId: "selom.proteomics_de", rationale: "Differential abundance across your condition.",
             params: { fdr: 0.05, lfc: 1.0, imputation: "MinProb" }, confidence: 0.74 },
           { skillId: "selom.enrichment", rationale: "Pathway context for the changed proteins.",
             params: { gene_sets: "Reactome" }, confidence: 0.58 },

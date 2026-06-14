@@ -10,12 +10,10 @@ import { compileFixture, getFixtureSet, searchFixture } from "./gene-sets-fixtur
 //       -> { figure, provenance, methods }   (publish-confidence bundle, B4)
 // The frontend calls these through the /api/* proxy, so we intercept the proxied paths.
 export const handlers = [
-  // Live registry: the Selom-native Verified slice, mirroring the 7 skills the backend
-  // actually serves (proteomics_volcano has no runner yet, so it's not Verified).
+  // Live registry: the Selom-native Verified slice, mirroring the skills the backend
+  // actually serves (every Selom-native entry now has a runner).
   http.get("/api/skills", () =>
-    HttpResponse.json(
-      CATALOG.filter((s) => s.source === "selom" && s.id !== "selom.proteomics_volcano"),
-    ),
+    HttpResponse.json(CATALOG.filter((s) => s.source === "selom")),
   ),
   // Gene-set catalog (gene-set builder Phase A): search + members from the offline fixture.
   http.get("/api/gene-sets", ({ request }) => {

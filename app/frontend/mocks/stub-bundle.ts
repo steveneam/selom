@@ -38,11 +38,15 @@ const METHODS: Record<string, string> = {
     "Samples were projected onto their first two principal components (scikit-learn PCA) and coloured by group; variance explained is shown per axis.",
   composition:
     "Category proportions (e.g. cell-type deconvolution) were displayed as grouped bars across conditions.",
+  proteomics_de:
+    "Protein intensities were log2-transformed and median-normalized across samples; sparse proteins were filtered and residual missing values mean-imputed per group. Differential abundance between groups was tested with a Welch t-test and Benjamini-Hochberg correction, displayed as a volcano plot.",
+  gsea:
+    "Genes were ranked by the signed differential statistic and tested for gene-set enrichment with a weighted Kolmogorov-Smirnov running enrichment score (Subramanian et al. 2005); a normalized enrichment score and empirical p-value were estimated by permutation.",
 };
 
 // Mirrors backend guardrails.py for the canned demo input (a clean raw-count h5ad):
 // FDR skills always report multiple-testing; a lax fdr_threshold query adds a warning.
-const FDR_SKILLS = new Set(["deg", "volcano", "enrichment"]);
+const FDR_SKILLS = new Set(["deg", "volcano", "enrichment", "proteomics_de"]);
 
 function mockGuardrails(skillId: string, params: Record<string, string>): SkillGuardrail[] {
   const out: SkillGuardrail[] = [];
