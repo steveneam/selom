@@ -31,6 +31,7 @@ _KIND = {
     "umap_scrna": "embedding",
     "annotate": "embedding",
     "trajectory": "trajectory",
+    "upset": "upset",
 }
 
 
@@ -149,6 +150,16 @@ def _style_embedding(spec, pseudotime=False):
     return spec
 
 
+def _style_upset(spec):
+    """UpSet: base styling, but the shared intersection axis stays label-free — the
+    dot-matrix below it identifies each column, so x ticks would only add noise."""
+    _apply_base(spec, grid=False)
+    x = spec["layout"].get("xaxis", {})
+    x.update(showticklabels=False, ticks="", showline=False)
+    spec["layout"]["xaxis"] = x
+    return spec
+
+
 # ---- public entrypoint -------------------------------------------------------
 def apply(spec, skill_id):
     """Return a themed copy of a Plotly figure spec for ``skill_id``."""
@@ -162,4 +173,6 @@ def apply(spec, skill_id):
         return _style_embedding(spec, pseudotime=False)
     if kind == "trajectory":
         return _style_embedding(spec, pseudotime=True)
+    if kind == "upset":
+        return _style_upset(spec)
     return _apply_base(spec)

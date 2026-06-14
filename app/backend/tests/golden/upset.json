@@ -1,0 +1,310 @@
+{
+  "data": [
+    {
+      "type": "bar",
+      "x": [
+        "c0",
+        "c1",
+        "c2",
+        "c3",
+        "c4",
+        "c5"
+      ],
+      "y": [
+        30,
+        24,
+        18,
+        15,
+        9,
+        6
+      ],
+      "marker": {
+        "color": "#3f4c5a"
+      },
+      "width": 0.6,
+      "text": [
+        "30",
+        "24",
+        "18",
+        "15",
+        "9",
+        "6"
+      ],
+      "textposition": "outside",
+      "cliponaxis": false,
+      "showlegend": false,
+      "hoverinfo": "y"
+    },
+    {
+      "type": "bar",
+      "orientation": "h",
+      "x": [
+        63,
+        48,
+        30
+      ],
+      "y": [
+        "A",
+        "B",
+        "C"
+      ],
+      "xaxis": "x2",
+      "yaxis": "y2",
+      "marker": {
+        "color": "#aeb7c2"
+      },
+      "showlegend": false,
+      "hoverinfo": "x"
+    },
+    {
+      "type": "scatter",
+      "mode": "markers",
+      "x": [
+        "c0",
+        "c0",
+        "c0",
+        "c1",
+        "c1",
+        "c1",
+        "c2",
+        "c2",
+        "c2",
+        "c3",
+        "c3",
+        "c3",
+        "c4",
+        "c4",
+        "c4",
+        "c5",
+        "c5",
+        "c5"
+      ],
+      "y": [
+        "A",
+        "B",
+        "C",
+        "A",
+        "B",
+        "C",
+        "A",
+        "B",
+        "C",
+        "A",
+        "B",
+        "C",
+        "A",
+        "B",
+        "C",
+        "A",
+        "B",
+        "C"
+      ],
+      "xaxis": "x",
+      "yaxis": "y2",
+      "marker": {
+        "color": "#dde3ea",
+        "size": 11
+      },
+      "showlegend": false,
+      "hoverinfo": "skip"
+    },
+    {
+      "type": "scatter",
+      "mode": "lines",
+      "x": [
+        "c2",
+        "c2",
+        null,
+        "c4",
+        "c4",
+        null,
+        "c5",
+        "c5",
+        null
+      ],
+      "y": [
+        "A",
+        "B",
+        null,
+        "A",
+        "C",
+        null,
+        "A",
+        "C",
+        null
+      ],
+      "xaxis": "x",
+      "yaxis": "y2",
+      "line": {
+        "color": "#33404d",
+        "width": 2
+      },
+      "showlegend": false,
+      "hoverinfo": "skip"
+    },
+    {
+      "type": "scatter",
+      "mode": "markers",
+      "x": [
+        "c0",
+        "c1",
+        "c2",
+        "c2",
+        "c3",
+        "c4",
+        "c4",
+        "c5",
+        "c5",
+        "c5"
+      ],
+      "y": [
+        "A",
+        "B",
+        "A",
+        "B",
+        "C",
+        "A",
+        "C",
+        "A",
+        "B",
+        "C"
+      ],
+      "xaxis": "x",
+      "yaxis": "y2",
+      "marker": {
+        "color": "#33404d",
+        "size": 11
+      },
+      "showlegend": false,
+      "hoverinfo": "skip"
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Set intersections (stub)",
+      "font": {
+        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "size": 16,
+        "color": "#1f2a37"
+      },
+      "x": 0.01,
+      "xanchor": "left"
+    },
+    "bargap": 0.4,
+    "xaxis": {
+      "showline": false,
+      "linecolor": "#c4ccd4",
+      "linewidth": 1,
+      "mirror": false,
+      "ticks": "",
+      "tickcolor": "#c4ccd4",
+      "ticklen": 4,
+      "tickwidth": 1,
+      "tickfont": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "zeroline": false,
+      "showgrid": false,
+      "domain": [
+        0.24,
+        1.0
+      ],
+      "anchor": "y2",
+      "showticklabels": false
+    },
+    "yaxis": {
+      "showline": true,
+      "linecolor": "#c4ccd4",
+      "linewidth": 1,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#c4ccd4",
+      "ticklen": 4,
+      "tickwidth": 1,
+      "tickfont": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "zeroline": false,
+      "showgrid": false,
+      "domain": [
+        0.55,
+        1.0
+      ],
+      "title": {
+        "text": "Intersection size",
+        "font": {
+          "size": 13,
+          "color": "#1f2a37"
+        }
+      }
+    },
+    "xaxis2": {
+      "domain": [
+        0.0,
+        0.18
+      ],
+      "anchor": "y2",
+      "autorange": "reversed",
+      "title": {
+        "text": "Set size"
+      },
+      "showgrid": false,
+      "zeroline": false
+    },
+    "yaxis2": {
+      "domain": [
+        0.0,
+        0.46
+      ],
+      "anchor": "x2",
+      "categoryorder": "array",
+      "categoryarray": [
+        "C",
+        "B",
+        "A"
+      ],
+      "showgrid": false,
+      "zeroline": false
+    },
+    "font": {
+      "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      "size": 13,
+      "color": "#33404d"
+    },
+    "paper_bgcolor": "#ffffff",
+    "plot_bgcolor": "#ffffff",
+    "colorway": [
+      "#2f6db0",
+      "#e08a2b",
+      "#3f9b6b",
+      "#c0392b",
+      "#7d5ba6",
+      "#1f9aa6",
+      "#9aa017",
+      "#6b7280"
+    ],
+    "hoverlabel": {
+      "font": {
+        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "size": 12
+      },
+      "bgcolor": "#1f2a37"
+    },
+    "margin": {
+      "t": 46,
+      "r": 24,
+      "b": 52,
+      "l": 64
+    },
+    "legend": {
+      "font": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "bgcolor": "rgba(0,0,0,0)",
+      "bordercolor": "rgba(0,0,0,0)"
+    }
+  }
+}

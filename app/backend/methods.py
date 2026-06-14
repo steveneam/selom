@@ -30,6 +30,7 @@ PAGA = "Wolf, F.A. et al. PAGA: graph abstraction reconciles clustering with tra
 DPT = "Haghverdi, L., Büttner, M., Wolf, F.A., Buettner, F. & Theis, F.J. Diffusion pseudotime robustly reconstructs lineage branching. Nature Methods 13, 845-848 (2016)."
 TIROSH = "Tirosh, I. et al. Dissecting the multicellular ecosystem of metastatic melanoma by single-cell RNA-seq. Science 352, 189-196 (2016)."
 SKLEARN = "Pedregosa, F. et al. Scikit-learn: Machine Learning in Python. Journal of Machine Learning Research 12, 2825-2830 (2011)."
+UPSET = "Lex, A., Gehlenborg, N., Strobelt, H., Vuillemot, R. & Pfister, H. UpSet: Visualization of Intersecting Sets. IEEE Transactions on Visualization and Computer Graphics 20, 1983-1992 (2014)."
 
 
 def _umap(p: dict):
@@ -188,6 +189,36 @@ def _composition(p: dict):
     return text, []
 
 
+def _corr_heatmap(p: dict):
+    axis = "samples" if str(p.get("axis", "samples")).startswith("sample") else "features"
+    method = str(p.get("method", "pearson")).title()
+    clustered = bool(p.get("cluster", True))
+    tail = (
+        " Rows and columns were reordered by hierarchical clustering (1−r distance, "
+        "average linkage; SciPy)." if clustered else ""
+    )
+    text = (
+        f"Pairwise {method} correlation coefficients were computed between {axis} and displayed "
+        f"as a heatmap on a diverging colour scale centred at zero.{tail}"
+    )
+    return text, ([SCIPY] if clustered else [])
+
+
+def _upset(p: dict):
+    mode = str(p.get("mode", "distinct")).lower()
+    semantics = (
+        "each element assigned to the intersection of exactly the sets it belongs to"
+        if mode != "inclusive"
+        else "each combination counting every element belonging to at least those sets"
+    )
+    text = (
+        f"Set membership was summarized as an UpSet plot: intersection sizes ({semantics}) are "
+        f"shown as bars above a dot-matrix of set membership, with the top {p.get('max_intersections', 20)} "
+        f"intersections of size at least {p.get('min_size', 1)} displayed."
+    )
+    return text, [UPSET]
+
+
 _TEMPLATES = {
     "umap_scrna": _umap,
     "cluster": _cluster,
@@ -202,6 +233,8 @@ _TEMPLATES = {
     "trajectory": _trajectory,
     "pca": _pca,
     "composition": _composition,
+    "corr_heatmap": _corr_heatmap,
+    "upset": _upset,
 }
 
 

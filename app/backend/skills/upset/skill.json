@@ -1,0 +1,28 @@
+{
+  "id": "upset",
+  "version": "0.1.0",
+  "title": "UpSet plot",
+  "engine": "python",
+  "omics": "bulk-rna-seq|scrna-seq|proteomics",
+  "entrypoint": "skills.upset.run:run",
+  "inputs": [{ "name": "matrix", "kind": "csv|tsv|xlsx", "required": true }],
+  "param_spec": {
+    "mode":              { "type": "str", "default": "distinct", "options": ["distinct", "inclusive"] },
+    "min_size":          { "type": "int", "default": 1,  "min": 1, "max": 100000 },
+    "max_intersections": { "type": "int", "default": 20, "min": 3, "max": 60 },
+    "sort_by":           { "type": "str", "default": "size", "options": ["size", "degree"] }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "summary": "UpSet plot of set intersections — intersection-size bars over a membership dot-matrix. Consumes a boolean membership matrix (elements × sets), e.g. DEG / marker-set overlaps.",
+    "category": "data-visualization",
+    "tier": "verified",
+    "status": "production",
+    "input_formats": [".csv", ".tsv", ".xlsx"],
+    "chains_with": ["deg", "enrichment"],
+    "license": "MIT",
+    "popularity": 64
+  }
+}
