@@ -148,6 +148,60 @@ def get_set(set_id: str) -> dict | None:
     }
 
 
+def compile_sets(set_ids: list[str], op: str = "union", do_normalize: bool = True) -> dict:
+    """Compile several catalog sets into one (gene-set builder Phase B).
+
+    Union or intersect the chosen sets' members, then HGNC-normalize/dedup
+    (gene_sets/normalize.py). Returns the compiled gene list + provenance (the source
+    sets with their licenses/attribution, the op, and dedup/remap stats) so the result
+    is a reproducible, citable `GeneSet`.
+    """
+    from gene_sets.normalize import normalize
+
+    op = op if op in ("union", "intersect") else "union"
+    members: list[set[str]] = []
+    resolved: list[dict] = []
+    missing: list[str] = []
+    for sid in set_ids:
+        meta = _index().get(sid)
+        if meta is None:
+            missing.append(sid)
+            continue
+        genes = set(_load_source(meta["source"]).get(meta["name"], ()))
+        members.append(genes)
+        resolved.append({
+            "id": sid, "name": meta["name"], "source": meta["source"],
+            "source_label": meta["source_label"], "license": meta["license"], "size": len(genes),
+        })
+
+    if not members:
+        combined: set[str] = set()
+    elif op == "intersect":
+        combined = set.intersection(*members)
+    else:
+        combined = set.union(*members)
+
+    norm = normalize(combined) if do_normalize else {
+        "genes": sorted(combined), "remapped": {}, "unrecognized": [], "mapped": False,
+    }
+    return {
+        "genes": norm["genes"],
+        "op": op,
+        "sources": resolved,
+        "missing": missing,
+        "provenance": {
+            "compiled_from": resolved,
+            "op": op,
+            "n_in": len(combined),
+            "n_out": len(norm["genes"]),
+            "n_remapped": len(norm["remapped"]),
+            "n_unrecognized": len(norm["unrecognized"]),
+            "normalized": norm["mapped"],
+            "licenses": sorted({r["license"] for r in resolved}),
+        },
+    }
+
+
 def load_collection(source: str | None) -> dict[str, list[str]]:
     """An ORA library for the ``enrichment`` skill: one source, or ``all`` to union every source.
 

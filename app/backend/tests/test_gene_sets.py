@@ -108,3 +108,41 @@ def test_volcano_panel_parsing_is_separator_tolerant():
 
     assert _parse_panel("rho, GNAT1\nPDE6B  sag") == {"RHO", "GNAT1", "PDE6B", "SAG"}
     assert _parse_panel("") == set()
+
+
+# --- Phase B: compile (union/intersect) + normalize ------------------------------------
+
+def test_normalize_uppercases_and_dedups():
+    from gene_sets.normalize import normalize
+
+    out = normalize(["RHO", "rho", " Sag ", "RHO"])
+    assert out["genes"] == sorted({"RHO", "SAG"})   # holds with or without the HGNC map
+
+
+def test_compile_union_intersect_and_provenance():
+    photo = library.search("phototransduction", source="curated")[0]["id"]
+    cilium = library.search("primary cilium", source="curated")[0]["id"]
+
+    u = library.compile_sets([photo, cilium], "union")
+    assert u["op"] == "union"
+    assert u["provenance"]["n_out"] == len(u["genes"]) > 0
+    assert len(u["provenance"]["compiled_from"]) == 2
+    assert "Selom (owned)" in u["provenance"]["licenses"]
+
+    # intersect of a set with itself is itself (normalized) and lives within the union.
+    i = library.compile_sets([cilium, cilium], "intersect")
+    assert i["op"] == "intersect" and i["genes"]
+    assert set(i["genes"]) <= set(u["genes"])
+
+    # an unknown id is reported, not fatal.
+    m = library.compile_sets([photo, "curated:doesnotexist"], "union")
+    assert m["missing"] == ["curated:doesnotexist"] and len(m["provenance"]["compiled_from"]) == 1
+
+
+def test_compile_endpoint_and_validation():
+    photo = client.get("/gene-sets", params={"q": "phototransduction", "source": "curated"}).json()["results"][0]["id"]
+    r = client.post("/gene-sets/compile", json={"set_ids": [photo], "op": "union", "name": "My panel"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["name"] == "My panel" and body["genes"]
+    assert client.post("/gene-sets/compile", json={"set_ids": []}).status_code == 400
