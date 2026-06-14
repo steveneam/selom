@@ -1,0 +1,27 @@
+{
+  "id": "pca",
+  "version": "0.1.0",
+  "title": "PCA (samples)",
+  "engine": "python",
+  "omics": "bulk-rna-seq|proteomics",
+  "entrypoint": "skills.pca.run:run",
+  "inputs": [{ "name": "matrix", "kind": "csv|xlsx", "required": true }],
+  "param_spec": {
+    "group_regex":  { "type": "str",  "default": "\\d+$" },
+    "scale":        { "type": "bool", "default": true },
+    "label_points": { "type": "bool", "default": true }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "summary": "Principal-component analysis of samples from a feature × sample table; PC1 vs PC2, coloured by group.",
+    "category": "data-visualization",
+    "tier": "verified",
+    "status": "production",
+    "input_formats": [".csv", ".tsv", ".xlsx"],
+    "chains_with": ["deg", "volcano", "heatmap"],
+    "license": "MIT",
+    "popularity": 70
+  }
+}

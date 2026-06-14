@@ -1,0 +1,62 @@
+{
+  "data": [
+    {
+      "type": "bar",
+      "name": "DR",
+      "orientation": "h",
+      "x": [
+        21.8,
+        2.6,
+        9.5,
+        10.4
+      ],
+      "y": [
+        "Rods",
+        "M\u00fcller glia",
+        "Microglia",
+        "Bipolar"
+      ]
+    },
+    {
+      "type": "bar",
+      "name": "PD",
+      "orientation": "h",
+      "x": [
+        4.5,
+        22.2,
+        15.2,
+        14.3
+      ],
+      "y": [
+        "Rods",
+        "M\u00fcller glia",
+        "Microglia",
+        "Bipolar"
+      ]
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Composition (stub)"
+    },
+    "barmode": "group",
+    "xaxis": {
+      "title": {
+        "text": "proportion / count"
+      }
+    },
+    "yaxis": {
+      "title": {
+        "text": "category"
+      },
+      "type": "category"
+    },
+    "legend": {
+      "title": {
+        "text": "condition"
+      }
+    },
+    "bargap": 0.25,
+    "plot_bgcolor": "white"
+  }
+}

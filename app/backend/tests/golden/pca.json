@@ -1,0 +1,87 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "markers+text",
+      "name": "DR",
+      "x": [
+        -2.3,
+        -2.0,
+        -2.6,
+        -1.8,
+        -2.1
+      ],
+      "y": [
+        0.5,
+        -0.4,
+        0.1,
+        0.6,
+        -0.6
+      ],
+      "text": [
+        "DR1",
+        "DR2",
+        "DR3",
+        "DR4",
+        "DR5"
+      ],
+      "textposition": "top center",
+      "marker": {
+        "size": 11
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "markers+text",
+      "name": "PD",
+      "x": [
+        2.1,
+        2.5,
+        1.9,
+        2.4,
+        2.2
+      ],
+      "y": [
+        0.4,
+        -0.3,
+        0.7,
+        -0.5,
+        0.2
+      ],
+      "text": [
+        "PD1",
+        "PD2",
+        "PD3",
+        "PD4",
+        "PD5"
+      ],
+      "textposition": "top center",
+      "marker": {
+        "size": 11
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "PCA (stub)"
+    },
+    "xaxis": {
+      "title": {
+        "text": "PC1 (61.2%)"
+      },
+      "zeroline": true
+    },
+    "yaxis": {
+      "title": {
+        "text": "PC2 (12.7%)"
+      },
+      "zeroline": true
+    },
+    "legend": {
+      "title": {
+        "text": "group"
+      }
+    },
+    "plot_bgcolor": "white"
+  }
+}

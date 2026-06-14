@@ -1,0 +1,27 @@
+{
+  "id": "composition",
+  "version": "0.1.0",
+  "title": "Composition bar",
+  "engine": "python",
+  "omics": "scrna-seq|proteomics",
+  "entrypoint": "skills.composition.run:run",
+  "inputs": [{ "name": "matrix", "kind": "csv|xlsx", "required": true }],
+  "param_spec": {
+    "mode":        { "type": "str", "default": "grouped" },
+    "orientation": { "type": "str", "default": "h" },
+    "sort_by":     { "type": "str", "default": "" }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "summary": "Composition / proportion bar across conditions (e.g. cell-type deconvolution or cluster makeup).",
+    "category": "data-visualization",
+    "tier": "verified",
+    "status": "production",
+    "input_formats": [".csv", ".tsv", ".xlsx"],
+    "chains_with": ["annotate", "cluster", "deg"],
+    "license": "MIT",
+    "popularity": 66
+  }
+}

@@ -29,6 +29,7 @@ SCIPY = "Virtanen, P. et al. SciPy 1.0: fundamental algorithms for scientific co
 PAGA = "Wolf, F.A. et al. PAGA: graph abstraction reconciles clustering with trajectory inference through a topology preserving map of single cells. Genome Biology 20, 59 (2019)."
 DPT = "Haghverdi, L., Büttner, M., Wolf, F.A., Buettner, F. & Theis, F.J. Diffusion pseudotime robustly reconstructs lineage branching. Nature Methods 13, 845-848 (2016)."
 TIROSH = "Tirosh, I. et al. Dissecting the multicellular ecosystem of metastatic melanoma by single-cell RNA-seq. Science 352, 189-196 (2016)."
+SKLEARN = "Pedregosa, F. et al. Scikit-learn: Machine Learning in Python. Journal of Machine Learning Research 12, 2825-2830 (2011)."
 
 
 def _umap(p: dict):
@@ -172,6 +173,21 @@ def _trajectory(p: dict):
     return text, [SCANPY, PAGA, DPT]
 
 
+def _pca(p: dict):
+    scaled = "standardized features and " if p.get("scale", True) else ""
+    text = (
+        f"Samples were projected onto their first two principal components ({scaled}scikit-learn "
+        "PCA) and coloured by group; the percentage of variance explained is shown on each axis."
+    )
+    return text, [SKLEARN]
+
+
+def _composition(p: dict):
+    mode = str(p.get("mode") or "grouped")
+    text = f"Category proportions were displayed as {mode} bars across conditions."
+    return text, []
+
+
 _TEMPLATES = {
     "umap_scrna": _umap,
     "cluster": _cluster,
@@ -184,6 +200,8 @@ _TEMPLATES = {
     "markers": _markers,
     "annotate": _annotate,
     "trajectory": _trajectory,
+    "pca": _pca,
+    "composition": _composition,
 }
 
 
