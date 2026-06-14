@@ -36,6 +36,10 @@ scrna = [
   "anndata>=0.12,<0.13",
   "leidenalg>=0.10",
   "igraph>=0.11",
+  # BSD-3 — the standalone `ppt` principal-tree engine from scFates (clean deps: numba/
+  # scipy/igraph), used by the trajectory skill to draw smooth Slingshot-style lineage
+  # curves. Avoids scFates itself (pulls GPL elpigraph-python) and R-only Slingshot.
+  "simpleppt>=1.1",
 ]
 # Full heavy stack (superset of scrna): adds scvi-tools/PyTorch, proteomics, and Kaleido export
 # for later buckets (trajectory, proteomics volcano, journal-preset export). Multi-GB install.

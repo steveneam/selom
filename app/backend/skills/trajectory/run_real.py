@@ -94,7 +94,12 @@ def run(data_path: str, params: dict) -> dict:
         for g in groups
     ]
 
+    # Smooth principal-curve lineages (the "flowy" Slingshot-style backbone) over the
+    # embedding — optional, degrades to PAGA-only if simpleppt is unavailable.
+    lineages = _lineage_curves(coords, pseudotime, np)
+
     emb_name = emb_key.replace("X_", "").upper()
+    lin_note = f" · {len(lineages)} lineage{'s' if len(lineages) != 1 else ''}" if lineages else ""
     spec = _trajectory_spec(
         [round(float(v), 4) for v in coords[:, 0]],
         [round(float(v), 4) for v in coords[:, 1]],
@@ -102,8 +107,61 @@ def run(data_path: str, params: dict) -> dict:
         edges,
         nodes,
         "Trajectory & pseudotime (PAGA + DPT)",
-        f"{root_note} · {len(groups)} clusters · {len(edges)} edges (≥{threshold})",
+        f"{root_note} · {len(groups)} clusters · {len(edges)} edges (≥{threshold}){lin_note}",
+        lineages,
     )
     spec["layout"]["xaxis"]["title"]["text"] = f"{emb_name} 1"
     spec["layout"]["yaxis"]["title"]["text"] = f"{emb_name} 2"
     return jsonable(spec)
+
+
+def _lineage_curves(coords, pseudotime, np, n_nodes=50):
+    """Smooth principal-curve lineages: a simpleppt principal tree over the embedding,
+    one scipy spline per root->tip path. Root = tree node nearest the lowest-pseudotime
+    cell. Returns ``[(xs, ys, name)]``; empty (PAGA-only) if simpleppt is missing or the
+    fit fails, so the figure always renders."""
+    import contextlib
+    import io
+
+    try:
+        import networkx as nx
+        import simpleppt
+        from scipy.interpolate import splev, splprep
+    except Exception:
+        return []
+
+    X = np.asarray(coords, dtype=float)[:, :2]
+    n = X.shape[0]
+    if n < 30:
+        return []
+    nodes = int(min(n_nodes, max(10, n // 30)))
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):  # mute simpleppt's tqdm
+            ppt = simpleppt.ppt(X, Nodes=nodes, seed=0)
+    except Exception:
+        return []
+
+    F = np.asarray(ppt.F).T                       # (Nodes, 2) principal-tree node coords
+    graph = nx.from_numpy_array(np.asarray(ppt.B))
+    root_cell = int(np.argmin(pseudotime))
+    root = int(np.argmin(((F - X[root_cell]) ** 2).sum(axis=1)))
+    tips = [v for v in graph.nodes if graph.degree(v) == 1 and v != root]
+
+    curves = []
+    for i, tip in enumerate(tips[:5]):
+        try:
+            path = nx.shortest_path(graph, root, tip)
+        except Exception:
+            continue
+        pts = F[path]
+        if len(pts) < 3:
+            continue
+        try:
+            tck, _ = splprep([pts[:, 0], pts[:, 1]], s=len(pts) * 0.5, k=min(3, len(pts) - 1))
+            u = np.linspace(0.0, 1.0, 200)
+            cx, cy = splev(u, tck)
+        except Exception:
+            cx, cy = pts[:, 0], pts[:, 1]
+        curves.append(([round(float(v), 4) for v in cx],
+                       [round(float(v), 4) for v in cy], f"Lineage {i + 1}"))
+    return curves

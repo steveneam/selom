@@ -3902,6 +3902,7 @@ omics = [
     { name = "pyteomics" },
     { name = "scanpy" },
     { name = "scvi-tools" },
+    { name = "simpleppt" },
     { name = "statsmodels" },
 ]
 scrna = [
@@ -3909,6 +3910,7 @@ scrna = [
     { name = "igraph" },
     { name = "leidenalg" },
     { name = "scanpy" },
+    { name = "simpleppt" },
 ]
 
 [package.metadata]
@@ -3939,6 +3941,7 @@ requires-dist = [
     { name = "scipy" },
     { name = "scvi-tools", marker = "extra == 'omics'", specifier = ">=1.4.3" },
     { name = "selom-backend", extras = ["scrna"], marker = "extra == 'omics'" },
+    { name = "simpleppt", marker = "extra == 'scrna'", specifier = ">=1.1" },
     { name = "statsmodels", marker = "extra == 'omics'" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.49.0" },
 ]
@@ -4047,6 +4050,25 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/7a/e6/cecd913df322df5bbe7ebb8ba39e0708e505a165553900da8a7761026d6f/simplejson-4.1.1-cp314-cp314t-win32.whl", hash = "sha256:d083b89d30948a751d3d97476c2ed91e4caaa24a1a1459bdbadb8876242c71fe", size = 91134, upload-time = "2026-04-24T19:24:17.635Z" },
     { url = "https://files.pythonhosted.org/packages/97/73/f540dde99cc1d393bd062ab3b5735b777561a5d8f8a5f2e241164444d77a/simplejson-4.1.1-cp314-cp314t-win_amd64.whl", hash = "sha256:4cbb299d0528ec0447fe366d8c9641860e28f997a62730690fef905f1f41046e", size = 94467, upload-time = "2026-04-24T19:24:19.109Z" },
     { url = "https://files.pythonhosted.org/packages/ce/6a/8b74c52ffd33dbbde00fe7251fee6a0acdc8cea33f7a43805aed258fb79b/simplejson-4.1.1-py3-none-any.whl", hash = "sha256:2ce92b3748f02423e26d2bfb636fb9d7a8f67c8f5854dcae69d350d123b2eee2", size = 69195, upload-time = "2026-04-24T19:24:57.962Z" },
+]
+
+[[package]]
+name = "simpleppt"
+version = "1.1.7"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "igraph" },
+    { name = "matplotlib" },
+    { name = "numba" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/10/14/427706d062da581e0940fcc4ec298f96c6c16b7c86b11dec732285b8181b/simpleppt-1.1.7.tar.gz", hash = "sha256:0413e670d7dab53a308a6663bc38d4bbd233230b11953a7677adb03c7fae4868", size = 70257, upload-time = "2026-03-04T15:53:14.554Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cb/0f/edb61bc3b8c251bb366b092e003644818e7b285c19883d521fbb4f7b20b8/simpleppt-1.1.7-py3-none-any.whl", hash = "sha256:3d3fae80ecb970e546101f59d1c5ad6eda7e688be02555f82ccdc8c0577c8827", size = 73031, upload-time = "2026-03-04T15:53:13.448Z" },
 ]
 
 [[package]]

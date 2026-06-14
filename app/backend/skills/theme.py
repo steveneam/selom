@@ -113,12 +113,15 @@ def _style_volcano(spec):
 def _style_embedding(spec, pseudotime=False):
     """UMAP/trajectory: square embedding, subdued backbone, crisp cells."""
     _apply_base(spec, grid=False)
-    widths = [tr.get("line", {}).get("width")
-              for tr in spec["data"]
-              if tr.get("mode") == "lines" and tr.get("line", {}).get("width")]
+    def _is_backbone(tr):
+        # a straight "lines" trace is a PAGA edge to demote; a spline is a lineage curve to keep
+        return tr.get("mode") == "lines" and tr.get("line", {}).get("shape") != "spline"
+
+    widths = [tr.get("line", {}).get("width") for tr in spec["data"]
+              if _is_backbone(tr) and tr.get("line", {}).get("width")]
     wmax = max(widths) if widths else 1.0
     for tr in spec["data"]:
-        if tr.get("mode") == "lines":  # PAGA edge -> faint thin backbone
+        if _is_backbone(tr):  # PAGA edge -> faint thin backbone
             w = tr.get("line", {}).get("width", 1.0)
             tr["line"] = dict(color="#aeb7c2", width=round(0.6 + (w / wmax) * 2.0, 2))
             tr["opacity"] = 0.5

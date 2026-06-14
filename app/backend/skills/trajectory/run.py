@@ -13,6 +13,8 @@ from skills._engine import use_real_engine
 VIRIDIS = "Viridis"
 EDGE_COLOR = "#475569"
 NODE_COLOR = "#0f172a"
+# bold lineage-curve colours that read over a Viridis cell field
+LINEAGE_COLORS = ["#ef4444", "#2563eb", "#d946ef", "#059669", "#f59e0b"]
 
 
 def run(data_path: str, params: dict) -> dict:
@@ -41,14 +43,21 @@ def _stub_figure() -> dict:
 
     edges = [(0.0, 0.0, 5.0, 1.0, 6.0), (5.0, 1.0, 9.0, 3.5, 4.0)]
     nodes = [(0.0, 0.0, "0", 28.0), (5.0, 1.0, "1", 24.0), (9.0, 3.5, "2", 20.0)]
+    # one smooth lineage threading the cluster centroids (Plotly splines the control points)
+    lineages = [([0.0, 5.0, 9.0], [0.0, 1.0, 3.5], "Lineage 1")]
     return _trajectory_spec(
         cell_x, cell_y, pseudotime, edges, nodes,
-        "Trajectory & pseudotime (stub)", "root cluster 0 · 3 clusters",
+        "Trajectory & pseudotime (stub)", "root cluster 0 · 3 clusters", lineages,
     )
 
 
-def _trajectory_spec(cell_x, cell_y, pseudotime, edges, nodes, title, subtitle) -> dict:
-    """Assemble the editable pseudotime-embedding + PAGA-overlay spec (stub + real)."""
+def _trajectory_spec(cell_x, cell_y, pseudotime, edges, nodes, title, subtitle, lineages=None) -> dict:
+    """Assemble the editable pseudotime-embedding + PAGA-overlay spec (stub + real).
+
+    ``lineages`` is an optional list of ``(xs, ys, name)`` smooth principal-curve
+    lineages (simpleppt + spline) drawn prominently on top of the faint PAGA backbone —
+    the "flowy" Slingshot-style look. Left None it adds nothing.
+    """
     data = [
         {
             "type": "scattergl",
@@ -79,6 +88,21 @@ def _trajectory_spec(cell_x, cell_y, pseudotime, edges, nodes, title, subtitle) 
                 "opacity": 0.6,
                 "hoverinfo": "skip",
                 "showlegend": False,
+            }
+        )
+    # Smooth principal-curve lineages, drawn over the cells/backbone (spline shape so the
+    # theme keeps them prominent rather than demoting them like a PAGA edge).
+    for i, (lx, ly, name) in enumerate(lineages or []):
+        data.append(
+            {
+                "type": "scatter",
+                "mode": "lines",
+                "name": name,
+                "x": lx,
+                "y": ly,
+                "line": {"color": LINEAGE_COLORS[i % len(LINEAGE_COLORS)], "width": 4, "shape": "spline"},
+                "opacity": 0.95,
+                "hoverinfo": "skip",
             }
         )
     # PAGA nodes — cluster centroids, size = cell count.
