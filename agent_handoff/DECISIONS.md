@@ -39,6 +39,17 @@ _Last updated: 2026-06-14 — added #11 (gene-set builder: open-core, list-first
   should be filed into the research vault's `Selom/Wiki/decisions/` by the wiki agent — this
   build session is **read-only** in the vault, so it cannot write them. This file is the
   authoritative build-side reference until then.
+- **Refinement to #10 (owner-directed, 2026-06-14):** **BAM is an accepted input file type.** This
+  refines "do not chase upstream NGS" — *ingest flexibility* (a user hands us a BAM, we quantify it to
+  a count matrix) is distinct from *being an aligner*, and lowering the barrier to the editable-figure
+  wedge serves it. **In scope:** BAM → gene-level **count matrix** (against a bundled open GTF —
+  GENCODE/Ensembl — via featureCounts / htseq / pysam; all open, GPL fine server-side per #7), which
+  then feeds the existing `deg`/`volcano`/`enrichment` skills. Owner rationale: not license-gated, gives
+  users a file-type choice. **Still out (for now):** FASTQ → BAM **read alignment** (STAR/HISAT2 — the
+  heaviest commodity step); add later only if owner wants full flexibility. **Build considerations:**
+  BAMs are GB-scale → bypass the in-memory Next proxy (RISKS #8) via direct/chunked upload + an async
+  job (arq/Redis = Docker-gated on Windows → ASK owner). Test set: 20 GRCh38 iRPE-control BAMs on the
+  CMRI share (`…/RNA-seq/2025_BAM files_Control samples`, ~38 GB). Present a plan before building.
 - **Clarification to #11 #3 (owner, 2026-06-14):** "ship the Fidelle lists as our own" is refined —
   gene lists extracted from **papers / publications / public repos are generally not license-gated**
   (gene symbols are facts), so they are **shippable**. Where a list traces to a third party or a
