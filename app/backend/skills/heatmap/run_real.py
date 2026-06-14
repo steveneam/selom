@@ -55,8 +55,11 @@ def _scrna(data_path: str, params: dict) -> dict:
     expr["__g"] = sub.obs[groupby].astype(str).to_numpy()
     means = expr.groupby("__g")[genes].mean().T  # genes x groups
     z = _row_zscore(means, np)
-    z, genes = _order_rows(z, genes)
-    return jsonable(heatmap_spec(z.tolist(), list(means.columns), genes, "Marker heatmap", "cluster"))
+    want_dendro = str(params.get("dendrogram") or "none").lower() == "row"
+    z, genes, dendro = _order_rows(z, genes, want_dendro)
+    return jsonable(
+        heatmap_spec(z.tolist(), list(means.columns), genes, "Marker heatmap", "cluster", dendro)
+    )
 
 
 def _bulk(data_path: str, params: dict) -> dict:
@@ -68,8 +71,11 @@ def _bulk(data_path: str, params: dict) -> dict:
     top = df.var(axis=1).sort_values(ascending=False).head(n_genes).index
     sub = df.loc[top]
     z = _row_zscore(sub, np)
-    z, ylabels = _order_rows(z, [str(g) for g in sub.index])
-    return jsonable(heatmap_spec(z.tolist(), list(sub.columns), ylabels, "Top-variable genes", "sample"))
+    want_dendro = str(params.get("dendrogram") or "none").lower() == "row"
+    z, ylabels, dendro = _order_rows(z, [str(g) for g in sub.index], want_dendro)
+    return jsonable(
+        heatmap_spec(z.tolist(), list(sub.columns), ylabels, "Top-variable genes", "sample", dendro)
+    )
 
 
 def _row_zscore(frame, np):
@@ -81,24 +87,35 @@ def _row_zscore(frame, np):
     return np.round((values - mean) / std, 4)
 
 
-def _order_rows(z, labels):
+def _order_rows(z, labels, want_dendro=False):
     """Reorder rows by hierarchical-clustering leaf order so co-varying genes sit
     together — the standard *clustered* heatmap layout (vs. raw input order). Rows are
     already z-scored, so correlation distance groups by expression *pattern*, not
     magnitude; average linkage. Falls back to euclidean when correlation is undefined
     (a constant row), and no-ops for trivially small matrices.
+
+    Returns ``(z, labels, dendro)``. When ``want_dendro`` is set, ``dendro`` carries the
+    SciPy dendrogram line coordinates (``icoord``/``dcoord``) so the caller can draw the
+    clustering tree aligned to these leaf-ordered rows; otherwise ``dendro`` is None.
     """
     import numpy as np
 
     z = np.asarray(z, dtype=float)
     if z.shape[0] < 3 or z.shape[1] < 2:
-        return z, labels
+        return z, labels, None
 
-    from scipy.cluster.hierarchy import leaves_list, linkage
+    from scipy.cluster.hierarchy import dendrogram, leaves_list, linkage
     from scipy.spatial.distance import pdist
 
     dist = pdist(z, metric="correlation")
     if not np.all(np.isfinite(dist)):
         dist = pdist(z, metric="euclidean")
-    order = leaves_list(linkage(dist, method="average"))
-    return z[order], [labels[i] for i in order]
+    linkage_matrix = linkage(dist, method="average")
+    if want_dendro:
+        dd = dendrogram(linkage_matrix, no_plot=True, orientation="left")
+        order = dd["leaves"]  # same leaf order the icoord positions are built against
+        dendro = {"icoord": dd["icoord"], "dcoord": dd["dcoord"]}
+    else:
+        order = leaves_list(linkage_matrix)
+        dendro = None
+    return z[order], [labels[i] for i in order], dendro

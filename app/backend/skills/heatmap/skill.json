@@ -7,8 +7,9 @@
   "entrypoint": "skills.heatmap.run:run",
   "inputs": [{ "name": "matrix", "kind": "anndata|h5ad|csv", "required": true }],
   "param_spec": {
-    "n_genes": { "type": "int", "default": 20, "min": 5, "max": 100 },
-    "groupby": { "type": "str", "default": "leiden" }
+    "n_genes":    { "type": "int", "default": 20, "min": 5, "max": 100 },
+    "groupby":    { "type": "str", "default": "leiden" },
+    "dendrogram": { "type": "str", "default": "none", "options": ["none", "row"] }
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" }

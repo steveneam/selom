@@ -55,7 +55,7 @@ def _style_axis(orig, grid=True):
     orig = dict(orig or {})
     title = orig.get("title")
     keep = {k: orig[k] for k in ("range", "type", "scaleanchor", "scaleratio", "domain", "anchor",
-                                 "categoryorder", "categoryarray") if k in orig}
+                                 "categoryorder", "categoryarray", "side") if k in orig}
     new = _axis(grid=grid)
     new.update(keep)
     tfont = dict(size=13, color=INK_STRONG)
