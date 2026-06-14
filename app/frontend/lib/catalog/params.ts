@@ -48,6 +48,14 @@ const SCHEMAS: Record<string, ParamField[]> = {
       ],
       help: "The license-clean library the over-representation test scores against.",
     },
+    {
+      key: "direction", label: "Direction", type: "select", default: "combined",
+      options: [
+        { value: "combined", label: "Combined" },
+        { value: "split", label: "Up / down split" },
+      ],
+      help: "Split scores up- and down-regulated genes separately (diverging dotplot). Needs a fold-change column.",
+    },
   ],
   volcano: [
     {
