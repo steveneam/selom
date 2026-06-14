@@ -56,6 +56,16 @@ const SCHEMAS: Record<string, ParamField[]> = {
       help: "Mark + label a gene-set panel on the plot (comma-separated). Applied from “Gene Sets”.",
     },
   ],
+  scorecard: [
+    {
+      key: "layout", label: "Layout", type: "select", default: "radar",
+      options: [
+        { value: "radar", label: "Radar (spider)" },
+        { value: "heatmap", label: "Heatmap (metrics × conditions)" },
+      ],
+      help: "Two forms of the same benchmark (paper Fig 6F).",
+    },
+  ],
 };
 
 export function skillParamSchema(catalogOrRuntimeId: string): ParamField[] {
