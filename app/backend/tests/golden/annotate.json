@@ -122,24 +122,103 @@
       "text": "Cell-type annotation (stub \u00b7 retinal panel)",
       "subtitle": {
         "text": "4 types \u00b7 4 clusters"
-      }
+      },
+      "font": {
+        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "size": 16,
+        "color": "#1f2a37"
+      },
+      "x": 0.01,
+      "xanchor": "left"
     },
     "xaxis": {
-      "title": {
-        "text": "UMAP 1"
+      "showline": true,
+      "linecolor": "#c4ccd4",
+      "linewidth": 1,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#c4ccd4",
+      "ticklen": 4,
+      "tickwidth": 1,
+      "tickfont": {
+        "size": 11,
+        "color": "#33404d"
       },
-      "zeroline": false
+      "zeroline": false,
+      "showgrid": false,
+      "title": {
+        "text": "UMAP 1",
+        "font": {
+          "size": 13,
+          "color": "#1f2a37"
+        }
+      }
     },
     "yaxis": {
-      "title": {
-        "text": "UMAP 2"
+      "showline": true,
+      "linecolor": "#c4ccd4",
+      "linewidth": 1,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#c4ccd4",
+      "ticklen": 4,
+      "tickwidth": 1,
+      "tickfont": {
+        "size": 11,
+        "color": "#33404d"
       },
-      "zeroline": false
+      "zeroline": false,
+      "showgrid": false,
+      "title": {
+        "text": "UMAP 2",
+        "font": {
+          "size": 13,
+          "color": "#1f2a37"
+        }
+      },
+      "scaleanchor": "x",
+      "scaleratio": 1
     },
     "legend": {
       "title": {
         "text": "cell type"
-      }
+      },
+      "font": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "bgcolor": "rgba(0,0,0,0)",
+      "bordercolor": "rgba(0,0,0,0)"
+    },
+    "font": {
+      "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      "size": 13,
+      "color": "#33404d"
+    },
+    "paper_bgcolor": "#ffffff",
+    "plot_bgcolor": "#ffffff",
+    "colorway": [
+      "#2f6db0",
+      "#e08a2b",
+      "#3f9b6b",
+      "#c0392b",
+      "#7d5ba6",
+      "#1f9aa6",
+      "#9aa017",
+      "#6b7280"
+    ],
+    "hoverlabel": {
+      "font": {
+        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "size": 12
+      },
+      "bgcolor": "#1f2a37"
+    },
+    "margin": {
+      "t": 46,
+      "r": 24,
+      "b": 52,
+      "l": 64
     }
   }
 }

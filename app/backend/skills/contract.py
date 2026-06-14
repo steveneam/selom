@@ -29,10 +29,13 @@ def load_skill(skill_id: str) -> SkillSpec:
 
 
 def run_skill(skill_id: str, data_path: str, params: dict) -> dict:
+    from skills import theme  # central publication theme — one look across every skill
+
     spec = load_skill(skill_id)
     mod_path, fn = spec.entrypoint.split(":")
     run = getattr(import_module(mod_path), fn)
-    return run(data_path=data_path, params={**defaults(spec), **params})  # returns Plotly spec dict
+    figure = run(data_path=data_path, params={**defaults(spec), **params})  # Plotly spec dict
+    return theme.apply(figure, skill_id)
 
 
 def defaults(spec: SkillSpec) -> dict:

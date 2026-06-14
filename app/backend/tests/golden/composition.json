@@ -37,26 +37,108 @@
   ],
   "layout": {
     "title": {
-      "text": "Composition (stub)"
+      "text": "Composition (stub)",
+      "font": {
+        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "size": 16,
+        "color": "#1f2a37"
+      },
+      "x": 0.01,
+      "xanchor": "left"
     },
     "barmode": "group",
     "xaxis": {
+      "showline": true,
+      "linecolor": "#c4ccd4",
+      "linewidth": 1,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#c4ccd4",
+      "ticklen": 4,
+      "tickwidth": 1,
+      "tickfont": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "zeroline": false,
+      "showgrid": true,
+      "gridcolor": "#eef1f5",
+      "gridwidth": 1,
       "title": {
-        "text": "proportion / count"
+        "text": "proportion / count",
+        "font": {
+          "size": 13,
+          "color": "#1f2a37"
+        }
       }
     },
     "yaxis": {
-      "title": {
-        "text": "category"
+      "showline": true,
+      "linecolor": "#c4ccd4",
+      "linewidth": 1,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#c4ccd4",
+      "ticklen": 4,
+      "tickwidth": 1,
+      "tickfont": {
+        "size": 11,
+        "color": "#33404d"
       },
-      "type": "category"
+      "zeroline": false,
+      "showgrid": true,
+      "gridcolor": "#eef1f5",
+      "gridwidth": 1,
+      "type": "category",
+      "title": {
+        "text": "category",
+        "font": {
+          "size": 13,
+          "color": "#1f2a37"
+        }
+      }
     },
     "legend": {
       "title": {
         "text": "condition"
-      }
+      },
+      "font": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "bgcolor": "rgba(0,0,0,0)",
+      "bordercolor": "rgba(0,0,0,0)"
     },
     "bargap": 0.25,
-    "plot_bgcolor": "white"
+    "plot_bgcolor": "#ffffff",
+    "font": {
+      "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      "size": 13,
+      "color": "#33404d"
+    },
+    "paper_bgcolor": "#ffffff",
+    "colorway": [
+      "#2f6db0",
+      "#e08a2b",
+      "#3f9b6b",
+      "#c0392b",
+      "#7d5ba6",
+      "#1f9aa6",
+      "#9aa017",
+      "#6b7280"
+    ],
+    "hoverlabel": {
+      "font": {
+        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "size": 12
+      },
+      "bgcolor": "#1f2a37"
+    },
+    "margin": {
+      "t": 46,
+      "r": 24,
+      "b": 52,
+      "l": 64
+    }
   }
 }
