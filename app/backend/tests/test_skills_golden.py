@@ -19,7 +19,7 @@ from skills.contract import load_skill, run_skill
 SKILLS = [
     "cluster", "violin", "deg", "volcano", "heatmap", "enrichment", "go_graph", "pathway",
     "markers", "annotate", "trajectory", "pca", "composition", "proteomics_de", "gsea",
-    "corr_heatmap", "upset",
+    "corr_heatmap", "upset", "scorecard", "normalization_qc",
 ]
 GOLDEN_DIR = pathlib.Path(__file__).parent / "golden"
 

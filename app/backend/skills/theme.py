@@ -32,6 +32,7 @@ _KIND = {
     "annotate": "embedding",
     "trajectory": "trajectory",
     "upset": "upset",
+    "normalization_qc": "qc",
 }
 
 
@@ -175,4 +176,7 @@ def apply(spec, skill_id):
         return _style_embedding(spec, pseudotime=True)
     if kind == "upset":
         return _style_upset(spec)
+    if kind == "qc":
+        # multi-panel QC violins: gridless to match the secondary panels theme skips
+        return _apply_base(spec, grid=False)
     return _apply_base(spec)

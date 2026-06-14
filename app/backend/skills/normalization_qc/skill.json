@@ -1,0 +1,26 @@
+{
+  "id": "normalization_qc",
+  "version": "0.1.0",
+  "title": "QC metrics panel",
+  "engine": "python",
+  "omics": "scrna-seq",
+  "entrypoint": "skills.normalization_qc.run:run",
+  "inputs": [{ "name": "matrix", "kind": "anndata|h5ad", "required": true }],
+  "param_spec": {
+    "groupby":   { "type": "str", "default": "sample" },
+    "max_cells": { "type": "int", "default": 6000, "min": 500, "max": 50000 }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "summary": "Per-cell QC violin panel — total counts, genes-per-cell and mitochondrial-% distributions per sample (paper Fig S1A). The standard scRNA quality check before analysis.",
+    "category": "single-cell",
+    "tier": "verified",
+    "status": "production",
+    "input_formats": [".h5ad"],
+    "chains_with": ["umap_scrna", "cluster"],
+    "license": "MIT",
+    "popularity": 67
+  }
+}

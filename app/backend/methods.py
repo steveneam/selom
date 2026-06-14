@@ -219,6 +219,27 @@ def _upset(p: dict):
     return text, [UPSET]
 
 
+def _scorecard(p: dict):
+    norm = (
+        " Each metric was min–max normalized to [0,1] so differently-scaled scores are comparable."
+        if p.get("normalize", True) else ""
+    )
+    text = (
+        "Conditions were compared across multiple metrics on a radar (spider) chart, one filled "
+        f"polygon per condition.{norm}"
+    )
+    return text, []
+
+
+def _normalization_qc(p: dict):
+    text = (
+        "Per-cell quality-control metrics — total counts, genes detected per cell, and the "
+        "percentage of mitochondrial reads — were computed with Scanpy and displayed as violin "
+        f"distributions split by {p.get('groupby', 'sample')}."
+    )
+    return text, [SCANPY]
+
+
 _TEMPLATES = {
     "umap_scrna": _umap,
     "cluster": _cluster,
@@ -235,6 +256,8 @@ _TEMPLATES = {
     "composition": _composition,
     "corr_heatmap": _corr_heatmap,
     "upset": _upset,
+    "scorecard": _scorecard,
+    "normalization_qc": _normalization_qc,
 }
 
 
