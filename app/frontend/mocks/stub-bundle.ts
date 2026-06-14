@@ -46,6 +46,10 @@ const METHODS: Record<string, string> = {
     "Pairwise Pearson correlation coefficients were computed between samples and displayed as a heatmap on a diverging colour scale centred at zero, with rows and columns reordered by hierarchical clustering (1−r distance, average linkage).",
   upset:
     "Set membership was summarized as an UpSet plot: intersection sizes are shown as bars above a dot-matrix of set membership, with the largest intersections displayed.",
+  scorecard:
+    "Conditions were compared across multiple metrics on a radar (spider) chart, one filled polygon per condition; each metric was min–max normalized to [0,1] for comparability.",
+  normalization_qc:
+    "Per-cell quality-control metrics — total counts, genes per cell, and mitochondrial-read percentage — were computed with Scanpy and shown as violin distributions split by sample.",
 };
 
 // Mirrors backend guardrails.py for the canned demo input (a clean raw-count h5ad):

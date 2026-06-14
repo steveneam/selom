@@ -183,6 +183,26 @@ export const CATALOG: SkillCatalogEntry[] = [
     outputs: ["figure"], license: "MIT",
     provenance: { repo: "selom/skills", path: "upset" }, version: "0.1.0", popularity: 64,
   }),
+  e({
+    id: "selom.scorecard",
+    name: "Benchmark scorecard (radar)",
+    summary: "Radar / spider chart comparing conditions across many metrics — rank N models/protocols on M scores at a glance (per-metric normalized).",
+    source: "selom", category: "data-visualization", omics: ["bulk RNA-seq", "scRNA-seq", "proteomics"],
+    tier: "verified", status: "production", engine: "python",
+    inputFormats: [".csv", ".tsv", ".xlsx"], chainsWith: ["selom.corr_heatmap", "selom.composition"],
+    outputs: ["figure"], license: "MIT",
+    provenance: { repo: "selom/skills", path: "scorecard" }, version: "0.1.0", popularity: 60,
+  }),
+  e({
+    id: "selom.normalization_qc",
+    name: "QC metrics panel",
+    summary: "Per-cell QC violins — total counts, genes-per-cell and mitochondrial-% per sample. The standard scRNA quality check before analysis.",
+    source: "selom", category: "single-cell", omics: ["scRNA-seq"],
+    tier: "verified", status: "production", engine: "python",
+    inputFormats: [".h5ad"], chainsWith: ["selom.umap_scrna", "selom.cluster"],
+    outputs: ["figure"], license: "MIT",
+    provenance: { repo: "selom/skills", path: "normalization_qc" }, version: "0.1.0", popularity: 67,
+  }),
 
   // ── ClawBio runnable (Verified — wrap the ~29 production pipelines) ────────
   e({
