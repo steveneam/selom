@@ -242,6 +242,21 @@
       "gridcolor": "#eef1f5",
       "gridwidth": 1,
       "type": "category",
+      "categoryorder": "array",
+      "categoryarray": [
+        "CST3",
+        "LYZ",
+        "FTL",
+        "S100A9",
+        "CD3D",
+        "IL7R",
+        "NKG7",
+        "GZMB",
+        "MS4A1",
+        "CD79A",
+        "GNLY",
+        "PPBP"
+      ],
       "title": {
         "text": "gene",
         "font": {
@@ -268,6 +283,12 @@
       "gridcolor": "#eef1f5",
       "gridwidth": 1,
       "type": "category",
+      "categoryorder": "array",
+      "categoryarray": [
+        "0",
+        "1",
+        "2"
+      ],
       "title": {
         "text": "cluster",
         "font": {
