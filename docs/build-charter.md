@@ -124,7 +124,7 @@ upstream into alignment / assembly / variant-calling — heavy, commodity, compu
 | Pri | What | Maps to | Note |
 |---|---|---|---|
 | **P1** | broaden `deg` (no-rep + time-course) + `enrichment` (ORA); new `pathway` (KEGG/Reactome) + `go-graph` figure skills | broadens **B2** + 2 new Verified skills | nearest gap; `pathway`/`go-graph` need the **KEGG · Reactome · GO/QuickGO · STRING** APIs eamos lacks → **printing-press CLI candidates** |
-| **P2** | single-cell depth — `markers` · `annotate` · `trajectory` | **B8 / B9** library growth | `h5ad`-native = their Seurat weakness |
+| **P2** ✅ | single-cell depth — `markers` · `annotate` · `trajectory` (SHIPPED 2026-06-14; + `pca`/`composition`) | **B8 / B9** library growth | `h5ad`-native = their Seurat weakness; annotate validated 7/7 vs published RPGRIP1 labels |
 | **P3** | `coexpression` (WGCNA) · `venn` · `pcoa` | **B8 / B9** | leapfrogs their 4.0 WGCNA |
 | **P4** 🆕 | proteomics + metabolomics (mzML) | **B9** Foundry + new-modality ingest | the long-term moat — OmicsBox can't match |
 
