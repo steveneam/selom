@@ -19,7 +19,7 @@ from skills.contract import run_skill  # noqa: E402
 SKILLS = [
     "cluster", "violin", "deg", "volcano", "heatmap", "enrichment", "go_graph", "pathway",
     "markers", "annotate", "trajectory", "pca", "composition", "proteomics_de", "gsea",
-    "corr_heatmap", "upset", "scorecard", "normalization_qc", "sankey",
+    "corr_heatmap", "upset", "scorecard", "normalization_qc", "sankey", "string_network",
 ]
 
 

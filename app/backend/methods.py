@@ -31,6 +31,7 @@ DPT = "Haghverdi, L., Büttner, M., Wolf, F.A., Buettner, F. & Theis, F.J. Diffu
 TIROSH = "Tirosh, I. et al. Dissecting the multicellular ecosystem of metastatic melanoma by single-cell RNA-seq. Science 352, 189-196 (2016)."
 SKLEARN = "Pedregosa, F. et al. Scikit-learn: Machine Learning in Python. Journal of Machine Learning Research 12, 2825-2830 (2011)."
 UPSET = "Lex, A., Gehlenborg, N., Strobelt, H., Vuillemot, R. & Pfister, H. UpSet: Visualization of Intersecting Sets. IEEE Transactions on Visualization and Computer Graphics 20, 1983-1992 (2014)."
+STRING = "Szklarczyk, D. et al. The STRING database in 2023: protein-protein association networks and functional enrichment analyses for any sequenced genome of interest. Nucleic Acids Research 51, D638-D646 (2023)."
 
 
 def _umap(p: dict):
@@ -255,6 +256,16 @@ def _sankey(p: dict):
     return text, []
 
 
+def _string_network(p: dict):
+    text = (
+        "Protein-protein interactions among the input genes were retrieved from the STRING database "
+        f"(species {p.get('species', 9606)}, minimum combined score {p.get('required_score', 400)}/1000) "
+        "and displayed as an editable interaction network, with nodes coloured by mean log2 fold "
+        "change where available (otherwise by node degree) and edges representing STRING interactions."
+    )
+    return text, [STRING]
+
+
 _TEMPLATES = {
     "umap_scrna": _umap,
     "cluster": _cluster,
@@ -274,6 +285,7 @@ _TEMPLATES = {
     "scorecard": _scorecard,
     "normalization_qc": _normalization_qc,
     "sankey": _sankey,
+    "string_network": _string_network,
 }
 
 

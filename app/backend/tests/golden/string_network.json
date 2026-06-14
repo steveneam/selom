@@ -1,0 +1,255 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "lines",
+      "name": "interactions",
+      "x": [
+        1.0,
+        0.7071,
+        null,
+        0.7071,
+        0.0,
+        null,
+        0.0,
+        -0.7071,
+        null,
+        1.0,
+        -0.7071,
+        null,
+        -0.7071,
+        -1.0,
+        null,
+        1.0,
+        -1.0,
+        null,
+        0.7071,
+        0.7071,
+        null,
+        1.0,
+        -0.0,
+        null
+      ],
+      "y": [
+        0.0,
+        0.7071,
+        null,
+        0.7071,
+        1.0,
+        null,
+        1.0,
+        0.7071,
+        null,
+        0.0,
+        -0.7071,
+        null,
+        -0.7071,
+        0.0,
+        null,
+        0.0,
+        0.0,
+        null,
+        0.7071,
+        -0.7071,
+        null,
+        0.0,
+        -1.0,
+        null
+      ],
+      "line": {
+        "color": "#9aa6b2",
+        "width": 1
+      },
+      "hoverinfo": "none",
+      "showlegend": false
+    },
+    {
+      "type": "scatter",
+      "mode": "markers+text",
+      "name": "proteins",
+      "x": [
+        1.0,
+        0.7071,
+        0.0,
+        -0.7071,
+        -1.0,
+        -0.7071,
+        -0.0,
+        0.7071
+      ],
+      "y": [
+        0.0,
+        0.7071,
+        1.0,
+        0.7071,
+        0.0,
+        -0.7071,
+        -1.0,
+        -0.7071
+      ],
+      "text": [
+        "RHO",
+        "GNAT1",
+        "PDE6B",
+        "PDE6A",
+        "SAG",
+        "GRK1",
+        "RCVRN",
+        "GNB1"
+      ],
+      "textposition": "top center",
+      "textfont": {
+        "size": 9
+      },
+      "hovertext": [
+        "RHO<br>4 interactions \u00b7 log2FC -2.10",
+        "GNAT1<br>3 interactions \u00b7 log2FC -1.80",
+        "PDE6B<br>2 interactions \u00b7 log2FC -1.90",
+        "PDE6A<br>1 interactions \u00b7 log2FC -1.70",
+        "SAG<br>2 interactions \u00b7 log2FC -1.20",
+        "GRK1<br>2 interactions \u00b7 log2FC -0.90",
+        "RCVRN<br>1 interactions \u00b7 log2FC -1.00",
+        "GNB1<br>1 interactions \u00b7 log2FC -0.60"
+      ],
+      "hoverinfo": "text",
+      "marker": {
+        "size": [
+          18.0,
+          17.2,
+          16.2,
+          15.0,
+          16.2,
+          16.2,
+          15.0,
+          15.0
+        ],
+        "sizemode": "diameter",
+        "color": [
+          -2.1,
+          -1.8,
+          -1.9,
+          -1.7,
+          -1.2,
+          -0.9,
+          -1.0,
+          -0.6
+        ],
+        "line": {
+          "color": "#0b0f17",
+          "width": 1
+        },
+        "colorscale": [
+          [
+            0.0,
+            "#2166ac"
+          ],
+          [
+            0.5,
+            "#f7f7f7"
+          ],
+          [
+            1.0,
+            "#b2182b"
+          ]
+        ],
+        "cmin": -2.1,
+        "cmid": 0,
+        "cmax": 2.1,
+        "showscale": true,
+        "colorbar": {
+          "title": {
+            "text": "log2FC"
+          }
+        }
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "STRING interaction network (stub)",
+      "font": {
+        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "size": 16,
+        "color": "#1f2a37"
+      },
+      "x": 0.01,
+      "xanchor": "left"
+    },
+    "xaxis": {
+      "showline": true,
+      "linecolor": "#c4ccd4",
+      "linewidth": 1,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#c4ccd4",
+      "ticklen": 4,
+      "tickwidth": 1,
+      "tickfont": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "zeroline": false,
+      "showgrid": true,
+      "gridcolor": "#eef1f5",
+      "gridwidth": 1
+    },
+    "yaxis": {
+      "showline": true,
+      "linecolor": "#c4ccd4",
+      "linewidth": 1,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#c4ccd4",
+      "ticklen": 4,
+      "tickwidth": 1,
+      "tickfont": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "zeroline": false,
+      "showgrid": true,
+      "gridcolor": "#eef1f5",
+      "gridwidth": 1
+    },
+    "hovermode": "closest",
+    "showlegend": false,
+    "font": {
+      "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      "size": 13,
+      "color": "#33404d"
+    },
+    "paper_bgcolor": "#ffffff",
+    "plot_bgcolor": "#ffffff",
+    "colorway": [
+      "#2f6db0",
+      "#e08a2b",
+      "#3f9b6b",
+      "#c0392b",
+      "#7d5ba6",
+      "#1f9aa6",
+      "#9aa017",
+      "#6b7280"
+    ],
+    "hoverlabel": {
+      "font": {
+        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "size": 12
+      },
+      "bgcolor": "#1f2a37"
+    },
+    "margin": {
+      "t": 46,
+      "r": 24,
+      "b": 52,
+      "l": 64
+    },
+    "legend": {
+      "font": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "bgcolor": "rgba(0,0,0,0)",
+      "bordercolor": "rgba(0,0,0,0)"
+    }
+  }
+}

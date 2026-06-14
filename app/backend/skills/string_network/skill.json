@@ -1,0 +1,28 @@
+{
+  "id": "string_network",
+  "version": "0.1.0",
+  "title": "STRING interaction network",
+  "engine": "python",
+  "omics": "bulk-rna-seq|scrna-seq|proteomics",
+  "entrypoint": "skills.string_network.run:run",
+  "inputs": [{ "name": "matrix", "kind": "csv", "required": true }],
+  "param_spec": {
+    "species":        { "type": "int",   "default": 9606 },
+    "required_score": { "type": "int",   "default": 400, "min": 0, "max": 1000 },
+    "max_genes":      { "type": "int",   "default": 50, "min": 2, "max": 200 },
+    "fdr_threshold":  { "type": "float", "default": 0.05, "min": 0, "max": 1 }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "summary": "STRING protein-protein interaction network for a gene list (or DE table) — live STRING API. Editable node-link; nodes coloured by log2 fold change (or degree), edges are STRING interactions above a confidence cutoff.",
+    "category": "pathway-analysis",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".csv"],
+    "chains_with": ["deg", "enrichment"],
+    "license": "MIT",
+    "popularity": 62
+  }
+}
