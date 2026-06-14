@@ -123,6 +123,22 @@
       ]
     }
   },
+  "pbmc": {
+    "name": "PBMC / immune cell types",
+    "organism": "human",
+    "attribution": "Canonical peripheral-blood mononuclear cell (PBMC) marker genes per immune cell type, compiled from the 10x Genomics / Seurat pbmc3k tutorial cell-type assignments and standard immunology references (e.g. CD3D/IL7R for T cells, MS4A1/CD79A for B cells, GNLY/NKG7 for NK, CD14/LYZ and FCGR3A/MS4A7 for monocyte subsets, FCER1A/CST3 for dendritic cells, PPBP/PF4 for megakaryocytes/platelets). Gene symbols are facts — cited for provenance. Provided so the bundled pbmc3k demo dataset self-annotates out of the box.",
+    "license": "public (gene symbols; cited for provenance)",
+    "markers": {
+      "CD4+ T cells": ["IL7R", "CD3D", "CD3E", "CD3G", "CCR7", "LTB", "TCF7"],
+      "CD8+ T cells": ["CD8A", "CD8B", "CD3D", "GZMK", "CCL5"],
+      "NK cells": ["GNLY", "NKG7", "KLRD1", "KLRF1", "NCAM1", "PRF1"],
+      "B cells": ["MS4A1", "CD79A", "CD79B", "CD19", "BANK1"],
+      "CD14+ monocytes": ["CD14", "LYZ", "S100A8", "S100A9", "FCN1", "VCAN"],
+      "FCGR3A+ monocytes": ["FCGR3A", "MS4A7", "LST1", "CDKN1C"],
+      "Dendritic cells": ["FCER1A", "CST3", "CLEC10A", "CD1C"],
+      "Megakaryocytes": ["PPBP", "PF4", "ITGA2B", "GP9", "TUBB1"]
+    }
+  },
   "retinal_cepo": {
     "name": "Retinal cell types (Cepo)",
     "organism": "human",

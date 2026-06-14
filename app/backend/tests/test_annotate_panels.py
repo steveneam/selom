@@ -19,7 +19,7 @@ PANELS = json.loads(
 
 
 def test_panels_well_formed():
-    assert set(PANELS) >= {"retinal", "retinal_cepo"}
+    assert set(PANELS) >= {"retinal", "retinal_cepo", "pbmc"}
     for key, panel in PANELS.items():
         assert panel.get("markers"), key
         assert panel.get("attribution"), key
@@ -39,6 +39,13 @@ def test_retinal_cepo_classes():
     assert "Microglia" in cepo
     assert all(len(v) == 50 for v in cepo.values())
     assert "Kim et al." in PANELS["retinal_cepo"]["attribution"]
+
+
+def test_pbmc_panel_has_core_immune_types():
+    pbmc = PANELS["pbmc"]["markers"]
+    assert {"CD4+ T cells", "CD8+ T cells", "NK cells", "B cells", "CD14+ monocytes"} <= set(pbmc)
+    assert "MS4A1" in pbmc["B cells"] and "CD14" in pbmc["CD14+ monocytes"]
+    assert "10x" in PANELS["pbmc"]["attribution"] or "Seurat" in PANELS["pbmc"]["attribution"]
 
 
 def test_load_panel_roundtrip_and_unknown():
