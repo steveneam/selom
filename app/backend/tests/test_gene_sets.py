@@ -139,6 +139,20 @@ def test_compile_union_intersect_and_provenance():
     assert m["missing"] == ["curated:doesnotexist"] and len(m["provenance"]["compiled_from"]) == 1
 
 
+def test_reference_panels_carry_attribution():
+    # Phase B: the reference source ships attributed third-party/curated panels (rich format).
+    hits = library.search("ciliopathy", source="reference")
+    assert hits, "the attributed CiliaCarta ciliopathy panel should be present"
+    card = next(h for h in hits if "CiliaCarta" in h["name"])
+    assert card["source"] == "reference"
+    assert "van Dam" in card["attribution"]              # source is cited, not claimed
+    assert card["license"] != "Selom (owned)"            # per-set license overrides the source default
+    full = library.get_set(card["id"])
+    assert full["provenance"]["attribution"] == card["attribution"]
+    assert len(full["genes"]) > 100
+    assert any(s["key"] == "reference" for s in library.list_sources())
+
+
 def test_compile_endpoint_and_validation():
     photo = client.get("/gene-sets", params={"q": "phototransduction", "source": "curated"}).json()["results"][0]["id"]
     r = client.post("/gene-sets/compile", json={"set_ids": [photo], "op": "union", "name": "My panel"})

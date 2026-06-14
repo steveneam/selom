@@ -43,7 +43,21 @@ SOURCES: dict[str, dict] = {
         "license": "Selom (owned)",
         "files": [_DATA / "gene_sets_curated.json"],
     },
+    # Reference panels derived from CMRI Fidelle curation + published resources. Uses the
+    # RICH per-set format ({genes, license, attribution}) so each set cites its own source
+    # (DECISIONS #11 #3 clarification, owner 2026-06-14: attribute, don't claim/exclude).
+    "reference": {
+        "label": "Reference panels",
+        "license": "Per set (attributed)",
+        "files": [_DATA / "gene_sets_reference.json"],
+    },
 }
+
+
+def _entry_genes(value) -> tuple[str, ...]:
+    """Members from a corpus entry — a flat ``[genes]`` list or a rich ``{genes, ...}`` dict."""
+    genes = value["genes"] if isinstance(value, dict) else value
+    return tuple(str(g).upper() for g in genes)
 
 
 @functools.lru_cache(maxsize=None)
@@ -52,6 +66,7 @@ def _load_source(source: str) -> dict[str, tuple[str, ...]]:
 
     Cached — the GO library is ~7.7k sets / 5 MB, so it is parsed at most once.
     Tuples keep the cached value immutable (callers must not mutate it in place).
+    Accepts both the flat list shape and the rich per-set dict shape.
     """
     meta = SOURCES.get(source)
     if not meta:
@@ -59,7 +74,27 @@ def _load_source(source: str) -> dict[str, tuple[str, ...]]:
     for path in meta["files"]:
         if path.exists():
             raw = json.loads(path.read_text())
-            return {k: tuple(g.upper() for g in v) for k, v in raw.items() if not k.startswith("_")}
+            return {k: _entry_genes(v) for k, v in raw.items() if not k.startswith("_")}
+    return {}
+
+
+@functools.lru_cache(maxsize=None)
+def _overrides(source: str) -> dict[str, dict]:
+    """Per-set ``{license?, attribution?}`` for sources whose file uses the rich format."""
+    meta = SOURCES.get(source)
+    if not meta:
+        return {}
+    for path in meta["files"]:
+        if path.exists():
+            raw = json.loads(path.read_text())
+            out: dict[str, dict] = {}
+            for k, v in raw.items():
+                if k.startswith("_") or not isinstance(v, dict):
+                    continue
+                ov = {f: v[f] for f in ("license", "attribution") if v.get(f)}
+                if ov:
+                    out[k] = ov
+            return out
     return {}
 
 
@@ -73,17 +108,22 @@ def _index() -> dict[str, dict]:
     """``id -> card`` over every available source. Cached once; cards omit gene lists."""
     idx: dict[str, dict] = {}
     for key, meta in SOURCES.items():
+        overrides = _overrides(key)
         for name, genes in _load_source(key).items():
+            ov = overrides.get(name, {})
             sid = _set_id(key, name)
-            idx[sid] = {
+            card = {
                 "id": sid,
                 "name": name,
                 "source": key,
                 "source_label": meta["label"],
-                "license": meta["license"],
+                "license": ov.get("license", meta["license"]),
                 "size": len(genes),
                 "sample_genes": list(genes[:8]),
             }
+            if ov.get("attribution"):
+                card["attribution"] = ov["attribution"]
+            idx[sid] = card
     return idx
 
 
@@ -135,17 +175,16 @@ def get_set(set_id: str) -> dict | None:
     if meta is None:
         return None
     genes = list(_load_source(meta["source"]).get(meta["name"], ()))
-    return {
-        **meta,
-        "genes": genes,
-        "provenance": {
-            "source": meta["source"],
-            "source_label": meta["source_label"],
-            "license": meta["license"],
-            "set_name": meta["name"],
-            "n_genes": len(genes),
-        },
+    prov = {
+        "source": meta["source"],
+        "source_label": meta["source_label"],
+        "license": meta["license"],
+        "set_name": meta["name"],
+        "n_genes": len(genes),
     }
+    if meta.get("attribution"):
+        prov["attribution"] = meta["attribution"]
+    return {**meta, "genes": genes, "provenance": prov}
 
 
 def compile_sets(set_ids: list[str], op: str = "union", do_normalize: bool = True) -> dict:
