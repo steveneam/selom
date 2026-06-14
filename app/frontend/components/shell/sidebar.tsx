@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Plus, Settings, Store } from "lucide-react";
+import { Dna, Home, Plus, Settings, Store } from "lucide-react";
 import { SelomWordmark } from "@/components/brand/selom-mark";
 import { cn } from "@/lib/cn";
 import { projectStore, useProjects } from "@/lib/projects/store";
@@ -48,6 +48,7 @@ export function Sidebar({
       <nav className="px-3 pb-2">
         <RailLink href="/" icon={<Home />} label="Home" active={pathname === "/"} onNavigate={onNavigate} />
         <RailLink href="/store" icon={<Store />} label="Skill Store" active={pathname.startsWith("/store")} onNavigate={onNavigate} />
+        <RailLink href="/gene-sets" icon={<Dna />} label="Gene Sets" active={pathname.startsWith("/gene-sets")} onNavigate={onNavigate} />
       </nav>
 
       <div className="mt-2 flex items-center justify-between px-4 pb-1">

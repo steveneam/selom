@@ -63,6 +63,25 @@ export interface SkillInstall {
   installedAt: number;
 }
 
+/**
+ * A saved gene set — the durable, provenance-stamped unit of the gene-set builder
+ * (DECISIONS #11). Compiled/picked from the license-clean corpus and reusable across
+ * the enrichment / volcano / heatmap skills. Maps to a future `gene_sets` table.
+ */
+export interface GeneSet {
+  id: string;
+  projectId: string;
+  name: string;
+  genes: string[];
+  /** Source key (go / wikipathways / curated) or "compiled" once Phase B unions sources. */
+  source: string;
+  sourceLabel: string;
+  license: string;
+  /** The catalog id this was saved from, for re-fetch + provenance. */
+  createdFrom?: string;
+  createdAt: number;
+}
+
 /** A produced figure reference. Maps to `figures` (spec stored by the editor). */
 export interface FigureRef {
   id: string;
@@ -88,4 +107,5 @@ export interface ProjectState {
   datasets: Dataset[];
   installs: SkillInstall[];
   figures: FigureRef[];
+  geneSets: GeneSet[];
 }

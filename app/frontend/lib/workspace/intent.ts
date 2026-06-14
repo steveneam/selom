@@ -25,6 +25,9 @@ export interface WorkspaceIntent {
   tab?: WorkspaceTab;
   /** A skill to install into the project and pre-select in the Workbench. */
   skillId?: string;
+  /** Param prefills for the pre-selected skill (e.g. a gene-set applied as a volcano
+   *  `highlight` panel, or an enrichment `gene_sets` library source). */
+  params?: Record<string, string | number | boolean>;
 }
 
 let pending: WorkspaceIntent | null = null;

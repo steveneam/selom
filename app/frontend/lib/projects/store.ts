@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { mockQcReport } from "@/lib/intake/mock";
-import type { Dataset, FigureRef, Modality, Project, ProjectState, SkillInstall } from "./types";
+import type { Dataset, FigureRef, GeneSet, Modality, Project, ProjectState, SkillInstall } from "./types";
 
 /**
  * Mock `ProjectStore` — the localStorage-backed implementation of the projects
@@ -50,7 +50,7 @@ function seed(): ProjectState {
   const figures: FigureRef[] = [
     { id: "f1", projectId: "demo-pbmc", datasetId: "demo-pbmc-ds", skillId: "selom.umap_scrna", title: "UMAP — Leiden clusters", createdAt: t },
   ];
-  return { projects, datasets, installs, figures };
+  return { projects, datasets, installs, figures, geneSets: [] };
 }
 
 let state: ProjectState = seed();
@@ -96,7 +96,8 @@ export const projectStore = {
       if (raw) {
         const parsed = JSON.parse(raw) as ProjectState;
         if (parsed && Array.isArray(parsed.projects)) {
-          state = parsed;
+          // Tolerate state persisted before geneSets existed (added in the gene-set builder).
+          state = { ...parsed, geneSets: parsed.geneSets ?? [] };
           emit();
         }
       } else {
@@ -127,6 +128,7 @@ export const projectStore = {
       datasets: state.datasets.filter((d) => d.projectId !== id),
       installs: state.installs.filter((i) => i.projectId !== id),
       figures: state.figures.filter((f) => f.projectId !== id),
+      geneSets: state.geneSets.filter((g) => g.projectId !== id),
     });
   },
   addDataset(projectId: string, filename: string, modality: Modality): Dataset {
@@ -150,6 +152,19 @@ export const projectStore = {
     setState({ ...state, figures: [...state.figures, f] });
     return f;
   },
+  /** Save a gene set into a project (idempotent on the source catalog id within a project). */
+  saveGeneSet(projectId: string, set: Omit<GeneSet, "id" | "projectId" | "createdAt">): GeneSet {
+    const existing = state.geneSets.find(
+      (g) => g.projectId === projectId && g.createdFrom != null && g.createdFrom === set.createdFrom,
+    );
+    if (existing) return existing;
+    const g: GeneSet = { ...set, id: uid("gs"), projectId, createdAt: Date.now() };
+    setState({ ...state, geneSets: [g, ...state.geneSets] });
+    return g;
+  },
+  removeGeneSet(id: string) {
+    setState({ ...state, geneSets: state.geneSets.filter((g) => g.id !== id) });
+  },
 };
 
 // ── selectors ────────────────────────────────────────────────────────────────
@@ -159,6 +174,7 @@ export const select = {
   installs: (s: ProjectState, id: string) => s.installs.filter((i) => i.projectId === id),
   installedIds: (s: ProjectState, id: string) => s.installs.filter((i) => i.projectId === id).map((i) => i.skillId),
   figures: (s: ProjectState, id: string) => s.figures.filter((f) => f.projectId === id),
+  geneSets: (s: ProjectState, id: string) => (s.geneSets ?? []).filter((g) => g.projectId === id),
 };
 
 /** Reactive snapshot hook. */

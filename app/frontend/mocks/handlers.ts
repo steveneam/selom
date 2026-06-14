@@ -2,6 +2,7 @@ import { http, HttpResponse } from "msw";
 import { CATALOG } from "@/lib/catalog/seed";
 import { stubUmapFigure } from "./stub-figure";
 import { mockBundle } from "./stub-bundle";
+import { getFixtureSet, searchFixture } from "./gene-sets-fixture";
 
 // Mirrors the live contract from app/backend/main.py:
 //   GET  /skills                 -> SkillCatalogEntry[]  (live registry, B3)
@@ -16,6 +17,18 @@ export const handlers = [
       CATALOG.filter((s) => s.source === "selom" && s.id !== "selom.proteomics_volcano"),
     ),
   ),
+  // Gene-set catalog (gene-set builder Phase A): search + members from the offline fixture.
+  http.get("/api/gene-sets", ({ request }) => {
+    const url = new URL(request.url);
+    const q = url.searchParams.get("q") ?? "";
+    const source = url.searchParams.get("source");
+    const limit = Number(url.searchParams.get("limit") ?? 60);
+    return HttpResponse.json(searchFixture(q, source, limit));
+  }),
+  http.get("/api/gene-sets/:id", ({ params }) => {
+    const set = getFixtureSet(String(params.id));
+    return set ? HttpResponse.json(set) : new HttpResponse(null, { status: 404 });
+  }),
   http.post("/api/skills/:skillId/run", async ({ params, request }) => {
     // A real upload would parse `matrix`; the stub is input-independent by design,
     // so we return the canned figure (same as the backend stub run.py) plus a

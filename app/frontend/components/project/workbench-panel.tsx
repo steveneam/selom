@@ -38,26 +38,41 @@ export function WorkbenchPanel({
   proposal: IntakeProposal | null;
   running: string | null;
   onRun: (step: ProposedStep) => void;
-  /** A skill the command palette asked to select (nonce → re-selectable). */
-  preselect?: { id: string; n: number } | null;
+  /** A skill the command palette / Gene Sets surface asked to select, with optional
+   *  param prefills (nonce → re-selectable). */
+  preselect?: { id: string; n: number; params?: SkillParams } | null;
 }) {
   const [selected, setSelected] = React.useState<string | null>(null);
   const [dragOver, setDragOver] = React.useState(false);
   const [params, setParams] = React.useState<SkillParams>({});
+  // The last preselect nonce whose param prefills we consumed (one-shot per dispatch).
+  const appliedPrefill = React.useRef<number>(-1);
 
   const isVerified = (id: string) => getSkill(id)?.tier === "verified";
   const apply = (skillId: string, p?: SkillParams) =>
     onRun({ skillId, rationale: "", params: p ?? defaultParams(skillId), confidence: 0 });
 
-  // Select a skill when the command palette deep-links one in (apply-a-skill).
+  // Select a skill when the command palette / Gene Sets surface deep-links one in.
   React.useEffect(() => {
     if (preselect?.id) setSelected(preselect.id);
   }, [preselect]);
 
-  // Reset the inline params whenever the selected skill changes.
+  // Initialise inline params when the selected skill changes; if a *fresh* preselect
+  // carried prefills for this skill (e.g. a gene-set applied as a volcano highlight),
+  // merge them once over the defaults.
   React.useEffect(() => {
-    setParams(selected ? defaultParams(selected) : {});
-  }, [selected]);
+    if (!selected) {
+      setParams({});
+      return;
+    }
+    const base = defaultParams(selected);
+    if (preselect && preselect.id === selected && preselect.params && preselect.n !== appliedPrefill.current) {
+      appliedPrefill.current = preselect.n;
+      setParams({ ...base, ...preselect.params });
+    } else {
+      setParams(base);
+    }
+  }, [selected, preselect]);
 
   const selectedSkill = selected ? getSkill(selected) : undefined;
   const schema = selected ? skillParamSchema(selected) : [];
@@ -338,6 +353,26 @@ function ParamControl({
             )}
           />
         </button>
+      </label>
+    );
+  }
+
+  if (field.type === "select") {
+    return (
+      <label className="block sm:col-span-2">
+        <span className="text-xs font-medium text-foreground">{field.label}</span>
+        <select
+          value={String(v)}
+          onChange={(e) => onChange(e.target.value)}
+          className="mt-1 h-9 w-full rounded-md border border-input bg-background/60 px-2.5 text-sm text-foreground outline-none focus-visible:border-ring/60 focus-visible:ring-2 focus-visible:ring-ring/30"
+        >
+          {field.options?.map((o) => (
+            <option key={o.value} value={o.value} className="bg-card text-foreground">
+              {o.label}
+            </option>
+          ))}
+        </select>
+        {field.help && <span className="mt-1 block text-[11px] text-muted-foreground">{field.help}</span>}
       </label>
     );
   }

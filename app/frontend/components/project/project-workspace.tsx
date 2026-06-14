@@ -31,9 +31,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 
   const figure = useFigureStore();
   const [tab, setTab] = React.useState<Tab>("overview");
-  // A skill the command palette asked to pre-select in the Workbench. The nonce
-  // makes a repeat request (same skill, again) a fresh prop for the panel.
-  const [preselect, setPreselect] = React.useState<{ id: string; n: number } | null>(null);
+  // A skill the command palette / Gene Sets surface asked to pre-select in the
+  // Workbench, with optional param prefills. The nonce makes a repeat request (same
+  // skill, again) a fresh prop for the panel.
+  const [preselect, setPreselect] = React.useState<{ id: string; n: number; params?: Record<string, string | number | boolean> } | null>(null);
   const [proposal, setProposal] = React.useState<IntakeProposal | null>(null);
   const [datasetId, setDatasetId] = React.useState<string | undefined>(undefined);
   const [lastFile, setLastFile] = React.useState<File | null>(null);
@@ -59,7 +60,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       if (!intent) return;
       if (intent.skillId) {
         projectStore.installSkill(projectId, intent.skillId);
-        setPreselect((p) => ({ id: intent.skillId!, n: (p?.n ?? 0) + 1 }));
+        setPreselect((p) => ({ id: intent.skillId!, n: (p?.n ?? 0) + 1, params: intent.params }));
       }
       if (intent.tab) setTab(intent.tab);
     }

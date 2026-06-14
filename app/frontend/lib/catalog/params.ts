@@ -11,13 +11,15 @@ import type { SkillParams } from "@/lib/skills-api";
 export interface ParamField {
   key: string;
   label: string;
-  type: "range" | "number" | "text" | "switch";
+  type: "range" | "number" | "text" | "switch" | "select";
   default: number | string | boolean;
   min?: number;
   max?: number;
   step?: number;
   placeholder?: string;
   help?: string;
+  /** Choices for a `select` field. */
+  options?: { value: string; label: string }[];
 }
 
 const SCHEMAS: Record<string, ParamField[]> = {
@@ -34,6 +36,26 @@ const SCHEMAS: Record<string, ParamField[]> = {
     { key: "treatment", label: "Treatment group", type: "text", default: "", placeholder: "e.g. treated" },
   ],
   violin: [{ key: "gene", label: "Marker gene", type: "text", default: "", placeholder: "e.g. MS4A1" }],
+  // Gene-set builder Phase A: apply a corpus source / a highlight panel from "Gene Sets".
+  enrichment: [
+    {
+      key: "gene_sets", label: "Reference library", type: "select", default: "go",
+      options: [
+        { value: "go", label: "Gene Ontology" },
+        { value: "wikipathways", label: "WikiPathways" },
+        { value: "curated", label: "Selom curated" },
+        { value: "all", label: "All sources" },
+      ],
+      help: "The license-clean library the over-representation test scores against.",
+    },
+  ],
+  volcano: [
+    {
+      key: "highlight", label: "Highlight genes", type: "text", default: "",
+      placeholder: "e.g. RHO, GNAT1, PDE6B",
+      help: "Mark + label a gene-set panel on the plot (comma-separated). Applied from “Gene Sets”.",
+    },
+  ],
 };
 
 export function skillParamSchema(catalogOrRuntimeId: string): ParamField[] {
