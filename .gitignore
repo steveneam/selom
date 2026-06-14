@@ -41,10 +41,12 @@ data/
 app/backend/skills/enrichment/gene_sets_go.json
 app/backend/skills/go_graph/go_dag.json
 
-# HGNC symbol map for gene-set compile/normalize (~4MB, regenerate: scripts/build_symbols.py).
-# gene_sets/normalize.py degrades to upper+dedup when absent. The WikiPathways + curated
-# corpus (gene_sets/corpus/*.json) IS committed — only this large derived map is ignored.
+# Large derived NCBI-gene_info maps (regenerate: scripts/build_symbols.py /
+# scripts/build_ensembl_map.py). gene_sets/normalize.py + skills/_genes.py degrade
+# gracefully when absent. The WikiPathways + curated corpus (gene_sets/corpus/*.json)
+# IS committed — only these large derived maps are ignored.
 app/backend/gene_sets/corpus/hgnc_symbols.json
+app/backend/gene_sets/corpus/ensembl_symbols.json
 
 # ── Assistant-local (tracked .claude/ otherwise) ────────
 .claude/settings.local.json
