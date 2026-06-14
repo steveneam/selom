@@ -65,6 +65,11 @@ const SCHEMAS: Record<string, ParamField[]> = {
       ],
       help: "Two forms of the same benchmark (paper Fig 6F).",
     },
+    {
+      key: "invert_metrics", label: "Lower-is-better metrics", type: "text", default: "",
+      placeholder: "e.g. off_target, error_rate",
+      help: "Comma-separated metrics where lower is better — inverted so higher always reads as better.",
+    },
   ],
   annotate: [
     {
