@@ -9,6 +9,13 @@ coverage/
 __pycache__/
 **/__pycache__/
 
+# Vendored agent tooling — gitignored design/skill installs, not Selom source.
+# Excluded 2026-06-15 (owner-approved): impeccable's ~1.7k JS nodes were 31% of
+# the graph and dominated the god nodes (e.g. modern-screenshot.umd.js). Keeping
+# the graph focused on Selom also holds it under the 5k HTML-viz limit.
+.claude/
+.impeccable/
+
 # Omics data payloads
 app/backend/data/
 data/
