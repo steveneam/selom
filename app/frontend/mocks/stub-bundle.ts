@@ -42,6 +42,10 @@ const METHODS: Record<string, string> = {
     "Protein intensities were log2-transformed and median-normalized across samples; sparse proteins were filtered and residual missing values mean-imputed per group. Differential abundance between groups was tested with a Welch t-test and Benjamini-Hochberg correction, displayed as a volcano plot.",
   gsea:
     "Genes were ranked by the signed differential statistic and tested for gene-set enrichment with a weighted Kolmogorov-Smirnov running enrichment score (Subramanian et al. 2005); a normalized enrichment score and empirical p-value were estimated by permutation.",
+  corr_heatmap:
+    "Pairwise Pearson correlation coefficients were computed between samples and displayed as a heatmap on a diverging colour scale centred at zero, with rows and columns reordered by hierarchical clustering (1−r distance, average linkage).",
+  upset:
+    "Set membership was summarized as an UpSet plot: intersection sizes are shown as bars above a dot-matrix of set membership, with the largest intersections displayed.",
 };
 
 // Mirrors backend guardrails.py for the canned demo input (a clean raw-count h5ad):

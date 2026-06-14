@@ -163,6 +163,26 @@ export const CATALOG: SkillCatalogEntry[] = [
     outputs: ["figure"], license: "MIT",
     provenance: { repo: "selom/skills", path: "gsea" }, version: "0.1.0", popularity: 64,
   }),
+  e({
+    id: "selom.corr_heatmap",
+    name: "Correlation heatmap",
+    summary: "Hierarchically-clustered sample×sample (or feature×feature) correlation matrix — replicate concordance & batch structure at a glance.",
+    source: "selom", category: "data-visualization", omics: ["bulk RNA-seq", "scRNA-seq", "proteomics"],
+    tier: "verified", status: "production", engine: "python",
+    inputFormats: [".csv", ".tsv", ".xlsx"], chainsWith: ["selom.pca", "selom.heatmap"],
+    outputs: ["figure"], license: "MIT",
+    provenance: { repo: "selom/skills", path: "corr_heatmap" }, version: "0.1.0", popularity: 68,
+  }),
+  e({
+    id: "selom.upset",
+    name: "UpSet plot",
+    summary: "Set-intersection plot — intersection-size bars over a membership dot-matrix; consumes a boolean elements×sets table (DEG / marker-set overlaps).",
+    source: "selom", category: "data-visualization", omics: ["bulk RNA-seq", "scRNA-seq", "proteomics"],
+    tier: "verified", status: "production", engine: "python",
+    inputFormats: [".csv", ".tsv", ".xlsx"], chainsWith: ["selom.deg", "selom.enrichment"],
+    outputs: ["figure"], license: "MIT",
+    provenance: { repo: "selom/skills", path: "upset" }, version: "0.1.0", popularity: 64,
+  }),
 
   // ── ClawBio runnable (Verified — wrap the ~29 production pipelines) ────────
   e({
