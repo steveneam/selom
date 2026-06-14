@@ -49,10 +49,14 @@ def run(data_path: str, params: dict) -> dict:
     # mean-impute residual dropouts within each group so a few missing values don't bias the FC
     A, B = _impute_rows(A, np), _impute_rows(B, np)
 
-    lfc = np.nanmean(A, axis=1) - np.nanmean(B, axis=1)
-    with np.errstate(all="ignore"):
-        _, pvals = stats.ttest_ind(A, B, axis=1, equal_var=False)
-    pvals = np.where(np.isfinite(pvals), pvals, 1.0)
+    mode = str(params.get("stats") or "welch").lower()
+    if mode == "moderated":
+        lfc, pvals = _moderated_stats(A, B)
+    else:
+        lfc = np.nanmean(A, axis=1) - np.nanmean(B, axis=1)
+        with np.errstate(all="ignore"):
+            _, pvals = stats.ttest_ind(A, B, axis=1, equal_var=False)
+        pvals = np.where(np.isfinite(pvals), pvals, 1.0)
     padj = _bh(pvals, np)
     nlp = -np.log10(np.clip(padj, 1e-300, 1.0))
 
@@ -75,7 +79,11 @@ def run(data_path: str, params: dict) -> dict:
         order = sig[np.argsort(nlp[sig])[::-1]][:top_n]
         labels = [(round(float(lfc[i]), 4), round(float(nlp[i]), 4), str(genes.iloc[i])) for i in order]
 
-    title = f"Proteomics differential abundance — {len(cols_a)}v{len(cols_b)} samples, {int(keep.sum())} proteins"
+    stat_label = "moderated t" if mode == "moderated" else "Welch t"
+    title = (
+        f"Proteomics differential abundance — {len(cols_a)}v{len(cols_b)} samples, "
+        f"{int(keep.sum())} proteins ({stat_label})"
+    )
     return _assemble(up, down, ns, labels, fc_t, y_cut, title)
 
 
@@ -86,6 +94,67 @@ def _impute_rows(M, np):
     bad = np.where(~np.isfinite(M))
     M[bad] = np.take(means, bad[0])
     return M
+
+
+def _moderated_stats(A, B):
+    """limma-style empirical-Bayes moderated t-test (Smyth, 2004) for a two-group contrast.
+
+    Returns ``(lfc, pvals)``. The pooled within-group variance of each protein is shrunk
+    toward a global prior estimated by method-of-moments from the variance distribution
+    across all proteins (Smyth's fitFDist). This stabilizes the per-protein variance and
+    recovers more true effects than an un-moderated t-test at small sample sizes. numpy +
+    scipy only (no R, no statsmodels) — keeps the skill on the core stack (ADR 0002).
+    """
+    import numpy as np
+    from scipy.special import digamma, polygamma
+    from scipy.stats import t as tdist
+
+    na, nb = A.shape[1], B.shape[1]
+    d = na + nb - 2  # residual df of the two-group linear model
+    mean_a, mean_b = A.mean(axis=1), B.mean(axis=1)
+    lfc = mean_a - mean_b
+    ss = ((A - mean_a[:, None]) ** 2).sum(axis=1) + ((B - mean_b[:, None]) ** 2).sum(axis=1)
+    s2 = ss / d if d > 0 else np.full(A.shape[0], np.nan)
+
+    s2_pos = s2[np.isfinite(s2) & (s2 > 0)]
+    if d <= 0 or s2_pos.size < 2:  # cannot estimate a prior -> fall back to ordinary t
+        s2_tilde = s2
+        df_total = np.full(A.shape[0], float(max(d, 1)))
+    else:
+        # fitFDist: estimate prior df (d0) and prior variance (s0^2) from the s2 distribution
+        e = np.log(s2_pos) - digamma(d / 2.0) + np.log(d / 2.0)
+        e_mean = float(e.mean())
+        e_var = float(e.var(ddof=1)) - float(polygamma(1, d / 2.0))
+        if e_var <= 0:  # between-protein variance within sampling noise -> full shrinkage
+            s0_2 = float(np.exp(e_mean))
+            s2_tilde = np.full_like(s2, s0_2)
+            df_total = np.full(A.shape[0], 1e6)
+        else:
+            d0 = 2.0 * _trigamma_inverse(e_var)
+            s0_2 = float(np.exp(e_mean + digamma(d0 / 2.0) - np.log(d0 / 2.0)))
+            s2_tilde = (d0 * s0_2 + d * s2) / (d0 + d)
+            df_total = np.full(A.shape[0], d + d0)
+
+    se = np.sqrt(s2_tilde * (1.0 / na + 1.0 / nb))
+    with np.errstate(all="ignore"):
+        tvals = lfc / se
+        pvals = 2.0 * tdist.sf(np.abs(tvals), df_total)
+    pvals = np.where(np.isfinite(pvals), pvals, 1.0)
+    return lfc, pvals
+
+
+def _trigamma_inverse(x):
+    """Solve trigamma(y) = x for y > 0 by Newton's method (Smyth's trigammaInverse)."""
+    from scipy.special import polygamma
+
+    y = 0.5 + 1.0 / x
+    for _ in range(50):
+        tri = polygamma(1, y)
+        dif = tri * (1.0 - tri / x) / polygamma(2, y)
+        y = y + dif
+        if abs(dif / y) < 1e-8:
+            break
+    return y
 
 
 def _bh(p, np):

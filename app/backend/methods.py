@@ -32,6 +32,7 @@ TIROSH = "Tirosh, I. et al. Dissecting the multicellular ecosystem of metastatic
 SKLEARN = "Pedregosa, F. et al. Scikit-learn: Machine Learning in Python. Journal of Machine Learning Research 12, 2825-2830 (2011)."
 UPSET = "Lex, A., Gehlenborg, N., Strobelt, H., Vuillemot, R. & Pfister, H. UpSet: Visualization of Intersecting Sets. IEEE Transactions on Visualization and Computer Graphics 20, 1983-1992 (2014)."
 STRING = "Szklarczyk, D. et al. The STRING database in 2023: protein-protein association networks and functional enrichment analyses for any sequenced genome of interest. Nucleic Acids Research 51, D638-D646 (2023)."
+SMYTH = "Smyth, G.K. Linear models and empirical Bayes methods for assessing differential expression in microarray experiments. Statistical Applications in Genetics and Molecular Biology 3, Article 3 (2004)."
 
 
 def _umap(p: dict):
@@ -283,8 +284,28 @@ def _string_network(p: dict):
     return text, [STRING]
 
 
+def _proteomics_de(p: dict):
+    moderated = str(p.get("stats") or "welch").lower() == "moderated"
+    test = (
+        "an empirical-Bayes moderated t-test (limma-style shrinkage of the per-protein variance "
+        "toward a global prior estimated across all proteins), which improves power at small "
+        "sample sizes"
+        if moderated else "a Welch (unequal-variance) t-test"
+    )
+    text = (
+        "Protein intensities were log2-transformed and median-normalized across samples; proteins "
+        f"quantified in at least {float(p.get('min_valid', 0.5)):g} of the samples per group were "
+        f"tested for differential abundance between the two groups with {test}, with residual "
+        "missing values mean-imputed within each group. P-values were corrected by the "
+        f"Benjamini-Hochberg procedure and the result drawn as a volcano (|log2FC| ≥ "
+        f"{float(p.get('fc_threshold', 1.0)):g}, FDR ≤ {float(p.get('fdr_threshold', 0.05)):g})."
+    )
+    return text, ([SMYTH, BH, SCIPY] if moderated else [BH, SCIPY])
+
+
 _TEMPLATES = {
     "umap_scrna": _umap,
+    "proteomics_de": _proteomics_de,
     "cluster": _cluster,
     "violin": _violin,
     "deg": _deg,

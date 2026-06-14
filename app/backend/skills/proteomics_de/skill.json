@@ -13,13 +13,14 @@
     "fdr_threshold": { "type": "float", "default": 0.05, "min": 0.0, "max": 1.0 },
     "top_n":         { "type": "int",   "default": 10,   "min": 0,   "max": 50 },
     "min_valid":     { "type": "float", "default": 0.5,  "min": 0.0, "max": 1.0 },
-    "log_input":     { "type": "bool",  "default": false }
+    "log_input":     { "type": "bool",  "default": false },
+    "stats":         { "type": "str",   "default": "welch", "options": ["welch", "moderated"] }
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" }
   ],
   "catalog": {
-    "summary": "Differential abundance from a proteomics intensity matrix (log2 + median-normalize + Welch t-test, BH-FDR) drawn as a volcano.",
+    "summary": "Differential abundance from a proteomics intensity matrix (log2 + median-normalize + Welch or limma-style moderated t-test, BH-FDR) drawn as a volcano.",
     "category": "proteomics",
     "tier": "verified",
     "status": "beta",

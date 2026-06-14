@@ -71,3 +71,58 @@ def test_proteomics_de_recovers_planted_de():
     assert all(labels[u] > 0 for u in UP), "up proteins (higher in A) must have positive log2FC"
     assert all(labels[d] < 0 for d in DOWN), "down proteins (lower in A) must have negative log2FC"
     assert not (set(labels) & set(NULL)), "no null protein should be called significant"
+
+
+def test_moderated_recovers_more_de_at_small_n():
+    """Empirical-Bayes moderation beats an un-moderated t-test at small N: more true DE at the
+    same FDR threshold, without inflating false positives. This is the point of the mode."""
+    from scipy import stats as sstats
+
+    from skills.proteomics_de.run_real import _bh, _moderated_stats
+
+    rng = np.random.RandomState(0)
+    n = 3  # only three replicates per group — where moderation pays off
+    n_de, n_null = 40, 160
+    effect, sd = 1.2, 0.7
+    g = n_de + n_null
+    A = np.empty((g, n))
+    B = np.empty((g, n))
+    truth = np.zeros(g, dtype=bool)
+    truth[:n_de] = True
+    for i in range(g):
+        mu = effect if truth[i] else 0.0
+        A[i] = mu + rng.normal(0, sd, n)
+        B[i] = rng.normal(0, sd, n)
+
+    _, p_mod = _moderated_stats(A, B)
+    padj_mod = _bh(p_mod, np)
+    with np.errstate(all="ignore"):
+        _, p_welch = sstats.ttest_ind(A, B, axis=1, equal_var=False)
+    p_welch = np.where(np.isfinite(p_welch), p_welch, 1.0)
+    padj_welch = _bh(p_welch, np)
+
+    tp_mod = int(((padj_mod <= 0.05) & truth).sum())
+    fp_mod = int(((padj_mod <= 0.05) & ~truth).sum())
+    tp_welch = int(((padj_welch <= 0.05) & truth).sum())
+
+    assert tp_mod > tp_welch, f"moderated should recover more true DE (mod={tp_mod}, welch={tp_welch})"
+    assert fp_mod <= 2, f"moderated must not inflate false positives (fp={fp_mod})"
+
+
+def test_moderated_mode_runs_via_skill():
+    fd, path = tempfile.mkstemp(suffix=".csv")
+    os.close(fd)
+    try:
+        _synthetic_csv(path)
+        fig = run_skill(
+            "proteomics_de", path,
+            {"group_a": "A", "group_b": "B", "log_input": True, "stats": "moderated", "top_n": 40},
+        )
+    finally:
+        os.unlink(path)
+
+    labels = set()
+    for tr in fig["data"]:
+        if tr.get("mode") == "text":
+            labels |= {str(t) for t in tr["text"]}
+    assert set(UP) | set(DOWN) <= labels, "moderated mode should still recover the planted DE"
