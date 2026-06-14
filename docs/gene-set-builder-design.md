@@ -143,12 +143,15 @@ build the Phase B builder over the open-core adapters.
   members dialog), first-class **`GeneSet`** in `ProjectStore`, intent-bus apply (Highlight in
   volcano / Enrich against source) with param prefill, Save + saved strip. tsc + build clean;
   browser-verified (mock :3010, desktop), both apply paths land prefilled.
-- **Owned curated panels — licensing finding (Decision #11 #3 nuance):** the staged Fidelle
-  `gene_lists` are **named third-party compilations** (CiliaCarta = van Dam 2013; RD_GeneList =
-  RetNet-style; the Proteostasis lists) — **not cleanly "ours to ship"** despite #11's wording.
-  So Phase A ships only **GO + WikiPathways** (unambiguously open) plus **two GO/textbook-derived
-  owned panels** (`gene_sets_curated.json`: phototransduction/visual-cycle, cilium/ciliopathy —
-  canonical *facts*, no third-party claim). The `curated` source slot is ready; **confirm provenance
-  before shipping the Fidelle lists** (memory `selom-real-datasets` flags them "licensing TBC").
+- **Owned curated panels — licensing stance (owner-clarified 2026-06-14; supersedes the earlier
+  conservative reading):** gene lists from **papers / publications / public repos are generally not
+  license-gated** (symbols are facts), so the staged Fidelle lists **are shippable** — we just
+  **attribute the source in provenance** where one exists (e.g. **CiliaCarta** = van Dam 2013,
+  **RetNet** for RD_GeneList, the originating paper) rather than claim them Selom-original.
+  Phase A shipped **GO + WikiPathways** + **two genuinely-Selom canonical panels**
+  (`gene_sets_curated.json`: phototransduction/visual-cycle, cilium/ciliopathy = textbook facts,
+  "Selom (owned)"). **Phase B will ingest the Fidelle Ciliopathy/Proteostasis/Cilia lists as
+  attributed curated panels** (each set's provenance names its source + license). See `DECISIONS.md`
+  Notes (clarification to #11 #3).
 - **Next (Phase B):** the keyword→compile→union/intersect builder over the open-core adapters
   (+ HGNC dedup/normalization); then Phase C grounded free-text→genes.

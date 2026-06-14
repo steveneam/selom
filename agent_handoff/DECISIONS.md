@@ -39,3 +39,11 @@ _Last updated: 2026-06-14 — added #11 (gene-set builder: open-core, list-first
   should be filed into the research vault's `Selom/Wiki/decisions/` by the wiki agent — this
   build session is **read-only** in the vault, so it cannot write them. This file is the
   authoritative build-side reference until then.
+- **Clarification to #11 #3 (owner, 2026-06-14):** "ship the Fidelle lists as our own" is refined —
+  gene lists extracted from **papers / publications / public repos are generally not license-gated**
+  (gene symbols are facts), so they are **shippable**. Where a list traces to a third party or a
+  reference (e.g. **CiliaCarta** = van Dam 2013, **RetNet**, a specific paper), we **attribute /
+  reference the source in the set's provenance** rather than claim it as Selom-original — not exclude
+  it. "Selom (owned)" is reserved for genuinely Selom-compiled sets (e.g. the canonical
+  phototransduction/cilium panels shipped in Phase A). Supersedes the conservative
+  "NOT shipped / confirm provenance" reading filed in `docs/gene-set-builder-design.md` §8.1.
