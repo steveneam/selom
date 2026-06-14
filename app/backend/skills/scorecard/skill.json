@@ -7,10 +7,11 @@
   "entrypoint": "skills.scorecard.run:run",
   "inputs": [{ "name": "matrix", "kind": "csv|tsv|xlsx", "required": true }],
   "param_spec": {
-    "layout":    { "type": "str",  "default": "radar", "options": ["radar", "heatmap"] },
-    "normalize": { "type": "bool", "default": true },
-    "fill":      { "type": "bool", "default": true },
-    "max_rows":  { "type": "int",  "default": 8, "min": 1, "max": 20 }
+    "layout":         { "type": "str",  "default": "radar", "options": ["radar", "heatmap"] },
+    "normalize":      { "type": "bool", "default": true },
+    "fill":           { "type": "bool", "default": true },
+    "max_rows":       { "type": "int",  "default": 8, "min": 1, "max": 20 },
+    "invert_metrics": { "type": "str",  "default": "" }
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" }

@@ -225,15 +225,23 @@ def _scorecard(p: dict):
         " Each metric was min–max normalized to [0,1] so differently-scaled scores are comparable."
         if p.get("normalize", True) else ""
     )
+    inv = ""
+    raw = str(p.get("invert_metrics") or "").strip()
+    if raw:
+        names = ", ".join(s.strip() for s in raw.split(",") if s.strip())
+        inv = (
+            f" Metrics where lower is better ({names}) were inverted so that higher values "
+            "always indicate better performance."
+        )
     if str(p.get("layout") or "radar").lower() == "heatmap":
         text = (
             "Conditions were compared across multiple metrics as a colour-coded scorecard heatmap "
-            f"(metrics in rows, conditions in columns).{norm}"
+            f"(metrics in rows, conditions in columns).{norm}{inv}"
         )
     else:
         text = (
             "Conditions were compared across multiple metrics on a radar (spider) chart, one filled "
-            f"polygon per condition.{norm}"
+            f"polygon per condition.{norm}{inv}"
         )
     return text, []
 

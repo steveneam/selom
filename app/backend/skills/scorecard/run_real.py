@@ -26,14 +26,25 @@ def run(data_path: str, params: dict) -> dict:
 
     max_rows = int(params.get("max_rows", 8))
     if num.shape[0] > max_rows:
-        num = num.iloc[:max_rows]
+        num = num.iloc[:max_rows].copy()
+
+    # Metrics where *lower* is better (off-target, error rate, ...) are inverted so the
+    # colour/radius reads consistently — higher always means "better" across the whole
+    # scorecard. Without this a high off-target value would look as good as high accuracy,
+    # which silently misleads the reader (a publish-confidence trap).
+    invert = _invert_cols(params.get("invert_metrics"), num.columns)
 
     radial_range = None
     if to_bool(params.get("normalize", True)):
         lo, hi = num.min(), num.max()
         span = (hi - lo).replace(0, 1.0)  # constant metric -> avoid divide-by-zero
         num = (num - lo) / span
+        for c in invert:
+            num[c] = 1.0 - num[c]
         radial_range = [0, 1]
+    else:
+        for c in invert:  # flip around the column's own range so the scale is preserved
+            num[c] = (num[c].min() + num[c].max()) - num[c]
 
     metrics = [str(c) for c in num.columns]
     series = {str(idx): num.loc[idx].tolist() for idx in num.index}
@@ -44,3 +55,13 @@ def run(data_path: str, params: dict) -> dict:
         fill = to_bool(params.get("fill", True))
         spec = scorecard_spec(metrics, series, fill, "Benchmark scorecard", radial_range)
     return jsonable(spec)
+
+
+def _invert_cols(invert_param, columns) -> list:
+    """Resolve ``invert_metrics`` (comma-separated metric names, case-insensitive) to the
+    matching column labels — the lower-is-better metrics to flip so higher always reads
+    as better. Unknown names are ignored."""
+    if not invert_param:
+        return []
+    wanted = {s.strip().lower() for s in str(invert_param).split(",") if s.strip()}
+    return [c for c in columns if str(c).lower() in wanted]
