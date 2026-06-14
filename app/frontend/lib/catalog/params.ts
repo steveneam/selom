@@ -97,6 +97,7 @@ const SCHEMAS: Record<string, ParamField[]> = {
       options: [
         { value: "retinal", label: "Retinal (canonical)" },
         { value: "retinal_cepo", label: "Retinal — Cepo (Kim 2023)" },
+        { value: "pbmc", label: "PBMC / immune" },
       ],
       help: "Curated marker panel scored per cluster to assign cell types.",
     },
