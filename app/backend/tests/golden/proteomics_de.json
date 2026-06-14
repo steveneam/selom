@@ -1,0 +1,304 @@
+{
+  "data": [
+    {
+      "type": "scattergl",
+      "mode": "markers",
+      "name": "n.s.",
+      "x": [
+        0.0,
+        0.627,
+        0.779,
+        0.342,
+        -0.354,
+        -0.782,
+        -0.618,
+        0.013,
+        0.635,
+        0.776,
+        0.33,
+        -0.366,
+        -0.785,
+        -0.61,
+        0.027,
+        0.643,
+        0.773,
+        0.317,
+        -0.378,
+        -0.787,
+        -0.601,
+        0.04,
+        0.651,
+        0.769
+      ],
+      "y": [
+        1.2,
+        1.059,
+        0.702,
+        0.297,
+        0.035,
+        0.038,
+        0.306,
+        0.712,
+        1.065,
+        1.2,
+        1.052,
+        0.692,
+        0.288,
+        0.031,
+        0.042,
+        0.315,
+        0.722,
+        1.072,
+        1.2,
+        1.046,
+        0.682,
+        0.28,
+        0.028,
+        0.046
+      ],
+      "marker": {
+        "color": "#5b6b80",
+        "size": 5,
+        "opacity": 0.6
+      }
+    },
+    {
+      "type": "scattergl",
+      "mode": "markers",
+      "name": "up",
+      "x": [
+        2.9,
+        2.1,
+        1.7,
+        1.4,
+        2.4,
+        1.2,
+        1.9
+      ],
+      "y": [
+        6.8,
+        4.4,
+        5.0,
+        4.2,
+        3.6,
+        2.3,
+        2.0
+      ],
+      "marker": {
+        "color": "#22d3ee",
+        "size": 6
+      }
+    },
+    {
+      "type": "scattergl",
+      "mode": "markers",
+      "name": "down",
+      "x": [
+        -2.7,
+        -2.2,
+        -1.6,
+        -1.9,
+        -1.3,
+        -2.0,
+        -1.4
+      ],
+      "y": [
+        5.6,
+        5.3,
+        4.1,
+        3.7,
+        2.6,
+        2.1,
+        1.8
+      ],
+      "marker": {
+        "color": "#f43f5e",
+        "size": 6
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "text",
+      "name": "labels",
+      "showlegend": false,
+      "x": [
+        2.9,
+        2.1,
+        1.7,
+        1.4,
+        2.4,
+        -2.7,
+        -2.2,
+        -1.6,
+        -1.9
+      ],
+      "y": [
+        6.8,
+        4.4,
+        5.0,
+        4.2,
+        3.6,
+        5.6,
+        5.3,
+        4.1,
+        3.7
+      ],
+      "text": [
+        "B2m",
+        "Flna",
+        "Tgm1",
+        "Spcs2",
+        "Mvp",
+        "Hk2",
+        "Taok3",
+        "Nt5e",
+        "Fmn2"
+      ],
+      "textposition": "top center",
+      "textfont": {
+        "size": 10
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Proteomics differential abundance (stub)",
+      "font": {
+        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "size": 16,
+        "color": "#1f2a37"
+      },
+      "x": 0.01,
+      "xanchor": "left"
+    },
+    "xaxis": {
+      "showline": true,
+      "linecolor": "#c4ccd4",
+      "linewidth": 1,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#c4ccd4",
+      "ticklen": 4,
+      "tickwidth": 1,
+      "tickfont": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "zeroline": false,
+      "showgrid": true,
+      "gridcolor": "#eef1f5",
+      "gridwidth": 1,
+      "title": {
+        "text": "log2 fold-change",
+        "font": {
+          "size": 13,
+          "color": "#1f2a37"
+        }
+      }
+    },
+    "yaxis": {
+      "showline": true,
+      "linecolor": "#c4ccd4",
+      "linewidth": 1,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#c4ccd4",
+      "ticklen": 4,
+      "tickwidth": 1,
+      "tickfont": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "zeroline": false,
+      "showgrid": true,
+      "gridcolor": "#eef1f5",
+      "gridwidth": 1,
+      "title": {
+        "text": "-log10 adjusted p",
+        "font": {
+          "size": 13,
+          "color": "#1f2a37"
+        }
+      }
+    },
+    "shapes": [
+      {
+        "type": "line",
+        "x0": 1.0,
+        "x1": 1.0,
+        "yref": "paper",
+        "y0": 0,
+        "y1": 1,
+        "line": {
+          "color": "#5b6b80",
+          "width": 1,
+          "dash": "dash"
+        }
+      },
+      {
+        "type": "line",
+        "x0": -1.0,
+        "x1": -1.0,
+        "yref": "paper",
+        "y0": 0,
+        "y1": 1,
+        "line": {
+          "color": "#5b6b80",
+          "width": 1,
+          "dash": "dash"
+        }
+      },
+      {
+        "type": "line",
+        "xref": "paper",
+        "x0": 0,
+        "x1": 1,
+        "y0": 1.3010299956639813,
+        "y1": 1.3010299956639813,
+        "line": {
+          "color": "#5b6b80",
+          "width": 1,
+          "dash": "dash"
+        }
+      }
+    ],
+    "font": {
+      "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      "size": 13,
+      "color": "#33404d"
+    },
+    "paper_bgcolor": "#ffffff",
+    "plot_bgcolor": "#ffffff",
+    "colorway": [
+      "#2f6db0",
+      "#e08a2b",
+      "#3f9b6b",
+      "#c0392b",
+      "#7d5ba6",
+      "#1f9aa6",
+      "#9aa017",
+      "#6b7280"
+    ],
+    "hoverlabel": {
+      "font": {
+        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "size": 12
+      },
+      "bgcolor": "#1f2a37"
+    },
+    "margin": {
+      "t": 46,
+      "r": 24,
+      "b": 52,
+      "l": 64
+    },
+    "legend": {
+      "font": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "bgcolor": "rgba(0,0,0,0)",
+      "bordercolor": "rgba(0,0,0,0)"
+    }
+  }
+}
