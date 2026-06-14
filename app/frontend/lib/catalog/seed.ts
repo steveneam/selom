@@ -203,6 +203,16 @@ export const CATALOG: SkillCatalogEntry[] = [
     outputs: ["figure"], license: "MIT",
     provenance: { repo: "selom/skills", path: "normalization_qc" }, version: "0.1.0", popularity: 67,
   }),
+  e({
+    id: "selom.sankey",
+    name: "Sankey flow",
+    summary: "Sankey / alluvial flow diagram — quantities flowing between stages or categories (cell-state transitions, QC attrition, sample→cell-type). Consumes a long edge table (source, target, value).",
+    source: "selom", category: "data-visualization", omics: ["bulk RNA-seq", "scRNA-seq", "proteomics"],
+    tier: "verified", status: "production", engine: "python",
+    inputFormats: [".csv", ".tsv", ".xlsx"], chainsWith: ["selom.composition", "selom.cluster"],
+    outputs: ["figure"], license: "MIT",
+    provenance: { repo: "selom/skills", path: "sankey" }, version: "0.1.0", popularity: 58,
+  }),
 
   // ── ClawBio runnable (Verified — wrap the ~29 production pipelines) ────────
   e({

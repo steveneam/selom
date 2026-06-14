@@ -50,6 +50,8 @@ const METHODS: Record<string, string> = {
     "Conditions were compared across multiple metrics on a radar (spider) chart, one filled polygon per condition; each metric was min–max normalized to [0,1] for comparability.",
   normalization_qc:
     "Per-cell quality-control metrics — total counts, genes per cell, and mitochondrial-read percentage — were computed with Scanpy and shown as violin distributions split by sample.",
+  sankey:
+    "Quantities flowing between categories were displayed as a Sankey (alluvial) diagram; node and link thickness are proportional to the flow value summed over the input edge list.",
 };
 
 // Mirrors backend guardrails.py for the canned demo input (a clean raw-count h5ad):
