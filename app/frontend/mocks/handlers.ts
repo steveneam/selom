@@ -2,7 +2,7 @@ import { http, HttpResponse } from "msw";
 import { CATALOG } from "@/lib/catalog/seed";
 import { stubUmapFigure } from "./stub-figure";
 import { mockBundle } from "./stub-bundle";
-import { getFixtureSet, searchFixture } from "./gene-sets-fixture";
+import { compileFixture, getFixtureSet, searchFixture } from "./gene-sets-fixture";
 
 // Mirrors the live contract from app/backend/main.py:
 //   GET  /skills                 -> SkillCatalogEntry[]  (live registry, B3)
@@ -24,6 +24,11 @@ export const handlers = [
     const source = url.searchParams.get("source");
     const limit = Number(url.searchParams.get("limit") ?? 60);
     return HttpResponse.json(searchFixture(q, source, limit));
+  }),
+  http.post("/api/gene-sets/compile", async ({ request }) => {
+    const body = (await request.json()) as { set_ids?: string[]; op?: string; name?: string };
+    if (!body.set_ids?.length) return new HttpResponse(null, { status: 400 });
+    return HttpResponse.json(compileFixture(body.set_ids, body.op ?? "union", body.name));
   }),
   http.get("/api/gene-sets/:id", ({ params }) => {
     const set = getFixtureSet(String(params.id));

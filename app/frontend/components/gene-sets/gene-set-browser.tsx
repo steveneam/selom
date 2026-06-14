@@ -2,13 +2,14 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Bookmark, BookmarkCheck, FlaskConical, Layers, Search, Sparkles, X } from "lucide-react";
+import { Bookmark, BookmarkCheck, Check, FlaskConical, GitMerge, Layers, Search, Sparkles, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
 import {
+  compileGeneSets,
   getGeneSet,
   searchGeneSets,
   sourceColor,
@@ -41,6 +42,13 @@ export function GeneSetBrowser() {
   const [error, setError] = React.useState<string | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [detail, setDetail] = React.useState<GeneSetCard | null>(null);
+  // Compile (Phase B): multi-select several sets, union/intersect, save as one GeneSet.
+  const [selected, setSelected] = React.useState<Record<string, GeneSetCard>>({});
+  const [op, setOp] = React.useState<"union" | "intersect">("union");
+  const [compileName, setCompileName] = React.useState("");
+  const [compiling, setCompiling] = React.useState(false);
+  const [compiledMsg, setCompiledMsg] = React.useState<string | null>(null);
+  const selectedIds = Object.keys(selected);
 
   const target = targetId ?? projects[0]?.id;
   const savedSets = target ? select.geneSets(state, target) : [];
@@ -128,6 +136,45 @@ export function GeneSetBrowser() {
     }
   }
 
+  function toggleSelect(card: GeneSetCard) {
+    setCompiledMsg(null);
+    setSelected((prev) => {
+      const next = { ...prev };
+      if (next[card.id]) delete next[card.id];
+      else next[card.id] = card;
+      return next;
+    });
+  }
+
+  // Compile the selected sets (union/intersect + HGNC dedup) and save the result as a
+  // provenance-stamped GeneSet in the target project.
+  async function runCompile() {
+    if (selectedIds.length < 1) return;
+    setCompiling(true);
+    setError(null);
+    try {
+      const picked = Object.values(selected);
+      const name = compileName.trim() || `${picked.map((s) => s.name).join(op === "union" ? " ∪ " : " ∩ ")}`;
+      const result = await compileGeneSets(selectedIds, op, name);
+      const projectId = ensureTarget();
+      projectStore.saveGeneSet(projectId, {
+        name: result.name ?? name,
+        genes: result.genes,
+        source: "compiled",
+        sourceLabel: "Compiled",
+        license: result.provenance.licenses.join(" + ") || "compiled",
+        createdFrom: `compiled:${selectedIds.sort().join(",")}:${op}`,
+      });
+      setCompiledMsg(`Compiled “${result.name ?? name}” — ${result.genes.length} genes saved to ${targetProject?.name ?? "the project"}.`);
+      setSelected({});
+      setCompileName("");
+    } catch {
+      setError("Couldn't compile those sets. Please try again.");
+    } finally {
+      setCompiling(false);
+    }
+  }
+
   const filterOptions = [{ key: "all", label: "All" }, ...sources.map((s) => ({ key: s.key, label: s.label }))];
   const activeSource = sources.find((s) => s.key === sourceKey);
   const targetProject = projects.find((p) => p.id === target);
@@ -206,6 +253,26 @@ export function GeneSetBrowser() {
         </div>
       )}
 
+      {compiledMsg && (
+        <div role="status" className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-foreground">
+          {compiledMsg}
+        </div>
+      )}
+
+      {/* compile bar — appears when one or more sets are ticked for compiling */}
+      {selectedIds.length > 0 && (
+        <CompileBar
+          count={selectedIds.length}
+          op={op}
+          onOp={setOp}
+          name={compileName}
+          onName={setCompileName}
+          busy={compiling}
+          onCompile={runCompile}
+          onClear={() => setSelected({})}
+        />
+      )}
+
       {/* saved in this project */}
       {savedSets.length > 0 && (
         <SavedStrip sets={savedSets} onApply={(g) => applySaved(g)} onRemove={(id) => projectStore.removeGeneSet(id)} />
@@ -228,6 +295,8 @@ export function GeneSetBrowser() {
               set={set}
               busy={busyId === set.id}
               saved={savedFrom.has(set.id)}
+              selected={!!selected[set.id]}
+              onToggleSelect={() => toggleSelect(set)}
               onOpen={() => setDetail(set)}
               onHighlight={() => highlightInVolcano(set)}
               onSave={() => saveToProject(set)}
@@ -264,6 +333,8 @@ function SetCard({
   set,
   busy,
   saved,
+  selected,
+  onToggleSelect,
   onOpen,
   onHighlight,
   onSave,
@@ -271,20 +342,37 @@ function SetCard({
   set: GeneSetCard;
   busy: boolean;
   saved: boolean;
+  selected: boolean;
+  onToggleSelect: () => void;
   onOpen: () => void;
   onHighlight: () => void;
   onSave: () => void;
 }) {
   const color = sourceColor(set.source);
   return (
-    <Card className="flex flex-col gap-3 p-4 transition-colors hover:border-primary/30">
-      <div className="flex items-start justify-between gap-2">
-        <button onClick={onOpen} className="min-w-0 text-left">
+    <Card
+      className={cn(
+        "flex flex-col gap-3 p-4 transition-colors hover:border-primary/30",
+        selected && "border-primary/60 ring-1 ring-ring/40",
+      )}
+    >
+      <div className="flex items-start gap-2.5">
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={selected}
+          aria-label={`Select ${set.name} to compile`}
+          onClick={onToggleSelect}
+          className={cn(
+            "mt-0.5 grid size-4 shrink-0 place-items-center rounded border transition-colors",
+            selected ? "border-primary bg-primary text-primary-foreground" : "border-input text-transparent hover:border-primary/50",
+          )}
+        >
+          <Check className="size-3" />
+        </button>
+        <button onClick={onOpen} className="min-w-0 flex-1 text-left">
           <h3 className="truncate text-sm font-semibold text-foreground hover:text-primary">{set.name}</h3>
-          <span
-            className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium"
-            style={{ color }}
-          >
+          <span className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium" style={{ color }}>
             <span aria-hidden className="size-2 rounded-full" style={{ background: color }} />
             {set.source_label}
           </span>
@@ -321,8 +409,68 @@ function SetCard({
         </Button>
       </div>
 
-      <span className="text-[10px] text-muted-foreground/80">License: {set.license}</span>
+      <span className="text-[10px] text-muted-foreground/80">
+        License: {set.license}
+        {set.attribution ? <> · via {set.attribution}</> : null}
+      </span>
     </Card>
+  );
+}
+
+function CompileBar({
+  count,
+  op,
+  onOp,
+  name,
+  onName,
+  busy,
+  onCompile,
+  onClear,
+}: {
+  count: number;
+  op: "union" | "intersect";
+  onOp: (v: "union" | "intersect") => void;
+  name: string;
+  onName: (v: string) => void;
+  busy: boolean;
+  onCompile: () => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/40 bg-primary/[0.06] p-3">
+      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground">
+        <GitMerge className="size-4 text-primary" />
+        {count} selected
+      </span>
+      <div className="inline-flex items-center gap-0.5 rounded-lg bg-muted/60 p-1">
+        {(["union", "intersect"] as const).map((o) => (
+          <button
+            key={o}
+            type="button"
+            onClick={() => onOp(o)}
+            className={cn(
+              "rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-colors",
+              op === o ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {o}
+          </button>
+        ))}
+      </div>
+      <input
+        value={name}
+        onChange={(e) => onName(e.target.value)}
+        aria-label="Compiled set name"
+        placeholder="Name (optional)"
+        className="h-8 min-w-[10rem] flex-1 rounded-md border border-input bg-background/60 px-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:border-ring/60 focus-visible:ring-2 focus-visible:ring-ring/30"
+      />
+      <Button size="sm" className="gap-1.5" disabled={busy} onClick={onCompile}>
+        <Layers className="size-4" /> {busy ? "Compiling…" : `Compile & save (${op})`}
+      </Button>
+      <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={onClear}>
+        Clear
+      </Button>
+    </div>
   );
 }
 
@@ -455,6 +603,9 @@ function MembersDialog({
               <span aria-hidden>·</span>
               <Badge variant="community">{card.license}</Badge>
             </p>
+            {card.attribution && (
+              <p className="mt-1.5 text-[11px] text-muted-foreground">Source: {card.attribution}</p>
+            )}
           </div>
           <button
             ref={closeRef}

@@ -27,6 +27,8 @@ export interface GeneSetCard {
   license: string;
   size: number;
   sample_genes: string[];
+  /** Source citation for attributed reference panels (e.g. "CiliaCarta — van Dam 2013"). */
+  attribution?: string;
 }
 
 export interface GeneSetSearchResponse {
@@ -69,6 +71,38 @@ export async function getGeneSet(id: string, signal?: AbortSignal): Promise<Gene
   });
   if (!res.ok) throw new Error(`GET /gene-sets/${id} -> ${res.status}`);
   return (await res.json()) as GeneSetDetail;
+}
+
+/** Result of compiling several sets into one (gene-set builder Phase B). */
+export interface GeneSetCompileResult {
+  genes: string[];
+  op: string;
+  sources: { id: string; name: string; source_label: string; license: string; size: number }[];
+  missing: string[];
+  provenance: {
+    op: string;
+    n_in: number;
+    n_out: number;
+    n_remapped: number;
+    n_unrecognized: number;
+    normalized: boolean;
+    licenses: string[];
+  };
+  name?: string;
+}
+
+export async function compileGeneSets(
+  setIds: string[],
+  op: "union" | "intersect",
+  name?: string,
+): Promise<GeneSetCompileResult> {
+  const res = await fetch("/api/gene-sets/compile", {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({ set_ids: setIds, op, name }),
+  });
+  if (!res.ok) throw new Error(`POST /gene-sets/compile -> ${res.status}`);
+  return (await res.json()) as GeneSetCompileResult;
 }
 
 /** Source identity — a clean, dark-legible colour per source (color-not-only: always paired with the label). */
