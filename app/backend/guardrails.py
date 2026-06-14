@@ -31,7 +31,7 @@ from skills.contract import SkillSpec, resolved_params
 _FDR_SKILLS = {"deg", "volcano", "enrichment"}
 # scRNA skills that normalize raw counts internally (CPM-10k + log1p) — pre-normalized
 # input risks double-normalization.
-_INTERNAL_NORMALIZE = {"umap_scrna", "cluster", "violin"}
+_INTERNAL_NORMALIZE = {"umap_scrna", "cluster", "violin", "markers", "annotate", "trajectory"}
 # obs column names that usually denote a batch / sample covariate.
 _BATCH_KEYS = {"batch", "sample", "donor", "patient", "condition", "batch_id", "orig.ident"}
 

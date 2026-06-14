@@ -1,0 +1,29 @@
+{
+  "id": "trajectory",
+  "version": "0.1.0",
+  "title": "Trajectory & pseudotime",
+  "engine": "python",
+  "omics": "scrna-seq",
+  "entrypoint": "skills.trajectory.run:run",
+  "inputs": [{ "name": "matrix", "kind": "anndata|h5ad", "required": true }],
+  "param_spec": {
+    "groupby":   { "type": "str",   "default": "leiden" },
+    "root":      { "type": "str",   "default": "" },
+    "embedding": { "type": "str",   "default": "X_umap" },
+    "threshold": { "type": "float", "default": 0.05, "min": 0.0, "max": 1.0 },
+    "normalize": { "type": "bool",  "default": true }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "summary": "Diffusion pseudotime (DPT) + PAGA — embedding coloured by pseudotime with the cluster-connectivity graph overlaid.",
+    "category": "single-cell",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".h5ad"],
+    "chains_with": ["cluster", "umap_scrna", "markers"],
+    "license": "MIT",
+    "popularity": 71
+  }
+}

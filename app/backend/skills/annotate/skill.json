@@ -1,0 +1,28 @@
+{
+  "id": "annotate",
+  "version": "0.1.0",
+  "title": "Cell-type annotation",
+  "engine": "python",
+  "omics": "scrna-seq",
+  "entrypoint": "skills.annotate.run:run",
+  "inputs": [{ "name": "matrix", "kind": "anndata|h5ad", "required": true }],
+  "param_spec": {
+    "marker_set": { "type": "str",  "default": "retinal" },
+    "groupby":    { "type": "str",  "default": "leiden" },
+    "embedding":  { "type": "str",  "default": "X_umap" },
+    "normalize":  { "type": "bool", "default": true }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "summary": "Marker-based cell-type labelling — score curated marker sets per cluster (score_genes) and recolour the UMAP by assigned type.",
+    "category": "single-cell",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".h5ad"],
+    "chains_with": ["cluster", "markers", "umap_scrna"],
+    "license": "MIT",
+    "popularity": 74
+  }
+}

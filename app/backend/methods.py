@@ -26,6 +26,9 @@ BH = "Benjamini, Y. & Hochberg, Y. Controlling the false discovery rate: a pract
 GO = "Ashburner, M. et al. Gene Ontology: tool for the unification of biology. Nature Genetics 25, 25-29 (2000)."
 REACTOME = "Milacic, M. et al. The Reactome Pathway Knowledgebase 2024. Nucleic Acids Research 52, D672-D678 (2024)."
 SCIPY = "Virtanen, P. et al. SciPy 1.0: fundamental algorithms for scientific computing in Python. Nature Methods 17, 261-272 (2020)."
+PAGA = "Wolf, F.A. et al. PAGA: graph abstraction reconciles clustering with trajectory inference through a topology preserving map of single cells. Genome Biology 20, 59 (2019)."
+DPT = "Haghverdi, L., Büttner, M., Wolf, F.A., Buettner, F. & Theis, F.J. Diffusion pseudotime robustly reconstructs lineage branching. Nature Methods 13, 845-848 (2016)."
+TIROSH = "Tirosh, I. et al. Dissecting the multicellular ecosystem of metastatic melanoma by single-cell RNA-seq. Science 352, 189-196 (2016)."
 
 
 def _umap(p: dict):
@@ -133,6 +136,42 @@ def _pathway(p: dict):
     return text, [REACTOME, BH]
 
 
+def _markers(p: dict):
+    scaled = " (scaled to [0,1] per gene)" if p.get("standard_scale", True) else ""
+    text = (
+        f"Marker genes were identified per {p['groupby']} group with the {p['method']} test "
+        f"(Scanpy rank_genes_groups), reporting the top {p['n_genes']} genes per group. "
+        "Expression is summarized as a dotplot in which colour encodes the mean log1p "
+        f"expression within each group{scaled} and dot size encodes the fraction of cells "
+        "expressing the gene; p-values are corrected by the Benjamini-Hochberg procedure."
+    )
+    return text, [SCANPY, BH]
+
+
+def _annotate(p: dict):
+    text = (
+        f"Cell types were assigned by marker-set scoring: for each cell type in the "
+        f"'{p['marker_set']}' panel, its marker genes were scored per cell with Scanpy's "
+        "score_genes (mean expression of the set minus a randomly sampled control set), "
+        f"averaged per {p['groupby']} cluster, and each cluster was labelled with its "
+        "top-scoring type. Cells are displayed on the embedding coloured by assigned type."
+    )
+    return text, [SCANPY, TIROSH]
+
+
+def _trajectory(p: dict):
+    root = str(p.get("root") or "").strip()
+    root_txt = f"cluster {root}" if root else "the diffusion-component extreme"
+    text = (
+        "A diffusion map was computed and the cluster graph abstracted with partition-based "
+        "graph abstraction (PAGA). Cells were ordered along diffusion pseudotime (DPT) from a "
+        f"root placed at {root_txt}. The embedding is coloured by pseudotime with the PAGA "
+        "graph overlaid (nodes = clusters sized by cell count; edges = connectivity above "
+        f"{p['threshold']})."
+    )
+    return text, [SCANPY, PAGA, DPT]
+
+
 _TEMPLATES = {
     "umap_scrna": _umap,
     "cluster": _cluster,
@@ -142,6 +181,9 @@ _TEMPLATES = {
     "heatmap": _heatmap,
     "enrichment": _enrichment,
     "pathway": _pathway,
+    "markers": _markers,
+    "annotate": _annotate,
+    "trajectory": _trajectory,
 }
 
 

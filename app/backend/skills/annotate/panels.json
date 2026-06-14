@@ -1,0 +1,19 @@
+{
+  "retinal": {
+    "name": "Retinal cell types",
+    "organism": "human",
+    "attribution": "Marker genes per retinal cell class compiled from Lu et al., 'Single-Cell RNA Sequencing of the Retina', Front. Mol. Biosci. 8:699906 (2021) (doi:10.3389/fmolb.2021.699906) and corroborating retinal scRNA-seq atlases; RPE markers from RPE transcriptome literature (RPE65/BEST1/MITF). Gene symbols are facts — cited for provenance.",
+    "license": "public (gene symbols; cited for provenance)",
+    "markers": {
+      "Rod photoreceptors": ["RHO", "NRL", "NR2E3", "GNAT1", "PDE6A", "PDE6B", "PDE6G", "CNGB1", "SAG", "RCVRN", "ROM1", "ABCA4", "SLC24A1", "GNB1", "UNC119"],
+      "Cone photoreceptors": ["ARR3", "GNAT2", "PDE6C", "PDE6H", "OPN1SW", "OPN1MW", "GNGT2", "CRX", "RAX2"],
+      "Bipolar cells": ["VSX2", "VSX1", "OTX2", "CABP5", "GRM6", "TRPM1", "KCNG4", "LHX4", "PRKCA"],
+      "Amacrine cells": ["GAD1", "GAD2", "SLC6A9", "TFAP2A", "TFAP2B", "MEIS2", "TACR1", "CALB2"],
+      "Horizontal cells": ["ONECUT1", "ONECUT2", "ONECUT3", "LHX1", "CALB1", "FOXN4"],
+      "Müller glia": ["RLBP1", "RGR", "GLUL", "SLC1A3", "APOE", "DKK3", "CA2", "SOX9", "CLU"],
+      "Retinal ganglion cells": ["RBPMS", "SNCG", "NEFL", "NEFM", "POU4F1", "POU4F2", "THY1", "ATOH7", "EBF3"],
+      "Retinal progenitor cells": ["PAX6", "SOX2", "SFRP2", "HES1", "MKI67", "CCND1", "ASCL1"],
+      "RPE": ["RPE65", "BEST1", "MITF", "TYR", "TYRP1", "PMEL", "TTR", "SERPINF1", "RLBP1"]
+    }
+  }
+}

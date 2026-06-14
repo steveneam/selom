@@ -16,7 +16,10 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from skills.contract import run_skill  # noqa: E402
 
-SKILLS = ["cluster", "violin", "deg", "volcano", "heatmap", "enrichment", "go_graph", "pathway"]
+SKILLS = [
+    "cluster", "violin", "deg", "volcano", "heatmap", "enrichment", "go_graph", "pathway",
+    "markers", "annotate", "trajectory",
+]
 
 
 def main() -> None:

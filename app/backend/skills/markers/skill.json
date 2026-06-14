@@ -1,0 +1,29 @@
+{
+  "id": "markers",
+  "version": "0.1.0",
+  "title": "Marker-gene dotplot",
+  "engine": "python",
+  "omics": "scrna-seq",
+  "entrypoint": "skills.markers.run:run",
+  "inputs": [{ "name": "matrix", "kind": "anndata|h5ad", "required": true }],
+  "param_spec": {
+    "groupby":        { "type": "str",   "default": "leiden" },
+    "n_genes":        { "type": "int",   "default": 5, "min": 1, "max": 20 },
+    "method":         { "type": "str",   "default": "wilcoxon" },
+    "standard_scale": { "type": "bool",  "default": true },
+    "normalize":      { "type": "bool",  "default": true }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "summary": "Per-cluster marker genes as a dotplot — colour = mean expression, dot size = % of cells expressing.",
+    "category": "single-cell",
+    "tier": "verified",
+    "status": "production",
+    "input_formats": [".h5ad"],
+    "chains_with": ["cluster", "umap_scrna", "annotate"],
+    "license": "MIT",
+    "popularity": 83
+  }
+}
