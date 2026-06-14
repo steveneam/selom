@@ -17,10 +17,12 @@ def run(data_path: str, params: dict) -> dict:
         from skills.enrichment.run_real import run as run_real
 
         return run_real(data_path=data_path, params=params)
-    return _stub_figure()
+    return _stub_figure(params)
 
 
-def _stub_figure() -> dict:
+def _stub_figure(params: dict | None = None) -> dict:
+    if str((params or {}).get("direction") or "combined").lower() == "split":
+        return _stub_split()
     pathways = [
         "Reactome: Interferon signaling",
         "GO: NK cell mediated cytotoxicity",
@@ -36,6 +38,20 @@ def _stub_figure() -> dict:
     nlp = [round(4.8 - i * 0.42, 2) for i in range(len(pathways))]
     overlap = [max(3, 22 - i * 2) for i in range(len(pathways))]
     return dotplot_spec(pathways, nlp, overlap, "Pathway enrichment (stub)")
+
+
+def _stub_split() -> dict:
+    up = [
+        {"pathway": "Reactome: Interferon signaling", "nlp": 4.6, "overlap": 18},
+        {"pathway": "GO: Inflammatory response", "nlp": 3.9, "overlap": 14},
+        {"pathway": "Reactome: Neutrophil degranulation", "nlp": 3.1, "overlap": 11},
+    ]
+    down = [
+        {"pathway": "Reactome: Cell Cycle", "nlp": 4.2, "overlap": 16},
+        {"pathway": "GO: DNA replication", "nlp": 3.4, "overlap": 12},
+        {"pathway": "Reactome: Mitotic spindle assembly", "nlp": 2.8, "overlap": 9},
+    ]
+    return dotplot_split_spec(up, down, "Pathway enrichment — up/down split (stub)")
 
 
 def dotplot_spec(pathways, nlp, overlap, title) -> dict:
@@ -67,5 +83,47 @@ def dotplot_spec(pathways, nlp, overlap, title) -> dict:
             "title": {"text": title},
             "xaxis": {"title": {"text": "-log10 adjusted p"}},
             "yaxis": {"title": {"text": "pathway"}, "automargin": True},
+        },
+    }
+
+
+def dotplot_split_spec(up_rows, down_rows, title) -> dict:
+    """Diverging enrichment dotplot — ORA run separately on the up- and down-regulated
+    significant genes (Suppl Fig 6 / 5C). Up terms sit on the right (positive x), down on
+    the left (negative x); x is the direction-signed -log10(adjusted p), marker size = the
+    overlap count, colour encodes direction. ``up_rows``/``down_rows`` are lists of
+    ``{pathway, nlp, overlap}``. The shared y-axis lists every term once, most-significant
+    (either direction) at the top."""
+    best: dict[str, float] = {}
+    for r in up_rows + down_rows:
+        best[r["pathway"]] = max(best.get(r["pathway"], 0.0), r["nlp"])
+    # plotly draws y categories bottom-up, so ascending significance puts the top hit on top
+    ordered = sorted(best, key=lambda p: best[p])
+
+    def _trace(rows, sign, name, color):
+        return {
+            "type": "scatter",
+            "mode": "markers",
+            "name": name,
+            "x": [round(sign * r["nlp"], 3) for r in rows],
+            "y": [r["pathway"] for r in rows],
+            "text": [f"{r['overlap']} genes" for r in rows],
+            "marker": {"size": [r["overlap"] for r in rows], "sizemode": "diameter", "color": color},
+        }
+
+    return {
+        "data": [
+            _trace(down_rows, -1, "Down-regulated", "#1f77b4"),
+            _trace(up_rows, +1, "Up-regulated", "#d62728"),
+        ],
+        "layout": {
+            "title": {"text": title},
+            "xaxis": {"title": {"text": "← down    direction-signed -log10 adjusted p    up →"}},
+            "yaxis": {
+                "title": {"text": "pathway"},
+                "automargin": True,
+                "categoryorder": "array",
+                "categoryarray": ordered,
+            },
         },
     }

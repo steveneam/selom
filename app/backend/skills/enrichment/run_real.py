@@ -8,7 +8,7 @@ Input: a CSV carrying a gene column (e.g. a DE gene list). The background is the
 union of all genes across the bundled sets. Emits the dotplot spec in ``run``.
 """
 
-from skills.enrichment.run import dotplot_spec
+from skills.enrichment.run import dotplot_spec, dotplot_split_spec
 
 # The ``gene_sets`` param selects which license-clean library the ORA scores against
 # (gene-set builder Phase A · DECISIONS #11). Aliases keep the old default working:
@@ -31,11 +31,9 @@ _P_COLS = ["padj", "adj.p.val", "fdr", "qvalue", "q.value", "pvals_adj", "pvalue
 
 def run(data_path: str, params: dict) -> dict:
     import pandas as pd
-    from scipy.stats import hypergeom
 
     sets = _load_gene_sets(params.get("gene_sets"))
     background = {g for genes in sets.values() for g in genes}
-    bg_size = len(background)
 
     df = pd.read_csv(data_path)
     cols = {c.lower(): c for c in df.columns}
@@ -50,33 +48,65 @@ def run(data_path: str, params: dict) -> dict:
         fc_t = float(params.get("fc_threshold", 0.0))
         if fc_col is not None and fc_t > 0:
             sub = sub[pd.to_numeric(sub[fc_col], errors="coerce").abs() >= fc_t]
-    query_series = sub[gene_col] if gene_col is not None else sub.iloc[:, 0]
-    query = {str(g).upper() for g in query_series} & background
-    n_query = len(query)
 
+    top_n = int(params["top_n"])
+    genes_series = sub[gene_col] if gene_col is not None else sub.iloc[:, 0]
+
+    # Up/down split: score the up- and down-regulated significant genes SEPARATELY and draw
+    # them as a diverging dotplot (Suppl Fig 6 / 5C). Needs a fold-change column to assign
+    # direction — erroring is more honest than silently collapsing to a combined plot.
+    if str(params.get("direction") or "combined").lower() == "split":
+        if fc_col is None:
+            raise ValueError(
+                "enrichment up/down split needs a fold-change column "
+                "(e.g. log2FoldChange) to assign direction"
+            )
+        fc_vals = pd.to_numeric(sub[fc_col], errors="coerce")
+        up_q = {str(g).upper() for g, v in zip(genes_series, fc_vals) if pd.notna(v) and v > 0} & background
+        down_q = {str(g).upper() for g, v in zip(genes_series, fc_vals) if pd.notna(v) and v < 0} & background
+        up_rows = _ora(up_q, sets, background, top_n)
+        down_rows = _ora(down_q, sets, background, top_n)
+        if not up_rows and not down_rows:
+            return dotplot_spec([], [], [], "Pathway enrichment (no overlap)")
+        return dotplot_split_spec(up_rows, down_rows, "Pathway enrichment — up/down split")
+
+    query = {str(g).upper() for g in genes_series} & background
+    rows = _ora(query, sets, background, top_n)
+    if not rows:  # nothing overlapped the bundled sets — return an honest empty plot.
+        return dotplot_spec([], [], [], "Pathway enrichment (no overlap)")
+    pathways = [r["pathway"] for r in rows]
+    nlp = [r["nlp"] for r in rows]
+    overlap = [r["overlap"] for r in rows]
+    return dotplot_spec(pathways, nlp, overlap, "Pathway enrichment (GO)")
+
+
+def _ora(query: set, sets: dict, background: set, top_n: int) -> list[dict]:
+    """Hypergeometric over-representation of ``query`` against ``sets`` with BH correction.
+    Returns the top_n rows ``{pathway, overlap, set_size, p, padj, nlp}`` ordered most- to
+    least-significant. Empty when the query is empty or nothing overlaps the bundled sets."""
+    import math
+
+    from scipy.stats import hypergeom
+
+    bg_size = len(background)
+    n_query = len(query)
+    if n_query == 0:
+        return []
     rows = []
     for name, genes in sets.items():
         members = set(genes) & background
         k = len(query & members)
-        if k == 0 or n_query == 0:
+        if k == 0:
             continue
         # P(X >= k) for X ~ Hypergeometric(bg_size, |members|, n_query).
         p = float(hypergeom.sf(k - 1, bg_size, len(members), n_query))
         rows.append({"pathway": name, "overlap": k, "set_size": len(members), "p": p})
-
     rows = _benjamini_hochberg(rows)
     rows.sort(key=lambda r: r["padj"])
-    rows = rows[: int(params["top_n"])]
-
-    if not rows:  # nothing overlapped the bundled sets — return an honest empty plot.
-        return dotplot_spec([], [], [], "Pathway enrichment (no overlap)")
-
-    import math
-
-    pathways = [r["pathway"] for r in rows]
-    nlp = [round(-math.log10(max(r["padj"], 1e-300)), 3) for r in rows]
-    overlap = [r["overlap"] for r in rows]
-    return dotplot_spec(pathways, nlp, overlap, "Pathway enrichment (GO)")
+    rows = rows[:top_n]
+    for r in rows:
+        r["nlp"] = round(-math.log10(max(r["padj"], 1e-300)), 3)
+    return rows
 
 
 def _load_gene_sets(source_param=None) -> dict:

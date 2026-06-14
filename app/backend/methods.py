@@ -119,11 +119,20 @@ def _heatmap(p: dict):
 
 
 def _enrichment(p: dict):
+    split = str(p.get("direction") or "combined").lower() == "split"
+    scope = (
+        "the up- and down-regulated significant genes were tested separately"
+        if split else "the input gene list was tested"
+    )
+    shown = (
+        f"The top {p['top_n']} enriched sets per direction are drawn as a diverging dotplot "
+        "(up-regulated to the right, down-regulated to the left)."
+        if split else f"The top {p['top_n']} enriched sets are shown."
+    )
     text = (
-        "Pathway enrichment was computed by over-representation analysis: the overlap between the input "
-        "gene list and each GO and Reactome gene set was tested with the hypergeometric distribution, and "
-        "p-values were corrected across gene sets by the Benjamini-Hochberg procedure. The top "
-        f"{p['top_n']} enriched sets are shown."
+        f"Pathway enrichment was computed by over-representation analysis: {scope} for overlap with each "
+        "GO and Reactome gene set using the hypergeometric distribution, and p-values were corrected "
+        f"across gene sets by the Benjamini-Hochberg procedure. {shown}"
     )
     return text, [GO, REACTOME, BH]
 
