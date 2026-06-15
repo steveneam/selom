@@ -9,6 +9,7 @@ import { WorkbenchPanel } from "./workbench-panel";
 import { PublishConfidence } from "./publish-confidence";
 import { Pipeline, type StageKey, type StageState } from "@/components/pipeline";
 import { EditorWorkspace } from "@/components/figure/editor-workspace";
+import { ExportMenu } from "@/components/figure/export-menu";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -301,9 +302,12 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     <Redo2 />
                   </Button>
                   <span className="ml-2 text-xs text-muted-foreground">Editing live — every change is a JSON-Patch.</span>
-                  <Button variant="ghost" size="sm" className="ml-auto" onClick={() => { figure.reset(); setBundle(null); setTab("workbench"); }}>
-                    New figure
-                  </Button>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <ExportMenu spec={figure.spec} filename={`selom-${bundle?.provenance?.skill?.id ?? "figure"}`} />
+                    <Button variant="ghost" size="sm" onClick={() => { figure.reset(); setBundle(null); setTab("workbench"); }}>
+                      New figure
+                    </Button>
+                  </div>
                 </div>
                 <PublishConfidence provenance={bundle?.provenance} methods={bundle?.methods} guardrails={bundle?.guardrails} />
                 <div className="flex min-h-[520px] flex-1 overflow-hidden rounded-xl border border-border bg-background">

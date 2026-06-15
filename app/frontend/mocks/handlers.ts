@@ -3,6 +3,7 @@ import { CATALOG } from "@/lib/catalog/seed";
 import { stubUmapFigure } from "./stub-figure";
 import { mockBundle } from "./stub-bundle";
 import { compileFixture, getFixtureSet, searchFixture } from "./gene-sets-fixture";
+import { EXPORT_PRESETS, mockExportFile } from "./export-fixture";
 
 // Mirrors the live contract from app/backend/main.py:
 //   GET  /skills                 -> SkillCatalogEntry[]  (live registry, B3)
@@ -31,6 +32,21 @@ export const handlers = [
   http.get("/api/gene-sets/:id", ({ params }) => {
     const set = getFixtureSet(String(params.id));
     return set ? HttpResponse.json(set) : new HttpResponse(null, { status: 404 });
+  }),
+  // Journal figure export (B4): presets catalog + a per-format file download. The
+  // mock returns a placeholder file (no Chrome in dev:mock) so the menu's download
+  // flow is verifiable offline; the real backend renders the figure via Kaleido.
+  http.get("/api/figures/export/presets", () => HttpResponse.json({ presets: EXPORT_PRESETS })),
+  http.post("/api/figures/export", async ({ request }) => {
+    const body = (await request.json()) as { format?: string; filename?: string };
+    const format = body.format ?? "png";
+    const { body: file, type } = mockExportFile(format);
+    return new HttpResponse(file, {
+      headers: {
+        "Content-Type": type,
+        "Content-Disposition": `attachment; filename="${body.filename ?? "selom-figure"}.${format}"`,
+      },
+    });
   }),
   http.post("/api/skills/:skillId/run", async ({ params, request }) => {
     // A real upload would parse `matrix`; the stub is input-independent by design,
