@@ -126,3 +126,34 @@ export const LEGEND_POSITIONS: Record<
   "bottom-right": { label: "Bottom right", x: 0.99, y: 0.01, xanchor: "right", yanchor: "bottom" },
   "outside-right": { label: "Outside right", x: 1.02, y: 1, xanchor: "left", yanchor: "top" },
 };
+
+/** Colour-bar position presets → the colorbar props they set (orientation baked in). */
+export const COLORBAR_POSITIONS: Record<
+  string,
+  { label: string; x: number; y: number; xanchor: string; yanchor: string; orientation: string }
+> = {
+  right: { label: "Right", x: 1.02, y: 0.5, xanchor: "left", yanchor: "middle", orientation: "v" },
+  bottom: { label: "Bottom", x: 0.5, y: -0.2, xanchor: "center", yanchor: "top", orientation: "h" },
+  left: { label: "Left", x: -0.15, y: 0.5, xanchor: "right", yanchor: "middle", orientation: "v" },
+};
+
+/**
+ * Locate the figure's colour bar, if any, and return the JSON-pointer base to its
+ * colorbar object. Heatmap/contour-style traces carry it at `data[i].colorbar`;
+ * colour-mapped markers (UMAP-by-gene, etc.) at `data[i].marker.colorbar`. Returns
+ * null when the figure has no colour bar (so the panel section stays hidden).
+ */
+export function findColorbarTrace(spec: FigureSpec): { index: number; base: string } | null {
+  const data = Array.isArray(spec.data) ? spec.data : [];
+  for (let i = 0; i < data.length; i++) {
+    const t = data[i] ?? {};
+    const heatmapLike =
+      t.type === "heatmap" || t.type === "heatmapgl" || t.type === "contour" || t.colorbar;
+    if (heatmapLike && t.showscale !== false) return { index: i, base: `/data/${i}/colorbar` };
+    const m = t.marker;
+    if (m && m.showscale !== false && (m.colorbar || m.showscale || (m.colorscale && m.color !== undefined))) {
+      return { index: i, base: `/data/${i}/marker/colorbar` };
+    }
+  }
+  return null;
+}

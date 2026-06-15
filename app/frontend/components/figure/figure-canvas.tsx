@@ -1,9 +1,16 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import type { Config, Data, Layout } from "plotly.js";
 import type { FigureSpec } from "@/lib/figure-spec";
+import type { FigureStore } from "@/hooks/use-figure-store";
+import { relayoutToOps, restyleToOps } from "@/lib/plotly-edits";
+
+type GraphDiv = {
+  on?: (ev: string, cb: (e: unknown) => void) => void;
+  removeListener?: (ev: string, cb: (e: unknown) => void) => void;
+};
 
 const Plot = dynamic(() => import("react-plotly.js"), {
   ssr: false,
@@ -27,7 +34,7 @@ function CanvasSkeleton() {
  * clone because react-plotly.js mutates the data/layout it receives; cloning keeps
  * the store's immutable history snapshots pristine.
  */
-export function FigureCanvas({ spec }: { spec: FigureSpec }) {
+export function FigureCanvas({ spec, store }: { spec: FigureSpec; store?: FigureStore }) {
   const fixed = typeof spec.layout.width === "number";
 
   const figure = useMemo(
@@ -35,14 +42,78 @@ export function FigureCanvas({ spec }: { spec: FigureSpec }) {
     [spec, fixed],
   );
 
+  // Handlers read the latest spec/store via a ref so the directly-bound Plotly
+  // listeners stay stable while always seeing live values.
+  const liveRef = useRef({ spec, store });
+  liveRef.current = { spec, store };
+
+  // Stable gesture handlers, created once. Each Plotly canvas gesture becomes ONE
+  // undoable JSON-Patch edit (Plotly fires once on drag-release → one history entry).
+  const handlersRef = useRef<
+    { relayout: (e: unknown) => void; restyle: (e: unknown) => void } | undefined
+  >(undefined);
+  if (!handlersRef.current) {
+    handlersRef.current = {
+      relayout: (e: unknown) => {
+        const { spec: s, store: st } = liveRef.current;
+        if (!st || !e) return;
+        const ops = relayoutToOps(s, e as Record<string, unknown>);
+        if (ops.length) st.commit(ops);
+      },
+      // Trace-level gestures (colour-bar move/retext, legend-label rename) arrive
+      // as a `plotly_restyle` event = [update, traceIndices].
+      restyle: (e: unknown) => {
+        const { spec: s, store: st } = liveRef.current;
+        if (!st || !Array.isArray(e)) return;
+        const [update, indices] = e as [Record<string, unknown>, number[]];
+        const ops = restyleToOps(s, update ?? {}, indices ?? []);
+        if (ops.length) st.commit(ops);
+      },
+    };
+  }
+
+  // Bind our gesture listeners straight onto the Plotly graph div, re-asserting
+  // after EVERY render. We do NOT use react-plotly's onRelayout/onRestyle props:
+  // those are synced inside a post-`Plotly.react` promise and don't attach until
+  // the first *update*, so a drag on a brand-new figure would silently fail to
+  // persist. react-plotly calls `onInitialized` (mount) and `onUpdate` (every
+  // subsequent render) right after `Plotly.react` resolves — binding here, removing
+  // first so it's idempotent, survives any internal listener reset. One commit/gesture.
+  const bindGestures = useCallback((_figure: unknown, gd: unknown) => {
+    const el = gd as GraphDiv;
+    const h = handlersRef.current;
+    if (!el || typeof el.on !== "function" || !h) return;
+    el.removeListener?.("plotly_relayout", h.relayout);
+    el.removeListener?.("plotly_restyle", h.restyle);
+    el.on("plotly_relayout", h.relayout);
+    el.on("plotly_restyle", h.restyle);
+  }, []);
+
   const config = useMemo(
     () => ({
       displaylogo: false,
       responsive: true,
+      // Direct manipulation: drag the legend / colour bar / annotations and
+      // double-click titles in place. We DON'T enable blanket `editable` — that
+      // also lets users drag data points (a data edit), which must stay server-side.
+      edits: store
+        ? {
+            legendPosition: true,
+            legendText: true,
+            annotationPosition: true,
+            annotationTail: true,
+            annotationText: true,
+            titleText: true,
+            axisTitleText: true,
+            colorbarPosition: true,
+            colorbarTitleText: true,
+            shapePosition: true,
+          }
+        : undefined,
       modeBarButtonsToRemove: ["lasso2d", "select2d"] as const,
       toImageButtonOptions: { format: "png" as const, scale: 2, filename: "selom-figure" },
     }),
-    [],
+    [store],
   );
 
   return (
@@ -50,6 +121,8 @@ export function FigureCanvas({ spec }: { spec: FigureSpec }) {
       data={figure.data as unknown as Data[]}
       layout={figure.layout as unknown as Partial<Layout>}
       config={config as unknown as Partial<Config>}
+      onInitialized={bindGestures as never}
+      onUpdate={bindGestures as never}
       useResizeHandler
       style={{
         width: fixed ? `${spec.layout.width}px` : "100%",

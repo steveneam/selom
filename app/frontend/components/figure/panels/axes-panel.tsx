@@ -11,6 +11,15 @@ const SCALE_OPTIONS = [
   { value: "log", label: "Log" },
 ];
 
+const X_SIDE = [
+  { value: "bottom", label: "Bottom" },
+  { value: "top", label: "Top" },
+];
+const Y_SIDE = [
+  { value: "left", label: "Left" },
+  { value: "right", label: "Right" },
+];
+
 export function AxesPanel({ store, spec }: { store: FigureStore; spec: FigureSpec }) {
   const xTitle = getAt<string>(spec, "/layout/xaxis/title/text", "")!;
   const yTitle = getAt<string>(spec, "/layout/yaxis/title/text", "")!;
@@ -18,6 +27,8 @@ export function AxesPanel({ store, spec }: { store: FigureStore; spec: FigureSpe
   const zeroLine = getAt<boolean>(spec, "/layout/xaxis/zeroline", false)!;
   const xType = getAt<string>(spec, "/layout/xaxis/type", "-")!;
   const yType = getAt<string>(spec, "/layout/yaxis/type", "-")!;
+  const xSide = getAt<string>(spec, "/layout/xaxis/side", "bottom")!;
+  const ySide = getAt<string>(spec, "/layout/yaxis/side", "left")!;
 
   return (
     <div className="space-y-6">
@@ -65,6 +76,21 @@ export function AxesPanel({ store, spec }: { store: FigureStore; spec: FigureSpe
           value={yType}
           options={SCALE_OPTIONS}
           onChange={(v) => store.commit([set("/layout/yaxis/type", v)])}
+        />
+      </Section>
+
+      <Section title="Tick labels">
+        <SelectField
+          label="X-axis side"
+          value={xSide}
+          options={X_SIDE}
+          onChange={(v) => store.commit([set("/layout/xaxis/side", v)])}
+        />
+        <SelectField
+          label="Y-axis side"
+          value={ySide}
+          options={Y_SIDE}
+          onChange={(v) => store.commit([set("/layout/yaxis/side", v)])}
         />
       </Section>
     </div>
