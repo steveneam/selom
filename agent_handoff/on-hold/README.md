@@ -8,7 +8,7 @@ this folder before building.
 
 | # | Item | What it is | Why gated | Belongs to | Resume when |
 |---|---|---|---|---|---|
-| 1 | **Kaleido journal export** | B4 journal-preset PNG/SVG/PDF export via Kaleido | needs Docker + system Chromium (RISKS #2 · DECISIONS #7 web-first) | **B4** (its only remaining item) | the deploy image is built (B8-adjacent) |
+| 1 | ~~**Kaleido journal export**~~ ✅ **DONE 2026-06-15 — NO Docker needed** | B4 journal-preset PNG/SVG/PDF export via Kaleido | ~~needs Docker + system Chromium~~ — **gating was wrong for the feature**: Kaleido v1 drives the *already-installed* Chrome over CDP (pure-Python, no container at runtime). Built + verified native on Windows (`POST /figures/export`, all 3 formats live). The Linux **deploy image** still needs a browser (`apt-get chromium`) — that's the only Docker touch, and it's B8, not this feature. | **B4** (done) | — |
 | 2 | **arq Redis job-status store** | Redis-backed `JobStore` so cross-process (arq) job *status*/errors are visible, not just success (`jobs/worker.py` caveat) | needs a running **Redis** (Docker/WSL on Windows) | B3 hardening → B7 | infra is stood up |
 | 3 | **OmicVerse isolated worker** | 2nd Verified engine + the prime Skill-Foundry source (~1000 `ov.*` fns ≈ SkillSpec runners) | `pandas<3` conflict (RISKS #9) → must run out-of-process / containerised | B2 follow-up → **B9** | scoping the isolated env (Docker / its MCP server) |
 | 4 | **Deploy image** | Render CPU + Modal GPU + Vercel; AGPL SCA scan (hard gate) | the deployment **Docker image** | **B8** launch | Stage 3 launch |

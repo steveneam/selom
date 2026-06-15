@@ -5,12 +5,12 @@
 > fix. Add new risks as they surface; do not delete — supersede with a resolution
 > note.
 
-_Last updated: 2026-06-12 01:48 +10:00 — #5 R2 checksum fix APPLIED in code (B3, dormant); #9 `gseapy` DROPPED from `[omics]` (B3)._
+_Last updated: 2026-06-15 13:52 +10:00 — #2 RESOLVED for the feature (Kaleido export shipped native, no Docker; Docker only for the B8 deploy image). Prior: #5 R2 checksum fix APPLIED (B3, dormant); #9 `gseapy` DROPPED from `[omics]` (B3)._
 
 | # | Risk | Impact | Fix / mitigation | Owner |
 |---|---|---|---|---|
 | 1 | **`react-chart-editor` is dead** (last publish Nov 2023, no React 18/19) | The assumed no-code figure-property-panel engine is unusable | Build a custom panel: `react-plotly.js` (render) + shadcn/ui (controls) -> RFC-6902 JSON-Patch. Same patch protocol as the LLM copilot. | Claude (FE) |
-| 2 | **Kaleido v1 needs system Chromium in Docker** — v1 no longer bundles Chromium | Server-side PNG/SVG/PDF export fails | In the Docker image: `apt-get install -y chromium` + `ENV KALEIDO_CHROME_PATH=/usr/bin/chromium`; pin kaleido>=1.3 + plotly>=6.1.1 from day 1 | Codex (BE) |
+| 2 | **Kaleido v1 needs system Chromium** — v1 no longer bundles Chromium | Server-side PNG/SVG/PDF export fails | **RESOLVED for the feature (2026-06-15):** Kaleido drives the *installed* Chrome over CDP, so on any box with a browser it needs **no Docker** — `POST /figures/export` shipped + verified native on Windows (kaleido 1.3, plotly 6.8). **Deploy image only:** the Linux server has no browser → `apt-get install -y chromium` (+ `KALEIDO_CHROME_PATH` if not auto-discovered) in the **B8** image. So: not a runtime container dependency, just a deploy-image install. | Codex (BE) / B8 |
 | 3 | **`react-plotly.js` is stale** (React <=18 peer-deps) | `npm install` fails without a flag | Always install with `--legacy-peer-deps`; monitor for a React 19 PR | Claude (FE) |
 | 4 | **pandas 3.0 Copy-on-Write is default** | Chained assignment raises `ChainedAssignmentError` in skill code | Audit all skill runners; use `.copy()` explicitly before mutating slices | Codex (BE) |
 | 5 | **boto3 >=1.36 breaks Cloudflare R2 checksums** | Uploads silently fail or error | Set `request_checksum_calculation='when_required'` (and `response_checksum_validation='when_supported'`) on the boto3 client `Config`. **APPLIED (B3, 2026-06-12)** in `R2ResultStore` (`app/backend/storage/results.py`) — dormant until R2 creds are set. | Codex (BE) |
