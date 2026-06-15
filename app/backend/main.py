@@ -15,6 +15,7 @@ import provenance
 from gene_sets import library as gene_sets
 from jobs.queue import get_job, result_store, submit
 from jobs.store import TERMINAL
+from skills import styles, theme
 from skills.contract import load_skill, run_skill
 from skills.registry import list_catalog, list_skill_ids
 
@@ -168,6 +169,11 @@ class ExportRequest(BaseModel):
     width: int | None = None           # explicit px overrides (preset wins if both unset)
     height: int | None = None
     filename: str | None = None        # download name (extension is forced to match format)
+    # Optional headless style skin. The WYSIWYG FE path omits these (the on-screen
+    # spec is already styled); they let a caller export a figure in a journal style
+    # without going through the editor. theme.apply needs the skill_id for figure-type polish.
+    style: str | None = None
+    skill_id: str | None = None
 
 
 _EXPORT_MEDIA = {"png": "image/png", "svg": "image/svg+xml", "pdf": "application/pdf"}
@@ -183,9 +189,10 @@ async def export_figure(req: ExportRequest):
         raise HTTPException(status_code=400, detail=f"unsupported format '{req.format}'")
     if not isinstance(req.figure, dict) or "data" not in req.figure:
         raise HTTPException(status_code=400, detail="figure must be a Plotly spec with a data array")
+    figure = theme.apply(req.figure, req.skill_id or "", req.style) if req.style else req.figure
     try:
         data = await asyncio.to_thread(
-            export.render, req.figure, fmt, preset=req.preset, width=req.width, height=req.height
+            export.render, figure, fmt, preset=req.preset, width=req.width, height=req.height
         )
     except export.ExportUnavailable as e:
         raise HTTPException(status_code=503, detail=str(e))
@@ -194,3 +201,24 @@ async def export_figure(req: ExportRequest):
     name = (req.filename or "selom-figure").rsplit(".", 1)[0] or "selom-figure"
     headers = {"Content-Disposition": f'attachment; filename="{name}.{fmt}"'}
     return Response(content=data, media_type=_EXPORT_MEDIA[fmt], headers=headers)
+
+
+@app.get("/figures/styles")
+def figure_styles():
+    # Journal style catalog (journal-styles v1): the FE style picker renders from this.
+    return {"styles": styles.list_styles()}
+
+
+class StyleApplyRequest(BaseModel):
+    figure: dict                       # Plotly {data, layout} spec to restyle
+    skill_id: str | None = None        # drives figure-type polish (volcano/embedding/…)
+    style: str = styles.DEFAULT_STYLE  # target style id (export.styles.STYLES)
+
+
+@app.post("/figures/style/apply")
+def apply_figure_style(req: StyleApplyRequest):
+    # Live editor preview: re-skin a figure in a journal style and return the styled
+    # spec (one Python source of the transform — the FE commits it as an undoable edit).
+    if not isinstance(req.figure, dict) or "data" not in req.figure:
+        raise HTTPException(status_code=400, detail="figure must be a Plotly spec with a data array")
+    return {"figure": theme.apply(req.figure, req.skill_id or "", req.style)}
