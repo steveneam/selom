@@ -1,6 +1,22 @@
 # Journal Styles — v1 spec
 
-_Status: spec for review (2026-06-15). Author: Claude (acting FE+BE). Charter: present scope before building._
+_Status: **v1 SHIPPED 2026-06-15** (BE `dd2e68f` + FE `ae221c6`, local/unpushed). Author: Claude (acting FE+BE)._
+
+**Shipped vs spec:** all v1 tasks landed. The editor-toolbar `Style ▾` picker restyles live as one
+undoable edit; export is WYSIWYG; the export menu's Style slot reflects the active style. As an
+unplanned bonus from owner feedback, the export popover got a **focus treatment** — the page dims+blurs
+behind it while the figure artboard stays crisp (it's the export subject).
+
+**Known v1 limitations (deferred polish):**
+- **Undo/redo doesn't rewind the picker label.** The figure (source of truth) reverts correctly, but the
+  toolbar's active-style label is separate React state, so after undoing a style change the label can be
+  stale until you pick again. Fix path: stamp the style id into the spec (e.g. `layout.meta.selom_style`)
+  and derive the label from the spec — deferred to avoid Plotly unknown-key console noise + golden churn.
+- Mock `style/apply` only remaps palette/font/bg (enough for an offline preview); the real backend runs
+  the full transform.
+
+**Future enhancement (owner-flagged, parked):** a true **export preview** — the crisp figure reflects the
+chosen size preset's crop/aspect (e.g. Nature 89 mm framing) before download. Fuses size + style + export.
 
 Installable/importable **visual style packs** for figures — the sibling of the journal
 **size** presets shipped in the export feature (2026-06-15). Owner-requested; sequenced as
