@@ -7,3 +7,8 @@ next-env.d.ts
 # Local dev verification artifacts (browser screenshots). Data fixtures like
 # sample-data/demo.csv stay tracked; throwaway PNGs do not.
 /sample-data/*.png
+
+# Playwright e2e output
+/playwright-report/
+/test-results/
+/.playwright/

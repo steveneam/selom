@@ -113,6 +113,22 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     [datasetId, datasets, figure, lastFile, designFile, projectId],
   );
 
+  // Dev helper: `?demo=<skillId>` (or any truthy `?demo`) auto-runs a skill so you
+  // land on a live editable figure in ONE step — for fast manual checks and the
+  // Playwright gesture test, skipping the data/intake/workbench dance. Mock-mode
+  // only; in a production build NEXT_PUBLIC_API_MOCKING is unset so this is dead code.
+  const demoRan = React.useRef(false);
+  React.useEffect(() => {
+    if (demoRan.current) return;
+    if (process.env.NEXT_PUBLIC_API_MOCKING !== "enabled") return;
+    const sp = new URLSearchParams(window.location.search);
+    if (!sp.has("demo")) return;
+    const skillId = sp.get("demo") || installs[0]?.skillId;
+    if (!skillId) return;
+    demoRan.current = true;
+    void runFlow({ skillId, params: {} } as ProposedStep);
+  }, [installs, runFlow]);
+
   function onAnalyze({ datasetId: id, file, proposal: p, designFile: df }: AnalyzeArgs) {
     setDatasetId(id);
     setLastFile(file);
