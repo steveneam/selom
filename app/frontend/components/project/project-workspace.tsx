@@ -10,6 +10,7 @@ import { PublishConfidence } from "./publish-confidence";
 import { Pipeline, type StageKey, type StageState } from "@/components/pipeline";
 import { EditorWorkspace } from "@/components/figure/editor-workspace";
 import { ExportMenu } from "@/components/figure/export-menu";
+import { StylePicker } from "@/components/figure/style-picker";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -44,6 +45,12 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [incomingFile, setIncomingFile] = React.useState<File | null>(null);
   const [running, setRunning] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  // Active journal style for the current figure (journal-styles v1). Runs come out
+  // in the Selom default; the toolbar picker restyles live and export reflects it.
+  const [activeStyle, setActiveStyle] = React.useState({ id: "selom", label: "Selom default" });
+  // When the export popover is open, the page dims+blurs behind it but the figure
+  // artboard stays crisp (it's the subject of the export) — see EditorWorkspace `elevated`.
+  const [exportOpen, setExportOpen] = React.useState(false);
   // Publish-confidence bundle for the current figure (B4): methods-text + repro record + guardrails.
   const [bundle, setBundle] = React.useState<{
     provenance?: SkillProvenance;
@@ -92,6 +99,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         const file = lastFile ?? new File(["mock"], datasets.find((d) => d.id === datasetId)?.filename ?? "data.csv");
         const res = await runSkill(runtimeSkillId(step.skillId), file, step.params, designFile);
         figure.init(res.figure);
+        setActiveStyle({ id: "selom", label: "Selom default" }); // runs render in the default style
         setBundle({ provenance: res.provenance, methods: res.methods, guardrails: res.guardrails });
         const name = getSkill(step.skillId)?.name ?? step.skillId;
         projectStore.addFigure(projectId, { title: `${name} — figure`, datasetId, skillId: step.skillId });
@@ -303,15 +311,26 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                   </Button>
                   <span className="ml-2 text-xs text-muted-foreground">Editing live — every change is a JSON-Patch.</span>
                   <div className="ml-auto flex items-center gap-1.5">
-                    <ExportMenu spec={figure.spec} filename={`selom-${bundle?.provenance?.skill?.id ?? "figure"}`} />
-                    <Button variant="ghost" size="sm" onClick={() => { figure.reset(); setBundle(null); setTab("workbench"); }}>
+                    <StylePicker
+                      store={figure}
+                      skillId={bundle?.provenance?.skill?.id}
+                      value={activeStyle.id}
+                      onChange={(id, label) => setActiveStyle({ id, label })}
+                    />
+                    <ExportMenu
+                      spec={figure.spec}
+                      filename={`selom-${bundle?.provenance?.skill?.id ?? "figure"}`}
+                      activeStyleLabel={activeStyle.label}
+                      onOpenChange={setExportOpen}
+                    />
+                    <Button variant="ghost" size="sm" onClick={() => { figure.reset(); setBundle(null); setActiveStyle({ id: "selom", label: "Selom default" }); setTab("workbench"); }}>
                       New figure
                     </Button>
                   </div>
                 </div>
                 <PublishConfidence provenance={bundle?.provenance} methods={bundle?.methods} guardrails={bundle?.guardrails} />
                 <div className="flex min-h-[520px] flex-1 overflow-hidden rounded-xl border border-border bg-background">
-                  <EditorWorkspace store={figure} />
+                  <EditorWorkspace store={figure} elevated={exportOpen} />
                 </div>
               </div>
             ) : (

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, Download, Loader2, Lock } from "lucide-react";
+import { AlertCircle, Download, Loader2, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { exportFigure, fetchExportPresets, type ExportFormat, type ExportPreset } from "@/lib/export-api";
@@ -22,8 +22,24 @@ const FIT = "__fit__";
  * on-screen figure is never mutated — the backend skins a copy and rasterizes it via
  * Kaleido. A disabled "Style" row marks where installable journal styles will land.
  */
-export function ExportMenu({ spec, filename = "selom-figure" }: { spec: FigureSpec; filename?: string }) {
+export function ExportMenu({
+  spec,
+  filename = "selom-figure",
+  activeStyleLabel = "Selom default",
+  onOpenChange,
+}: {
+  spec: FigureSpec;
+  filename?: string;
+  activeStyleLabel?: string;
+  /** Notifies the parent when the popover opens/closes (so it can keep the figure
+   *  crisp above the scrim while the rest of the page blurs). */
+  onOpenChange?: (open: boolean) => void;
+}) {
   const [open, setOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    onOpenChange?.(open);
+  }, [open, onOpenChange]);
   const [format, setFormat] = React.useState<ExportFormat>("png");
   const [presets, setPresets] = React.useState<ExportPreset[]>([]);
   const [presetId, setPresetId] = React.useState<string>(FIT);
@@ -84,7 +100,7 @@ export function ExportMenu({ spec, filename = "selom-figure" }: { spec: FigureSp
       <Button
         variant="outline"
         size="sm"
-        className="gap-1.5"
+        className="relative z-50 gap-1.5"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -94,11 +110,18 @@ export function ExportMenu({ spec, filename = "selom-figure" }: { spec: FigureSp
       </Button>
 
       {open && (
-        <div
-          role="dialog"
-          aria-label="Export figure"
-          className="absolute right-0 z-50 mt-2 w-72 origin-top-right rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-xl"
-        >
+        <>
+          {/* Scrim: dim + blur the busy page so the popover reads as a focused layer. */}
+          <div
+            className="fixed inset-0 z-40 bg-background/55 backdrop-blur-[3px] motion-safe:animate-in motion-safe:fade-in-0"
+            aria-hidden
+            onClick={() => setOpen(false)}
+          />
+          <div
+            role="dialog"
+            aria-label="Export figure"
+            className="absolute right-0 z-50 mt-2 w-72 origin-top-right rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl ring-1 ring-border motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95"
+          >
           {/* Format — segmented control */}
           <fieldset className="space-y-1.5">
             <legend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Format</legend>
@@ -150,11 +173,14 @@ export function ExportMenu({ spec, filename = "selom-figure" }: { spec: FigureSp
             </p>
           </div>
 
-          {/* Style slot — forward-compatible (installable journal styles land here) */}
-          <div className="mt-2 flex items-center gap-2 rounded-lg border border-dashed border-border/70 px-2.5 py-1.5">
-            <Lock className="size-3.5 text-muted-foreground/70" />
+          {/* Style — reflects the active journal style (set in the editor toolbar);
+              export is WYSIWYG, so the download uses whatever style is showing. */}
+          <div className="mt-2 flex items-center gap-2 rounded-lg border border-border/70 bg-background/40 px-2.5 py-1.5">
+            <Palette className="size-3.5 text-muted-foreground/80" />
             <span className="text-xs text-muted-foreground">Style</span>
-            <span className="ml-auto text-[11px] text-muted-foreground/80">Selom default · more soon</span>
+            <span className="ml-auto truncate text-[11px] font-medium text-foreground/80" title="Change in the toolbar">
+              {activeStyleLabel}
+            </span>
           </div>
 
           {error && (
@@ -168,7 +194,8 @@ export function ExportMenu({ spec, filename = "selom-figure" }: { spec: FigureSp
             {busy ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
             {busy ? "Rendering…" : `Export ${format.toUpperCase()}`}
           </Button>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

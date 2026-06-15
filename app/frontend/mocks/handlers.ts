@@ -1,9 +1,11 @@
 import { http, HttpResponse } from "msw";
 import { CATALOG } from "@/lib/catalog/seed";
+import type { FigureSpec } from "@/lib/figure-spec";
 import { stubUmapFigure } from "./stub-figure";
 import { mockBundle } from "./stub-bundle";
 import { compileFixture, getFixtureSet, searchFixture } from "./gene-sets-fixture";
 import { EXPORT_PRESETS, mockExportFile } from "./export-fixture";
+import { FIGURE_STYLES, mockApplyStyle } from "./styles-fixture";
 
 // Mirrors the live contract from app/backend/main.py:
 //   GET  /skills                 -> SkillCatalogEntry[]  (live registry, B3)
@@ -47,6 +49,15 @@ export const handlers = [
         "Content-Disposition": `attachment; filename="${body.filename ?? "selom-figure"}.${format}"`,
       },
     });
+  }),
+  // Journal styles (journal-styles v1): the style catalog + a live restyle. The mock
+  // remaps palette/font/bg so the editor preview visibly changes offline; the real
+  // backend runs the full theme transform.
+  http.get("/api/figures/styles", () => HttpResponse.json({ styles: FIGURE_STYLES })),
+  http.post("/api/figures/style/apply", async ({ request }) => {
+    const body = (await request.json()) as { figure?: FigureSpec; style?: string };
+    if (!body.figure?.data) return new HttpResponse(null, { status: 400 });
+    return HttpResponse.json({ figure: mockApplyStyle(body.figure, body.style ?? "selom") });
   }),
   http.post("/api/skills/:skillId/run", async ({ params, request }) => {
     // A real upload would parse `matrix`; the stub is input-independent by design,

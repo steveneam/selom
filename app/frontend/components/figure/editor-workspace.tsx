@@ -2,9 +2,10 @@
 
 import { FigureCanvas } from "./figure-canvas";
 import { PropertyPanel } from "./property-panel";
+import { cn } from "@/lib/cn";
 import type { FigureStore } from "@/hooks/use-figure-store";
 
-export function EditorWorkspace({ store }: { store: FigureStore }) {
+export function EditorWorkspace({ store, elevated = false }: { store: FigureStore; elevated?: boolean }) {
   const spec = store.spec;
   if (!spec) return null;
   const fixed = typeof spec.layout.width === "number";
@@ -22,7 +23,12 @@ export function EditorWorkspace({ store }: { store: FigureStore }) {
           }}
         />
         <div
-          className="relative flex rounded-xl border border-border bg-artboard p-3 shadow-2xl ring-1 ring-black/5"
+          className={cn(
+            "relative flex rounded-xl border border-border bg-artboard p-3 shadow-2xl ring-1 ring-black/5",
+            // During export, the figure is the subject — lift it above the scrim (z-40)
+            // but below the popover (z-50) so the rest of the page blurs around it.
+            elevated && "z-[45]",
+          )}
           style={
             fixed ? undefined : { width: "100%", maxWidth: "64rem", height: "min(74vh, 720px)" }
           }
