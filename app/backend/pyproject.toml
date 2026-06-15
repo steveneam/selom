@@ -41,6 +41,14 @@ scrna = [
   # curves. Avoids scFates itself (pulls GPL elpigraph-python) and R-only Slingshot.
   "simpleppt>=1.1",
 ]
+# Journal figure export (B4): Kaleido v1 (github.com/plotly/Kaleido) rasterizes a Plotly
+# spec to PNG/SVG/PDF by driving the SYSTEM Chrome over CDP — pure-Python, no bundled
+# Chromium, no container at runtime. Deliberately split out of the heavy `omics` extra so
+# export works on a `uv sync --extra export` without pulling scvi-tools/PyTorch. The Linux
+# deploy image still needs a browser installed (RISKS #2 — a B8 deploy concern, not this one).
+export = [
+  "kaleido>=1.3",
+]
 # Full heavy stack (superset of scrna): adds scvi-tools/PyTorch, proteomics, and Kaleido export
 # for later buckets (trajectory, proteomics volcano, journal-preset export). Multi-GB install.
 #
@@ -56,13 +64,13 @@ scrna = [
 # listed for later pathway work; re-check its license at the pre-launch SCA gate.
 omics = [
   "selom-backend[scrna]",
+  "selom-backend[export]",
   "scvi-tools>=1.4.3",
   "decoupler",
   "pydeseq2>=0.5.4",
   "alphastats",
   "pyteomics",
   "statsmodels",
-  "kaleido>=1.3",
 ]
 # Async job path (B3): arq + Redis queue (DECISIONS #6) + boto3 for the R2 result
 # store. OPTIONAL — the default inline executor + local-filesystem result store need

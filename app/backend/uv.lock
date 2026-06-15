@@ -3886,6 +3886,9 @@ dev = [
     { name = "pytest" },
     { name = "ruff" },
 ]
+export = [
+    { name = "kaleido" },
+]
 jobs = [
     { name = "arq" },
     { name = "boto3" },
@@ -3923,7 +3926,7 @@ requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.136.3" },
     { name = "httpx", marker = "extra == 'dev'" },
     { name = "igraph", marker = "extra == 'scrna'", specifier = ">=0.11" },
-    { name = "kaleido", marker = "extra == 'omics'", specifier = ">=1.3" },
+    { name = "kaleido", marker = "extra == 'export'", specifier = ">=1.3" },
     { name = "leidenalg", marker = "extra == 'scrna'", specifier = ">=0.10" },
     { name = "numpy", specifier = ">=2.4" },
     { name = "openpyxl" },
@@ -3940,12 +3943,13 @@ requires-dist = [
     { name = "scikit-learn" },
     { name = "scipy" },
     { name = "scvi-tools", marker = "extra == 'omics'", specifier = ">=1.4.3" },
+    { name = "selom-backend", extras = ["export"], marker = "extra == 'omics'" },
     { name = "selom-backend", extras = ["scrna"], marker = "extra == 'omics'" },
     { name = "simpleppt", marker = "extra == 'scrna'", specifier = ">=1.1" },
     { name = "statsmodels", marker = "extra == 'omics'" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.49.0" },
 ]
-provides-extras = ["scrna", "omics", "jobs", "dev"]
+provides-extras = ["scrna", "export", "omics", "jobs", "dev"]
 
 [[package]]
 name = "sentry-sdk"

@@ -4,10 +4,11 @@ import pathlib
 import shutil
 import tempfile
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+import export
 import guardrails
 import methods
 import provenance
@@ -151,3 +152,45 @@ def job_result(job_id: str):
     if bundle is None:
         raise HTTPException(status_code=404, detail="result not available")
     return bundle                                     # {figure, provenance, methods} — same shape as /run
+
+
+@app.get("/figures/export/presets")
+def export_presets():
+    # Journal-preset catalog (B4 journal export): the FE export menu renders from
+    # this so sizes live in one place (export.PRESETS).
+    return {"presets": export.list_presets()}
+
+
+class ExportRequest(BaseModel):
+    figure: dict                       # Plotly {data, layout} spec — the edited figure
+    format: str = "png"                # png | svg | pdf
+    preset: str | None = None          # journal size preset id (export.PRESETS)
+    width: int | None = None           # explicit px overrides (preset wins if both unset)
+    height: int | None = None
+    filename: str | None = None        # download name (extension is forced to match format)
+
+
+_EXPORT_MEDIA = {"png": "image/png", "svg": "image/svg+xml", "pdf": "application/pdf"}
+
+
+@app.post("/figures/export")
+async def export_figure(req: ExportRequest):
+    # Render the edited figure to a publication-ready file via Kaleido + system
+    # Chrome (no container at runtime). Off-thread so the sync render doesn't block
+    # the event loop; a kaleido-less / Chrome-less install degrades to a clean 503.
+    fmt = req.format.lower()
+    if fmt not in export.FORMATS:
+        raise HTTPException(status_code=400, detail=f"unsupported format '{req.format}'")
+    if not isinstance(req.figure, dict) or "data" not in req.figure:
+        raise HTTPException(status_code=400, detail="figure must be a Plotly spec with a data array")
+    try:
+        data = await asyncio.to_thread(
+            export.render, req.figure, fmt, preset=req.preset, width=req.width, height=req.height
+        )
+    except export.ExportUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    name = (req.filename or "selom-figure").rsplit(".", 1)[0] or "selom-figure"
+    headers = {"Content-Disposition": f'attachment; filename="{name}.{fmt}"'}
+    return Response(content=data, media_type=_EXPORT_MEDIA[fmt], headers=headers)
