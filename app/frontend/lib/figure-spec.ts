@@ -157,3 +157,32 @@ export function findColorbarTrace(spec: FigureSpec): { index: number; base: stri
   }
   return null;
 }
+
+/* ---- Journal-style stamp (journal-styles v1) ---------------------------------
+ * The active journal style lives INSIDE the spec (layout.meta.selomStyle), not in
+ * separate React state — so it rides the same undo/redo history as the restyle it
+ * describes. Undo a style-pick → the spec (and its stamp) reverts → the toolbar
+ * picker + export label rewind automatically. `meta` is Plotly's free-form layout
+ * escape hatch (ignored at render), so this never affects the figure or the export.
+ */
+export interface StyleStamp {
+  id: string;
+  label: string;
+}
+
+export const DEFAULT_STYLE: StyleStamp = { id: "selom", label: "Selom default" };
+
+/** The journal style stamped into a spec, or the default when none is stamped. */
+export function readStyleStamp(spec: FigureSpec | null | undefined): StyleStamp {
+  const s = (spec?.layout?.meta as { selomStyle?: Partial<StyleStamp> } | undefined)?.selomStyle;
+  return s && typeof s === "object" && typeof s.id === "string"
+    ? { id: s.id, label: typeof s.label === "string" ? s.label : s.id }
+    : DEFAULT_STYLE;
+}
+
+/** Return a copy of `layout` with the style stamp written into meta (other meta kept). */
+export function stampStyle(layout: PlotlyLayout, stamp: StyleStamp): PlotlyLayout {
+  const meta = layout?.meta;
+  const base = meta && typeof meta === "object" && !Array.isArray(meta) ? meta : {};
+  return { ...layout, meta: { ...base, selomStyle: stamp } };
+}

@@ -4,7 +4,7 @@ import * as React from "react";
 import { AlertCircle, Download, Loader2, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { exportFigure, fetchExportPresets, type ExportFormat, type ExportPreset } from "@/lib/export-api";
+import { exportFigure, fetchExportPresets, resolveExportDimensions, type ExportFormat, type ExportPreset } from "@/lib/export-api";
 import type { FigureSpec } from "@/lib/figure-spec";
 
 const FORMATS: { id: ExportFormat; label: string; hint: string }[] = [
@@ -47,6 +47,13 @@ export function ExportMenu({
   const [error, setError] = React.useState<string | null>(null);
   const ref = React.useRef<HTMLDivElement>(null);
 
+  // Preview the exact file this will produce (mirrors the backend's resolve_dimensions).
+  const dims = React.useMemo(
+    () => resolveExportDimensions(spec, format, presetId === FIT ? undefined : presets.find((p) => p.id === presetId)),
+    [spec, format, presetId, presets],
+  );
+  const isVector = format !== "png";
+
   // Load the journal presets the first time the menu opens (optional — falls back to FIT).
   React.useEffect(() => {
     if (!open || presets.length) return;
@@ -65,7 +72,12 @@ export function ExportMenu({
   React.useEffect(() => {
     if (!open) return;
     function onDown(e: PointerEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as HTMLElement | null;
+      // The Size <Select> renders its listbox in a Radix portal OUTSIDE this popover,
+      // so a click on a preset option is technically "outside" — don't let that dismiss
+      // the popover (otherwise picking a journal size closes the whole menu).
+      if (target?.closest("[data-radix-popper-content-wrapper]")) return;
+      if (ref.current && target && !ref.current.contains(target)) setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
@@ -164,13 +176,24 @@ export function ExportMenu({
                 ))}
               </SelectContent>
             </Select>
-            <p className="min-h-[1rem] text-[11px] text-muted-foreground">
-              {presetId === FIT
-                ? format === "png"
-                  ? "On-screen size, 2× for a crisp raster."
-                  : "On-screen size, scalable vector."
-                : (presets.find((p) => p.id === presetId)?.note ?? "")}
-            </p>
+            {/* Output preview: the exact file you'll get. A journal preset sets the
+                column width + DPI; the height keeps the figure's aspect (no crop). */}
+            <div className="rounded-md bg-muted/40 px-2.5 py-1.5 text-[11px] leading-snug">
+              <div className="font-semibold text-foreground/85">
+                {dims.widthMm != null
+                  ? `${dims.widthMm} × ${dims.heightMm} mm`
+                  : `${dims.widthPx.toLocaleString()} × ${dims.heightPx.toLocaleString()} px`}
+              </div>
+              <div className="text-muted-foreground">
+                {dims.widthMm != null
+                  ? isVector
+                    ? "scalable vector"
+                    : `${dims.widthPx.toLocaleString()} × ${dims.heightPx.toLocaleString()} px · ${dims.dpi} dpi`
+                  : isVector
+                    ? "figure size · scalable vector"
+                    : "figure size · 2× raster"}
+              </div>
+            </div>
           </div>
 
           {/* Style — reflects the active journal style (set in the editor toolbar);

@@ -13,6 +13,66 @@ export type ExportFormat = "png" | "svg" | "pdf";
 
 const EXT: Record<ExportFormat, string> = { png: "png", svg: "svg", pdf: "pdf" };
 
+/* ---- Output-size preview --------------------------------------------------------
+ * Tiny mirror of app/backend/export.py `resolve_dimensions`, kept in one place so the
+ * export menu can show the EXACT file the backend will produce before the user clicks.
+ * The backend stays authoritative for the actual render — this is a preview label only.
+ * Key fact it surfaces: a journal preset sets the column WIDTH + DPI; the height keeps
+ * the figure's own aspect (4:3 for an autosize figure), so the export isn't cropped.
+ */
+const CSS_DPI = 96;
+const MM_PER_IN = 25.4;
+const DEFAULT_WIDTH_PX = 800;
+const DEFAULT_ASPECT = 4 / 3;
+
+/** The aspect ratio the export uses: the figure's own w/h if it has both, else 4:3. */
+export function figureExportAspect(figure: FigureSpec): number {
+  const w = figure.layout?.width;
+  const h = figure.layout?.height;
+  return typeof w === "number" && typeof h === "number" && h ? w / h : DEFAULT_ASPECT;
+}
+
+export interface ExportDimensions {
+  /** Final delivered pixels (already includes the DPI `scale` multiplier). */
+  widthPx: number;
+  heightPx: number;
+  /** Physical size in mm when a journal preset is chosen (else undefined). */
+  widthMm?: number;
+  heightMm?: number;
+  dpi?: number;
+}
+
+/** Compute the export's output size for a format + optional preset (mirrors the backend). */
+export function resolveExportDimensions(
+  figure: FigureSpec,
+  format: ExportFormat,
+  preset: ExportPreset | undefined,
+): ExportDimensions {
+  const raster = format === "png";
+  const aspect = figureExportAspect(figure);
+  let baseWidth: number;
+  let scale = 1;
+  if (preset) {
+    baseWidth = Math.round((preset.width_mm / MM_PER_IN) * CSS_DPI);
+    if (raster) scale = preset.dpi / CSS_DPI;
+  } else {
+    const w = figure.layout?.width;
+    baseWidth = typeof w === "number" ? Math.round(w) : DEFAULT_WIDTH_PX;
+    if (raster) scale = 2; // retina default when exporting at the figure's own size
+  }
+  const baseHeight = Math.round(baseWidth / aspect);
+  const dims: ExportDimensions = {
+    widthPx: Math.max(1, Math.round(baseWidth * scale)),
+    heightPx: Math.max(1, Math.round(baseHeight * scale)),
+  };
+  if (preset) {
+    dims.widthMm = preset.width_mm;
+    dims.heightMm = Math.round((preset.width_mm / aspect) * 10) / 10;
+    dims.dpi = preset.dpi;
+  }
+  return dims;
+}
+
 /**
  * Journal size presets the export menu offers. Mirrors GET /figures/export/presets
  * (app/backend/main.py); the menu still works if this fails — it falls back to

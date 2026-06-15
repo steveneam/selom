@@ -18,6 +18,7 @@ import { useFigureStore } from "@/hooks/use-figure-store";
 import { getSkill } from "@/lib/catalog/seed";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 import { projectStore, select, useProjects } from "@/lib/projects/store";
+import { readStyleStamp } from "@/lib/figure-spec";
 import { runSkill, runtimeSkillId, type SkillGuardrail, type SkillMethods, type SkillProvenance } from "@/lib/skills-api";
 import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
 
@@ -45,9 +46,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [incomingFile, setIncomingFile] = React.useState<File | null>(null);
   const [running, setRunning] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  // Active journal style for the current figure (journal-styles v1). Runs come out
-  // in the Selom default; the toolbar picker restyles live and export reflects it.
-  const [activeStyle, setActiveStyle] = React.useState({ id: "selom", label: "Selom default" });
+  // Active journal style for the current figure (journal-styles v1) — DERIVED from the
+  // spec's stamp (layout.meta.selomStyle), not held separately, so undo/redo and "New
+  // figure" rewind the picker label for free. Runs come out in the Selom default.
+  const activeStyle = readStyleStamp(figure.spec);
   // When the export popover is open, the page dims+blurs behind it but the figure
   // artboard stays crisp (it's the subject of the export) — see EditorWorkspace `elevated`.
   const [exportOpen, setExportOpen] = React.useState(false);
@@ -98,8 +100,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       try {
         const file = lastFile ?? new File(["mock"], datasets.find((d) => d.id === datasetId)?.filename ?? "data.csv");
         const res = await runSkill(runtimeSkillId(step.skillId), file, step.params, designFile);
-        figure.init(res.figure);
-        setActiveStyle({ id: "selom", label: "Selom default" }); // runs render in the default style
+        figure.init(res.figure); // fresh spec carries no style stamp → activeStyle derives the default
         setBundle({ provenance: res.provenance, methods: res.methods, guardrails: res.guardrails });
         const name = getSkill(step.skillId)?.name ?? step.skillId;
         projectStore.addFigure(projectId, { title: `${name} — figure`, datasetId, skillId: step.skillId });
@@ -331,7 +332,6 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                       store={figure}
                       skillId={bundle?.provenance?.skill?.id}
                       value={activeStyle.id}
-                      onChange={(id, label) => setActiveStyle({ id, label })}
                     />
                     <ExportMenu
                       spec={figure.spec}
@@ -339,7 +339,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                       activeStyleLabel={activeStyle.label}
                       onOpenChange={setExportOpen}
                     />
-                    <Button variant="ghost" size="sm" onClick={() => { figure.reset(); setBundle(null); setActiveStyle({ id: "selom", label: "Selom default" }); setTab("workbench"); }}>
+                    <Button variant="ghost" size="sm" onClick={() => { figure.reset(); setBundle(null); setTab("workbench"); }}>
                       New figure
                     </Button>
                   </div>

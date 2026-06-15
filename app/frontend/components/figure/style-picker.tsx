@@ -4,6 +4,7 @@ import * as React from "react";
 import { AlertCircle, Loader2, Palette } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { applyStyle, fetchStyles, type FigureStyle } from "@/lib/styles-api";
+import { stampStyle } from "@/lib/figure-spec";
 import type { Operation } from "@/lib/patch";
 import type { FigureStore } from "@/hooks/use-figure-store";
 
@@ -12,19 +13,20 @@ import type { FigureStore } from "@/hooks/use-figure-store";
  *
  * Picking a style restyles the live figure: the single Python theme transform runs
  * server-side and the result is committed as ONE undoable edit (replace data+layout),
- * so the figure stays editable and undo reverts the restyle. Export is WYSIWYG, so the
- * download reflects whatever style is showing. On failure the controlled value reverts.
+ * so the figure stays editable and undo reverts the restyle. The active style is
+ * STAMPED into the spec (layout.meta.selomStyle) as part of that same commit, so the
+ * picker `value` is derived from the spec by the parent — undo rewinds the figure AND
+ * the picker label together. Export is WYSIWYG, so the download reflects what's showing.
+ * On failure nothing commits, so the controlled value stays put.
  */
 export function StylePicker({
   store,
   skillId,
   value,
-  onChange,
 }: {
   store: FigureStore;
   skillId?: string;
   value: string;
-  onChange: (id: string, label: string) => void;
 }) {
   const [styles, setStyles] = React.useState<FigureStyle[]>([]);
   const [busy, setBusy] = React.useState(false);
@@ -48,12 +50,13 @@ export function StylePicker({
     setError(null);
     try {
       const styled = await applyStyle(store.spec, skillId, styleId);
+      const label = styles.find((s) => s.id === styleId)?.label ?? styleId;
       const ops: Operation[] = [
         { op: "replace", path: "/data", value: styled.data },
-        { op: "replace", path: "/layout", value: styled.layout },
+        // Stamp the chosen style into the styled layout so undo rewinds the picker label.
+        { op: "replace", path: "/layout", value: stampStyle(styled.layout, { id: styleId, label }) },
       ];
-      store.commit(ops); // one undoable history entry
-      onChange(styleId, styles.find((s) => s.id === styleId)?.label ?? styleId);
+      store.commit(ops); // one undoable history entry (figure + style stamp together)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Style failed.");
     } finally {
