@@ -1,4 +1,4 @@
-import type { SkillGuardrail, SkillMethods, SkillProvenance } from "@/lib/skills-api";
+import type { SkillGuardrail, SkillMethods, SkillProvenance, StatsTable } from "@/lib/skills-api";
 
 /**
  * A representative publish-confidence bundle for the MSW mock (B4), so the panel
@@ -115,4 +115,39 @@ export function mockBundle(
 
 function titleize(slug: string): string {
   return slug.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Skills whose figure carries a tabular DE result (Pillar 1 Statistics node).
+const DE_SKILLS = new Set(["deg", "volcano", "proteomics_de"]);
+
+/**
+ * A representative Statistics `table` for the mock (Pillar 1, Decision D7), so the
+ * Statistics node renders offline (`npm run dev:mock`). Purely-visual skills get null.
+ * The real table comes from the backend runner (skills/_table.py).
+ */
+export function mockTable(skillId: string): StatsTable | null {
+  if (DE_SKILLS.has(skillId)) {
+    const genes = ["RHO", "PDE6B", "GNAT1", "NRL", "CRX", "RCVRN", "SAG", "GUCA1A", "RBP3", "OPN1SW", "NR2E3", "ROM1"];
+    const rows = genes.map((g, i): (string | number)[] => {
+      const lfc = Number(((i % 2 ? 1 : -1) * (3.4 - i * 0.22)).toFixed(3));
+      const padj = Number(Math.min(0.5, 1e-6 * 10 ** (i * 0.5)).toPrecision(2));
+      const direction = lfc >= 1 ? "up" : lfc <= -1 ? "down" : "n.s.";
+      return [g, lfc, padj, direction];
+    });
+    return { columns: ["gene", "log2FC", "padj", "direction"], rows, title: "Differential expression" };
+  }
+  if (skillId === "enrichment") {
+    return {
+      columns: ["pathway", "-log10 padj", "overlap genes"],
+      rows: [
+        ["Reactome: Phototransduction", 6.2, 18],
+        ["GO: Visual perception", 5.4, 22],
+        ["Reactome: Cilium assembly", 4.8, 14],
+        ["GO: Photoreceptor outer segment", 4.1, 11],
+        ["Reactome: Retinoid metabolism", 3.3, 9],
+      ],
+      title: "Enrichment results",
+    };
+  }
+  return null;
 }

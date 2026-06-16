@@ -2,7 +2,7 @@ import { http, HttpResponse } from "msw";
 import { CATALOG } from "@/lib/catalog/seed";
 import type { FigureSpec } from "@/lib/figure-spec";
 import { stubUmapFigure } from "./stub-figure";
-import { mockBundle } from "./stub-bundle";
+import { mockBundle, mockTable } from "./stub-bundle";
 import { compileFixture, getFixtureSet, searchFixture } from "./gene-sets-fixture";
 import { EXPORT_PRESETS, mockExportFile } from "./export-fixture";
 import { FIGURE_STYLES, mockApplyStyle } from "./styles-fixture";
@@ -65,6 +65,10 @@ export const handlers = [
     // representative B4 bundle so the publish-confidence panel renders offline too.
     const skillId = String(params.skillId);
     const query = Object.fromEntries(new URL(request.url).searchParams.entries());
-    return HttpResponse.json({ figure: stubUmapFigure(), ...mockBundle(skillId, query) });
+    return HttpResponse.json({
+      figure: stubUmapFigure(),
+      ...mockBundle(skillId, query),
+      table: mockTable(skillId),
+    });
   }),
 ];

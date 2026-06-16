@@ -46,6 +46,8 @@ export interface SkillRunResponse {
   provenance?: SkillProvenance;
   methods?: SkillMethods;
   guardrails?: SkillGuardrail[];
+  // Statistics result (Pillar 1, Decision D7) — null for purely-visual skills.
+  table?: StatsTable | null;
 }
 
 export type SkillParams = Record<string, string | number | boolean>;
@@ -115,5 +117,6 @@ export async function runSkill(
     provenance: json.provenance,
     methods: json.methods,
     guardrails: json.guardrails,
+    table: json.table ?? null,
   };
 }

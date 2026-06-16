@@ -8,6 +8,7 @@ import { Dropzone } from "./dropzone";
 import { WorkbenchPanel } from "./workbench-panel";
 import { PublishConfidence } from "./publish-confidence";
 import { StaleBadge } from "./stale-badge";
+import { StatsPanel } from "./stats-panel";
 import { Pipeline, type StageKey, type StageState } from "@/components/pipeline";
 import { EditorWorkspace } from "@/components/figure/editor-workspace";
 import { ExportMenu } from "@/components/figure/export-menu";
@@ -21,6 +22,7 @@ import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 import { projectStore, select, useProjects } from "@/lib/projects/store";
 import type { Dataset, Figure } from "@/lib/projects/types";
 import { figureStaleness } from "@/lib/lineage/staleness";
+import { deriveTable } from "@/lib/lineage/derive-table";
 import { readStyleStamp } from "@/lib/figure-spec";
 import { runSkill, runtimeSkillId, type SkillProvenance } from "@/lib/skills-api";
 import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
@@ -94,6 +96,9 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // Re-run needs the dataset bytes: present this session (lastFile) or fabricated in
   // mock mode; with neither (e.g. after reload against a real backend) it's disabled.
   const canRerun = !!activeFigure?.skillId && !!activeFigure?.provenance && (lastFile != null || mockMode);
+  // Statistics node (Pillar 1): the figure's stored result table, or a fallback derived
+  // from the figure traces (D3); omitted entirely when there's nothing tabular.
+  const statsTable = activeFigure?.table ?? deriveTable(figure.spec);
 
   // Consume a command-palette intent for this project: switch tab, and (when a
   // skill was named) install it and pre-select it in the Workbench. Runs on
@@ -161,6 +166,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           provenance: stampDataVersion(res.provenance, dataset),
           methods: res.methods,
           guardrails: res.guardrails,
+          table: res.table ?? undefined,
         });
         setActiveFigureId(saved.id);
         figure.init(res.figure); // fresh spec carries no style stamp → activeStyle derives the default
@@ -195,6 +201,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           provenance: stampDataVersion(res.provenance, dataset),
           methods: res.methods,
           guardrails: res.guardrails,
+          table: res.table ?? undefined,
           parentFigureId: fig.id,
           variantLabel: "re-run",
         });
@@ -481,6 +488,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                   </div>
                 </div>
                 <PublishConfidence provenance={bundle?.provenance} methods={bundle?.methods} guardrails={bundle?.guardrails} />
+                {statsTable && <StatsPanel table={statsTable} />}
                 <div className="flex min-h-[520px] flex-1 overflow-hidden rounded-xl border border-border bg-background">
                   <EditorWorkspace store={figure} elevated={exportOpen} />
                 </div>
