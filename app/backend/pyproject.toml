@@ -70,9 +70,12 @@ pdf = [
 # Integration path: run OmicVerse in an ISOLATED worker/env (its own venv or container, the
 # §6.5C/E per-skill-env model) and call it out-of-process; do NOT downgrade the main stack.
 # Tracked: RISKS #9, plans/v2-backend.md backlog, docs/integrations.md.
-# SCA: `gseapy` was DROPPED — enrichment uses an in-house hypergeometric ORA
-# (DECISIONS #9), so gseapy was unused AGPL surface (RISKS #6 / #9). `decoupler` is still
-# listed for later pathway work; re-check its license at the pre-launch SCA gate.
+# SCA: `gseapy` was DROPPED at B3 because enrichment uses an in-house hypergeometric ORA
+# (DECISIONS #9) — it was simply unused, NOT an "AGPL surface" (corrected 2026-06-16:
+# gseapy is BSD-3, not AGPL — the old note conflated gseapy=code with MSigDB=restricted
+# data; RISKS #6 / #9). gseapy.prerank (BSD-3) + blitzgsea (Apache-2.0) are now allowed
+# GSEA engines over our from-GO library and may be re-added here for the Fig5/6 GSEA work.
+# `decoupler` is still listed for later pathway work; re-check its license at the pre-launch SCA gate.
 omics = [
   "selom-backend[scrna]",
   "selom-backend[export]",
