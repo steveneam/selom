@@ -14,7 +14,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from skills.deg.run_real import _bulk, _labels_from_design_or_names, _numeric_time, _timecourse
+from skills.deg.run_real import (
+    _bulk,
+    _labels_from_design_or_names,
+    _numeric_time,
+    _timecourse,
+    tmm_size_factors,
+)
 
 
 @pytest.fixture
@@ -95,6 +101,27 @@ def test_bulk_fallback_recovers_planted_signal(tmp_path, no_pydeseq2):
     assert len(fig["data"][0]["x"]) == 5                     # top_n bars
     import json
     assert json.loads(json.dumps(fig)) == fig               # plain JSON, no numpy leakage
+
+
+# --- TMM normalization toggle ---------------------------------------------------
+
+
+def test_tmm_size_factors_geomean_one_and_composition_corrected():
+    """TMM size factors are geomean-1 and correct composition bias (so they differ from
+    naive library-size scaling) — the property that makes them match an edgeR/limma run."""
+    rnanorm = pytest.importorskip("rnanorm")  # noqa: F841
+    rng = np.random.default_rng(0)
+    mat = rng.poisson(50, size=(500, 6)).astype(float)
+    mat[:5, :3] *= 80  # a few genes dominate samples 0-2 -> their libraries are composition-inflated
+    df = pd.DataFrame(mat, index=[f"g{i}" for i in range(500)], columns=[f"s{i}" for i in range(6)])
+
+    sf = tmm_size_factors(df)
+    assert sf.shape == (6,)
+    assert np.all(sf > 0) and np.isfinite(sf).all()
+    assert abs(np.exp(np.mean(np.log(sf))) - 1.0) < 1e-6, "size factors should have geometric mean 1"
+    lib = df.sum(axis=0).to_numpy(dtype=float)
+    naive = lib / np.exp(np.mean(np.log(lib)))
+    assert not np.allclose(sf, naive, atol=0.05), "TMM should correct composition bias vs raw library size"
 
 
 # --- time-course error contracts + fallback -------------------------------------

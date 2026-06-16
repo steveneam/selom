@@ -151,15 +151,20 @@ def _bulk(data_path: str, params: dict) -> dict:
     sub = sub[sub.sum(axis=1) >= min_count]
 
     top_n = int(params["top_n"])
-    names, scores, engine = _bulk_deseq(sub, cond, reference, treatment, top_n)
+    normalization = str(params.get("normalization") or "deseq2").strip().lower()
+    names, scores, engine = _bulk_deseq(sub, cond, reference, treatment, top_n, normalization)
     subtitle = f"{engine} · {treatment} (n={n_treat}) vs {reference} (n={n_ref}) · {sub.shape[0]} genes tested"
     return _bar(names, scores, f"Top DE genes — {treatment} vs {reference}", jsonable, subtitle)
 
 
-def _bulk_deseq(sub, cond, reference, treatment, top_n):
+def _bulk_deseq(sub, cond, reference, treatment, top_n, normalization="deseq2"):
     """pyDESeq2 Wald (treatment vs reference) on raw counts; CPM-log2FC fallback if absent.
 
-    Returns (gene names, signed log2FC scores, engine label) for the top-N by |log2FC|.
+    ``normalization``: ``deseq2`` (median-of-ratios, the default) or ``tmm`` — edgeR-identical
+    TMM size factors (via rnanorm, Apache-2.0) injected into the otherwise-standard pyDESeq2
+    fit, to match the normalization of an edgeR/limma-voom reference pipeline. The *test* stays
+    DESeq2's Wald (only the normalization changes). Returns (gene names, signed log2FC scores,
+    engine label) for the top-N by |log2FC|.
     """
     import numpy as np
     import pandas as pd
@@ -172,12 +177,21 @@ def _bulk_deseq(sub, cond, reference, treatment, top_n):
         dds = DeseqDataSet(
             counts=sub.T, metadata=metadata, design="~condition", ref_level=["condition", reference], quiet=True
         )
-        dds.deseq2()
+        engine = "pyDESeq2 (Wald)"
+        if normalization == "tmm":
+            try:
+                _fit_deseq_with_tmm(dds, sub)
+                engine = "pyDESeq2 (Wald, TMM norm)"
+            except Exception:
+                dds.deseq2()  # rnanorm absent / API drift → fall back to median-of-ratios
+                engine = "pyDESeq2 (Wald, TMM unavailable)"
+        else:
+            dds.deseq2()
         stat = DeseqStats(dds, contrast=["condition", treatment, reference], quiet=True)
         stat.summary()
         res = stat.results_df.dropna(subset=["log2FoldChange", "padj"])
         res = res.reindex(res["log2FoldChange"].abs().sort_values(ascending=False).index).head(top_n)
-        return [str(g) for g in res.index], [float(v) for v in res["log2FoldChange"]], "pyDESeq2 (Wald)"
+        return [str(g) for g in res.index], [float(v) for v in res["log2FoldChange"]], engine
     except ImportError:
         # Light fallback when pyDESeq2 isn't installed: log2FC of mean CPM per group.
         cpm = sub.div(sub.sum(axis=0), axis=1) * 1e6
@@ -186,6 +200,48 @@ def _bulk_deseq(sub, cond, reference, treatment, top_n):
         lfc = np.log2((b + 1.0) / (a + 1.0))
         lfc = lfc.reindex(lfc.abs().sort_values(ascending=False).index).head(top_n)
         return [str(g) for g in lfc.index], [float(v) for v in lfc], "CPM log2FC (pyDESeq2 absent)"
+
+
+def tmm_size_factors(counts_genes_x_samples):
+    """edgeR-identical TMM size factors (geomean 1) for a genes x samples count frame.
+
+    rnanorm (Apache-2.0) computes the per-sample TMM normalization factor; the DESeq2 size
+    factor is the *effective* library size (lib_size x norm_factor) rescaled to geometric
+    mean 1 — so swapping these into pyDESeq2 reproduces edgeR/limma-voom's TMM normalization.
+    """
+    import numpy as np
+    from rnanorm import TMM
+
+    x = counts_genes_x_samples.T.to_numpy(dtype=float)  # rnanorm wants samples x genes
+    nf = np.asarray(TMM().fit(x).get_norm_factors(x), dtype=float)
+    eff = x.sum(axis=1) * nf                              # effective library size per sample
+    return eff / np.exp(np.mean(np.log(eff)))            # rescale to geometric mean 1
+
+
+def _fit_deseq_with_tmm(dds, sub):
+    """Run the standard pyDESeq2 pipeline but with TMM size factors swapped in.
+
+    Lets pyDESeq2 populate its internal state via ``fit_size_factors()``, overwrites the size
+    factors + normalized counts with the TMM values, then runs the remaining deseq2() steps
+    (dispersions -> LFC -> Cooks). Only the normalization differs from a vanilla ``deseq2()``.
+    """
+    import numpy as np
+
+    sf = tmm_size_factors(sub)
+    dds.fit_size_factors()  # populate logmeans / filtered_genes / internal state first
+    dds.obs["size_factors"] = sf
+    counts = dds.X.toarray() if not isinstance(dds.X, np.ndarray) else dds.X
+    dds.layers["normed_counts"] = counts / sf[:, None]
+    dds.var["_normed_means"] = dds.layers["normed_counts"].mean(axis=0)
+    dds.fit_genewise_dispersions()
+    dds.fit_dispersion_trend()
+    dds.fit_dispersion_prior()
+    dds.fit_MAP_dispersions()
+    dds.fit_LFC()
+    dds.calculate_cooks()
+    if dds.refit_cooks:
+        dds.refit()
+    dds.cooks_outlier()
 
 
 def _bar(names, scores, title, jsonable, subtitle=None) -> dict:

@@ -18,7 +18,8 @@
     "group_val": { "type": "str", "default": "" },
     "time_col":  { "type": "str", "default": "time" },
     "covariate_col": { "type": "str", "default": "" },
-    "min_count": { "type": "int", "default": 10, "min": 0, "max": 1000 }
+    "min_count": { "type": "int", "default": 10, "min": 0, "max": 1000 },
+    "normalization": { "type": "str", "default": "deseq2", "options": ["deseq2", "tmm"] }
   },
   "inputs_optional": [
     { "name": "design", "kind": "csv", "required": false, "note": "sample id + condition/time columns; bulk + time-course" }
