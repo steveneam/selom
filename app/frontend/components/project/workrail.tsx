@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Database, LayoutGrid, Play, Plus, Sparkles, Table2, type LucideIcon } from "lucide-react";
+import { Database, LayoutGrid, Play, Plus, Sparkles, Table2, Trash2, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { StaleBadge } from "./stale-badge";
 import { getSkill } from "@/lib/catalog/seed";
@@ -49,6 +49,7 @@ export function Workrail({
   onRunSkill,
   onSelectStats,
   onSelectFigure,
+  onDeleteFigure,
 }: {
   datasets: Dataset[];
   figureNodes: FigureNode[];
@@ -60,6 +61,7 @@ export function Workrail({
   onRunSkill: () => void;
   onSelectStats: (fig: Figure) => void;
   onSelectFigure: (fig: Figure) => void;
+  onDeleteFigure: (fig: Figure) => void;
 }) {
   const statsNodes = figureNodes.filter((n) => n.hasStats);
 
@@ -173,6 +175,8 @@ export function Workrail({
                 selected={view === "figure" && activeFigureId === n.figure.id}
                 linked={lineage.figureId === n.figure.id}
                 onClick={() => onSelectFigure(n.figure)}
+                onDelete={() => onDeleteFigure(n.figure)}
+                deleteLabel={`Delete figure “${n.figure.title}”`}
               />
             ))
           )}
@@ -226,7 +230,9 @@ function Section({
 }
 
 /** One artifact row in a section. `selected` = open in main pane; `linked` = part of the
- *  active figure's lineage (softer ring). */
+ *  active figure's lineage (softer ring). An optional `onDelete` adds a row action
+ *  (revealed on hover/focus) — kept a sibling button so it never nests inside the
+ *  select button. */
 function Row({
   icon: Icon,
   color,
@@ -236,6 +242,8 @@ function Row({
   selected,
   linked,
   onClick,
+  onDelete,
+  deleteLabel,
 }: {
   icon: LucideIcon;
   color: string;
@@ -245,14 +253,13 @@ function Row({
   selected?: boolean;
   linked?: boolean;
   onClick: () => void;
+  onDelete?: () => void;
+  deleteLabel?: string;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-current={selected ? "true" : undefined}
+    <div
       className={cn(
-        "flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+        "group/row relative flex items-center rounded-lg border transition-colors",
         selected
           ? "border-transparent"
           : linked
@@ -270,15 +277,33 @@ function Row({
             : undefined
       }
     >
-      <span aria-hidden className="grid size-6 shrink-0 place-items-center [&_svg]:size-3.5" style={{ color }}>
-        <Icon />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-medium leading-tight text-foreground">{title}</span>
-        {sub && <span className="block truncate text-[11px] leading-tight text-muted-foreground">{sub}</span>}
-      </span>
-      {badge}
-    </button>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-current={selected ? "true" : undefined}
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      >
+        <span aria-hidden className="grid size-6 shrink-0 place-items-center [&_svg]:size-3.5" style={{ color }}>
+          <Icon />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-medium leading-tight text-foreground">{title}</span>
+          {sub && <span className="block truncate text-[11px] leading-tight text-muted-foreground">{sub}</span>}
+        </span>
+      </button>
+      {badge && <span className="shrink-0 pr-1">{badge}</span>}
+      {onDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          aria-label={deleteLabel}
+          title={deleteLabel}
+          className="mr-1 grid size-6 shrink-0 place-items-center rounded text-muted-foreground/50 opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 group-hover/row:opacity-100 [&_svg]:size-3.5"
+        >
+          <Trash2 />
+        </button>
+      )}
+    </div>
   );
 }
 

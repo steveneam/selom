@@ -26,6 +26,7 @@ import { deriveTable } from "@/lib/lineage/derive-table";
 import { readStyleStamp } from "@/lib/figure-spec";
 import { runSkill, runtimeSkillId, type SkillProvenance } from "@/lib/skills-api";
 import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
+import { pushUndo } from "@/lib/workspace/undo";
 
 /** Map a command-palette intent's tab onto the workrail's view model (Pillar 1, S2.3). */
 function viewFromTab(tab: WorkspaceTab): RailView {
@@ -319,6 +320,20 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     setView("stats");
   }
 
+  // Delete ONE figure (only that figure — never the project). Offers an Undo rather
+  // than a confirm, since the removal is reversible from the returned record. If the
+  // deleted figure was open, drop back to the project home.
+  function deleteFigure(f: Figure) {
+    const removed = projectStore.removeFigure(f.id);
+    if (!removed) return;
+    pushUndo(`Deleted figure “${f.title}”`, () => projectStore.restoreFigure(removed));
+    if (activeFigureId === f.id) {
+      setActiveFigureId(null);
+      figure.reset();
+      if (view === "figure" || view === "stats") setView("home");
+    }
+  }
+
   return (
     <div className="mx-auto flex h-full max-w-7xl flex-col px-6 py-8 lg:px-10">
       {/* header */}
@@ -343,13 +358,21 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           size="sm"
           className="text-muted-foreground hover:text-destructive"
           onClick={() => {
-            if (confirm(`Delete "${project.name}"? This cannot be undone.`)) {
-              projectStore.deleteProject(project.id);
+            const n = datasets.length;
+            const m = figures.length;
+            const msg =
+              `Delete the entire project “${project.name}”?\n\n` +
+              `This removes the whole project — its ${n} dataset${n === 1 ? "" : "s"} and ` +
+              `${m} figure${m === 1 ? "" : "s"}. (To remove a single figure, hover it in the ` +
+              `rail and use its trash icon instead.)\n\nYou can Undo right after.`;
+            if (confirm(msg)) {
+              const snap = projectStore.deleteProject(project.id);
+              pushUndo(`Deleted project “${project.name}”`, () => projectStore.restoreProject(snap));
               router.push("/");
             }
           }}
         >
-          <Trash2 /> Delete
+          <Trash2 /> Delete project
         </Button>
       </div>
 
@@ -372,6 +395,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           onRunSkill={() => setView("skill")}
           onSelectStats={openStats}
           onSelectFigure={openFigure}
+          onDeleteFigure={deleteFigure}
         />
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">

@@ -156,13 +156,38 @@ export const projectStore = {
   renameProject(id: string, name: string) {
     setState({ ...state, projects: state.projects.map((p) => (p.id === id ? { ...p, name } : p)) });
   },
-  deleteProject(id: string) {
+  /**
+   * Delete a project and everything in it, returning a snapshot of exactly what was
+   * removed so the caller can offer an Undo (the mock has no server-side trash). A
+   * confirmed delete is otherwise irreversible — the snapshot is the only safety net.
+   */
+  deleteProject(id: string): ProjectState {
+    const removed: ProjectState = {
+      projects: state.projects.filter((p) => p.id === id),
+      datasets: state.datasets.filter((d) => d.projectId === id),
+      installs: state.installs.filter((i) => i.projectId === id),
+      figures: state.figures.filter((f) => f.projectId === id),
+      geneSets: state.geneSets.filter((g) => g.projectId === id),
+    };
     setState({
       projects: state.projects.filter((p) => p.id !== id),
       datasets: state.datasets.filter((d) => d.projectId !== id),
       installs: state.installs.filter((i) => i.projectId !== id),
       figures: state.figures.filter((f) => f.projectId !== id),
       geneSets: state.geneSets.filter((g) => g.projectId !== id),
+    });
+    return removed;
+  },
+  /** Re-insert a deleted project's slices (Undo). No-op for ids already present. */
+  restoreProject(snap: ProjectState) {
+    const has = new Set(state.projects.map((p) => p.id));
+    if (snap.projects.some((p) => has.has(p.id))) return;
+    setState({
+      projects: [...snap.projects, ...state.projects],
+      datasets: [...state.datasets, ...snap.datasets],
+      installs: [...state.installs, ...snap.installs],
+      figures: [...state.figures, ...snap.figures],
+      geneSets: [...state.geneSets, ...snap.geneSets],
     });
   },
   addDataset(projectId: string, filename: string, modality: Modality): Dataset {
@@ -205,6 +230,17 @@ export const projectStore = {
   /** Persist an in-canvas edit back to the figure's stored spec (durable working spec). */
   updateFigureSpec(id: string, spec: FigureSpec) {
     setState({ ...state, figures: state.figures.map((f) => (f.id === id ? { ...f, spec } : f)) });
+  },
+  /** Delete one figure, returning the removed record so the caller can offer an Undo. */
+  removeFigure(id: string): Figure | undefined {
+    const fig = state.figures.find((f) => f.id === id);
+    if (fig) setState({ ...state, figures: state.figures.filter((f) => f.id !== id) });
+    return fig;
+  },
+  /** Re-insert a deleted figure (Undo). No-op if it's already present. */
+  restoreFigure(fig: Figure) {
+    if (state.figures.some((f) => f.id === fig.id)) return;
+    setState({ ...state, figures: [...state.figures, fig] });
   },
   /**
    * Fork a figure into a new sibling version (copies the parent, applies `patch`,
