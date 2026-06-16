@@ -43,7 +43,7 @@ would be dishonest and would dilute the real signal. So:
 | `pathway` (**Selom Pathway Map**) | Reactome enrichment drawn in the event hierarchy as an **editable, fold-change-coloured** node-link. |
 | `string_network` (**Selom STRING Network**) | Live STRING PPI turned into an **editable** node-link figure. |
 | `gsea` (**Selom GSEA**) | In-house running-enrichment GSEA with leading-edge viz over our own GO library. The engine may wrap `gseapy.prerank` (BSD-3) / `blitzgsea` (Apache-2.0), but the **editable figure + license-clean set library + provenance** are ours. |
-| `cepo` (**Selom Cepo**) _(building)_ | **Clean-room Python reimplementation** of Cepo differential-stability markers — no Python port exists anywhere upstream (R-only, MIT). Real algorithmic IP; validated against the Hani `mmc2` oracle. Cites Kim 2021. Lives in `skills/proprietary/`. |
+| `cepo` (**Selom Cepo**) | **Clean-room Python reimplementation** of Cepo differential-stability markers — no Python port exists anywhere upstream (R-only, MIT). Real algorithmic IP. Validated against the Hani `mmc2` Cepo oracle on real RPGRIP1 data (top-DS genes recover the published markers far above chance — Amacrine p=4e-14, Glial p=1e-6, Bipolar p=2e-8). Cites Kim 2021. First resident of `skills/proprietary/`. |
 
 ### Flagship module (not a figure-skill)
 
