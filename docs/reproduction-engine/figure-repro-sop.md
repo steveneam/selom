@@ -101,3 +101,21 @@ is the problem. Check every one before declaring a verdict. (Fold each into the 
    Quantify the delta before declaring a gap or building a replacement skill.
 9. **Tooling gotchas:** `PYTHONIOENCODING=utf-8` (Windows console dies on ∩/−); redirect Rscript/long
    output to a file then read it (pipe-to-grep can return empty); R is registry-registered, **not on PATH**.
+10. **Batch ≈ genotype confound (the killer for composition/abundance panels).** When each condition is a
+    *single* line/sample (or replicates are *experimental*, not biological), "batch" and "genotype" are
+    confounded and cluster-abundance claims ("subtype X is 2× higher in mutant") may be pure batch. RPGRIP1
+    Fig 6D: un-integrated rod subclustering gave "Rod-2 = 99% MS-VUS" (a batch cluster). **Always check the
+    batch purity of any cluster before trusting an abundance claim**; integrate (Harmony) and re-test; report
+    that the magnitude is structurally unreachable when replication can't separate batch from genotype.
+11. **Naïve scRNA subclustering is batch-confounded — integrate before believing subtypes.** Standard
+    PCA→Louvain on merged samples separates by batch. Run Harmony (or the paper's GLM-PCA/harmonization),
+    confirm subtypes are *shared* across samples (max single-sample share ≪ 1), then test the biology.
+12. **GSEA-engine sensitivity is NOT interchangeable.** gseapy.prerank calls far fewer significant terms
+    than fgsea on the *same* ranking (Fig 6E: 24/36/1 vs 62/95/85). For any "N enriched terms / GO-term Venn"
+    target, run the authors' engine (fgsea) on the same ranking to split engine-delta from upstream-delta.
+13. **Combined-genome deposits.** 10x `features.tsv` may carry a multi-species reference (RPGRIP1 scRNA =
+    GRCh38+mm10, organoids on a mouse substrate). Filter to the analysis species *before* gene-count QC, and
+    keep the off-species fraction as a contamination QC metric — don't let mouse genes inflate `n_genes`.
+14. **Annotation-substitution gaps.** Marker-score annotation (substituting for reference label-transfer)
+    can miss rare types (Fig 6: Retinal-ganglion didn't separate) and add spurious tiny clusters (a 48-cell
+    RPE). Report the cell-type-set delta ({missing}↔{spurious}); the *set* is the target, the *method* differs.
