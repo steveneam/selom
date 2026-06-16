@@ -1,0 +1,32 @@
+{
+  "id": "cepo",
+  "version": "0.1.0",
+  "title": "Cepo stability markers",
+  "engine": "python",
+  "omics": "scrna-seq",
+  "entrypoint": "skills.proprietary.cepo.run:run",
+  "origin": "proprietary",
+  "inputs": [{ "name": "matrix", "kind": "anndata|h5ad", "required": true }],
+  "param_spec": {
+    "group_key":  { "type": "str",   "default": "" },
+    "n_genes":    { "type": "int",   "default": 8,    "min": 1, "max": 30 },
+    "min_cells":  { "type": "int",   "default": 20,   "min": 2, "max": 1000 },
+    "exprs_pct":  { "type": "float", "default": 0.05, "min": 0.0, "max": 1.0 },
+    "normalize":  { "type": "bool",  "default": true }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table",  "kind": "csv" }
+  ],
+  "catalog": {
+    "name": "Selom Cepo",
+    "summary": "Cepo differential-stability cell-type markers — genes that are highly AND stably expressed within a type vs. the rest. Clean-room Python reimplementation (no upstream Python port); catches identity genes mean-difference tests miss.",
+    "category": "single-cell",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".h5ad"],
+    "chains_with": ["annotate", "enrichment", "markers"],
+    "license": "MIT",
+    "popularity": 58
+  }
+}

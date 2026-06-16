@@ -20,6 +20,7 @@ SKILLS = [
     "cluster", "violin", "deg", "volcano", "heatmap", "enrichment", "go_graph", "pathway",
     "markers", "annotate", "trajectory", "pca", "composition", "proteomics_de", "gsea",
     "corr_heatmap", "upset", "scorecard", "normalization_qc", "sankey", "string_network",
+    "cepo",
 ]
 GOLDEN_DIR = pathlib.Path(__file__).parent / "golden"
 
@@ -34,7 +35,10 @@ def test_skill_spec_loads(skill_id):
     spec = load_skill(skill_id)
     assert spec.id == skill_id
     assert spec.engine == "python"
-    assert spec.entrypoint == f"skills.{skill_id}.run:run"
+    # Skills live flat (skills/<id>/) or in the proprietary namespace (skills/proprietary/<id>/).
+    assert spec.entrypoint in (
+        f"skills.{skill_id}.run:run", f"skills.proprietary.{skill_id}.run:run"
+    )
     assert any(o["kind"] == "plotly_spec" for o in spec.outputs)
 
 

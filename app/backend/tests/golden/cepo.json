@@ -1,0 +1,341 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "markers",
+      "x": [
+        "NRL",
+        "GNAT1",
+        "RHO",
+        "PDE6B",
+        "ARR3",
+        "GNGT2",
+        "OPN1SW",
+        "PDE6H",
+        "VSX2",
+        "GRIK1",
+        "TRPM1",
+        "CABP5",
+        "NRL",
+        "GNAT1",
+        "RHO",
+        "PDE6B",
+        "ARR3",
+        "GNGT2",
+        "OPN1SW",
+        "PDE6H",
+        "VSX2",
+        "GRIK1",
+        "TRPM1",
+        "CABP5",
+        "NRL",
+        "GNAT1",
+        "RHO",
+        "PDE6B",
+        "ARR3",
+        "GNGT2",
+        "OPN1SW",
+        "PDE6H",
+        "VSX2",
+        "GRIK1",
+        "TRPM1",
+        "CABP5"
+      ],
+      "y": [
+        "Rods",
+        "Rods",
+        "Rods",
+        "Rods",
+        "Rods",
+        "Rods",
+        "Rods",
+        "Rods",
+        "Rods",
+        "Rods",
+        "Rods",
+        "Rods",
+        "Cones",
+        "Cones",
+        "Cones",
+        "Cones",
+        "Cones",
+        "Cones",
+        "Cones",
+        "Cones",
+        "Cones",
+        "Cones",
+        "Cones",
+        "Cones",
+        "Bipolar",
+        "Bipolar",
+        "Bipolar",
+        "Bipolar",
+        "Bipolar",
+        "Bipolar",
+        "Bipolar",
+        "Bipolar",
+        "Bipolar",
+        "Bipolar",
+        "Bipolar",
+        "Bipolar"
+      ],
+      "marker": {
+        "color": [
+          0.4,
+          0.38,
+          0.36,
+          0.34,
+          -0.12,
+          -0.11,
+          -0.1,
+          -0.09,
+          -0.12,
+          -0.11,
+          -0.1,
+          -0.09,
+          -0.12,
+          -0.11,
+          -0.1,
+          -0.09,
+          0.4,
+          0.38,
+          0.36,
+          0.34,
+          -0.12,
+          -0.11,
+          -0.1,
+          -0.09,
+          -0.12,
+          -0.11,
+          -0.1,
+          -0.09,
+          -0.12,
+          -0.11,
+          -0.1,
+          -0.09,
+          0.4,
+          0.38,
+          0.36,
+          0.34
+        ],
+        "colorscale": "RdBu",
+        "reversescale": true,
+        "cmid": 0,
+        "showscale": true,
+        "colorbar": {
+          "title": {
+            "text": "DS score"
+          }
+        },
+        "size": [
+          22.92,
+          22.04,
+          21.16,
+          20.28,
+          6.2,
+          6.64,
+          7.08,
+          7.52,
+          6.2,
+          6.64,
+          7.08,
+          7.52,
+          6.2,
+          6.64,
+          7.08,
+          7.52,
+          22.92,
+          22.04,
+          21.16,
+          20.28,
+          6.2,
+          6.64,
+          7.08,
+          7.52,
+          6.2,
+          6.64,
+          7.08,
+          7.52,
+          6.2,
+          6.64,
+          7.08,
+          7.52,
+          22.92,
+          22.04,
+          21.16,
+          20.28
+        ],
+        "line": {
+          "color": "#334155",
+          "width": 0.5
+        }
+      },
+      "customdata": [
+        0.86,
+        0.82,
+        0.78,
+        0.74,
+        0.1,
+        0.12,
+        0.14,
+        0.16,
+        0.1,
+        0.12,
+        0.14,
+        0.16,
+        0.1,
+        0.12,
+        0.14,
+        0.16,
+        0.86,
+        0.82,
+        0.78,
+        0.74,
+        0.1,
+        0.12,
+        0.14,
+        0.16,
+        0.1,
+        0.12,
+        0.14,
+        0.16,
+        0.1,
+        0.12,
+        0.14,
+        0.16,
+        0.86,
+        0.82,
+        0.78,
+        0.74
+      ],
+      "hovertemplate": "%{x} \u00b7 %{y}<br>DS %{marker.color:.3f}<br>%{customdata:.0%} of cells expressing<extra></extra>",
+      "name": "cepo"
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Cepo stability markers \u2014 top 4 per cell type (stub)",
+      "subtitle": {
+        "text": "colour = differential stability \u00b7 dot size = % of cells expressing"
+      },
+      "font": {
+        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "size": 16,
+        "color": "#1f2a37"
+      },
+      "x": 0.01,
+      "xanchor": "left"
+    },
+    "xaxis": {
+      "showline": true,
+      "linecolor": "#c4ccd4",
+      "linewidth": 1,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#c4ccd4",
+      "ticklen": 4,
+      "tickwidth": 1,
+      "tickfont": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "zeroline": false,
+      "showgrid": true,
+      "gridcolor": "#eef1f5",
+      "gridwidth": 1,
+      "type": "category",
+      "categoryorder": "array",
+      "categoryarray": [
+        "NRL",
+        "GNAT1",
+        "RHO",
+        "PDE6B",
+        "ARR3",
+        "GNGT2",
+        "OPN1SW",
+        "PDE6H",
+        "VSX2",
+        "GRIK1",
+        "TRPM1",
+        "CABP5"
+      ],
+      "title": {
+        "text": "gene",
+        "font": {
+          "size": 13,
+          "color": "#1f2a37"
+        }
+      }
+    },
+    "yaxis": {
+      "showline": true,
+      "linecolor": "#c4ccd4",
+      "linewidth": 1,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#c4ccd4",
+      "ticklen": 4,
+      "tickwidth": 1,
+      "tickfont": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "zeroline": false,
+      "showgrid": true,
+      "gridcolor": "#eef1f5",
+      "gridwidth": 1,
+      "type": "category",
+      "categoryorder": "array",
+      "categoryarray": [
+        "Rods",
+        "Cones",
+        "Bipolar"
+      ],
+      "title": {
+        "text": "cell type",
+        "font": {
+          "size": 13,
+          "color": "#1f2a37"
+        }
+      }
+    },
+    "plot_bgcolor": "#ffffff",
+    "font": {
+      "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      "size": 13,
+      "color": "#33404d"
+    },
+    "paper_bgcolor": "#ffffff",
+    "colorway": [
+      "#2f6db0",
+      "#e08a2b",
+      "#3f9b6b",
+      "#c0392b",
+      "#7d5ba6",
+      "#1f9aa6",
+      "#9aa017",
+      "#6b7280"
+    ],
+    "hoverlabel": {
+      "font": {
+        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "size": 12
+      },
+      "bgcolor": "#1f2a37"
+    },
+    "margin": {
+      "t": 46,
+      "r": 24,
+      "b": 52,
+      "l": 64
+    },
+    "legend": {
+      "font": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "bgcolor": "rgba(0,0,0,0)",
+      "bordercolor": "rgba(0,0,0,0)"
+    }
+  }
+}
