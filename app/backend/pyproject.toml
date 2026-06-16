@@ -85,6 +85,12 @@ omics = [
   "alphastats",
   "pyteomics",
   "statsmodels",
+  # GSEA engines for the `gsea` skill, over Selom's own license-clean GO library (NOT MSigDB).
+  # Both permissive (DECISIONS #9, corrected 2026-06-16): gseapy = BSD-3 (exposes the running
+  # ES curve), blitzgsea = Apache-2.0 (gamma-fit p-values, closest to fgsea). In-house
+  # weighted-KS stays as the zero-extra-dep fallback.
+  "gseapy>=1.1",
+  "blitzgsea>=1.3",
 ]
 # Async job path (B3): arq + Redis queue (DECISIONS #6) + boto3 for the R2 result
 # store. OPTIONAL — the default inline executor + local-filesystem result store need

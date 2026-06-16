@@ -1,13 +1,29 @@
-"""Real GSEA engine — weighted-KS running enrichment over a ranked DE table.
+"""Real GSEA engine — pre-ranked GSEA over a gene set or the GO library.
 
-Ranks genes by a signed metric (log2FC or a statistic), walks the list accumulating
-a weighted hit/miss running sum (Subramanian 2005), and reports the enrichment score
-(max deviation), the leading-edge hits, and a permutation NES + empirical p. Pure
-numpy/pandas — no gseapy — matching Selom's in-house ORA. Shares the figure with the
-stub via ``run._assemble``.
+Ranks genes by a signed metric (log2FC or a statistic) and runs Gene Set Enrichment
+Analysis. Engines (``engine`` param):
+
+  * ``gseapy``    — gseapy.prerank (BSD-3). Exposes the running ES + leading-edge hits, so
+                    the three-panel figure is drawn straight from the engine's own walk.
+  * ``blitzgsea`` — blitzgsea (Apache-2.0). Gamma-distribution-fit p-values (closest to
+                    fgsea for tiny q) and scales to thousands of sets; the table is
+                    blitzgsea's, the curve is the weighted-KS walk over the same ranking for
+                    display. OPT-IN ONLY: its first-import numba JIT was pathologically slow in
+                    the dev environment (timed out), so ``auto`` never selects it — gseapy is
+                    the validated default. Expected to work on a normal deploy box.
+  * ``inhouse``   — the original numpy weighted-KS + permutation (single set only) — the
+                    zero-extra-dep fallback when neither library is installed.
+  * ``auto`` (default) — gseapy if importable, else blitzgsea, else inhouse.
+
+DECISIONS #9 (corrected 2026-06-16): gseapy is BSD-3 and blitzgsea Apache-2.0 — both are
+allowed GSEA *engines*; the only license constraint was MSigDB's *data*, so GSEA runs over
+Selom's own license-clean GO library (gene_sets/library.py), never MSigDB. With no explicit
+``gene_set``, the skill runs library mode against the ``gene_sets`` source (default ``go``).
+Shares the three-panel figure with the stub via ``run._assemble``.
 """
 
 import re
+from importlib.util import find_spec
 
 from skills.gsea.run import _assemble
 
@@ -15,14 +31,44 @@ _METRIC_COLS = ["log2foldchange", "log2fc", "logfc", "log2_fold_change", "avg_lo
                 "stat", "score", "t", "signed_rank", "metric"]
 _GENE_COLS = ["external_gene_name", "gene_symbol", "gene_name", "symbol", "gene", "genes",
               "feature", "geneid", "gene_id", "names", "id"]
-_MAX_PLOT = 800  # downsample the curve/metric to keep the spec light
+_MAX_PLOT = 800   # downsample the curve/metric to keep the spec light
+_MIN_SIZE = 5
+_MAX_SIZE = 2000
+_SOURCE_ALIASES = {"": "go", "go": "go", "wikipathways": "wikipathways", "wiki": "wikipathways",
+                   "curated": "curated", "reference": "reference", "all": "all"}
 
 
 def run(data_path: str, params: dict) -> dict:
-    import numpy as np
     import pandas as pd
 
     df = pd.read_csv(data_path)
+    ranked = _ranked(df)
+    sets, lib_mode = _resolve_sets(params, ranked)
+
+    engine = str(params.get("engine", "auto")).strip().lower()
+    if engine == "auto":
+        # gseapy.prerank is the validated default — it exposes the running-ES curve and gives
+        # real NES/FDR. blitzgsea (gamma-fit, scales to thousands of sets) is opt-in only: its
+        # numba JIT was pathologically slow in this environment (timed out), so `auto` never
+        # selects it. For a large library (e.g. full GO ~7.7k sets) gseapy is slow (minutes) —
+        # use a smaller `gene_sets` source or fewer `n_perm` for interactive runs.
+        engine = "gseapy" if find_spec("gseapy") else ("blitzgsea" if find_spec("blitzgsea") else "inhouse")
+
+    if engine == "gseapy" and find_spec("gseapy"):
+        return _run_gseapy(ranked, sets, lib_mode, params)
+    if engine == "blitzgsea" and find_spec("blitzgsea"):
+        return _run_blitz(ranked, sets, lib_mode, params)
+    if lib_mode:
+        raise ValueError("library-mode GSEA needs gseapy or blitzgsea installed (uv sync --extra omics)")
+    return _run_inhouse(ranked, sets, params)
+
+
+# ---- inputs ------------------------------------------------------------------
+def _ranked(df):
+    """A clean, de-duplicated descending rank: DataFrame[gene, metric]. Keeps the row with
+    the largest |metric| per gene, then sorts by the signed metric descending."""
+    import pandas as pd
+
     cols = {c.lower(): c for c in df.columns}
     metric_col = _pick(cols, _METRIC_COLS)
     if metric_col is None:
@@ -30,38 +76,185 @@ def run(data_path: str, params: dict) -> dict:
     gene_col = _pick(cols, _GENE_COLS)
     genes = (df[gene_col] if gene_col else df.index.to_series()).astype(str).str.upper()
     metric = pd.to_numeric(df[metric_col], errors="coerce")
+    sub = pd.DataFrame({"gene": genes, "metric": metric}).dropna(subset=["metric"])
+    sub = sub.assign(_abs=sub["metric"].abs()).sort_values("_abs", ascending=False)
+    sub = sub.drop_duplicates("gene", keep="first")
+    return sub.sort_values("metric", ascending=False)[["gene", "metric"]].reset_index(drop=True)
 
-    ok = metric.notna().to_numpy()
-    g = genes.to_numpy()[ok]
-    m = metric.to_numpy(dtype=float)[ok]
-    order = np.argsort(m)[::-1]            # rank descending by metric
-    g, m = g[order], m[order]
 
-    panel = _parse_panel(params.get("gene_set", ""))
-    if not panel:
-        raise ValueError("gsea needs a gene_set — the set members to test for enrichment")
+def _resolve_sets(params, ranked):
+    """The gene sets to test + whether this is library mode. An explicit ``gene_set`` (pasted
+    members) → single-set mode; otherwise the ``gene_sets`` source (default GO) → library mode."""
+    explicit = _parse_panel(params.get("gene_set", ""))
+    if explicit:
+        set_name = str(params.get("set_name", "Gene set")) or "Gene set"
+        return {set_name: sorted(explicit)}, False
+    from gene_sets.library import load_collection
+
+    token = _SOURCE_ALIASES.get(str(params.get("gene_sets", "go")).strip().lower(), "go")
+    sets = load_collection(token)
+    if not sets:
+        raise ValueError(f"gsea: gene-set library '{token}' is empty or unavailable")
+    return sets, True
+
+
+# ---- gseapy ------------------------------------------------------------------
+def _run_gseapy(ranked, sets, lib_mode, params):
+    import gseapy as gp
+    import numpy as np
+
+    from skills._plotly import jsonable
+
+    kw = dict(
+        rnk=ranked, gene_sets={k: list(v) for k, v in sets.items()},
+        min_size=_MIN_SIZE, max_size=_MAX_SIZE,
+        permutation_num=max(100, int(params.get("n_perm", 1000)) or 1000),
+        seed=0, threads=4, no_plot=True, outdir=None, verbose=False,
+    )
+    weight = float(params.get("weight", 1.0))
+    try:  # gseapy 1.2 renamed weighted_score_type -> weight
+        pre = gp.prerank(**kw, weight=weight)
+    except TypeError:
+        pre = gp.prerank(**kw, weighted_score_type=weight)
+    res = pre.res2d.copy()
+    for c in ("ES", "NES", "NOM p-val", "FDR q-val"):
+        if c in res.columns:
+            res[c] = _num(res[c])
+    if res.empty:
+        raise ValueError("gsea: no gene set reached the minimum size against this ranked list")
+    term = _pick_term(res, sets, lib_mode)
+    r = pre.results[term]
+
+    RES = np.asarray(r["RES"], dtype=float)
+    metric = _ranking_values(pre, ranked, len(RES))
+    hits = [int(i) for i in r.get("hits", [])]
+    es, nes, pval, fdr = float(r["es"]), float(r["nes"]), float(r["pval"]), float(r["fdr"])
+    return _figure(RES, metric, hits, es, nes, pval, fdr, _label(term, params, lib_mode),
+                   res if lib_mode else None, jsonable)
+
+
+def _ranking_values(pre, ranked, n):
+    """The signed metric aligned with the engine's walk (gseapy's own ranking if exposed)."""
+    import numpy as np
+
+    rk = getattr(pre, "ranking", None)
+    if rk is not None and len(rk) == n:
+        return np.asarray(getattr(rk, "values", rk), dtype=float)
+    return ranked["metric"].to_numpy(dtype=float)[:n]
+
+
+# ---- blitzgsea ---------------------------------------------------------------
+def _run_blitz(ranked, sets, lib_mode, params):
+    import blitzgsea as blitz
+    import numpy as np
+
+    from skills._plotly import jsonable
+
+    sig = ranked.rename(columns={"gene": 0, "metric": 1})[[0, 1]]
+    res = blitz.gsea(sig, {k: list(v) for k, v in sets.items()},
+                     permutations=max(100, int(params.get("n_perm", 1000)) or 1000), seed=0)
+    res = res.reset_index().rename(columns={"index": "Term"}) if "Term" not in res.columns else res
+    if res.empty:
+        raise ValueError("gsea: no gene set reached the minimum size against this ranked list")
+    # Normalize blitzgsea's columns to the shared names used by _pick_term / the table.
+    ren = {"es": "ES", "nes": "NES", "pval": "NOM p-val", "fdr": "FDR q-val", "sidak": "FDR q-val"}
+    res = res.rename(columns={k: v for k, v in ren.items() if k in res.columns and v not in res.columns})
+    for c in ("ES", "NES", "NOM p-val", "FDR q-val"):
+        if c in res.columns:
+            res[c] = _num(res[c])
+    term = _pick_term(res, sets, lib_mode)
+    row = res[res["Term"] == term].iloc[0]
+
+    # blitzgsea reports the stats; draw the running-ES curve from the weighted-KS walk so the
+    # three-panel figure matches (curve shape is method-agnostic; the labels are blitzgsea's).
+    m = ranked["metric"].to_numpy(dtype=float)
+    g = ranked["gene"].to_numpy()
+    panel = {x.upper() for x in sets[term]}
+    hit = np.fromiter((x in panel for x in g), dtype=bool, count=g.size)
+    RES, es, _peak = _running_es(m, hit, float(params.get("weight", 1.0)), np)
+    nes = float(row.get("NES", es))
+    pval = float(row.get("NOM p-val", float("nan")))
+    fdr = float(row.get("FDR q-val", float("nan")))
+    hits = [int(i) for i in np.where(hit)[0]]
+    return _figure(RES, m, hits, float(es), nes, pval, fdr, _label(term, params, lib_mode),
+                   res if lib_mode else None, jsonable)
+
+
+# ---- in-house fallback (single set) ------------------------------------------
+def _run_inhouse(ranked, sets, params):
+    import numpy as np
+
+    from skills._plotly import jsonable
+
+    set_name, members = next(iter(sets.items()))
+    g = ranked["gene"].to_numpy()
+    m = ranked["metric"].to_numpy(dtype=float)
+    panel = {x.upper() for x in members}
     hit = np.fromiter((x in panel for x in g), dtype=bool, count=g.size)
     k = int(hit.sum())
     if k < 2:
         raise ValueError(f"only {k} gene_set members found in the ranked list (need >=2)")
-
     p = float(params.get("weight", 1.0))
-    running, es, peak = _running_es(m, hit, p, np)
+    RES, es, _peak = _running_es(m, hit, p, np)
     nes, pval = _nes_p(m, k, p, es, int(params.get("n_perm", 1000)), np)
+    hits = [int(i) for i in np.where(hit)[0]]
+    return _figure(RES, m, hits, es, nes, pval, None, set_name, None, jsonable)
 
-    n = m.size
+
+# ---- shared figure assembly --------------------------------------------------
+def _figure(RES, metric, hits, es, nes, pval, fdr, label, res_table, jsonable):
+    import numpy as np
+
+    RES = np.asarray(RES, dtype=float)
+    metric = np.asarray(metric, dtype=float)
+    n = RES.size
+    peak = int(np.argmax(np.abs(RES))) if n else 0
     step = max(1, n // _MAX_PLOT)
     idx = list(range(0, n, step))
-    if idx[-1] != n - 1:
+    if n and idx[-1] != n - 1:
         idx.append(n - 1)
     x_plot = [i + 1 for i in idx]
-    y_es = [round(float(running[i]), 4) for i in idx]
-    y_m = [round(float(m[i]), 4) for i in idx]
-    hit_x = [int(i) + 1 for i in np.where(hit)[0]]
+    y_es = [round(float(RES[i]), 4) for i in idx]
+    y_m = [round(float(metric[i]), 4) for i in idx]
+    hit_x = [i + 1 for i in hits]
+    table = _results_table(res_table) if res_table is not None else None
+    return jsonable(_assemble(
+        x_plot, y_es, peak + 1, round(float(es), 4), hit_x, x_plot, y_m,
+        round(float(nes), 4), _safe(pval), label, fdr=_safe(fdr), table=table,
+    ))
 
-    set_name = str(params.get("set_name", "Gene set")) or "Gene set"
-    return _assemble(x_plot, y_es, int(peak) + 1, round(float(es), 4),
-                     hit_x, x_plot, y_m, round(float(nes), 4), float(pval), set_name)
+
+def _results_table(res):
+    """Top enriched sets as a Statistics table (most significant first)."""
+    from skills._table import table
+
+    sort_cols = [c for c in ("FDR q-val", "NOM p-val") if c in res.columns]
+    ordered = res.sort_values(sort_cols, ascending=True) if sort_cols else res
+    rows = []
+    for _, r in ordered.head(25).iterrows():
+        rows.append([
+            str(r.get("Term", "")),
+            round(float(r["NES"]), 3) if "NES" in res.columns and _isnum(r.get("NES")) else None,
+            _sig(r.get("NOM p-val")), _sig(r.get("FDR q-val")),
+        ])
+    n_sig = int((res["FDR q-val"] <= 0.25).sum()) if "FDR q-val" in res.columns else len(res)
+    title = f"GSEA — {len(res)} sets tested, {n_sig} at FDR<=0.25 (top {min(25, len(res))})"
+    return table(["gene set", "NES", "NOM p", "FDR q"], rows, title)
+
+
+# ---- helpers -----------------------------------------------------------------
+def _pick_term(res, sets, lib_mode):
+    if not lib_mode:
+        return next(iter(sets))  # the single requested set
+    sort_cols = [c for c in ("FDR q-val", "NOM p-val") if c in res.columns]
+    ordered = res.sort_values(sort_cols, ascending=True) if sort_cols else res
+    return str(ordered.iloc[0]["Term"])
+
+
+def _label(term, params, lib_mode):
+    if lib_mode:
+        return str(term)
+    return str(params.get("set_name", "Gene set")) or "Gene set"
 
 
 def _running_es(metric, hit, p, np):
@@ -98,6 +291,37 @@ def _nes_p(metric, k, p, es, n_perm, np):
     else:
         pval = (int(np.sum(null <= es)) + 1) / (n_perm + 1)
     return float(nes), float(pval)
+
+
+def _num(series):
+    import pandas as pd
+    return pd.to_numeric(series, errors="coerce")
+
+
+def _isnum(v):
+    try:
+        float(v)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def _safe(v):
+    if v is None:
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    import math
+    return None if math.isnan(f) else f
+
+
+def _sig(v, digits=3):
+    f = _safe(v)
+    if f is None:
+        return None
+    return float(f"{f:.{digits}g}")
 
 
 def _parse_panel(raw) -> set:

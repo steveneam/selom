@@ -44,8 +44,12 @@ def _stub_figure(params: dict) -> dict:
     return _assemble(x, y_es, peak, es, hit_x, x, y_m, nes=2.04, pval=0.001, set_name=set_name)
 
 
-def _assemble(x_es, y_es, peak_x, es, hit_x, x_m, y_m, nes, pval, set_name):
-    """Build the three-panel GSEA spec (ES curve / hit rug / ranked metric)."""
+def _assemble(x_es, y_es, peak_x, es, hit_x, x_m, y_m, nes, pval, set_name, fdr=None, table=None):
+    """Build the three-panel GSEA spec (ES curve / hit rug / ranked metric).
+
+    ``fdr`` (library-mode multiple-testing q) is appended to the title when given;
+    ``table`` (a Statistics StatsTable) is attached for the Statistics node. Both default
+    off so the dependency-free stub renders byte-identically to its committed golden."""
     y_pos = [v if v > 0 else 0 for v in y_m]
     y_neg = [v if v < 0 else 0 for v in y_m]
     data = [
@@ -66,6 +70,8 @@ def _assemble(x_es, y_es, peak_x, es, hit_x, x_m, y_m, nes, pval, set_name):
          "yaxis": "y2", "showlegend": False, "hoverinfo": "skip"},
     ]
     title = f"GSEA — {set_name}   ES={es:.2f}  NES={nes:.2f}  p={_fmt_p(pval)}"
+    if fdr is not None:
+        title += f"  FDR={_fmt_p(fdr)}"
     layout = {
         "title": {"text": title},
         "xaxis": {"title": {"text": "gene rank"}, "anchor": "y2"},
@@ -77,7 +83,10 @@ def _assemble(x_es, y_es, peak_x, es, hit_x, x_m, y_m, nes, pval, set_name):
                     "y0": 0.42, "y1": 1.0, "line": {"color": ES_LINE, "width": 1, "dash": "dot"},
                     "opacity": 0.6}],
     }
-    return {"data": data, "layout": layout}
+    spec = {"data": data, "layout": layout}
+    if table is not None:
+        spec["table"] = table
+    return spec
 
 
 def _fmt_p(p):

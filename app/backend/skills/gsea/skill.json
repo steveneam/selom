@@ -8,17 +8,20 @@
   "inputs": [{ "name": "ranked", "kind": "csv", "required": true }],
   "param_spec": {
     "gene_set":  { "type": "str",   "default": "" },
+    "gene_sets": { "type": "str",   "default": "go", "options": ["go", "wikipathways", "curated", "reference", "all"] },
+    "engine":    { "type": "str",   "default": "auto", "options": ["auto", "gseapy", "blitzgsea", "inhouse"] },
     "set_name":  { "type": "str",   "default": "Gene set" },
     "weight":    { "type": "float", "default": 1.0, "min": 0.0, "max": 2.0 },
     "n_perm":    { "type": "int",   "default": 1000, "min": 0, "max": 10000 }
   },
   "outputs": [
-    { "name": "figure", "kind": "plotly_spec" }
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table",  "kind": "csv" }
   ],
   "origin": "proprietary",
   "catalog": {
     "name": "Selom GSEA",
-    "summary": "Gene Set Enrichment Analysis — running enrichment-score curve with leading-edge hits and permutation NES/p. In-house weighted-KS, no gseapy.",
+    "summary": "Gene Set Enrichment Analysis — running enrichment-score curve with leading-edge hits + NES/p/FDR. Runs against the license-clean GO library (or a pasted set) via gseapy.prerank / blitzgsea, with an in-house weighted-KS fallback.",
     "category": "pathway-analysis",
     "tier": "verified",
     "status": "beta",
