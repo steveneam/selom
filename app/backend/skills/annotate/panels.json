@@ -129,14 +129,64 @@
     "attribution": "Canonical peripheral-blood mononuclear cell (PBMC) marker genes per immune cell type, compiled from the 10x Genomics / Seurat pbmc3k tutorial cell-type assignments and standard immunology references (e.g. CD3D/IL7R for T cells, MS4A1/CD79A for B cells, GNLY/NKG7 for NK, CD14/LYZ and FCGR3A/MS4A7 for monocyte subsets, FCER1A/CST3 for dendritic cells, PPBP/PF4 for megakaryocytes/platelets). Gene symbols are facts — cited for provenance. Provided so the bundled pbmc3k demo dataset self-annotates out of the box.",
     "license": "public (gene symbols; cited for provenance)",
     "markers": {
-      "CD4+ T cells": ["IL7R", "CD3D", "CD3E", "CD3G", "CCR7", "LTB", "TCF7"],
-      "CD8+ T cells": ["CD8A", "CD8B", "CD3D", "GZMK", "CCL5"],
-      "NK cells": ["GNLY", "NKG7", "KLRD1", "KLRF1", "NCAM1", "PRF1"],
-      "B cells": ["MS4A1", "CD79A", "CD79B", "CD19", "BANK1"],
-      "CD14+ monocytes": ["CD14", "LYZ", "S100A8", "S100A9", "FCN1", "VCAN"],
-      "FCGR3A+ monocytes": ["FCGR3A", "MS4A7", "LST1", "CDKN1C"],
-      "Dendritic cells": ["FCER1A", "CST3", "CLEC10A", "CD1C"],
-      "Megakaryocytes": ["PPBP", "PF4", "ITGA2B", "GP9", "TUBB1"]
+      "CD4+ T cells": [
+        "IL7R",
+        "CD3D",
+        "CD3E",
+        "CD3G",
+        "CCR7",
+        "LTB",
+        "TCF7"
+      ],
+      "CD8+ T cells": [
+        "CD8A",
+        "CD8B",
+        "CD3D",
+        "GZMK",
+        "CCL5"
+      ],
+      "NK cells": [
+        "GNLY",
+        "NKG7",
+        "KLRD1",
+        "KLRF1",
+        "NCAM1",
+        "PRF1"
+      ],
+      "B cells": [
+        "MS4A1",
+        "CD79A",
+        "CD79B",
+        "CD19",
+        "BANK1"
+      ],
+      "CD14+ monocytes": [
+        "CD14",
+        "LYZ",
+        "S100A8",
+        "S100A9",
+        "FCN1",
+        "VCAN"
+      ],
+      "FCGR3A+ monocytes": [
+        "FCGR3A",
+        "MS4A7",
+        "LST1",
+        "CDKN1C"
+      ],
+      "Dendritic cells": [
+        "FCER1A",
+        "CST3",
+        "CLEC10A",
+        "CD1C"
+      ],
+      "Megakaryocytes": [
+        "PPBP",
+        "PF4",
+        "ITGA2B",
+        "GP9",
+        "TUBB1"
+      ]
     }
   },
   "retinal_cepo": {
@@ -612,6 +662,94 @@
         "MSMO1",
         "B3GNT2",
         "TACC2"
+      ]
+    }
+  },
+  "retinal_swamy": {
+    "name": "Retinal cell types (Swamy 2021 reference)",
+    "organism": "human",
+    "attribution": "Top AUC-ranked marker genes per major retinal cell type (FDR<0.05, top 12/type) from the integrated human-retina reference of Swamy et al., 'Building the mega single-cell transcriptome ocular meta-atlas (scEiaD)', GigaScience 10:giab061 (2021) (supplemental_file__celltype_markers.tsv). Rod Bipolar Cells merged into Bipolar cells. Provided as the reference-derived marker substitute for Seurat reference label-transfer when the reference expression matrix is unavailable. Gene symbols are facts — cited for provenance.",
+    "license": "public (gene symbols; cited for provenance)",
+    "markers": {
+      "Rod photoreceptors": [
+        "ROM1",
+        "SAG",
+        "PDE6G",
+        "GNGT1",
+        "NRL",
+        "RHO",
+        "PRPH2",
+        "GNAT1",
+        "TULP1",
+        "RCVRN",
+        "NR2E3",
+        "PDE6B"
+      ],
+      "Cone photoreceptors": [
+        "PCBP4",
+        "GNGT2",
+        "UNC119",
+        "PDE6H",
+        "GNAT2",
+        "OTX2",
+        "ARR3",
+        "OPN1SW",
+        "AIPL1",
+        "OPN1LW",
+        "GUCA1A"
+      ],
+      "Bipolar cells": [
+        "CALM1",
+        "PCP4",
+        "ISL1",
+        "PCP2",
+        "TRNP1",
+        "GNG13",
+        "PRKCA",
+        "TRPM1",
+        "QPCT",
+        "CABP5",
+        "CPLX3",
+        "GNAO1"
+      ],
+      "Amacrine cells": [
+        "PAX6",
+        "SYT1",
+        "CELF4",
+        "SNCB"
+      ],
+      "Horizontal cells": [
+        "ONECUT2",
+        "SOX4",
+        "TFAP2B",
+        "TUBB2B",
+        "CXXC5",
+        "ONECUT1"
+      ],
+      "Müller glia": [
+        "DKK3",
+        "CA2",
+        "FRZB",
+        "GPM6B",
+        "CP",
+        "C1orf61",
+        "TRDN",
+        "SLC2A1",
+        "PRSS35"
+      ],
+      "Retinal ganglion cells": [
+        "STMN2",
+        "MAP1B",
+        "RTN1",
+        "GAP43",
+        "DPYSL2",
+        "INA",
+        "SNCG",
+        "TAGLN3",
+        "UCHL1",
+        "BASP1",
+        "EBF1",
+        "YWHAH"
       ]
     }
   }
