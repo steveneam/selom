@@ -23,7 +23,7 @@ import { projectStore, select, useProjects } from "@/lib/projects/store";
 import type { Dataset, Figure } from "@/lib/projects/types";
 import { figureStaleness } from "@/lib/lineage/staleness";
 import { deriveTable } from "@/lib/lineage/derive-table";
-import { familyColorMap } from "@/lib/lineage/family";
+import { datasetDisplayName, familyColorMap } from "@/lib/lineage/family";
 import { readStyleStamp } from "@/lib/figure-spec";
 import { runSkill, runtimeSkillId, type SkillProvenance } from "@/lib/skills-api";
 import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
@@ -69,6 +69,9 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // the Statistics table (stats view), and the staleness/bundle read-out. null = nothing
   // open / fresh run.
   const [activeFigureId, setActiveFigureId] = React.useState<string | null>(null);
+  // The dataset in focus in the Data view (picked from the rail) — drives the
+  // context-scoped header delete ("Delete dataset").
+  const [activeDatasetId, setActiveDatasetId] = React.useState<string | null>(null);
   // A skill the command palette / Gene Sets surface asked to pre-select in the
   // Workbench, with optional param prefills. The nonce makes a repeat request (same
   // skill, again) a fresh prop for the panel.
@@ -338,6 +341,19 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     }
   }
 
+  // Delete ONE dataset (only the dataset — its figures stay, just without a live data
+  // link). Undo-backed, like figure delete.
+  function deleteDataset(d: Dataset) {
+    const removed = projectStore.removeDataset(d.id);
+    if (!removed) return;
+    pushUndo(`Deleted dataset “${datasetDisplayName(removed)}”`, () => projectStore.restoreDataset(removed));
+    if (activeDatasetId === d.id) setActiveDatasetId(null);
+  }
+
+  // The dataset in focus in the Data view (picked from the rail) — the subject of the
+  // context-scoped header delete.
+  const focusedDataset = activeDatasetId ? datasets.find((d) => d.id === activeDatasetId) : undefined;
+
   return (
     <div className="mx-auto flex h-full max-w-7xl flex-col px-6 py-8 lg:px-10">
       {/* header */}
@@ -357,27 +373,50 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           }}
           className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-lg font-semibold tracking-tight text-foreground outline-none hover:border-border focus-visible:border-ring/60 focus-visible:bg-background/40"
         />
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:text-destructive"
-          onClick={() => {
-            const n = datasets.length;
-            const m = figures.length;
-            const msg =
-              `Delete the entire project “${project.name}”?\n\n` +
-              `This removes the whole project — its ${n} dataset${n === 1 ? "" : "s"} and ` +
-              `${m} figure${m === 1 ? "" : "s"}. (To remove a single figure, hover it in the ` +
-              `rail and use its trash icon instead.)\n\nYou can Undo right after.`;
-            if (confirm(msg)) {
-              const snap = projectStore.deleteProject(project.id);
-              pushUndo(`Deleted project “${project.name}”`, () => projectStore.restoreProject(snap));
-              router.push("/");
-            }
-          }}
-        >
-          <Trash2 /> Delete project
-        </Button>
+        {/* The header's destructive action is scoped to the current view — the whole
+            project can only be deleted from the Pipeline (home), never from inside a
+            Data / Statistics / Figure view (owner steer). */}
+        {view === "home" ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-destructive"
+            onClick={() => {
+              const n = datasets.length;
+              const m = figures.length;
+              const msg =
+                `Delete the entire project “${project.name}”?\n\n` +
+                `This removes the whole project — its ${n} dataset${n === 1 ? "" : "s"} and ` +
+                `${m} figure${m === 1 ? "" : "s"}. (To remove a single figure or dataset, open ` +
+                `it and use the scoped Delete, or its rail trash icon.)\n\nYou can Undo right after.`;
+              if (confirm(msg)) {
+                const snap = projectStore.deleteProject(project.id);
+                pushUndo(`Deleted project “${project.name}”`, () => projectStore.restoreProject(snap));
+                router.push("/");
+              }
+            }}
+          >
+            <Trash2 /> Delete project
+          </Button>
+        ) : (view === "figure" || view === "stats") && activeFigure ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-destructive"
+            onClick={() => deleteFigure(activeFigure)}
+          >
+            <Trash2 /> Delete figure
+          </Button>
+        ) : view === "data" && focusedDataset ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-destructive"
+            onClick={() => deleteDataset(focusedDataset)}
+          >
+            <Trash2 /> Delete dataset
+          </Button>
+        ) : null}
       </div>
 
       {error && (
@@ -394,9 +433,13 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           familyColors={familyColors}
           view={view}
           activeFigureId={activeFigureId}
+          activeDatasetId={activeDatasetId}
           lineage={lineage}
           onHome={() => setView("home")}
-          onSelectData={() => setView("data")}
+          onSelectData={(id) => {
+            setActiveDatasetId(id ?? null);
+            setView("data");
+          }}
           onRunSkill={() => setView("skill")}
           onSelectStats={openStats}
           onSelectFigure={openFigure}

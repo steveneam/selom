@@ -45,6 +45,7 @@ export function Workrail({
   familyColors,
   view,
   activeFigureId,
+  activeDatasetId,
   lineage,
   onHome,
   onSelectData,
@@ -60,9 +61,12 @@ export function Workrail({
   familyColors: Map<string, string>;
   view: RailView;
   activeFigureId: string | null;
+  activeDatasetId: string | null;
   lineage: Lineage;
   onHome: () => void;
-  onSelectData: () => void;
+  /** Navigate to the Data view, focusing a dataset when one was picked (drives the
+   *  context-scoped header delete). */
+  onSelectData: (datasetId?: string) => void;
   onRunSkill: () => void;
   onSelectStats: (fig: Figure) => void;
   onSelectFigure: (fig: Figure) => void;
@@ -115,14 +119,14 @@ export function Workrail({
                 key={d.id}
                 dataset={d}
                 color={familyColors.get(d.id) ?? "var(--stage-data)"}
-                selected={view === "data"}
+                selected={view === "data" && activeDatasetId === d.id}
                 linked={lineage.datasetId === d.id}
-                onSelect={onSelectData}
+                onSelect={() => onSelectData(d.id)}
                 onRename={(label) => onRenameDataset(d.id, label)}
               />
             ))
           )}
-          <AddRow onClick={onSelectData} label={datasets.length === 0 ? "Add data" : "Add another dataset"} />
+          <AddRow onClick={() => onSelectData()} label={datasets.length === 0 ? "Add data" : "Add another dataset"} />
         </Section>
 
         {/* RUN A SKILL — the action in the flow, between data and its outputs. */}

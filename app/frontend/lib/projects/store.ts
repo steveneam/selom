@@ -201,6 +201,18 @@ export const projectStore = {
     const next = label.trim() || undefined;
     setState({ ...state, datasets: state.datasets.map((d) => (d.id === id ? { ...d, label: next } : d)) });
   },
+  /** Delete one dataset (only the dataset — its figures are left in place, just without
+   *  a live data link). Returns the removed record so the caller can offer an Undo. */
+  removeDataset(id: string): Dataset | undefined {
+    const d = state.datasets.find((x) => x.id === id);
+    if (d) setState({ ...state, datasets: state.datasets.filter((x) => x.id !== id) });
+    return d;
+  },
+  /** Re-insert a deleted dataset (Undo). No-op if it's already present. */
+  restoreDataset(dataset: Dataset) {
+    if (state.datasets.some((d) => d.id === dataset.id)) return;
+    setState({ ...state, datasets: [...state.datasets, dataset] });
+  },
   /**
    * Mark a dataset's bytes as changed — bumps `currentSha256` to a new version so
    * every figure built on the old bytes reads as stale (Pillar 1). The real trigger
