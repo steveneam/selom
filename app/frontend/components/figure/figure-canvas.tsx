@@ -34,7 +34,17 @@ function CanvasSkeleton() {
  * clone because react-plotly.js mutates the data/layout it receives; cloning keeps
  * the store's immutable history snapshots pristine.
  */
-export function FigureCanvas({ spec, store }: { spec: FigureSpec; store?: FigureStore }) {
+export function FigureCanvas({
+  spec,
+  store,
+  displayModeBar,
+}: {
+  spec: FigureSpec;
+  store?: FigureStore;
+  /** Force the Plotly modebar on/off. Default (undefined) = Plotly's on-hover behaviour.
+   *  Read-only previews (the compare panes) pass `false` for a clean, chrome-free figure. */
+  displayModeBar?: boolean;
+}) {
   const fixed = typeof spec.layout.width === "number";
 
   const figure = useMemo(
@@ -93,6 +103,7 @@ export function FigureCanvas({ spec, store }: { spec: FigureSpec; store?: Figure
     () => ({
       displaylogo: false,
       responsive: true,
+      ...(displayModeBar === undefined ? {} : { displayModeBar }),
       // Direct manipulation: drag the legend / colour bar / annotations and
       // double-click titles in place. We DON'T enable blanket `editable` — that
       // also lets users drag data points (a data edit), which must stay server-side.
@@ -113,7 +124,7 @@ export function FigureCanvas({ spec, store }: { spec: FigureSpec; store?: Figure
       modeBarButtonsToRemove: ["lasso2d", "select2d"] as const,
       toImageButtonOptions: { format: "png" as const, scale: 2, filename: "selom-figure" },
     }),
-    [store],
+    [store, displayModeBar],
   );
 
   return (

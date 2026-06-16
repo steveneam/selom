@@ -124,8 +124,28 @@ const DE_SKILLS = new Set(["deg", "volcano", "proteomics_de"]);
  * A representative Statistics `table` for the mock (Pillar 1, Decision D7), so the
  * Statistics node renders offline (`npm run dev:mock`). Purely-visual skills get null.
  * The real table comes from the backend runner (skills/_table.py).
+ *
+ * The clustering table scales its cluster count with the `resolution` query param
+ * (more clusters at higher resolution — the real Leiden behaviour), so a parameter
+ * sweep produces genuinely different tables and the S3 compare view shows a real
+ * row-level diff offline. Mock-only; the production umap/cluster table is a backend
+ * concern (markers/cluster-summary not yet wired into the S2.1 contract).
  */
-export function mockTable(skillId: string): StatsTable | null {
+export function mockTable(skillId: string, query: Record<string, string> = {}): StatsTable | null {
+  if (skillId === "umap_scrna" || skillId === "cluster") {
+    const res = Number(query.resolution ?? 1.0);
+    const n = Math.max(2, Math.min(18, Math.round(3 + (Number.isFinite(res) ? res : 1) * 6)));
+    const total = 2700;
+    const weights = Array.from({ length: n }, (_, i) => 1 / (i + 1.4));
+    const sum = weights.reduce((a, b) => a + b, 0);
+    let acc = 0;
+    const rows = weights.map((w, i): (string | number)[] => {
+      const cells = i === n - 1 ? total - acc : Math.round((total * w) / sum);
+      acc += cells;
+      return [`cluster ${i}`, cells, Number(((cells / total) * 100).toFixed(1))];
+    });
+    return { columns: ["cluster", "cells", "% of total"], rows, title: "Cluster summary" };
+  }
   if (DE_SKILLS.has(skillId)) {
     const genes = ["RHO", "PDE6B", "GNAT1", "NRL", "CRX", "RCVRN", "SAG", "GUCA1A", "RBP3", "OPN1SW", "NR2E3", "ROM1"];
     const rows = genes.map((g, i): (string | number)[] => {

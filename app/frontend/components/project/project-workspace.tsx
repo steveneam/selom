@@ -2,13 +2,15 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Redo2, RefreshCw, Sparkles, Table2, Trash2, Undo2 } from "lucide-react";
+import { ArrowRight, Lock, Redo2, RefreshCw, Sparkles, Table2, Trash2, Undo2 } from "lucide-react";
 import { DataPanel, type AnalyzeArgs } from "./data-panel";
 import { Dropzone } from "./dropzone";
 import { WorkbenchPanel } from "./workbench-panel";
 import { PublishConfidence } from "./publish-confidence";
 import { StaleBadge } from "./stale-badge";
 import { StatsPanel } from "./stats-panel";
+import { VersionBar } from "./version-bar";
+import { CompareView } from "./compare-view";
 import { Workrail, type FigureNode, type Lineage, type RailView } from "./workrail";
 import { Pipeline, type StageKey, type StageState } from "@/components/pipeline";
 import { EditorWorkspace } from "@/components/figure/editor-workspace";
@@ -22,8 +24,11 @@ import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 import { projectStore, select, useProjects } from "@/lib/projects/store";
 import type { Dataset, Figure } from "@/lib/projects/types";
 import { figureStaleness } from "@/lib/lineage/staleness";
-import { deriveTable } from "@/lib/lineage/derive-table";
+import { figureTable } from "@/lib/lineage/figure-table";
+import { versionFamily } from "@/lib/lineage/versions";
+import type { ParamValue } from "@/lib/lineage/diff";
 import { datasetDisplayName, familyColorMap } from "@/lib/lineage/family";
+import { defaultParams } from "@/lib/catalog/params";
 import { readStyleStamp } from "@/lib/figure-spec";
 import { runSkill, runtimeSkillId, type SkillProvenance } from "@/lib/skills-api";
 import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
@@ -48,11 +53,6 @@ function stampDataVersion(
   return { ...provenance, input: { ...provenance.input, sha256: dataset.currentSha256 } };
 }
 
-/** The figure's result table, or a fallback derived from its stored spec (D3); none → no Statistics node. */
-function figureTable(fig: Figure) {
-  return fig.table ?? (fig.spec ? deriveTable(fig.spec) : undefined);
-}
-
 export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const router = useRouter();
   const state = useProjects();
@@ -72,6 +72,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // The dataset in focus in the Data view (picked from the rail) — drives the
   // context-scoped header delete ("Delete dataset").
   const [activeDatasetId, setActiveDatasetId] = React.useState<string | null>(null);
+  // The version family (figure ids) shown in the compare view (S3.2).
+  const [compareIds, setCompareIds] = React.useState<string[]>([]);
   // A skill the command palette / Gene Sets surface asked to pre-select in the
   // Workbench, with optional param prefills. The nonce makes a repeat request (same
   // skill, again) a fresh prop for the panel.
@@ -114,6 +116,17 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // The Statistics table for the focused figure (stats view) — its stored table or a
   // fallback derived from its spec (D3).
   const activeStatsTable = activeFigure ? figureTable(activeFigure) : undefined;
+  // Versioning (S3): the frozen "paper" flag, the open figure's version family
+  // (self + siblings + ancestors), and the figures resolved for the compare view.
+  const frozen = !!activeFigure?.frozen;
+  const activeFamily = React.useMemo(
+    () => (activeFigure ? versionFamily(figures, activeFigure.id) : []),
+    [figures, activeFigure],
+  );
+  const compareFamily = React.useMemo(
+    () => compareIds.map((id) => figures.find((f) => f.id === id)).filter((f): f is Figure => !!f),
+    [compareIds, figures],
+  );
 
   // Per-figure rail nodes (S2.3): each figure with its staleness + whether it carries a
   // Statistics table (so the Statistics section lists only substantive nodes, D3).
@@ -157,9 +170,9 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     return subscribeIntent(consume);
   }, [projectId]);
 
-  // Undo / redo while editing a figure.
+  // Undo / redo while editing a figure (not on a frozen, read-only one).
   React.useEffect(() => {
-    if (view !== "figure") return;
+    if (view !== "figure" || frozen) return;
     function onKey(e: KeyboardEvent) {
       if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
       const t = e.target as HTMLElement | null;
@@ -170,17 +183,18 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [view, figure]);
+  }, [view, figure, frozen]);
 
   // Persist in-canvas edits back to the open figure's stored spec (Pillar 1 — the
   // working spec is durable now). Debounced so a live drag (many `set`s) coalesces
   // into one write on settle; undo/redo + discrete commits persist their result too.
+  // Never writes a frozen "paper" version — it's immutable (edits fork instead, D6).
   React.useEffect(() => {
     const spec = figure.spec;
-    if (!activeFigureId || !spec) return;
+    if (!activeFigureId || !spec || frozen) return;
     const id = setTimeout(() => projectStore.updateFigureSpec(activeFigureId, spec), 350);
     return () => clearTimeout(id);
-  }, [figure.spec, activeFigureId]);
+  }, [figure.spec, activeFigureId, frozen]);
 
   const runFlow = React.useCallback(
     async (step: ProposedStep) => {
@@ -255,6 +269,74 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     [datasets, lastFile, designFile, figure, projectId],
   );
 
+  // Parameter sweep (S3.1): run the open figure's skill once per value of a chosen
+  // param (holding the rest fixed) → N linked sibling versions sharing the figure as
+  // parent. Lands in the compare view so the sweep is immediately legible.
+  const runSweep = React.useCallback(
+    async (param: string, values: ParamValue[]) => {
+      const origin = activeFigure;
+      if (!origin?.skillId) return;
+      setRunning(origin.skillId);
+      setError(null);
+      const dataset = origin.datasetId ? datasets.find((d) => d.id === origin.datasetId) : undefined;
+      const base = origin.provenance?.params ?? defaultParams(origin.skillId);
+      const saved: Figure[] = [];
+      try {
+        for (const value of values) {
+          const params = { ...base, [param]: value };
+          const file = lastFile ?? new File(["mock"], dataset?.filename ?? "data.csv");
+          const res = await runSkill(runtimeSkillId(origin.skillId), file, params, designFile);
+          saved.push(
+            projectStore.addFigure(projectId, {
+              title: origin.title,
+              datasetId: origin.datasetId,
+              skillId: origin.skillId,
+              spec: res.figure,
+              provenance: stampDataVersion(res.provenance, dataset),
+              methods: res.methods,
+              guardrails: res.guardrails,
+              table: res.table ?? undefined,
+              parentFigureId: origin.id,
+              variantLabel: `${param} = ${value}`,
+            }),
+          );
+        }
+        if (saved.length >= 2) {
+          setCompareIds(saved.map((f) => f.id));
+          setActiveFigureId(saved[saved.length - 1].id);
+          setView("compare");
+        } else if (saved.length === 1) {
+          setActiveFigureId(saved[0].id);
+          if (saved[0].spec) figure.init(saved[0].spec);
+          setView("figure");
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Sweep failed. Please try again.");
+      } finally {
+        setRunning(null);
+      }
+    },
+    [activeFigure, datasets, lastFile, designFile, figure, projectId],
+  );
+
+  // Freeze / unfreeze the open figure (S3.3, Decision D6) — tag it as the "paper"
+  // version. Frozen figures are read-only; editing one forks a copy (see `editCopy`).
+  const toggleFreeze = React.useCallback(() => {
+    if (!activeFigure) return;
+    projectStore.freezeFigure(activeFigure.id, !activeFigure.frozen);
+  }, [activeFigure]);
+
+  // Edit a frozen "paper" version: fork an editable copy (the original stays, untouched)
+  // and open it in the editor.
+  const editCopy = React.useCallback(() => {
+    if (!activeFigure) return;
+    const fork = projectStore.forkFigure(activeFigure.id, { variantLabel: "edited copy" });
+    if (!fork) return;
+    setActiveFigureId(fork.id);
+    if (fork.spec) figure.init(fork.spec);
+    setView("figure");
+  }, [activeFigure, figure]);
+
   // Dev helper: `?demo=<skillId>` (or any truthy `?demo`) auto-runs a skill so you
   // land on a live editable figure in ONE step — for fast manual checks and the
   // Playwright gesture test, skipping the data/intake/workbench dance. Mock-mode
@@ -327,6 +409,15 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     setView("stats");
   }
 
+  // Open the compare view for a version family (from the rail's family group or the
+  // version bar). Needs ≥2 versions; focuses the newest so the lineage reads cleanly.
+  function openCompare(ids: string[]) {
+    if (ids.length < 2) return;
+    setCompareIds(ids);
+    setActiveFigureId(ids[ids.length - 1]);
+    setView("compare");
+  }
+
   // Delete ONE figure (only that figure — never the project). Offers an Undo rather
   // than a confirm, since the removal is reversible from the returned record. If the
   // deleted figure was open, drop back to the project home.
@@ -355,7 +446,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const focusedDataset = activeDatasetId ? datasets.find((d) => d.id === activeDatasetId) : undefined;
 
   return (
-    <div className="mx-auto flex h-full max-w-7xl flex-col px-6 py-8 lg:px-10">
+    <div className="flex h-full flex-col px-5 py-6 lg:px-7">
       {/* header */}
       <div className="flex flex-wrap items-center gap-3">
         <span
@@ -445,6 +536,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           onSelectFigure={openFigure}
           onDeleteFigure={deleteFigure}
           onRenameDataset={(id, label) => projectStore.renameDataset(id, label)}
+          onCompareFamily={openCompare}
         />
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -452,13 +544,26 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
             figure.spec ? (
               <div className="flex h-full flex-col gap-3">
                 <div className="flex items-center gap-1.5">
-                  <Button variant="ghost" size="icon" disabled={!figure.canUndo} onClick={figure.undo} aria-label="Undo">
-                    <Undo2 />
-                  </Button>
-                  <Button variant="ghost" size="icon" disabled={!figure.canRedo} onClick={figure.redo} aria-label="Redo">
-                    <Redo2 />
-                  </Button>
-                  <span className="ml-2 text-xs text-muted-foreground">Editing live — every change is a JSON-Patch.</span>
+                  {frozen ? (
+                    <>
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-stage-figure">
+                        <Lock className="size-3.5" /> Frozen — read-only
+                      </span>
+                      <Button size="sm" variant="outline" className="ml-1 h-7" onClick={editCopy}>
+                        Edit a copy
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button variant="ghost" size="icon" disabled={!figure.canUndo} onClick={figure.undo} aria-label="Undo">
+                        <Undo2 />
+                      </Button>
+                      <Button variant="ghost" size="icon" disabled={!figure.canRedo} onClick={figure.redo} aria-label="Redo">
+                        <Redo2 />
+                      </Button>
+                      <span className="ml-2 text-xs text-muted-foreground">Editing live — every change is a JSON-Patch.</span>
+                    </>
+                  )}
                   {staleness.stale && activeFigure && (
                     <div className="ml-2 flex items-center gap-2">
                       <StaleBadge result={staleness} />
@@ -488,11 +593,13 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                         Simulate data change
                       </Button>
                     )}
-                    <StylePicker
-                      store={figure}
-                      skillId={bundle?.provenance?.skill?.id}
-                      value={activeStyle.id}
-                    />
+                    {!frozen && (
+                      <StylePicker
+                        store={figure}
+                        skillId={bundle?.provenance?.skill?.id}
+                        value={activeStyle.id}
+                      />
+                    )}
                     <ExportMenu
                       spec={figure.spec}
                       filename={`selom-${bundle?.provenance?.skill?.id ?? "figure"}`}
@@ -504,9 +611,21 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     </Button>
                   </div>
                 </div>
+                {activeFigure && (
+                  <VersionBar
+                    figure={activeFigure}
+                    familyCount={activeFamily.length}
+                    running={running != null}
+                    skillId={activeFigure.skillId}
+                    baseParams={activeFigure.provenance?.params ?? (activeFigure.skillId ? defaultParams(activeFigure.skillId) : {})}
+                    onSweep={runSweep}
+                    onCompare={() => openCompare(activeFamily.map((f) => f.id))}
+                    onToggleFreeze={toggleFreeze}
+                  />
+                )}
                 <PublishConfidence provenance={bundle?.provenance} methods={bundle?.methods} guardrails={bundle?.guardrails} />
                 <div className="flex min-h-[520px] flex-1 overflow-hidden rounded-xl border border-border bg-background">
-                  <EditorWorkspace store={figure} elevated={exportOpen} />
+                  <EditorWorkspace store={figure} elevated={exportOpen} readOnly={frozen} onEditCopy={editCopy} />
                 </div>
               </div>
             ) : activeFigure && !activeFigure.spec ? (
@@ -520,6 +639,23 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
               <EmptyState
                 title="No figure yet"
                 body="Run a skill and the editable figure appears here."
+                action="Run a skill"
+                onAction={() => setView("skill")}
+              />
+            )
+          ) : view === "compare" ? (
+            compareFamily.length >= 2 ? (
+              <CompareView
+                family={compareFamily}
+                datasets={datasets}
+                familyColors={familyColors}
+                onClose={() => (activeFigure ? openFigure(activeFigure) : setView("home"))}
+                onOpenFigure={openFigure}
+              />
+            ) : (
+              <EmptyState
+                title="Nothing to compare"
+                body="A version family needs at least two versions. Run a parameter sweep or re-run a figure to make one."
                 action="Run a skill"
                 onAction={() => setView("skill")}
               />

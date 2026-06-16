@@ -249,6 +249,14 @@ export const projectStore = {
   updateFigureSpec(id: string, spec: FigureSpec) {
     setState({ ...state, figures: state.figures.map((f) => (f.id === id ? { ...f, spec } : f)) });
   },
+  /**
+   * Tag a figure as frozen ("paper") or unfreeze it (Pillar 1, S3, Decision D6). A
+   * frozen figure is immutable in the editor — editing it forks a new version via
+   * `forkFigure` — so this is just a flag; nothing else changes.
+   */
+  freezeFigure(id: string, frozen: boolean) {
+    setState({ ...state, figures: state.figures.map((f) => (f.id === id ? { ...f, frozen } : f)) });
+  },
   /** Delete one figure, returning the removed record so the caller can offer an Undo. */
   removeFigure(id: string): Figure | undefined {
     const fig = state.figures.find((f) => f.id === id);

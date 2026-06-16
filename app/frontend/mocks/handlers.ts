@@ -68,7 +68,7 @@ export const handlers = [
     return HttpResponse.json({
       figure: stubUmapFigure(),
       ...mockBundle(skillId, query),
-      table: mockTable(skillId),
+      table: mockTable(skillId, query),
     });
   }),
 ];
