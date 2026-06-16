@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
 import { modalityColor } from "@/lib/catalog/modality";
+import { datasetDisplayName } from "@/lib/lineage/family";
 import { detectModality, proposeForModality, type IntakeProposal } from "@/lib/intake/mock";
 import { projectStore } from "@/lib/projects/store";
 import type { Dataset } from "@/lib/projects/types";
@@ -164,8 +165,9 @@ export function DataPanel({
                     <Database />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground">{d.filename}</p>
+                    <p className="truncate text-sm font-medium text-foreground">{datasetDisplayName(d)}</p>
                     <p className="tabular text-xs text-muted-foreground">
+                      {d.label ? `${d.filename} · ` : ""}
                       {d.modality}
                       {d.qc ? ` · ${d.qc.nObs.toLocaleString()} × ${d.qc.nVar.toLocaleString()}` : ""}
                       {d.qc?.cleaning.length ? ` · ${d.qc.cleaning.length} cleaning steps` : ""}
