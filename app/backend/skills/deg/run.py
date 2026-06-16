@@ -37,10 +37,12 @@ def _stub_figure() -> dict:
         ("NKG7", 2.4), ("GZMB", 2.9), ("CD3D", 3.3), ("IL7R", 3.8),
         ("MS4A1", 4.2), ("CD79A", 4.7), ("GNLY", 5.1), ("PPBP", 5.8),
     ]
+    from skills._table import table
+
     genes = [g for g, _ in rows]
     scores = [s for _, s in rows]
     colors = [UP if s >= 0 else DOWN for s in scores]
-    return {
+    spec = {
         "data": [
             {
                 "type": "bar",
@@ -58,3 +60,7 @@ def _stub_figure() -> dict:
             "bargap": 0.3,
         },
     }
+    # Statistics node (Pillar 1) — strongest effect first.
+    tbl = sorted(range(len(scores)), key=lambda i: abs(scores[i]), reverse=True)
+    spec["table"] = table(["gene", "log2 fold-change"], [[genes[i], scores[i]] for i in tbl], "Top differential genes")
+    return spec

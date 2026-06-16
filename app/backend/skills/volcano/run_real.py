@@ -65,7 +65,13 @@ def run(data_path: str, params: dict) -> dict:
             if str(gene_upper.iloc[i]) in panel:
                 highlight.append((round(float(lfc[i]), 4), round(float(nlp[i]), 4), str(genes.iloc[i])))
 
-    return _assemble(up, down, ns, labels, fc_t, y_cut, "Volcano plot", highlight=highlight)
+    spec = _assemble(up, down, ns, labels, fc_t, y_cut, "Volcano plot", highlight=highlight)
+    # Statistics node (Pillar 1): the full DE table the figure was drawn from — the
+    # figure keeps only the plotted points + top-N labels, so this carries the real values.
+    from skills._table import de_table
+
+    spec["table"] = de_table(list(genes), lfc, padj, fc_t=fc_t, fdr_t=fdr_t)
+    return spec
 
 
 def _parse_panel(raw) -> set[str]:

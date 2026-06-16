@@ -25,19 +25,27 @@ def run(data_path: str, params: dict) -> dict:
 
 
 def _stub_figure(params: dict) -> dict:
+    from skills._table import de_table
+
     fc_t = float(params.get("fc_threshold", 1.0))
     fdr_t = float(params.get("fdr_threshold", 0.05))
     y_cut = -math.log10(fdr_t) if fdr_t > 0 else 0.0
 
     up, down, ns = ([], []), ([], []), ([], [])
+    genes, lfcs, padjs = [], [], []
     for i in range(80):
         lfc = round(3.0 * math.sin(i * 0.7), 3)
         nlp = round(abs(lfc) * 1.15 + 0.5 * (1 + math.cos(i * 0.9)), 3)
         bucket = up if (lfc >= fc_t and nlp >= y_cut) else down if (lfc <= -fc_t and nlp >= y_cut) else ns
         bucket[0].append(lfc)
         bucket[1].append(nlp)
+        genes.append(f"GENE{i + 1}")
+        lfcs.append(lfc)
+        padjs.append(10 ** (-nlp))  # invert the synthetic -log10 padj back to padj
 
-    return _assemble(up, down, ns, [], fc_t, y_cut, "Volcano (stub)")
+    spec = _assemble(up, down, ns, [], fc_t, y_cut, "Volcano (stub)")
+    spec["table"] = de_table(genes, lfcs, padjs, fc_t=fc_t, fdr_t=fdr_t)
+    return spec
 
 
 def _assemble(up, down, ns, labels, fc_t, y_cut, title, highlight=None) -> dict:

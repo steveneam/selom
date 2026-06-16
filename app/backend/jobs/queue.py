@@ -29,7 +29,7 @@ def execute_job(job_id: str, data_path: str, params: dict) -> None:
     import guardrails
     import methods
     import provenance
-    from skills.contract import load_skill, run_skill  # lazy: keeps import graph light
+    from skills.contract import load_skill, run_skill_with_table  # lazy: keeps import graph light
 
     job = job_store.get(job_id)
     if job is None:
@@ -37,14 +37,15 @@ def execute_job(job_id: str, data_path: str, params: dict) -> None:
     job_store.update(job_id, status=JobStatus.RUNNING)
     try:
         spec = load_skill(job.skill_id)
-        figure = run_skill(job.skill_id, data_path, params)
+        figure, table = run_skill_with_table(job.skill_id, data_path, params)
         # Store the full B4 bundle (same shape /run returns) so /jobs/{id}/result
-        # carries the reproducibility record + methods, not just the figure.
+        # carries the reproducibility record + methods + Statistics table, not just the figure.
         bundle = {
             "figure": figure,
             "provenance": provenance.build(spec, data_path, job.filename, params),
             "methods": methods.build(spec, params),
             "guardrails": guardrails.build(spec, data_path, params),
+            "table": table,
         }
         url = result_store.put(job_id, bundle)
         job_store.update(job_id, status=JobStatus.SUCCEEDED, result_url=url)

@@ -60,7 +60,9 @@ def dotplot_spec(pathways, nlp, overlap, title) -> dict:
     ``pathways`` are ordered most- to least-significant; Plotly draws the y-axis
     bottom-up, so reverse to put the top hit at the top.
     """
-    return {
+    from skills._table import table
+
+    spec = {
         "data": [
             {
                 "type": "scatter",
@@ -85,6 +87,13 @@ def dotplot_spec(pathways, nlp, overlap, title) -> dict:
             "yaxis": {"title": {"text": "pathway"}, "automargin": True},
         },
     }
+    # Statistics node (Pillar 1) — the enriched terms, most significant first.
+    spec["table"] = table(
+        ["pathway", "-log10 padj", "overlap genes"],
+        [[p, n, o] for p, n, o in zip(pathways, nlp, overlap)],
+        "Enrichment results",
+    )
+    return spec
 
 
 def dotplot_split_spec(up_rows, down_rows, title) -> dict:
@@ -111,7 +120,9 @@ def dotplot_split_spec(up_rows, down_rows, title) -> dict:
             "marker": {"size": [r["overlap"] for r in rows], "sizemode": "diameter", "color": color},
         }
 
-    return {
+    from skills._table import table
+
+    spec = {
         "data": [
             _trace(down_rows, -1, "Down-regulated", "#1f77b4"),
             _trace(up_rows, +1, "Up-regulated", "#d62728"),
@@ -127,3 +138,11 @@ def dotplot_split_spec(up_rows, down_rows, title) -> dict:
             },
         },
     }
+    rows = sorted(
+        [[r["pathway"], "up", r["nlp"], r["overlap"]] for r in up_rows]
+        + [[r["pathway"], "down", r["nlp"], r["overlap"]] for r in down_rows],
+        key=lambda x: x[2],
+        reverse=True,
+    )
+    spec["table"] = table(["pathway", "direction", "-log10 padj", "overlap genes"], rows, "Enrichment (up / down)")
+    return spec

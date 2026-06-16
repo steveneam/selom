@@ -189,6 +189,8 @@ def _bulk_deseq(sub, cond, reference, treatment, top_n):
 
 
 def _bar(names, scores, title, jsonable, subtitle=None) -> dict:
+    from skills._table import table
+
     # Ascending so the strongest |score| sits at the top of the horizontal bar.
     order = sorted(range(len(scores)), key=lambda i: scores[i])
     names = [names[i] for i in order]
@@ -211,6 +213,13 @@ def _bar(names, scores, title, jsonable, subtitle=None) -> dict:
             "bargap": 0.3,
         },
     }
+    # Statistics node (Pillar 1) — the top genes, strongest effect first.
+    tbl = sorted(range(len(scores)), key=lambda i: abs(scores[i]), reverse=True)
+    spec["table"] = table(
+        ["gene", "log2 fold-change"],
+        [[names[i], round(float(scores[i]), 4)] for i in tbl],
+        "Top differential genes",
+    )
     return jsonable(spec)
 
 

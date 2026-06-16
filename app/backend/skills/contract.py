@@ -28,14 +28,31 @@ def load_skill(skill_id: str) -> SkillSpec:
     return SkillSpec(**json.loads(p.read_text()))
 
 
-def run_skill(skill_id: str, data_path: str, params: dict) -> dict:
+def _execute(skill_id: str, data_path: str, params: dict) -> tuple[dict, dict | None]:
     from skills import theme  # central publication theme — one look across every skill
 
     spec = load_skill(skill_id)
     mod_path, fn = spec.entrypoint.split(":")
     run = getattr(import_module(mod_path), fn)
     figure = run(data_path=data_path, params={**defaults(spec), **params})  # Plotly spec dict
-    return theme.apply(figure, skill_id)
+    # Pillar 1: a runner may attach a Statistics `table` to its figure dict. Pop it
+    # BEFORE theming so the spec the FE renders stays a pure {data, layout}, and so the
+    # golden figures (taken via run_skill) are unaffected.
+    table = figure.pop("table", None) if isinstance(figure, dict) else None
+    return theme.apply(figure, skill_id), table
+
+
+def run_skill(skill_id: str, data_path: str, params: dict) -> dict:
+    """Run a skill → its themed Plotly figure. Any Statistics table is dropped here —
+    use run_skill_with_table when the bundle needs it (Pillar 1)."""
+    figure, _table = _execute(skill_id, data_path, params)
+    return figure
+
+
+def run_skill_with_table(skill_id: str, data_path: str, params: dict) -> tuple[dict, dict | None]:
+    """Run a skill → (themed figure, StatsTable | None). The Statistics node reads the
+    table; the figure stays a pure {data, layout} spec (Decision D7)."""
+    return _execute(skill_id, data_path, params)
 
 
 def defaults(spec: SkillSpec) -> dict:

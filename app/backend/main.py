@@ -16,7 +16,7 @@ from gene_sets import library as gene_sets
 from jobs.queue import get_job, result_store, submit
 from jobs.store import TERMINAL
 from skills import styles, theme
-from skills.contract import load_skill, run_skill
+from skills.contract import load_skill, run_skill_with_table
 from skills.registry import list_catalog, list_skill_ids
 
 app = FastAPI(title="Selom API")
@@ -95,14 +95,16 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
         params["_design_path"] = design_path
     spec = load_skill(skill_id)
     try:
-        figure = run_skill(skill_id, path, params)
+        figure, table = run_skill_with_table(skill_id, path, params)
         # B4 publish-confidence: every figure ships with its reproducibility bundle +
-        # auto methods-text. Additive — the FE still reads `.figure`.
+        # auto methods-text. Pillar 1 adds the Statistics `table` (None for purely-visual
+        # skills). Additive — the FE still reads `.figure`.
         return {
             "figure": figure,                            # Plotly JSON -> frontend
             "provenance": provenance.build(spec, path, matrix.filename, params),
             "methods": methods.build(spec, params),
             "guardrails": guardrails.build(spec, path, params),
+            "table": table,                              # Statistics node (Pillar 1) | None
         }
     finally:
         if design_path:
