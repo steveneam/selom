@@ -195,6 +195,12 @@ export const projectStore = {
     setState({ ...state, datasets: [...state.datasets, d] });
     return d;
   },
+  /** Rename a dataset (Pillar 1 family). An empty label clears the override (back to
+   *  the filename); the change propagates to every figure/stat chip built on it. */
+  renameDataset(id: string, label: string) {
+    const next = label.trim() || undefined;
+    setState({ ...state, datasets: state.datasets.map((d) => (d.id === id ? { ...d, label: next } : d)) });
+  },
   /**
    * Mark a dataset's bytes as changed — bumps `currentSha256` to a new version so
    * every figure built on the old bytes reads as stale (Pillar 1). The real trigger

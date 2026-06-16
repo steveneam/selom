@@ -53,6 +53,10 @@ export interface Dataset {
   id: string;
   projectId: string;
   filename: string;
+  /** Optional user-set display name (Pillar 1 family rename); falls back to `filename`.
+   *  Renaming a dataset propagates to its figures'/stats' source chips automatically,
+   *  since those read the live name rather than copying it. */
+  label?: string;
   modality: Modality;
   /**
    * sha256 of the dataset's CURRENT bytes — the "live" data version a figure's

@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Database, LayoutGrid, Play, Plus, Sparkles, Table2, Trash2, type LucideIcon } from "lucide-react";
+import { Database, LayoutGrid, Pencil, Play, Plus, Sparkles, Table2, Trash2, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { StaleBadge } from "./stale-badge";
 import { getSkill } from "@/lib/catalog/seed";
+import { datasetChipName, datasetDisplayName } from "@/lib/lineage/family";
 import type { StalenessResult } from "@/lib/lineage/staleness";
 import type { Dataset, Figure } from "@/lib/projects/types";
 
@@ -41,6 +42,7 @@ export interface Lineage {
 export function Workrail({
   datasets,
   figureNodes,
+  familyColors,
   view,
   activeFigureId,
   lineage,
@@ -50,9 +52,12 @@ export function Workrail({
   onSelectStats,
   onSelectFigure,
   onDeleteFigure,
+  onRenameDataset,
 }: {
   datasets: Dataset[];
   figureNodes: FigureNode[];
+  /** Dataset id → its stable family accent colour (Pillar 1 lineage). */
+  familyColors: Map<string, string>;
   view: RailView;
   activeFigureId: string | null;
   lineage: Lineage;
@@ -62,8 +67,17 @@ export function Workrail({
   onSelectStats: (fig: Figure) => void;
   onSelectFigure: (fig: Figure) => void;
   onDeleteFigure: (fig: Figure) => void;
+  onRenameDataset: (id: string, label: string) => void;
 }) {
   const statsNodes = figureNodes.filter((n) => n.hasStats);
+  const datasetById = React.useMemo(() => new Map(datasets.map((d) => [d.id, d])), [datasets]);
+
+  // The source-family chip for a figure/stat node: its dataset's colour + (live) name.
+  function familyOf(fig: Figure): { color: string; name: string } | undefined {
+    const d = fig.datasetId ? datasetById.get(fig.datasetId) : undefined;
+    if (!d) return undefined;
+    return { color: familyColors.get(d.id) ?? "var(--muted-foreground)", name: datasetChipName(d) };
+  }
 
   return (
     <nav
@@ -97,15 +111,14 @@ export function Workrail({
             <EmptyHint>No data yet</EmptyHint>
           ) : (
             datasets.map((d) => (
-              <Row
+              <DatasetRow
                 key={d.id}
-                icon={Database}
-                color="var(--stage-data)"
-                title={d.filename}
-                sub={d.qc ? `${d.modality} · ${d.qc.nObs.toLocaleString()} × ${d.qc.nVar.toLocaleString()}` : d.modality}
+                dataset={d}
+                color={familyColors.get(d.id) ?? "var(--stage-data)"}
                 selected={view === "data"}
                 linked={lineage.datasetId === d.id}
-                onClick={onSelectData}
+                onSelect={onSelectData}
+                onRename={(label) => onRenameDataset(d.id, label)}
               />
             ))
           )}
@@ -149,6 +162,7 @@ export function Workrail({
                 icon={Table2}
                 color="var(--stage-publish)"
                 title={n.figure.table?.title ?? `${skillName(n.figure)} — statistics`}
+                family={familyOf(n.figure)}
                 sub={n.figure.table ? `${n.figure.table.rows.length} rows · ${n.figure.table.columns.length} cols` : "derived table"}
                 selected={view === "stats" && activeFigureId === n.figure.id}
                 linked={lineage.figureId === n.figure.id}
@@ -170,6 +184,7 @@ export function Workrail({
                 icon={Sparkles}
                 color="var(--stage-figure)"
                 title={n.figure.title}
+                family={familyOf(n.figure)}
                 sub={skillName(n.figure)}
                 badge={n.staleness.stale ? <StaleBadge result={n.staleness} className="px-1 py-0 text-[9px]" /> : undefined}
                 selected={view === "figure" && activeFigureId === n.figure.id}
@@ -238,6 +253,7 @@ function Row({
   color,
   title,
   sub,
+  family,
   badge,
   selected,
   linked,
@@ -249,6 +265,8 @@ function Row({
   color: string;
   title: string;
   sub?: string;
+  /** Source-dataset chip (family colour + name) — shows which data this came from. */
+  family?: { color: string; name: string };
   badge?: React.ReactNode;
   selected?: boolean;
   linked?: boolean;
@@ -288,7 +306,13 @@ function Row({
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[13px] font-medium leading-tight text-foreground">{title}</span>
-          {sub && <span className="block truncate text-[11px] leading-tight text-muted-foreground">{sub}</span>}
+          {(family || sub) && (
+            <span className="flex items-center gap-1 truncate text-[11px] leading-tight text-muted-foreground">
+              {family && <FamilyChip color={family.color} name={family.name} />}
+              {family && sub && <span aria-hidden className="text-muted-foreground/40">·</span>}
+              {sub && <span className="truncate">{sub}</span>}
+            </span>
+          )}
         </span>
       </button>
       {badge && <span className="shrink-0 pr-1">{badge}</span>}
@@ -301,6 +325,107 @@ function Row({
           className="mr-1 grid size-6 shrink-0 place-items-center rounded text-muted-foreground/50 opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 group-hover/row:opacity-100 [&_svg]:size-3.5"
         >
           <Trash2 />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** A source-dataset chip: a family-colour dot + the dataset's (live) short name. */
+function FamilyChip({ color, name }: { color: string; name: string }) {
+  return (
+    <span className="inline-flex min-w-0 shrink items-center gap-1" title={`From ${name}`}>
+      <span aria-hidden className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+      <span className="truncate text-foreground/70">{name}</span>
+    </span>
+  );
+}
+
+/** A dataset row in the Data section — its family-coloured icon, an inline-renameable
+ *  name (the Prism "rename the family" gesture; propagates to every source chip), and
+ *  select. The rename pencil is revealed on hover/focus. */
+function DatasetRow({
+  dataset,
+  color,
+  selected,
+  linked,
+  onSelect,
+  onRename,
+}: {
+  dataset: Dataset;
+  color: string;
+  selected?: boolean;
+  linked?: boolean;
+  onSelect: () => void;
+  onRename: (label: string) => void;
+}) {
+  const [editing, setEditing] = React.useState(false);
+  const name = datasetDisplayName(dataset);
+  const sub = dataset.qc
+    ? `${dataset.modality} · ${dataset.qc.nObs.toLocaleString()} × ${dataset.qc.nVar.toLocaleString()}`
+    : dataset.modality;
+
+  function commit(value: string) {
+    setEditing(false);
+    if (value.trim() !== name) onRename(value);
+  }
+
+  return (
+    <div
+      className={cn(
+        "group/row relative flex items-center rounded-lg border transition-colors",
+        selected ? "border-transparent" : linked ? "border-transparent bg-accent/20" : "border-transparent hover:bg-accent/30",
+      )}
+      style={
+        selected
+          ? { borderColor: `color-mix(in oklab, ${color} 45%, transparent)`, background: `color-mix(in oklab, ${color} 12%, var(--card))` }
+          : linked
+            ? { boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${color} 30%, transparent)` }
+            : undefined
+      }
+    >
+      {editing ? (
+        <div className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5">
+          <span aria-hidden className="grid size-6 shrink-0 place-items-center [&_svg]:size-3.5" style={{ color }}>
+            <Database />
+          </span>
+          <input
+            autoFocus
+            defaultValue={name}
+            aria-label="Dataset name"
+            onBlur={(e) => commit(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+              else if (e.key === "Escape") setEditing(false);
+            }}
+            className="min-w-0 flex-1 rounded border border-input bg-background px-1.5 py-0.5 text-[13px] font-medium text-foreground outline-none focus-visible:border-ring/60 focus-visible:ring-2 focus-visible:ring-ring/30"
+          />
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={onSelect}
+          aria-current={selected ? "true" : undefined}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        >
+          <span aria-hidden className="grid size-6 shrink-0 place-items-center [&_svg]:size-3.5" style={{ color }}>
+            <Database />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13px] font-medium leading-tight text-foreground">{name}</span>
+            <span className="block truncate text-[11px] leading-tight text-muted-foreground">{sub}</span>
+          </span>
+        </button>
+      )}
+      {!editing && (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          aria-label={`Rename dataset “${name}”`}
+          title="Rename dataset"
+          className="mr-1 grid size-6 shrink-0 place-items-center rounded text-muted-foreground/50 opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 group-hover/row:opacity-100 [&_svg]:size-3.5"
+        >
+          <Pencil />
         </button>
       )}
     </div>

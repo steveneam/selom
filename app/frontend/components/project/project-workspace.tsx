@@ -23,6 +23,7 @@ import { projectStore, select, useProjects } from "@/lib/projects/store";
 import type { Dataset, Figure } from "@/lib/projects/types";
 import { figureStaleness } from "@/lib/lineage/staleness";
 import { deriveTable } from "@/lib/lineage/derive-table";
+import { familyColorMap } from "@/lib/lineage/family";
 import { readStyleStamp } from "@/lib/figure-spec";
 import { runSkill, runtimeSkillId, type SkillProvenance } from "@/lib/skills-api";
 import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
@@ -125,6 +126,9 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       }),
     [figures, datasets],
   );
+  // Stable family accent colour per dataset (Pillar 1 lineage) — its figures + stats
+  // carry this colour + the dataset's live name as a source chip.
+  const familyColors = React.useMemo(() => familyColorMap(datasets), [datasets]);
   // The active figure's lineage — light its source dataset + its own stats/figure nodes
   // in the rail (only while a figure or its stats is in focus).
   const lineage: Lineage =
@@ -387,6 +391,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         <Workrail
           datasets={datasets}
           figureNodes={figureNodes}
+          familyColors={familyColors}
           view={view}
           activeFigureId={activeFigureId}
           lineage={lineage}
@@ -396,6 +401,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           onSelectStats={openStats}
           onSelectFigure={openFigure}
           onDeleteFigure={deleteFigure}
+          onRenameDataset={(id, label) => projectStore.renameDataset(id, label)}
         />
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">
