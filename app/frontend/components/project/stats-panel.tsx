@@ -14,8 +14,8 @@ import type { StatsTable } from "@/lib/skills-api";
  */
 const MAX_RENDER = 200;
 
-export function StatsPanel({ table, className }: { table: StatsTable; className?: string }) {
-  const [open, setOpen] = React.useState(false);
+export function StatsPanel({ table, className, defaultOpen = false }: { table: StatsTable; className?: string; defaultOpen?: boolean }) {
+  const [open, setOpen] = React.useState(defaultOpen);
   const [sort, setSort] = React.useState<{ col: number; dir: 1 | -1 } | null>(null);
 
   const rows = React.useMemo(() => {

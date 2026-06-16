@@ -2,20 +2,20 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Database, LayoutGrid, Redo2, RefreshCw, Sparkles, Trash2, Undo2, Wrench } from "lucide-react";
+import { ArrowRight, Redo2, RefreshCw, Sparkles, Table2, Trash2, Undo2 } from "lucide-react";
 import { DataPanel, type AnalyzeArgs } from "./data-panel";
 import { Dropzone } from "./dropzone";
 import { WorkbenchPanel } from "./workbench-panel";
 import { PublishConfidence } from "./publish-confidence";
 import { StaleBadge } from "./stale-badge";
 import { StatsPanel } from "./stats-panel";
+import { Workrail, type FigureNode, type Lineage, type RailView } from "./workrail";
 import { Pipeline, type StageKey, type StageState } from "@/components/pipeline";
 import { EditorWorkspace } from "@/components/figure/editor-workspace";
 import { ExportMenu } from "@/components/figure/export-menu";
 import { StylePicker } from "@/components/figure/style-picker";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFigureStore } from "@/hooks/use-figure-store";
 import { getSkill } from "@/lib/catalog/seed";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
@@ -27,7 +27,10 @@ import { readStyleStamp } from "@/lib/figure-spec";
 import { runSkill, runtimeSkillId, type SkillProvenance } from "@/lib/skills-api";
 import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
 
-type Tab = WorkspaceTab;
+/** Map a command-palette intent's tab onto the workrail's view model (Pillar 1, S2.3). */
+function viewFromTab(tab: WorkspaceTab): RailView {
+  return tab === "overview" ? "home" : tab === "workbench" ? "skill" : tab;
+}
 
 /**
  * Stamp the figure's input hash with the dataset's CURRENT version (Pillar 1). The
@@ -43,6 +46,11 @@ function stampDataVersion(
   return { ...provenance, input: { ...provenance.input, sha256: dataset.currentSha256 } };
 }
 
+/** The figure's result table, or a fallback derived from its stored spec (D3); none → no Statistics node. */
+function figureTable(fig: Figure) {
+  return fig.table ?? (fig.spec ? deriveTable(fig.spec) : undefined);
+}
+
 export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const router = useRouter();
   const state = useProjects();
@@ -52,10 +60,12 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const figures = select.figures(state, projectId);
 
   const figure = useFigureStore();
-  const [tab, setTab] = React.useState<Tab>("overview");
-  // The persisted figure currently open in the editor (Pillar 1). Its stored spec
-  // seeds the live editor; in-canvas edits persist back to it; its provenance bundle
-  // is read from the record, not transient state. null = nothing open / fresh run.
+  // The workrail view (Pillar 1, S2.3) — replaces the old four tabs. The lineage rail
+  // navigates: home (pipeline) / data / skill (run) / stats (a result table) / figure.
+  const [view, setView] = React.useState<RailView>("home");
+  // The persisted figure currently in focus (Pillar 1). Drives the editor (figure view),
+  // the Statistics table (stats view), and the staleness/bundle read-out. null = nothing
+  // open / fresh run.
   const [activeFigureId, setActiveFigureId] = React.useState<string | null>(null);
   // A skill the command palette / Gene Sets surface asked to pre-select in the
   // Workbench, with optional param prefills. The nonce makes a repeat request (same
@@ -96,11 +106,32 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // Re-run needs the dataset bytes: present this session (lastFile) or fabricated in
   // mock mode; with neither (e.g. after reload against a real backend) it's disabled.
   const canRerun = !!activeFigure?.skillId && !!activeFigure?.provenance && (lastFile != null || mockMode);
-  // Statistics node (Pillar 1): the figure's stored result table, or a fallback derived
-  // from the figure traces (D3); omitted entirely when there's nothing tabular.
-  const statsTable = activeFigure?.table ?? deriveTable(figure.spec);
+  // The Statistics table for the focused figure (stats view) — its stored table or a
+  // fallback derived from its spec (D3).
+  const activeStatsTable = activeFigure ? figureTable(activeFigure) : undefined;
 
-  // Consume a command-palette intent for this project: switch tab, and (when a
+  // Per-figure rail nodes (S2.3): each figure with its staleness + whether it carries a
+  // Statistics table (so the Statistics section lists only substantive nodes, D3).
+  const figureNodes: FigureNode[] = React.useMemo(
+    () =>
+      figures.map((f) => {
+        const ds = f.datasetId ? datasets.find((d) => d.id === f.datasetId) : undefined;
+        return {
+          figure: f,
+          staleness: figureStaleness(f, { sha256: ds?.currentSha256 }),
+          hasStats: !!figureTable(f),
+        };
+      }),
+    [figures, datasets],
+  );
+  // The active figure's lineage — light its source dataset + its own stats/figure nodes
+  // in the rail (only while a figure or its stats is in focus).
+  const lineage: Lineage =
+    (view === "figure" || view === "stats") && activeFigure
+      ? { datasetId: activeFigure.datasetId, figureId: activeFigure.id }
+      : {};
+
+  // Consume a command-palette intent for this project: switch view, and (when a
   // skill was named) install it and pre-select it in the Workbench. Runs on
   // mount (intent queued just before navigation) and on every later dispatch
   // while this workspace stays mounted (same-project ⌘K actions).
@@ -112,7 +143,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         projectStore.installSkill(projectId, intent.skillId);
         setPreselect((p) => ({ id: intent.skillId!, n: (p?.n ?? 0) + 1, params: intent.params }));
       }
-      if (intent.tab) setTab(intent.tab);
+      if (intent.tab) setView(viewFromTab(intent.tab));
     }
     consume();
     return subscribeIntent(consume);
@@ -120,7 +151,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 
   // Undo / redo while editing a figure.
   React.useEffect(() => {
-    if (tab !== "figure") return;
+    if (view !== "figure") return;
     function onKey(e: KeyboardEvent) {
       if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
       const t = e.target as HTMLElement | null;
@@ -131,7 +162,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tab, figure]);
+  }, [view, figure]);
 
   // Persist in-canvas edits back to the open figure's stored spec (Pillar 1 — the
   // working spec is durable now). Debounced so a live drag (many `set`s) coalesces
@@ -170,7 +201,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         });
         setActiveFigureId(saved.id);
         figure.init(res.figure); // fresh spec carries no style stamp → activeStyle derives the default
-        setTab("figure");
+        setView("figure");
       } catch (e) {
         setError(e instanceof Error ? e.message : "Run failed. Please try again.");
       } finally {
@@ -237,7 +268,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     setLastFile(file);
     setDesignFile(df ?? null);
     setProposal(p);
-    setTab("workbench");
+    setView("skill");
   }
 
   if (!project) {
@@ -261,24 +292,31 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   };
 
   function goToStage(key: StageKey) {
-    setTab(key === "skill" ? "workbench" : key === "publish" ? "figure" : (key as Tab));
+    setView(key === "publish" ? "figure" : key);
   }
 
-  // Drop a file straight onto the Overview hub: hand it to the Data tab, which
+  // Drop a file straight onto the Overview hub: hand it to the Data view, which
   // ingests it and opens the intake — so the first thing in a new project just works.
   function dropOnOverview(file: File) {
     setIncomingFile(file);
-    setTab("data");
+    setView("data");
   }
 
   // Open a persisted figure in the editor: seed the live store from its stored spec
   // (durable now — Pillar 1). A legacy figure with no stored spec opens to a notice
-  // rather than crashing (see the Figure tab's empty states).
+  // rather than crashing (see the Figure view's empty states).
   function openFigure(f: Figure) {
     setActiveFigureId(f.id);
     if (f.spec) figure.init(f.spec);
     else figure.reset();
-    setTab("figure");
+    setView("figure");
+  }
+
+  // Select a figure's Statistics node: focus it (drives the table read-out) without
+  // disturbing the editor store.
+  function openStats(f: Figure) {
+    setActiveFigureId(f.id);
+    setView("stats");
   }
 
   return (
@@ -321,118 +359,24 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         </div>
       )}
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="mt-4 flex min-h-0 flex-1 flex-col">
-        <TabsList className="self-start">
-          <TabsTrigger value="overview"><LayoutGrid /> Overview</TabsTrigger>
-          <TabsTrigger value="data"><Database /> Data{datasets.length > 0 ? ` · ${datasets.length}` : ""}</TabsTrigger>
-          <TabsTrigger value="workbench"><Wrench /> Workbench{installs.length > 0 ? ` · ${installs.length}` : ""}</TabsTrigger>
-          <TabsTrigger value="figure"><Sparkles /> Figure</TabsTrigger>
-        </TabsList>
+      {/* Workrail + main pane (Pillar 1, S2.3) — the lineage rail replaces the tabs. */}
+      <div className="mt-5 flex min-h-0 flex-1 gap-6">
+        <Workrail
+          datasets={datasets}
+          figureNodes={figureNodes}
+          view={view}
+          activeFigureId={activeFigureId}
+          lineage={lineage}
+          onHome={() => setView("home")}
+          onSelectData={() => setView("data")}
+          onRunSkill={() => setView("skill")}
+          onSelectStats={openStats}
+          onSelectFigure={openFigure}
+        />
 
-        <div className="mt-5 min-h-0 flex-1">
-          <TabsContent value="overview">
-            {/* The pipeline box IS the command surface. Empty project → drop here to
-                start; in-progress → a live, clickable tracker of where you are. */}
-            <Card className="p-6 lg:p-8">
-              {datasets.length === 0 ? (
-                <>
-                  <div className="text-center">
-                    <h2 className="text-xl font-semibold tracking-tight text-foreground">
-                      Let&apos;s make your first figure
-                    </h2>
-                    <p className="mx-auto mt-1.5 max-w-md text-sm text-muted-foreground">
-                      Drop a dataset to get started — Selom detects the type, cleans it, and walks you
-                      through the rest.
-                    </p>
-                  </div>
-                  <Dropzone
-                    onFile={dropOnOverview}
-                    accept=".h5ad,.csv,.tsv,.mzML"
-                    title="Drop your data here"
-                    hint="or click to browse — this is step one"
-                    formats=".h5ad · .csv · .tsv · .mzML"
-                    className="mx-auto mt-6 max-w-2xl"
-                  />
-                  <p className="mt-8 text-center text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80">
-                    What happens next
-                  </p>
-                  <Pipeline variant="progress" states={stageStates} onStageClick={goToStage} className="mt-4" />
-                </>
-              ) : (
-                <>
-                  <div className="flex flex-wrap items-end justify-between gap-3">
-                    <div>
-                      <h2 className="text-lg font-semibold tracking-tight text-foreground">Project pipeline</h2>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {figures.length > 0
-                          ? "Keep editing, or publish with the methods text and provenance attached."
-                          : "Next: apply a skill in the Workbench to make your first figure."}
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant={figures.length > 0 ? "outline" : "default"}
-                      onClick={() => {
-                        if (figures.length > 0) openFigure(activeFigure ?? figures[figures.length - 1]);
-                        else setTab("workbench");
-                      }}
-                    >
-                      {figures.length > 0 ? "Open figure" : "Apply a skill"}
-                      <ArrowRight />
-                    </Button>
-                  </div>
-                  <Pipeline variant="progress" states={stageStates} onStageClick={goToStage} className="mt-10" />
-                </>
-              )}
-            </Card>
-
-            {/* Counts — a quiet strip, not a hero-metric grid. */}
-            <Card className="mt-5 grid grid-cols-3 divide-x divide-border p-0">
-              <OverviewStat label="Datasets" value={datasets.length} />
-              <OverviewStat label="Installed skills" value={installs.length} />
-              <OverviewStat label="Figures" value={figures.length} />
-            </Card>
-
-            {figures.length > 0 && (
-              <div className="mt-8">
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                  Figures in this project
-                </h3>
-                <Card className="divide-y divide-border p-0">
-                  {figures.slice(0, 6).map((f) => (
-                    <button
-                      key={f.id}
-                      onClick={() => openFigure(f)}
-                      className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-accent/40"
-                    >
-                      <Sparkles className="size-4 shrink-0 text-primary" />
-                      <span className="truncate text-sm text-foreground">{f.title}</span>
-                      <span className="tabular ml-auto text-[11px] text-muted-foreground">
-                        {getSkill(f.skillId ?? "")?.name ?? "figure"}
-                      </span>
-                    </button>
-                  ))}
-                </Card>
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="data">
-            <DataPanel
-              projectId={project.id}
-              datasets={datasets}
-              onAnalyze={onAnalyze}
-              incomingFile={incomingFile}
-              onIncomingConsumed={() => setIncomingFile(null)}
-            />
-          </TabsContent>
-
-          <TabsContent value="workbench">
-            <WorkbenchPanel installs={installs} proposal={proposal} running={running} onRun={runFlow} preselect={preselect} />
-          </TabsContent>
-
-          <TabsContent value="figure" className="h-full">
-            {figure.spec ? (
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {view === "figure" ? (
+            figure.spec ? (
               <div className="flex h-full flex-col gap-3">
                 <div className="flex items-center gap-1.5">
                   <Button variant="ghost" size="icon" disabled={!figure.canUndo} onClick={figure.undo} aria-label="Undo">
@@ -482,49 +426,226 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                       activeStyleLabel={activeStyle.label}
                       onOpenChange={setExportOpen}
                     />
-                    <Button variant="ghost" size="sm" onClick={() => { figure.reset(); setActiveFigureId(null); setTab("workbench"); }}>
+                    <Button variant="ghost" size="sm" onClick={() => { figure.reset(); setActiveFigureId(null); setView("skill"); }}>
                       New figure
                     </Button>
                   </div>
                 </div>
                 <PublishConfidence provenance={bundle?.provenance} methods={bundle?.methods} guardrails={bundle?.guardrails} />
-                {statsTable && <StatsPanel table={statsTable} />}
                 <div className="flex min-h-[520px] flex-1 overflow-hidden rounded-xl border border-border bg-background">
                   <EditorWorkspace store={figure} elevated={exportOpen} />
                 </div>
               </div>
             ) : activeFigure && !activeFigure.spec ? (
-              <Card className="grid h-full min-h-[320px] place-items-center p-10 text-center">
-                <div className="max-w-sm space-y-2">
-                  <Sparkles className="mx-auto size-6 text-muted-foreground" />
-                  <p className="text-sm font-medium text-foreground">Figure spec not stored</p>
-                  <p className="text-xs text-muted-foreground">
-                    “{activeFigure.title}” was created before figures were saved durably, so its
-                    editable spec isn’t available. Re-run the skill to produce a fresh, editable version.
-                  </p>
-                  <Button variant="outline" size="sm" onClick={() => setTab("workbench")}>
-                    Go to Workbench
-                  </Button>
-                </div>
-              </Card>
+              <EmptyState
+                title="Figure spec not stored"
+                body={`“${activeFigure.title}” was created before figures were saved durably, so its editable spec isn’t available. Re-run the skill to produce a fresh, editable version.`}
+                action="Run a skill"
+                onAction={() => setView("skill")}
+              />
             ) : (
-              <Card className="grid h-full min-h-[320px] place-items-center p-10 text-center">
-                <div className="max-w-sm space-y-2">
-                  <Sparkles className="mx-auto size-6 text-muted-foreground" />
-                  <p className="text-sm font-medium text-foreground">No figure yet</p>
-                  <p className="text-xs text-muted-foreground">
-                    Run a skill from the Workbench and the editable figure appears here.
-                  </p>
-                  <Button variant="outline" size="sm" onClick={() => setTab("workbench")}>
-                    Go to Workbench
-                  </Button>
-                </div>
-              </Card>
-            )}
-          </TabsContent>
-        </div>
-      </Tabs>
+              <EmptyState
+                title="No figure yet"
+                body="Run a skill and the editable figure appears here."
+                action="Run a skill"
+                onAction={() => setView("skill")}
+              />
+            )
+          ) : (
+            <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
+              {view === "home" && (
+                <Overview
+                  datasets={datasets}
+                  installs={installs}
+                  figures={figures}
+                  activeFigure={activeFigure}
+                  stageStates={stageStates}
+                  onDrop={dropOnOverview}
+                  onStage={goToStage}
+                  onRunSkill={() => setView("skill")}
+                  onOpenFigure={openFigure}
+                />
+              )}
+
+              {view === "data" && (
+                <DataPanel
+                  projectId={project.id}
+                  datasets={datasets}
+                  onAnalyze={onAnalyze}
+                  incomingFile={incomingFile}
+                  onIncomingConsumed={() => setIncomingFile(null)}
+                />
+              )}
+
+              {view === "skill" && (
+                <WorkbenchPanel installs={installs} proposal={proposal} running={running} onRun={runFlow} preselect={preselect} />
+              )}
+
+              {view === "stats" &&
+                (activeFigure && activeStatsTable ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight text-foreground">
+                          <Table2 className="size-4 text-stage-publish" />
+                          {activeStatsTable.title ?? "Statistics"}
+                        </h2>
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          from <span className="text-foreground">{activeFigure.title}</span> ·{" "}
+                          {getSkill(activeFigure.skillId ?? "")?.name ?? "skill"}
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => openFigure(activeFigure)}>
+                        <Sparkles /> Open figure
+                      </Button>
+                    </div>
+                    <StatsPanel table={activeStatsTable} defaultOpen />
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="No statistics selected"
+                    body="Pick a Statistics node in the rail, or run a skill that computes a table (DEG, enrichment, markers)."
+                    action="Run a skill"
+                    onAction={() => setView("skill")}
+                  />
+                ))}
+            </div>
+          )}
+        </main>
+      </div>
     </div>
+  );
+}
+
+/** The project home — the pipeline tracker (or drop-to-start when empty) + figures. */
+function Overview({
+  datasets,
+  installs,
+  figures,
+  activeFigure,
+  stageStates,
+  onDrop,
+  onStage,
+  onRunSkill,
+  onOpenFigure,
+}: {
+  datasets: Dataset[];
+  installs: { id: string }[];
+  figures: Figure[];
+  activeFigure: Figure | undefined;
+  stageStates: Partial<Record<StageKey, StageState>>;
+  onDrop: (file: File) => void;
+  onStage: (key: StageKey) => void;
+  onRunSkill: () => void;
+  onOpenFigure: (f: Figure) => void;
+}) {
+  return (
+    <>
+      <Card className="p-6 lg:p-8">
+        {datasets.length === 0 ? (
+          <>
+            <div className="text-center">
+              <h2 className="text-xl font-semibold tracking-tight text-foreground">Let&apos;s make your first figure</h2>
+              <p className="mx-auto mt-1.5 max-w-md text-sm text-muted-foreground">
+                Drop a dataset to get started — Selom detects the type, cleans it, and walks you through the rest.
+              </p>
+            </div>
+            <Dropzone
+              onFile={onDrop}
+              accept=".h5ad,.csv,.tsv,.mzML"
+              title="Drop your data here"
+              hint="or click to browse — this is step one"
+              formats=".h5ad · .csv · .tsv · .mzML"
+              className="mx-auto mt-6 max-w-2xl"
+            />
+            <p className="mt-8 text-center text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80">
+              What happens next
+            </p>
+            <Pipeline variant="progress" states={stageStates} onStageClick={onStage} className="mt-4" />
+          </>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight text-foreground">Project pipeline</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {figures.length > 0
+                    ? "Keep editing, or publish with the methods text and provenance attached."
+                    : "Next: run a skill to make your first figure."}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant={figures.length > 0 ? "outline" : "default"}
+                onClick={() => {
+                  if (figures.length > 0) onOpenFigure(activeFigure ?? figures[figures.length - 1]);
+                  else onRunSkill();
+                }}
+              >
+                {figures.length > 0 ? "Open figure" : "Run a skill"}
+                <ArrowRight />
+              </Button>
+            </div>
+            <Pipeline variant="progress" states={stageStates} onStageClick={onStage} className="mt-10" />
+          </>
+        )}
+      </Card>
+
+      {/* Counts — a quiet strip, not a hero-metric grid. */}
+      <Card className="mt-5 grid grid-cols-3 divide-x divide-border p-0">
+        <OverviewStat label="Datasets" value={datasets.length} />
+        <OverviewStat label="Installed skills" value={installs.length} />
+        <OverviewStat label="Figures" value={figures.length} />
+      </Card>
+
+      {figures.length > 0 && (
+        <div className="mt-8">
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Figures in this project
+          </h3>
+          <Card className="divide-y divide-border p-0">
+            {figures.slice(0, 6).map((f) => (
+              <button
+                key={f.id}
+                onClick={() => onOpenFigure(f)}
+                className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-accent/40"
+              >
+                <Sparkles className="size-4 shrink-0 text-primary" />
+                <span className="truncate text-sm text-foreground">{f.title}</span>
+                <span className="tabular ml-auto text-[11px] text-muted-foreground">
+                  {getSkill(f.skillId ?? "")?.name ?? "figure"}
+                </span>
+              </button>
+            ))}
+          </Card>
+        </div>
+      )}
+    </>
+  );
+}
+
+function EmptyState({
+  title,
+  body,
+  action,
+  onAction,
+}: {
+  title: string;
+  body: string;
+  action: string;
+  onAction: () => void;
+}) {
+  return (
+    <Card className="grid h-full min-h-[320px] place-items-center p-10 text-center">
+      <div className="max-w-sm space-y-2">
+        <Sparkles className="mx-auto size-6 text-muted-foreground" />
+        <p className="text-sm font-medium text-foreground">{title}</p>
+        <p className="text-xs text-muted-foreground">{body}</p>
+        <Button variant="outline" size="sm" onClick={onAction}>
+          {action}
+        </Button>
+      </div>
+    </Card>
   );
 }
 
