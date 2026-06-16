@@ -15,7 +15,9 @@
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" }
   ],
+  "origin": "proprietary",
   "catalog": {
+    "name": "Selom GO Graph",
     "summary": "Top enriched GO terms drawn in their is_a/part_of hierarchy as an editable node-link graph.",
     "category": "pathway-analysis",
     "tier": "verified",

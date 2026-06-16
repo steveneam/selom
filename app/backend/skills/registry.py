@@ -9,7 +9,7 @@ the backend is down. So adding a new skill dir = the Store shows it, no FE edit.
 
 import pathlib
 
-from skills.contract import SkillSpec, load_skill
+from skills.contract import PROPRIETARY_DIR, SkillSpec, load_skill
 
 SKILLS_DIR = pathlib.Path(__file__).parent
 
@@ -31,8 +31,11 @@ def _omics_facets(omics: str) -> list[str]:
 
 
 def list_skill_ids() -> list[str]:
-    """Slugs of every skill that ships a ``skill.json``, sorted for stable output."""
-    return sorted(p.parent.name for p in SKILLS_DIR.glob("*/skill.json"))
+    """Slugs of every skill that ships a ``skill.json``, sorted for stable output.
+    Scans the flat ``skills/<id>/`` dirs and the proprietary namespace
+    ``skills/proprietary/<id>/`` (deduped; the flat location wins on a clash)."""
+    found = SKILLS_DIR.glob("*/skill.json"), PROPRIETARY_DIR.glob("*/skill.json")
+    return sorted({p.parent.name for group in found for p in group})
 
 
 def to_catalog_entry(spec: SkillSpec) -> dict:
@@ -43,6 +46,9 @@ def to_catalog_entry(spec: SkillSpec) -> dict:
         "name": cat.get("name") or spec.title,
         "summary": cat.get("summary") or spec.title,
         "source": "selom",
+        # Open-core split marker (DECISIONS #8) — the FE Store can badge proprietary skills.
+        "origin": spec.origin,
+        "proprietary": spec.origin == "proprietary",
         "category": cat.get("category", "analysis"),
         "omics": _omics_facets(spec.omics),
         "tier": cat.get("tier", "verified"),

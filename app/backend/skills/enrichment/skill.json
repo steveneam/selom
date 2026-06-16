@@ -17,7 +17,9 @@
     { "name": "figure", "kind": "plotly_spec" },
     { "name": "table",  "kind": "csv" }
   ],
+  "origin": "proprietary",
   "catalog": {
+    "name": "Selom Enrichment",
     "summary": "In-house hypergeometric ORA + BH-FDR over GO & Reactome; dotplot output.",
     "category": "pathway-analysis",
     "tier": "verified",

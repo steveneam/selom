@@ -14,7 +14,9 @@
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" }
   ],
+  "origin": "proprietary",
   "catalog": {
+    "name": "Selom Pathway Map",
     "summary": "Reactome pathway enrichment drawn in the event hierarchy as an editable node-link, coloured by fold change.",
     "category": "pathway-analysis",
     "tier": "verified",

@@ -43,3 +43,20 @@ def test_enrichment_is_license_clean():
     # DECISIONS #9: in-house ORA over GO/Reactome — no gseapy/MSigDB, so MIT, not GPL.
     enr = next(s for s in client.get("/skills").json() if s["id"] == "selom.enrichment")
     assert enr["license"] == "MIT"
+
+
+def test_origin_flag_classifies_proprietary_vs_commodity():
+    # Open-core split (DECISIONS #8): every entry carries origin + a derived proprietary
+    # boolean; the genuinely-original skills are flagged, the wrappers are not.
+    by_id = {s["id"]: s for s in client.get("/skills").json()}
+    for s in by_id.values():
+        assert s["origin"] in ("proprietary", "commodity")
+        assert s["proprietary"] == (s["origin"] == "proprietary")
+    # In-house IP — flagged proprietary (+ branded display name).
+    for sid in ("enrichment", "go_graph", "pathway", "string_network", "gsea"):
+        e = by_id[f"selom.{sid}"]
+        assert e["proprietary"] is True, f"{sid} should be proprietary"
+        assert e["name"].startswith("Selom "), f"{sid} should carry a branded name"
+    # Commodity wrappers — value is the editable output, not the algorithm.
+    for sid in ("umap_scrna", "deg", "volcano", "heatmap"):
+        assert by_id[f"selom.{sid}"]["proprietary"] is False, f"{sid} is a commodity wrapper"

@@ -15,7 +15,9 @@
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" }
   ],
+  "origin": "proprietary",
   "catalog": {
+    "name": "Selom STRING Network",
     "summary": "STRING protein-protein interaction network for a gene list (or DE table) — live STRING API. Editable node-link; nodes coloured by log2 fold change (or degree), edges are STRING interactions above a confidence cutoff.",
     "category": "pathway-analysis",
     "tier": "verified",

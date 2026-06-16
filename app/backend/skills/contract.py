@@ -6,6 +6,12 @@ from pydantic import BaseModel
 
 from skills._engine import to_bool
 
+SKILLS_DIR = pathlib.Path(__file__).parent
+# Branded namespace for genuinely-original Selom IP. New proprietary skills live here
+# (skills/proprietary/<id>/); the loader scans it alongside the flat skills/<id>/ dirs.
+# See docs/proprietary-skills.md for the open-core boundary + classification.
+PROPRIETARY_DIR = SKILLS_DIR / "proprietary"
+
 
 class SkillSpec(BaseModel):
     id: str
@@ -17,14 +23,34 @@ class SkillSpec(BaseModel):
     inputs: list[dict]
     param_spec: dict
     outputs: list[dict]
-    # Optional Skill-Store display metadata (summary/category/tier/status/license/…).
-    # Presentation only — the execution contract above is what the runner needs.
-    # The registry (skills/registry.py) reads this to serve GET /skills.
+    # Open-core split marker (DECISIONS #8): "proprietary" = genuinely Selom-original IP
+    # — novel or clean-room-reimplemented algorithms, and the editable graph-figure skills
+    # that turn public API data into editable Plotly figures. "commodity" = a thin wrapper
+    # over a public library where the value is the editable output + provenance, not the
+    # algorithm. Default commodity (existing flat skills omit it). See docs/proprietary-skills.md.
+    origin: str = "commodity"
+    # Optional Skill-Store display metadata (name/summary/category/tier/status/license/…).
+    # Presentation only — the execution contract above is what the runner needs. `catalog.name`
+    # carries the branded display name. The registry (skills/registry.py) reads this to serve GET /skills.
     catalog: dict | None = None
 
 
+def _skill_dir(skill_id: str) -> pathlib.Path:
+    """Resolve a skill slug to its directory. Skills live flat under ``skills/<id>/``;
+    genuinely-original ones may instead live in the proprietary namespace
+    ``skills/proprietary/<id>/``. Both are scanned; the flat location wins on a clash.
+    Falls back to the flat path so a missing skill raises a clear error there."""
+    flat = SKILLS_DIR / skill_id
+    if (flat / "skill.json").exists():
+        return flat
+    prop = PROPRIETARY_DIR / skill_id
+    if (prop / "skill.json").exists():
+        return prop
+    return flat
+
+
 def load_skill(skill_id: str) -> SkillSpec:
-    p = pathlib.Path(__file__).parent / skill_id / "skill.json"
+    p = _skill_dir(skill_id) / "skill.json"
     return SkillSpec(**json.loads(p.read_text()))
 
 

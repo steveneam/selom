@@ -15,7 +15,9 @@
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" }
   ],
+  "origin": "proprietary",
   "catalog": {
+    "name": "Selom GSEA",
     "summary": "Gene Set Enrichment Analysis — running enrichment-score curve with leading-edge hits and permutation NES/p. In-house weighted-KS, no gseapy.",
     "category": "pathway-analysis",
     "tier": "verified",
