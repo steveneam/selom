@@ -2,11 +2,12 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Database, LayoutGrid, Redo2, Sparkles, Trash2, Undo2, Wrench } from "lucide-react";
+import { ArrowRight, Database, LayoutGrid, Redo2, RefreshCw, Sparkles, Trash2, Undo2, Wrench } from "lucide-react";
 import { DataPanel, type AnalyzeArgs } from "./data-panel";
 import { Dropzone } from "./dropzone";
 import { WorkbenchPanel } from "./workbench-panel";
 import { PublishConfidence } from "./publish-confidence";
+import { StaleBadge } from "./stale-badge";
 import { Pipeline, type StageKey, type StageState } from "@/components/pipeline";
 import { EditorWorkspace } from "@/components/figure/editor-workspace";
 import { ExportMenu } from "@/components/figure/export-menu";
@@ -18,11 +19,27 @@ import { useFigureStore } from "@/hooks/use-figure-store";
 import { getSkill } from "@/lib/catalog/seed";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 import { projectStore, select, useProjects } from "@/lib/projects/store";
+import type { Dataset, Figure } from "@/lib/projects/types";
+import { figureStaleness } from "@/lib/lineage/staleness";
 import { readStyleStamp } from "@/lib/figure-spec";
-import { runSkill, runtimeSkillId, type SkillGuardrail, type SkillMethods, type SkillProvenance } from "@/lib/skills-api";
+import { runSkill, runtimeSkillId, type SkillProvenance } from "@/lib/skills-api";
 import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
 
 type Tab = WorkspaceTab;
+
+/**
+ * Stamp the figure's input hash with the dataset's CURRENT version (Pillar 1). The
+ * input hash is the dataset bytes' hash; in the dogfood mock the backend hash is a
+ * fixed stand-in, so we record the dataset's client-maintained version, which is what
+ * staleness diffs against. For a real backend the two are equal, so this is a no-op.
+ */
+function stampDataVersion(
+  provenance: SkillProvenance | undefined,
+  dataset: Dataset | undefined,
+): SkillProvenance | undefined {
+  if (!provenance || !dataset?.currentSha256) return provenance;
+  return { ...provenance, input: { ...provenance.input, sha256: dataset.currentSha256 } };
+}
 
 export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const router = useRouter();
@@ -34,6 +51,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 
   const figure = useFigureStore();
   const [tab, setTab] = React.useState<Tab>("overview");
+  // The persisted figure currently open in the editor (Pillar 1). Its stored spec
+  // seeds the live editor; in-canvas edits persist back to it; its provenance bundle
+  // is read from the record, not transient state. null = nothing open / fresh run.
+  const [activeFigureId, setActiveFigureId] = React.useState<string | null>(null);
   // A skill the command palette / Gene Sets surface asked to pre-select in the
   // Workbench, with optional param prefills. The nonce makes a repeat request (same
   // skill, again) a fresh prop for the panel.
@@ -53,12 +74,26 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // When the export popover is open, the page dims+blurs behind it but the figure
   // artboard stays crisp (it's the subject of the export) — see EditorWorkspace `elevated`.
   const [exportOpen, setExportOpen] = React.useState(false);
-  // Publish-confidence bundle for the current figure (B4): methods-text + repro record + guardrails.
-  const [bundle, setBundle] = React.useState<{
-    provenance?: SkillProvenance;
-    methods?: SkillMethods;
-    guardrails?: SkillGuardrail[];
-  } | null>(null);
+  // Publish-confidence bundle for the open figure (B4): methods-text + repro record +
+  // guardrails. Derived from the persisted record (Pillar 1) so it survives reload —
+  // no longer transient React state.
+  const activeFigure = activeFigureId ? figures.find((f) => f.id === activeFigureId) : undefined;
+  const bundle = activeFigure
+    ? { provenance: activeFigure.provenance, methods: activeFigure.methods, guardrails: activeFigure.guardrails }
+    : null;
+
+  // Staleness (Pillar 1): diff the open figure's stored provenance against the live
+  // trigger-set. The only "live" factor we can compute in the dogfood mock is the
+  // dataset's current data version; params (a re-run uses the figure's own), skill
+  // version, and env aren't separately tracked here, so they're left unknown (skipped).
+  const activeDataset = activeFigure?.datasetId ? datasets.find((d) => d.id === activeFigure.datasetId) : undefined;
+  const staleness = activeFigure
+    ? figureStaleness(activeFigure, { sha256: activeDataset?.currentSha256 })
+    : { stale: false, reasons: [] };
+  const mockMode = process.env.NEXT_PUBLIC_API_MOCKING === "enabled";
+  // Re-run needs the dataset bytes: present this session (lastFile) or fabricated in
+  // mock mode; with neither (e.g. after reload against a real backend) it's disabled.
+  const canRerun = !!activeFigure?.skillId && !!activeFigure?.provenance && (lastFile != null || mockMode);
 
   // Consume a command-palette intent for this project: switch tab, and (when a
   // skill was named) install it and pre-select it in the Workbench. Runs on
@@ -93,17 +128,42 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [tab, figure]);
 
+  // Persist in-canvas edits back to the open figure's stored spec (Pillar 1 — the
+  // working spec is durable now). Debounced so a live drag (many `set`s) coalesces
+  // into one write on settle; undo/redo + discrete commits persist their result too.
+  React.useEffect(() => {
+    const spec = figure.spec;
+    if (!activeFigureId || !spec) return;
+    const id = setTimeout(() => projectStore.updateFigureSpec(activeFigureId, spec), 350);
+    return () => clearTimeout(id);
+  }, [figure.spec, activeFigureId]);
+
   const runFlow = React.useCallback(
     async (step: ProposedStep) => {
       setRunning(step.skillId);
       setError(null);
       try {
-        const file = lastFile ?? new File(["mock"], datasets.find((d) => d.id === datasetId)?.filename ?? "data.csv");
+        // Attach the project's dataset even on the demo deep-link (no explicit pick),
+        // so produced figures have a dataset to compute staleness against.
+        const dsId = datasetId ?? datasets[0]?.id;
+        const dataset = dsId ? datasets.find((d) => d.id === dsId) : undefined;
+        const file = lastFile ?? new File(["mock"], dataset?.filename ?? "data.csv");
         const res = await runSkill(runtimeSkillId(step.skillId), file, step.params, designFile);
-        figure.init(res.figure); // fresh spec carries no style stamp → activeStyle derives the default
-        setBundle({ provenance: res.provenance, methods: res.methods, guardrails: res.guardrails });
         const name = getSkill(step.skillId)?.name ?? step.skillId;
-        projectStore.addFigure(projectId, { title: `${name} — figure`, datasetId, skillId: step.skillId });
+        // Persist the figure durably — full spec + the provenance bundle (the staleness
+        // trigger-set, stamped with the dataset's current version). Both were transient
+        // before Pillar 1, lost on reload.
+        const saved = projectStore.addFigure(projectId, {
+          title: `${name} — figure`,
+          datasetId: dsId,
+          skillId: step.skillId,
+          spec: res.figure,
+          provenance: stampDataVersion(res.provenance, dataset),
+          methods: res.methods,
+          guardrails: res.guardrails,
+        });
+        setActiveFigureId(saved.id);
+        figure.init(res.figure); // fresh spec carries no style stamp → activeStyle derives the default
         setTab("figure");
       } catch (e) {
         setError(e instanceof Error ? e.message : "Run failed. Please try again.");
@@ -112,6 +172,41 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       }
     },
     [datasetId, datasets, figure, lastFile, designFile, projectId],
+  );
+
+  // Re-run a (stale) figure: replay its skill with the SAME params against the
+  // dataset's CURRENT bytes, persisting a NEW version (`parentFigureId`). The prior is
+  // retained, never mutated (Pillar 1). The new version stamps the current data
+  // version, so it reads fresh while the prior stays stale.
+  const rerunFigure = React.useCallback(
+    async (fig: Figure) => {
+      if (!fig.skillId || !fig.provenance) return;
+      setRunning(fig.skillId);
+      setError(null);
+      try {
+        const dataset = fig.datasetId ? datasets.find((d) => d.id === fig.datasetId) : undefined;
+        const file = lastFile ?? new File(["mock"], dataset?.filename ?? "data.csv");
+        const res = await runSkill(runtimeSkillId(fig.skillId), file, fig.provenance.params, designFile);
+        const saved = projectStore.addFigure(projectId, {
+          title: fig.title,
+          datasetId: fig.datasetId,
+          skillId: fig.skillId,
+          spec: res.figure,
+          provenance: stampDataVersion(res.provenance, dataset),
+          methods: res.methods,
+          guardrails: res.guardrails,
+          parentFigureId: fig.id,
+          variantLabel: "re-run",
+        });
+        setActiveFigureId(saved.id);
+        figure.init(res.figure);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Re-run failed. Please try again.");
+      } finally {
+        setRunning(null);
+      }
+    },
+    [datasets, lastFile, designFile, figure, projectId],
   );
 
   // Dev helper: `?demo=<skillId>` (or any truthy `?demo`) auto-runs a skill so you
@@ -167,6 +262,16 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   function dropOnOverview(file: File) {
     setIncomingFile(file);
     setTab("data");
+  }
+
+  // Open a persisted figure in the editor: seed the live store from its stored spec
+  // (durable now — Pillar 1). A legacy figure with no stored spec opens to a notice
+  // rather than crashing (see the Figure tab's empty states).
+  function openFigure(f: Figure) {
+    setActiveFigureId(f.id);
+    if (f.spec) figure.init(f.spec);
+    else figure.reset();
+    setTab("figure");
   }
 
   return (
@@ -260,7 +365,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     <Button
                       size="sm"
                       variant={figures.length > 0 ? "outline" : "default"}
-                      onClick={() => setTab(figures.length > 0 ? "figure" : "workbench")}
+                      onClick={() => {
+                        if (figures.length > 0) openFigure(activeFigure ?? figures[figures.length - 1]);
+                        else setTab("workbench");
+                      }}
                     >
                       {figures.length > 0 ? "Open figure" : "Apply a skill"}
                       <ArrowRight />
@@ -287,7 +395,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                   {figures.slice(0, 6).map((f) => (
                     <button
                       key={f.id}
-                      onClick={() => setTab("figure")}
+                      onClick={() => openFigure(f)}
                       className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-accent/40"
                     >
                       <Sparkles className="size-4 shrink-0 text-primary" />
@@ -327,7 +435,35 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     <Redo2 />
                   </Button>
                   <span className="ml-2 text-xs text-muted-foreground">Editing live — every change is a JSON-Patch.</span>
+                  {staleness.stale && activeFigure && (
+                    <div className="ml-2 flex items-center gap-2">
+                      <StaleBadge result={staleness} />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7"
+                        data-testid="rerun-figure"
+                        onClick={() => rerunFigure(activeFigure)}
+                        disabled={!canRerun || running != null}
+                        title={canRerun ? "Re-run with the current data → a new version" : "Re-attach the dataset to re-run"}
+                      >
+                        <RefreshCw /> {running === activeFigure.skillId ? "Re-running…" : "Re-run"}
+                      </Button>
+                    </div>
+                  )}
                   <div className="ml-auto flex items-center gap-1.5">
+                    {mockMode && activeDataset && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground"
+                        data-testid="simulate-data-change"
+                        onClick={() => projectStore.markDatasetUpdated(activeDataset.id)}
+                        title="Dev (mock only): mark this figure's dataset as changed, to demo staleness"
+                      >
+                        Simulate data change
+                      </Button>
+                    )}
                     <StylePicker
                       store={figure}
                       skillId={bundle?.provenance?.skill?.id}
@@ -339,7 +475,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                       activeStyleLabel={activeStyle.label}
                       onOpenChange={setExportOpen}
                     />
-                    <Button variant="ghost" size="sm" onClick={() => { figure.reset(); setBundle(null); setTab("workbench"); }}>
+                    <Button variant="ghost" size="sm" onClick={() => { figure.reset(); setActiveFigureId(null); setTab("workbench"); }}>
                       New figure
                     </Button>
                   </div>
@@ -349,6 +485,20 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                   <EditorWorkspace store={figure} elevated={exportOpen} />
                 </div>
               </div>
+            ) : activeFigure && !activeFigure.spec ? (
+              <Card className="grid h-full min-h-[320px] place-items-center p-10 text-center">
+                <div className="max-w-sm space-y-2">
+                  <Sparkles className="mx-auto size-6 text-muted-foreground" />
+                  <p className="text-sm font-medium text-foreground">Figure spec not stored</p>
+                  <p className="text-xs text-muted-foreground">
+                    “{activeFigure.title}” was created before figures were saved durably, so its
+                    editable spec isn’t available. Re-run the skill to produce a fresh, editable version.
+                  </p>
+                  <Button variant="outline" size="sm" onClick={() => setTab("workbench")}>
+                    Go to Workbench
+                  </Button>
+                </div>
+              </Card>
             ) : (
               <Card className="grid h-full min-h-[320px] place-items-center p-10 text-center">
                 <div className="max-w-sm space-y-2">

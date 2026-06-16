@@ -27,6 +27,18 @@ export interface SkillGuardrail {
   detail: string;
 }
 
+/**
+ * A tabular result a skill computes — the DE / enrichment / marker / correlation
+ * table that becomes the Statistics artifact (Pillar 1). The backend returns it
+ * alongside the figure (wired into the contract in S2, Decision D7); the durable
+ * `Figure` record stores it so the Statistics node survives reload.
+ */
+export interface StatsTable {
+  columns: string[];
+  rows: (string | number)[][];
+  title?: string;
+}
+
 export interface SkillRunResponse {
   figure: FigureSpec;
   // Publish-confidence bundle (B4). Optional so an older backend / a mock without it

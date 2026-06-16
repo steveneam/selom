@@ -7,6 +7,9 @@
  * No component imports Supabase directly — everything goes through `ProjectStore`.
  */
 
+import type { FigureSpec } from "@/lib/figure-spec";
+import type { SkillGuardrail, SkillMethods, SkillProvenance, StatsTable } from "@/lib/skills-api";
+
 export type Modality = "scRNA-seq" | "bulk RNA-seq" | "proteomics" | "unknown";
 
 export type GuardrailLevel = "info" | "warn" | "error";
@@ -51,6 +54,13 @@ export interface Dataset {
   projectId: string;
   filename: string;
   modality: Modality;
+  /**
+   * sha256 of the dataset's CURRENT bytes — the "live" data version a figure's
+   * stored input hash is diffed against (Pillar 1 staleness). A figure goes stale
+   * when its `provenance.input.sha256` no longer matches this. (In the dogfood mock,
+   * with no real bytes, it's a stable real-looking stand-in the client maintains.)
+   */
+  currentSha256?: string;
   qc?: QcReport;
   createdAt: number;
 }
@@ -82,15 +92,35 @@ export interface GeneSet {
   createdAt: number;
 }
 
-/** A produced figure reference. Maps to `figures` (spec stored by the editor). */
-export interface FigureRef {
+/**
+ * A produced figure — the durable record. Maps to `figures` (design §5).
+ *
+ * Pillar 1 (liveness & lineage) makes this the source of truth for the editable
+ * `spec` + its provenance `bundle` (both were transient before — lost on reload).
+ * That stored bundle IS the staleness trigger-set (input hash / params / skill
+ * version / env). Lineage/version metadata lives HERE, never inside the spec.
+ * All new fields are optional → legacy persisted figures (spec-less) still load.
+ */
+export interface Figure {
   id: string;
   projectId: string;
   datasetId?: string;
-  skillId?: string;
+  skillId?: string;            // catalog id
   title: string;
+  spec?: FigureSpec;           // the editable Plotly spec (was transient)
+  provenance?: SkillProvenance;// the staleness trigger-set (was transient)
+  methods?: SkillMethods;
+  guardrails?: SkillGuardrail[];
+  table?: StatsTable;          // the Statistics result (wired in S2)
+  // lineage / versioning
+  parentFigureId?: string;     // set on a fork / variant / re-run
+  variantLabel?: string;       // e.g. "resolution = 1.0"
+  frozen?: boolean;            // the "paper" tag (S3)
   createdAt: number;
 }
+
+/** @deprecated Use {@link Figure}. Kept as an alias during the Pillar-1 migration. */
+export type FigureRef = Figure;
 
 /** A project folder (the sidebar entries). Maps to `projects`. */
 export interface Project {
@@ -106,6 +136,6 @@ export interface ProjectState {
   projects: Project[];
   datasets: Dataset[];
   installs: SkillInstall[];
-  figures: FigureRef[];
+  figures: Figure[];
   geneSets: GeneSet[];
 }

@@ -2,7 +2,8 @@
 
 import { useSyncExternalStore } from "react";
 import { mockQcReport } from "@/lib/intake/mock";
-import type { Dataset, FigureRef, GeneSet, Modality, Project, ProjectState, SkillInstall } from "./types";
+import type { FigureSpec } from "@/lib/figure-spec";
+import type { Dataset, Figure, GeneSet, Modality, Project, ProjectState, SkillInstall } from "./types";
 
 /**
  * Mock `ProjectStore` — the localStorage-backed implementation of the projects
@@ -25,8 +26,38 @@ function uid(prefix: string): string {
   return `${prefix}_${Math.floor(Math.random() * 1e9).toString(36)}`;
 }
 
+/**
+ * Deterministic sha256-shaped stand-in derived from a seed string (FNV-1a, expanded
+ * to 64 hex chars). Stable for a given id → no SSR/hydration mismatch and a
+ * real-looking input hash in the repro panel. The dogfood mock has no real bytes to
+ * hash; the real backend supplies the genuine sha256 on ingest (Pillar 1).
+ */
+function hexFrom(seed: string): string {
+  let h = 0x811c9dc5;
+  let out = "";
+  let s = seed;
+  while (out.length < 64) {
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    out += h.toString(16).padStart(8, "0");
+    s = out;
+  }
+  return out.slice(0, 64);
+}
+
+/** A fresh random data version (client-only mutator path) — used to simulate the
+ *  dataset's bytes changing, so figures built on the old bytes read as stale. */
+function randomSha(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, "").slice(0, 64);
+  }
+  return hexFrom(`${Math.random()}`);
+}
+
 function ds(projectId: string, id: string, filename: string, modality: Modality, t: number): Dataset {
-  return { id, projectId, filename, modality, qc: mockQcReport(modality), createdAt: t };
+  return { id, projectId, filename, modality, currentSha256: hexFrom(id), qc: mockQcReport(modality), createdAt: t };
 }
 
 /** Deterministic seed (stable ids → no hydration mismatch). */
@@ -47,7 +78,7 @@ function seed(): ProjectState {
     { id: "i3", projectId: "demo-tumor", skillId: "selom.deg", installedAt: t },
     { id: "i4", projectId: "demo-tumor", skillId: "selom.volcano", installedAt: t },
   ];
-  const figures: FigureRef[] = [
+  const figures: Figure[] = [
     { id: "f1", projectId: "demo-pbmc", datasetId: "demo-pbmc-ds", skillId: "selom.umap_scrna", title: "UMAP — Leiden clusters", createdAt: t },
   ];
   return { projects, datasets, installs, figures, geneSets: [] };
@@ -96,8 +127,11 @@ export const projectStore = {
       if (raw) {
         const parsed = JSON.parse(raw) as ProjectState;
         if (parsed && Array.isArray(parsed.projects)) {
-          // Tolerate state persisted before geneSets existed (added in the gene-set builder).
-          state = { ...parsed, geneSets: parsed.geneSets ?? [] };
+          // Tolerate state persisted before later fields existed: geneSets (gene-set
+          // builder) and figures persisted before Pillar 1 (no `spec`/`provenance` —
+          // they load fine since those fields are optional; the editor flags them as
+          // "spec not stored (legacy)" rather than crashing).
+          state = { ...parsed, geneSets: parsed.geneSets ?? [], figures: parsed.figures ?? [] };
           emit();
         }
       } else {
@@ -136,6 +170,17 @@ export const projectStore = {
     setState({ ...state, datasets: [...state.datasets, d] });
     return d;
   },
+  /**
+   * Mark a dataset's bytes as changed — bumps `currentSha256` to a new version so
+   * every figure built on the old bytes reads as stale (Pillar 1). The real trigger
+   * is a re-ingest with different bytes; this is the dogfood/dev stand-in for it.
+   */
+  markDatasetUpdated(id: string): void {
+    setState({
+      ...state,
+      datasets: state.datasets.map((d) => (d.id === id ? { ...d, currentSha256: randomSha() } : d)),
+    });
+  },
   installSkill(projectId: string, skillId: string) {
     if (state.installs.some((i) => i.projectId === projectId && i.skillId === skillId)) return;
     const i: SkillInstall = { id: uid("i"), projectId, skillId, installedAt: Date.now() };
@@ -147,8 +192,29 @@ export const projectStore = {
       installs: state.installs.filter((i) => !(i.projectId === projectId && i.skillId === skillId)),
     });
   },
-  addFigure(projectId: string, fig: { title: string; datasetId?: string; skillId?: string }): FigureRef {
-    const f: FigureRef = { id: uid("f"), projectId, title: fig.title, datasetId: fig.datasetId, skillId: fig.skillId, createdAt: Date.now() };
+  /**
+   * Persist a produced figure durably — its full Plotly `spec`, the provenance
+   * `bundle`, the Statistics `table`, and any lineage (`parentFigureId` on a
+   * re-run / variant). Pillar 1: the spec + bundle were transient before this.
+   */
+  addFigure(projectId: string, fig: Omit<Figure, "id" | "projectId" | "createdAt">): Figure {
+    const f: Figure = { ...fig, id: uid("f"), projectId, createdAt: Date.now() };
+    setState({ ...state, figures: [...state.figures, f] });
+    return f;
+  },
+  /** Persist an in-canvas edit back to the figure's stored spec (durable working spec). */
+  updateFigureSpec(id: string, spec: FigureSpec) {
+    setState({ ...state, figures: state.figures.map((f) => (f.id === id ? { ...f, spec } : f)) });
+  },
+  /**
+   * Fork a figure into a new sibling version (copies the parent, applies `patch`,
+   * links via `parentFigureId`). A fork is always unfrozen — editing a frozen
+   * "paper" figure forks an editable copy (Decision D6). Never mutates the parent.
+   */
+  forkFigure(parentId: string, patch: Partial<Omit<Figure, "id" | "projectId" | "createdAt">> = {}): Figure | null {
+    const parent = state.figures.find((f) => f.id === parentId);
+    if (!parent) return null;
+    const f: Figure = { ...parent, ...patch, id: uid("f"), parentFigureId: parentId, frozen: false, createdAt: Date.now() };
     setState({ ...state, figures: [...state.figures, f] });
     return f;
   },
