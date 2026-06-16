@@ -16,14 +16,36 @@ import { projectStore } from "@/lib/projects/store";
  * Below `lg` the rail is an off-canvas drawer toggled from the header; at desktop
  * it's a static column. The drawer closes on any navigation (route change).
  */
+const RAIL_COLLAPSED_KEY = "selom.rail.collapsed";
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = React.useState(false);
   const [paletteOpen, setPaletteOpen] = React.useState(false);
+  // Desktop app-rail collapse (icon-only spine). Starts expanded (matches SSR), then
+  // syncs from localStorage after mount so the preference persists across navigation.
+  const [railCollapsed, setRailCollapsed] = React.useState(false);
 
-  // Load persisted projects on the client, once, after hydration.
+  // Load persisted projects + the rail-collapse preference on the client, once.
   React.useEffect(() => {
     projectStore.hydrate();
+    try {
+      if (localStorage.getItem(RAIL_COLLAPSED_KEY) === "1") setRailCollapsed(true);
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+
+  const toggleRail = React.useCallback(() => {
+    setRailCollapsed((c) => {
+      const next = !c;
+      try {
+        localStorage.setItem(RAIL_COLLAPSED_KEY, next ? "1" : "0");
+      } catch {
+        /* storage unavailable */
+      }
+      return next;
+    });
   }, []);
 
   // Close the mobile drawer whenever the route changes.
@@ -53,7 +75,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           className="fixed inset-0 z-30 bg-black/55 lg:hidden"
         />
       )}
-      <Sidebar open={navOpen} onNavigate={() => setNavOpen(false)} />
+      <Sidebar
+        open={navOpen}
+        collapsed={railCollapsed}
+        onToggleCollapse={toggleRail}
+        onNavigate={() => setNavOpen(false)}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card/30 px-4 backdrop-blur-sm sm:px-5">
           <button
