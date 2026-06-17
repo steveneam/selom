@@ -212,6 +212,15 @@ extract/
    `VisionClassifier(gateway=…)` adapter lands in X1 slice-2._
 3. **Track-B SSIM acceptance band** — what SSIM counts as "visually equivalent"? Calibrate on the
    RPGRIP1 panels during X2.
-   _Provisional bands set (`reconstruct.py`: equivalent ≥0.80, plausible ≥0.55 = the accept floor);
-   STILL TO CALIBRATE against real RPGRIP1 panel pairs (render→SSIM-vs-original-scan, owner dogfood)
-   before they gate anything — a redraw never pixel-matches a publisher scan._
+   _**RESOLVED 2026-06-18** by calibration on real RPGRIP1 Fig-6 panels (Selom redraw vs publisher-
+   scan crop). The result is a **correction**, not a threshold: SSIM is a **registered** (pixel-
+   aligned) metric, and a fresh Plotly redraw is not registered to a scan. Measured — equivalent
+   pairs 0.66–0.76 (venn .758 / dotplot .741 / violin .696 / comp .687) but **different-panel**
+   controls 0.74–0.78, i.e. NEG scored ABOVE EQ; content-variance-weighting and content-bbox cropping
+   did not separate them (gaps −0.097 / −0.078). Whole-panel SSIM-vs-scan is dominated by shared
+   whitespace + gross layout, not figure identity, so it **cannot gate** a redraw. Shipped:
+   `reconstruct.py` bands recalibrated to the **registered** regime where SSIM is valid (equivalent
+   ≥0.95, plausible ≥0.80; anchored by controls identity=1.00, blur-3px=0.85), and `self_qa(...,
+   registered=False)` returns an **advisory** verdict (`accepted=None`) for scan comparisons.
+   `reconstruct_and_qa` defaults `registered=False`. Faithfulness of a redraw to the authors' figure
+   is decided by the **golden-target match** (counts/%/gene-set sizes — the engine's job), never pixels._
