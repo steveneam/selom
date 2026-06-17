@@ -110,6 +110,34 @@ class OracleResult(BaseModel):
     note: str = ""
 
 
+class SweepCell(BaseModel):
+    """One evaluated point in the sweep grid (SOP step 9)."""
+
+    setting: dict  # e.g. {"contrast": "MS-VUS", "stat": "padj", "thr": 0.05, ...}
+    value: float | int
+
+
+class Sweep(BaseModel):
+    """The threshold/contrast sweep for one count golden (stage 9, guard 1).
+
+    Either pins the authors' *undocumented* setting that reproduces the printed number
+    (``reproducing_setting``) or proves no grid point reaches it (``irreproducible``).
+    When the printed number is not what the *stated* method yields — reachable only at an
+    unstated setting, or not at all — that is the ``methods_vs_numbers`` inconsistency."""
+
+    panel_key: str
+    golden_metric: str
+    golden_value: float | int
+    axes: list[str] = Field(default_factory=list)
+    grid: list[SweepCell] = Field(default_factory=list)
+    stated_setting: dict | None = None
+    stated_value: float | int | None = None
+    reproducing_setting: dict | None = None
+    irreproducible: bool = False
+    inconsistency_ref: int | None = None
+    note: str = ""
+
+
 class MetricValue(BaseModel):
     metric: str
     value: float | int | str | None = None
@@ -198,7 +226,7 @@ class Ledger(BaseModel):
     panels: list[Panel] = Field(default_factory=list)
     runs: list[ReproRun] = Field(default_factory=list)
     oracles: list[OracleResult] = Field(default_factory=list)
-    sweeps: list[dict] = Field(default_factory=list)  # Sweep shape lands in R3
+    sweeps: list[Sweep] = Field(default_factory=list)
     validations: list[Validation] = Field(default_factory=list)
     scorecard: Scorecard | None = None
 
@@ -299,6 +327,42 @@ def assign_blame(
     if not oracle.agrees_with_paper:
         return UPSTREAM_DELTA
     return ENGINE_DELTA if not oracle.agrees_with_selom else SELOM_ENGINE
+
+
+def oracle_agreement(
+    oracle_value,
+    golden,
+    computed,
+    *,
+    rel_tol: float = 0.01,
+    close_tol: float = 0.25,
+    ints_exact: bool = True,
+    direction_close: bool = False,
+) -> tuple[bool, bool]:
+    """Turn an oracle's recomputed value into the two booleans :func:`assign_blame` needs.
+
+    The oracle *agrees* with a target when re-running the authors' actual tool lands
+    within that target's verdict band (``exact`` or ``close``) — reusing
+    :func:`classify_metric`, not a second heuristic. ``close_tol`` is the metric's
+    declared band (D4): engine-sensitive counts (GSEA term counts, RISKS #10) declare a
+    wide band on their ``Golden`` so "recovers comparable counts" reads as agreement,
+    while an exact count or ID-set stays strict. Returns
+    ``(agrees_with_paper, agrees_with_selom)``."""
+
+    def _agrees(target) -> bool:
+        if target is None:
+            return False
+        verdict, _ = classify_metric(
+            target,
+            oracle_value,
+            rel_tol=rel_tol,
+            close_tol=close_tol,
+            ints_exact=ints_exact,
+            direction_close=direction_close,
+        )
+        return verdict in (EXACT, CLOSE)
+
+    return _agrees(golden), _agrees(computed)
 
 
 _VERDICT_RANK = {EXACT: 0, CLOSE: 1, FAIL: 2}
@@ -491,6 +555,33 @@ def run_panel(
     ledger.validations.append(validation)
     ledger.scorecard = build_scorecard(ledger)
     return run, validation
+
+
+def revalidate_panel(
+    ledger: Ledger,
+    panel: Panel,
+    *,
+    oracles: dict[str, OracleResult] | None = None,
+    guards_fired: list[str] | None = None,
+) -> Validation:
+    """Re-run validate+blame for a panel after a sweep/oracle lands (stages 7/9).
+
+    Pulls the panel's latest run's computed values, replaces the panel's prior
+    ``Validation`` in place, and rebuilds the scorecard — so blame upgrades from
+    ``delta-unmeasured`` to the oracle-assigned class once the instrument has run.
+    ``guards_fired`` defaults to the prior validation's (pass the union to add the
+    oracle/sweep-stage guards, e.g. ``authors_tool_misses``)."""
+    run = next((r for r in reversed(ledger.runs) if r.panel_key == panel.key), None)
+    if run is None:
+        raise ValueError(f"panel {panel.key} has no run to revalidate")
+    computed = {mv.metric: mv.value for mv in run.computed}
+    prior = next((v for v in ledger.validations if v.panel_key == panel.key), None)
+    fired = list(guards_fired) if guards_fired is not None else (prior.guards_fired if prior else [])
+    new_val = validate_panel(panel, computed, run_id=run.id, oracles=oracles, guards_fired=fired)
+    ledger.validations = [v for v in ledger.validations if v.panel_key != panel.key]
+    ledger.validations.append(new_val)
+    ledger.scorecard = build_scorecard(ledger)
+    return new_val
 
 
 # --- persistence (D1/D2: typed JSON per paper) --------------------------------

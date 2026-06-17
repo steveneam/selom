@@ -26,6 +26,17 @@ class Settings(BaseSettings):
         default=pathlib.Path(__file__).parent / "data", validation_alias="SELOM_DATA_DIR"
     )
 
+    # Reproduction-engine R oracle (validation-only, ADR 0002 — NEVER on the shipped path).
+    # OFF by default: the blame instrument runs the authors' actual R tool (edgeR/fgsea) to
+    # split engine-delta / upstream-delta / paper-irreproducible. Disabled -> blame degrades
+    # to ``delta-unmeasured`` honestly (config.py docstring + spec D9/D12).
+    oracle: str = Field(default="off", validation_alias="SELOM_ORACLE")  # off | r
+    r_oracle_bin: str = Field(default="", validation_alias="SELOM_R_ORACLE_BIN")  # Rscript.exe
+
+    @property
+    def oracle_enabled(self) -> bool:
+        return self.oracle.strip().lower() in {"r", "1", "true", "on"}
+
     # Cloudflare R2 result store — canonical names shared with .env.example. All set -> R2;
     # otherwise the local filesystem store is used.
     r2_account_id: str = Field(default="", validation_alias="R2_ACCOUNT_ID")
