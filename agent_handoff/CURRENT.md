@@ -16,6 +16,40 @@ _Sessions 8 and earlier archived → `agent_handoff/archive/2026-06-17-pre-sessi
 pinned in `.claude/settings.json` (`model=claude-opus-4-8`, `effortLevel=xhigh`); applies on
 session restart. Supersedes the prior Fable-5 default.
 
+## Resume Prompt (next session)
+
+> Stamped 2026-06-17 19:50 +10:00. Paste at session start; re-stamp date+time before reuse.
+
+```
+Resume · 2026-06-17 19:50 +10:00 (Australia/Sydney) · Selom · Claude (FE+BE, acting) · Opus 4.8 (xhigh)
+
+Selom build repo D:/selom. CLAUDE.md auto-loads. Read FIRST: agent_handoff/README.md + CURRENT.md (session-14 live state) + agent_handoff/RISKS.md (#10 GSEA engine sensitivity) + docs/reproduction-engine/spec.md (APPROVED; R0+R1+R2+R3 SHIPPED; build plan R0–R5) + docs/reproduction-engine/figure-extraction-subsystem.md (the R4 sub-spec: Track A/B + X1–X4) + docs/reproduction-engine/figure-repro-sop.md + docs/rpgrip1-figrepro.md + memory (selom-figure-repro-mission, selom-repro-edge-cases, selom-scrna-batch-genotype-confound, selom-gsea-engine-sensitivity, selom-r-validation-oracle, commercial-gated-tools-build-now-gate-later, selom-backend-python-exec, ask-before-docker-wsl) + git status.
+
+ROLE: Codex away → Claude owns BOTH lanes. Per-lane EXPLICIT scoped commits (NEVER git add -A; feat(backend:)/feat(frontend:)/docs(...)); separate code commits from doc commits. Opus 4.8 xhigh. ASK before Docker/WSL. ASK before every push (per-push authorization). For FE work invoke the 3 design skills (impeccable/frontend-design/ui-ux-pro-max) + browser-verify at DESKTOP widths only (Selom is desktop-only).
+
+GIT STATE: main ↔ origin/main IN SYNC through 2402673 (session 14). Session-14 commits all PUSHED: a98a067 feat(backend) R3 oracle+sweep · 7382027 docs(reproduction) · 2402673 docs(handoff) s14 (session-13's 3 were pushed first this session). graphify-out/ untracked (ignore). Verify sync at boot.
+
+WHAT HAPPENED (session 14): Owner picked R3 over R4 (my rec) + "go go, can commit and push". Pushed session-13's 3 commits, then BUILT + SHIPPED + VERIFIED LIVE the Reproduction Engine R3 (oracle + sweep — the blame instruments feeding the already-shipped R0+R1+R2 verdict/blame core):
+ • app/backend/sweep.py (stage 9, pure-Python, no heavy deps): signature_count/signature_set + run_sweep over the contrast×stat×thr×direction×lfc grid → typed Sweep (reproducing_setting | irreproducible) + the methods_vs_numbers Inconsistency; sweep_panel wires it to the ledger; supports down-in-both intersection. Codifies the manual fig5_sweep*.py.
+ • app/backend/oracle.py (stage 7, VALIDATION-ONLY ADR 0002, GATED SELOM_ORACLE=off default): resolve_rscript → run_r (output→.log, guard 9; raises on non-zero) → read_result → build_oracle_result (pure, via the new oracle_agreement). Running gated+isolated; parse+verdict pure (fast suite needs no R). Bundled oracle_templates/{edger_signature,fgsea_terms}.R (generalize the dogfood scripts → result.json). Dev CLI: python -m oracle edger|fgsea.
+ • app/backend/reproduction.py += typed Sweep/SweepCell (flipped Ledger.sweeps), oracle_agreement (reuses classify_metric, no new heuristic; wide close_tol for engine-sensitive counts per D4/RISKS#10), revalidate_panel (upgrades blame from delta-unmeasured once an oracle lands). config.py += oracle/r_oracle_bin (+oracle_enabled).
+ • tests/test_reproduction_sweep.py + tests/test_reproduction_oracle.py (dogfood numbers as fixtures). pytest 231 (+12); ruff clean.
+ • VERIFIED LIVE on real data (gated dev CLI): edgeR on GSE293982 → universe 1133 / sig.adj 19 / sig.raw 125 / down-both 13 (golden 181/78/49) ⇒ paper-irreproducible, automatic; fgsea on real Rod1/2/3 rankings → 62/95/85 + all_three 0 (gseapy 24/36/1) ⇒ engine-delta + upstream-delta. Both reproduce the manual *_oracle.log EXACTLY. Smoke outputs: D:/tmp-thl/r3-oracle-smoke{,-fgsea}/ (scratch, harmless).
+ • Engine is LIBRARY-ONLY, no HTTP surface (v1 internal-first, D12; R5/FE deferred).
+ • ALSO (owner-asked, NON-repo): wrote a Forj field guide to the vault — C:\Users\seamegdool\Desktop\Claude code and website tips\EAMOS Web Tool\Forj\Wiki\syntheses\selom-web-app-field-guide.md (data-heavy/scientific sibling of eamos-web-app-field-guide.md); registered in that Wiki's index.md + log.md (bones untouched, rule 14).
+
+ENV (don't guess): BE python (EDR workaround) PY=C:\Users\seamegdool\AppData\Roaming\uv\python\cpython-3.12.13-windows-x86_64-none\python.exe ; PYTHONPATH='D:/selom/app/backend;D:/selom/app/backend/.venv/Lib/site-packages' ; PYTHONIOENCODING=utf-8 ; SELOM_SKILLS_ENGINE=real (NOT plain uv run). R oracle (validation-only, ADR 0002, NEVER shipped): enable with SELOM_ORACLE=r + SELOM_R_ORACLE_BIN=C:\Users\seamegdool\AppData\Local\Programs\R\R-4.6.0\bin\Rscript.exe (R 4.6, edgeR 4.10.1 + fgsea 1.38.0 installed; NOT on PATH; oracle.py redirects output to a .log). Harmony = harmonypy 0.0.10 in scratch D:/tmp-thl/pylibs/ (prepend to PYTHONPATH; not in repo venv).
+
+GO (next, owner picks — PRESENT SCOPE BEFORE BUILDING, charter rule):
+ (a) R4 — extraction subsystem X1 (extract/ package): PDF → panel inventory + methods digest + golden-target table, via papers.py (pypdfium2/PDFium, NOT fitz) + vision LLM; verifies the RPGRIP1 PDFs reproduce the hand-written D:\tmp-thl\rpgrip1_target_spec.md. Removes the manual front-half. Larger/novel.
+ (b) FIRST END-TO-END INTEGRATION DOGFOOD — now that sweep + the live oracle both work, drive the REAL RPGRIP1 Fig 5/6 ledger through the engine programmatically (build the Paper/Panel ledger from rpgrip1_target_spec.md → run_panel over the existing skills on GSE293982/GSE293984 → sweep_panel on the count misses → oracle_panel (gated) → revalidate_panel → findings-first scorecard). This exercises R0–R3 together on real data and surfaces any glue gaps before R4.
+ R5 (FE read-only Reproduction view + Track A/B reconstruction) DEFERRED per D12.
+
+DATA/SCRATCH: C:\Temp\selom-geo\GSE293982\ (Fig 5 bulk: …_dedup_countTable_geneName.tsv.gz) + GSE293984\ (Fig 6 scRNA, …_annotated.h5ad w/ Harmony rods). D:\tmp-thl\fig5-real\ (universe.txt + edgeR oracle CSVs + sweep scripts) + fig6-real\ (ranked_Rod{1,2,3}.rnk + c5_go.gmt + fgsea CSVs) = manual repro records (KEEP). D:\tmp-thl\rpgrip1_target_spec.md = golden targets (KEEP). D:\selom-data\msigdb\c5_go_2024.1.Hs.COMMERCIAL-RESTRICTED.json (tagged). Real CMRI data under D:\selom-data (outside repo); Bash CANNOT reach \\cmri.com.au UNC — use PowerShell (local C:/D: drives are fine for Bash).
+
+FLAGS: No dev servers running. End clear-safe. ASK before pushing. ASK before Docker/WSL. go go.
+```
+
 ## Active Status
 
 | Agent | Role | Lane | Status |
