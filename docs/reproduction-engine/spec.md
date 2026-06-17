@@ -1,6 +1,6 @@
 # Reproduction Engine — spec
 
-> Selom's 4th pillar. Status: **APPROVED (owner, 2026-06-17) — R0+R1+R2+R3 SHIPPED** (R3 oracle+sweep verified live on real GSE293982/GSE293984) — revised against **two completed
+> Selom's 4th pillar. Status: **APPROVED (owner, 2026-06-17) — R0+R1+R2+R3 + the Reproducibility Score SHIPPED; R4 substantially shipped** (X1 slice-1+2 incl. the vision layer with Claude-as-gateway, E7 two-input ingest, and X2 Track-B reconstruction+SSIM — see the sub-spec; X3/X4 + SSIM-band calibration pending; R5 FE view deferred per D12). 3 real ledgers span the score spectrum (RPGRIP1 63 / JEV 86 / Hani 96). R3 oracle+sweep verified live on real GSE293982/GSE293984 — revised against **two completed
 > real dogfoods** (RPGRIP1 Fig 5 bulk on GSE293982 + Fig 6 scRNA on GSE293984, both 2026-06-17). The
 > pillar process: research → interview → design → **saved spec** → plan → build (memory
 > `selom-prism-pillar-phases`). Cross-lane (backend + frontend); Codex away, Claude covering both.

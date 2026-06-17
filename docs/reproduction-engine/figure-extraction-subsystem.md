@@ -174,10 +174,25 @@ extract/
     (edgeR/limma/fgsea/TMM). **Open-Q#1 → manual-assist first** (panel-letter assignment is
     best-effort text-only; segmentation deferred). **Open-Q#2 → the vision LLM is gated** (no gateway
     wired; degrades to the rule classifier, R-oracle pattern).
-  - **X1 slice-2 — NEXT:** wire the live vision call (chart-classify + semantic label association)
-    through the shared AI gateway, behind the `VisionClassifier` already in place.
-- **X2 — Track B (editable reconstruction + SSIM).** Redraw via the existing skills + theme; validate
-  by SSIM; attach confidence. Unblocks the product figure surface and self-QA.
+  - **X1 slice-2 — SHIPPED 2026-06-18** (`extract/vision.py`, pytest +8): the live vision layer with
+    **Claude acting as the gateway** for the dev/dogfood profile (open-Q#2 resolution). `VisionGateway`
+    Protocol + `OperatorVisionGateway` (replays operator reads deterministically → CI-safe; degrades
+    to `VisionUnavailable`, drops in behind the existing `VisionClassifier`) + `associate_counts` /
+    `augment_with_vision` (add goldens for counts stated only graphically) + `venn3_totals` (per-set
+    totals from a 3-set Venn's seven regions) + `PanelBox`/`segment_panels` (manual-assist, **open-Q#1**).
+    **Verified live acting as the gateway on the real RPGRIP1 Fig 6E Venn:** read the seven region
+    counts off the raster (unique 27/52/10, pairwise 13/10/2, all-three 52) — slice-1's text reader is
+    silent on the panel, the pairwise overlaps are **pixel-only**, and reconstructing per-rod totals
+    gives **102/119/74**, the exact GO-term targets the GSEA panel is judged against.
+  - **E7 — two-input intake — SHIPPED 2026-06-18** (`extract/ingest.py`): `ingest_paper(main,
+    supplements=[...])` → `PaperBundle` (main PDF + N human-designated PDF/xlsx/csv supplements);
+    `build_extracted_spec` reads DE counts from the main figures, the methods digest from the whole
+    corpus. Verified on real JEV (main + xlsx) and Hani (main + csv).
+- **X2 — Track B (editable reconstruction + SSIM) — slice SHIPPED 2026-06-18** (`extract/reconstruct.py`,
+  pytest +10): pure-numpy SSIM core (CI-safe) + `reconstruct_panel` (editable Plotly redraw via
+  skills.theme) + `self_qa` (SSIM vs original raster → `ReconstructionQA`) + gated Kaleido `render_spec`.
+  Verified live: redraw → Kaleido render (no Docker) → SSIM self-QA = 1.0 identity / 0.924 vs a blurred
+  copy. The render→SSIM-vs-original-scan calibration (acceptance band, open-Q#3) is the owner dogfood.
 - **X3 — Track A (vector-faithful lift).** XObject lifter + re-emitter for vector panels — the
   differentiator; fast-follow after Track B proves the loop.
 - **X4 — chart→data recovery** (bar/line via DePlot/LineFormer) for panels where the data must be
@@ -187,7 +202,16 @@ extract/
 
 1. **Panel-segment automation depth for X1** — ship manual-assist (operator confirms panel boxes)
    first, automate (vector-gutter + label anchor) in X2? Recommend manual-assist first.
+   _Resolved: manual-assist SHIPPED (`PanelBox`/`segment_panels`, slice-2); vector-gutter/label-anchor
+   automation still deferred (a fast-follow)._
 2. **Vision-LLM provider boundary** — the engine calls the shared AI gateway (backend); confirm the
    gateway is available in the dev/dogfood profile, not just the product runtime.
+   _Dev/dogfood resolution (owner-directed 2026-06-18): the live gateway is **not built yet** — **Claude
+   acts as the gateway** (real vision via operator inspection of panel rasters), slotting behind
+   `VisionClassifier`. A **PoC stand-in for building, NOT the product runtime path**; the formal
+   `VisionClassifier(gateway=…)` adapter lands in X1 slice-2._
 3. **Track-B SSIM acceptance band** — what SSIM counts as "visually equivalent"? Calibrate on the
    RPGRIP1 panels during X2.
+   _Provisional bands set (`reconstruct.py`: equivalent ≥0.80, plausible ≥0.55 = the accept floor);
+   STILL TO CALIBRATE against real RPGRIP1 panel pairs (render→SSIM-vs-original-scan, owner dogfood)
+   before they gate anything — a redraw never pixel-matches a publisher scan._
