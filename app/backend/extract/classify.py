@@ -94,7 +94,8 @@ class VisionClassifier:
     def classify_chart(self, caption: str, *, image: bytes | None = None) -> tuple[str, float]:
         if self._gateway is None:
             raise VisionUnavailable(
-                "vision chart-classification needs the shared AI gateway (not wired in this "
-                "profile); use CaptionRuleClassifier or wire the gateway (X1 slice-2)"
+                "vision chart-classification needs a gateway; pass an extract.vision."
+                "OperatorVisionGateway (Claude-as-gateway, dev/dogfood) or a future "
+                "LiveVisionGateway, or fall back to CaptionRuleClassifier"
             )
         return self._gateway.classify_chart(caption, image=image)  # pragma: no cover - gated

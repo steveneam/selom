@@ -15,16 +15,23 @@ from extract import (
     CaptionRuleClassifier,
     IngestedPaper,
     IngestedSupplement,
+    OperatorVisionGateway,
     PaperBundle,
+    PanelBox,
     VisionClassifier,
+    VisionObservation,
     VisionUnavailable,
+    associate_counts,
+    augment_with_vision,
     build_extracted_spec,
+    venn3_totals,
     classify_scope,
     extract_de_counts,
     extract_methods_digest,
     find_figures_vs_methods,
     ingest_paper,
     ingest_supplement,
+    segment_panels,
     to_engine_panels,
     to_golden,
 )
@@ -158,6 +165,93 @@ def test_build_extracted_spec_assembles_bundle():
     totals = {g.value for g in spec.goldens if g.metric == "de_total"}
     assert {35, 180} <= totals
     assert spec.panels  # one coarse panel draft per distinct (figure, panel)
+
+
+# --- X1 slice-2: vision layer (Claude as gateway, replayed → CI-safe) ---------
+
+
+def test_operator_gateway_observe_replays_and_degrades():
+    gw = OperatorVisionGateway({"5a": VisionObservation(panel_key="5a", chart_form="volcano",
+                                                        counts={"signature": 181})})
+    assert gw.observe("5a").chart_form == "volcano"
+    with pytest.raises(VisionUnavailable):  # unrecorded panel → degrade cleanly
+        gw.observe("9z")
+
+
+def test_vision_classifier_wires_behind_the_existing_seam():
+    # The operator gateway drops in behind the slice-1 VisionClassifier (sub-spec open-Q#2).
+    gw = OperatorVisionGateway({"4e": VisionObservation(panel_key="4e", chart_form="volcano",
+                                                        confidence=0.95)})
+    form, conf = VisionClassifier(gw).classify_chart("4e")
+    assert form == "volcano" and conf == 0.95
+    with pytest.raises(VisionUnavailable):
+        VisionClassifier(gw).classify_chart("nope")
+
+
+def test_associate_counts_marks_vision_confidence_and_source():
+    obs = VisionObservation(panel_key="5a", counts={"signature": 181}, confidence=0.9)
+    g = associate_counts(obs, "rpgrip1")[0]
+    assert g.metric == "signature" and g.value == 181
+    assert g.figure == "5" and g.panel == "a"
+    assert g.source == "figure" and g.confidence == 0.9  # vision-only, not text-layer-exact 1.0
+
+
+def test_augment_with_vision_recovers_a_count_the_text_reader_missed():
+    # RPGRIP1's "signature" count is stated graphically; slice-1's DE-count reader returns nothing.
+    spec = build_extracted_spec(None, "rpgrip1",
+                                text="Figure 5a shows the rod signature gene set.")
+    assert not [g for g in spec.goldens if g.metric == "signature"]  # text reader is silent
+    gw = OperatorVisionGateway({"5a": VisionObservation(
+        panel_key="5a", chart_form="volcano", counts={"signature": 181}, confidence=0.9)})
+    enriched = augment_with_vision(spec, gw, keys=["5a"])
+    sig = [g for g in enriched.goldens if g.metric == "signature"]
+    assert sig and sig[0].value == 181 and sig[0].confidence == 0.9
+    # the empty slice-1 chart_form for 5a is now filled from vision
+    assert any(d.key == "5a" and d.chart_form == "volcano" for d in enriched.panels)
+
+
+def test_augment_with_vision_does_not_duplicate_existing_goldens():
+    spec = build_extracted_spec(None, "p", text=PROTEIN)  # already has de_total/up/down for 4e
+    gw = OperatorVisionGateway({"4e": VisionObservation(panel_key="4e", counts={"de_total": 999})})
+    enriched = augment_with_vision(spec, gw, keys=["4e"])
+    totals = [g for g in enriched.goldens if g.panel_key == "4e" and g.metric == "de_total"]
+    assert len(totals) == 1 and totals[0].value == 180  # text-layer value kept, vision not dupd
+
+
+def test_venn3_totals_reconstructs_rpgrip1_fig6e_targets():
+    # The real Fig 6E Venn read off the raster (Claude-as-gateway): unique 27/52/10, pairwise
+    # 13/10/2, all-three 52. The text states only the unique + all-three; the pairwise overlaps
+    # are pixel-only. Reconstructing per-set totals gives the paper's GO-term targets 102/119/74.
+    tot = venn3_totals(a=27, b=52, c=10, ab=13, ac=10, bc=2, abc=52)
+    assert (tot["A"], tot["B"], tot["C"]) == (102, 119, 74)  # Rod-1/2/3 GSEA-panel targets
+    assert tot["total"] == 166
+
+
+def test_vision_recovers_fig6e_venn_the_text_reader_cannot():
+    # Regression for the live dogfood: slice-1's DE-count reader is silent on the Fig 6E GO-term
+    # sentence (wrong vocabulary); the replayed vision observation recovers the pixel-only overlaps.
+    six_e = ("We identified 52 enriched GO terms common to all 3 rod subtypes, with 27, 52, and 10 "
+             "terms unique to Rod-1, 2, and 3, respectively (Figure 6E).")
+    spec = build_extracted_spec(None, "rpgrip1", text=six_e)
+    assert extract_de_counts(six_e, "rpgrip1") == []           # text reader: nothing
+    gw = OperatorVisionGateway({"6e": VisionObservation(
+        panel_key="6e", chart_form="venn", confidence=0.97,
+        counts={"venn_rod1_rod2": 13, "venn_rod1_rod3": 10, "venn_rod2_rod3": 2})})
+    enriched = augment_with_vision(spec, gw, keys=["6e"])
+    pairwise = {g.metric: g.value for g in enriched.goldens if g.metric.startswith("venn_")}
+    assert pairwise == {"venn_rod1_rod2": 13, "venn_rod1_rod3": 10, "venn_rod2_rod3": 2}
+
+
+def test_segment_panels_manual_assist():
+    gw = OperatorVisionGateway({"6d": VisionObservation(panel_key="6d", chart_form="stacked_bar",
+                                                        confidence=0.85)})
+    boxes = [PanelBox(figure="6", panel="d", caption="composition of cell types"),
+             PanelBox(figure="6", panel="e", caption="PRPH2 immunostaining of retina")]
+    drafts = segment_panels("rpgrip1", boxes, gw)
+    by_key = {d.key: d for d in drafts}
+    assert by_key["6d"].chart_form == "stacked_bar"             # filled from the gateway
+    assert by_key["6e"].scope == R.WET_LAB                      # scope from caption (guard 7)
+    assert by_key["6e"].chart_form == ""                       # no observation → left for rule reader
 
 
 # --- E7: two-input intake (main + N supplements, format-plural) ---------------

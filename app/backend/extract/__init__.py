@@ -5,13 +5,18 @@ Sub-spec: ``docs/reproduction-engine/figure-extraction-subsystem.md``. This pack
 form of the hand-written ``<slug>_target_spec.md`` that ``reproduction_{rpgrip1,jev}.
 build_ledger()`` encode by hand today (X1 auto-generates them).
 
-Slice-1 (this build) = the **text-derivable** target-extraction core, no live vision:
+Slice-1 = the **text-derivable** target-extraction core; slice-2 adds the **vision layer** and
+**E7 two-input intake**:
 
-* ``ingest``  — thin typed wrapper over ``papers.py`` (PDFium text + rasters; BSD, E1).
+* ``ingest``  — thin typed wrapper over ``papers.py`` (PDFium text + rasters; BSD, E1) + the E7
+  ``ingest_paper(main, supplements=[...])`` two-input bundle (main PDF + N PDF/xlsx/csv supplements).
 * ``golden``  — **text-layer-exact** golden extraction (E2), the methods-digest lexicon,
   inconsistency capture, and the bridge into the engine's ``Panel``/``Golden``.
-* ``classify`` — rule-based scope classification (guard 7) + a pluggable ``Classifier``;
-  the vision LLM is **gated** (``VisionUnavailable``, dev-only) exactly like the R-oracle.
+* ``classify`` — rule-based scope classification (guard 7) + a pluggable ``Classifier``; the
+  vision LLM is gated behind ``VisionClassifier``.
+* ``vision`` (slice-2) — the live vision layer with **Claude acting as the gateway** for the
+  dev/dogfood profile (``OperatorVisionGateway`` replays operator reads; CI-safe). Recovers chart
+  forms and counts stated only graphically that the text reader misses; manual-assist segmentation.
 
 One-directional dependency: ``extract`` may import ``reproduction``; never the reverse.
 """
@@ -41,6 +46,16 @@ from .ingest import (
     page_raster,
 )
 from .models import ExtractedSpec, GoldenTarget, MethodsDigest, PanelDraft
+from .vision import (
+    OperatorVisionGateway,
+    PanelBox,
+    VisionGateway,
+    VisionObservation,
+    associate_counts,
+    augment_with_vision,
+    segment_panels,
+    venn3_totals,
+)
 
 __all__ = [
     "CaptionRuleClassifier",
@@ -65,4 +80,12 @@ __all__ = [
     "GoldenTarget",
     "MethodsDigest",
     "PanelDraft",
+    "OperatorVisionGateway",
+    "PanelBox",
+    "VisionGateway",
+    "VisionObservation",
+    "associate_counts",
+    "augment_with_vision",
+    "segment_panels",
+    "venn3_totals",
 ]
