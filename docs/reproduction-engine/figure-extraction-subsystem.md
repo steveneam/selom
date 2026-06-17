@@ -1,7 +1,7 @@
 # Figure Extraction Subsystem — sub-spec
 
-> Sub-spec of the **Reproduction Engine** pillar (`spec.md`). Status: **X1 slice-1 SHIPPED
-> 2026-06-18** (`app/backend/extract/`); X2–X4 pending. Split out from `spec.md` 2026-06-17 per the
+> Sub-spec of the **Reproduction Engine** pillar (`spec.md`). Status: **X1 (slice-1+2 + E7), X2,
+> and X3 SHIPPED 2026-06-18** (`app/backend/extract/`); X4 pending. Split out from `spec.md` 2026-06-17 per the
 > owner steer. Cross-lane (backend-led extraction + thin frontend surfacing). Grounded in two
 > completed real dogfoods — RPGRIP1 Fig 5 (bulk, GSE293982) + Fig 6 (scRNA, GSE293984) — whose
 > front-half (PDF → panel inventory → methods digest → golden-target table) was run **by hand** and
@@ -193,8 +193,16 @@ extract/
   skills.theme) + `self_qa` (SSIM vs original raster → `ReconstructionQA`) + gated Kaleido `render_spec`.
   Verified live: redraw → Kaleido render (no Docker) → SSIM self-QA = 1.0 identity / 0.924 vs a blurred
   copy. The render→SSIM-vs-original-scan calibration (acceptance band, open-Q#3) is the owner dogfood.
-- **X3 — Track A (vector-faithful lift).** XObject lifter + re-emitter for vector panels — the
-  differentiator; fast-follow after Track B proves the loop.
+- **X3 — Track A (vector-faithful lift) — SHIPPED 2026-06-18** (`extract/lift.py`, pytest +9):
+  built on **pypdf** (BSD, already shipped via the `pdf` extra — no pikepdf/PyMuPDF/poppler needed).
+  Two honest tiers: `lift_panel_region(pdf, page, bbox)` clips a page to the panel's bounding box
+  (sets `MediaBox`+`CropBox`, content stream untouched) → a standalone 1-page PDF that renders
+  **pixel-identical** to the source region at any DPI (vector content is `scalable`); and
+  `extract_raster_panel` pulls an Image XObject's bytes exactly (image-identical, not scalable,
+  honest ceiling #2). `page_is_vector` + `list_page_xobjects` route the two. **Verified live:** lifted
+  a vector region → rendered (PDFium) → **SSIM(registered)=1.0** vs the same region of the source —
+  the registered regime where SSIM is valid (the open-Q#3 finding). SVG re-emit (svgpathtools) is a
+  future extension; the PDF crop is the faithful artifact.
 - **X4 — chart→data recovery** (bar/line via DePlot/LineFormer) for panels where the data must be
   recovered rather than recomputed from raw inputs.
 
