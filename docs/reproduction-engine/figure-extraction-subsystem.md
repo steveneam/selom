@@ -1,11 +1,11 @@
 # Figure Extraction Subsystem — sub-spec
 
-> Sub-spec of the **Reproduction Engine** pillar (`spec.md`). Status: **spec, pending owner
-> approval** (split out from `spec.md` 2026-06-17 per the owner steer + the parent spec's flagged
-> action). Cross-lane (backend-led extraction + thin frontend surfacing). Grounded in two completed
-> real dogfoods — RPGRIP1 Fig 5 (bulk, GSE293982) + Fig 6 (scRNA, GSE293984) — whose front-half
-> (PDF → panel inventory → methods digest → golden-target table) was run **by hand** and is the
-> thing this subsystem automates. The manual procedure is `figure-repro-sop.md` steps 1–4.
+> Sub-spec of the **Reproduction Engine** pillar (`spec.md`). Status: **X1 slice-1 SHIPPED
+> 2026-06-18** (`app/backend/extract/`); X2–X4 pending. Split out from `spec.md` 2026-06-17 per the
+> owner steer. Cross-lane (backend-led extraction + thin frontend surfacing). Grounded in two
+> completed real dogfoods — RPGRIP1 Fig 5 (bulk, GSE293982) + Fig 6 (scRNA, GSE293984) — whose
+> front-half (PDF → panel inventory → methods digest → golden-target table) was run **by hand** and
+> is the thing this subsystem automates. The manual procedure is `figure-repro-sop.md` steps 1–4.
 
 ## What
 
@@ -123,6 +123,16 @@ recorded `out-of-scope`, **excluded from the scorecard denominator**, and never 
   (DocLayout-YOLO, PyMuPDF, poppler, WebPlotDigitizer) are dev/validation-only, gated (inherited D8).
 - **E6 — Clean-room ClawBio `data-extractor` (MIT) as a blueprint** for chart→data, built native to
   Selom's contract; do not vendor the unverified scaffold (inherited D7).
+- **E7 — Intake = a MAIN-paper drop + a SEPARATE supplementary drop (owner 2026-06-18).** Two inputs,
+  human-designated, until auto-detection improves: the main PDF carries the figures + text counts; the
+  supplement (PDF *or* xlsx) carries the golden result tables (JEV ST2/ST6) + the extended methods.
+  Some papers combine both in one file (RPGRIP1 `…/Data/THL/mmc1.pdf` = main + supplement) — so the
+  contract accepts 1..N documents tagged ``main`` / ``supplementary``, not a single fixed PDF. Slice-1
+  ``ingest_pdf`` is single-file; generalize the ingest signature (``ingest_paper(main, supplements=[])``)
+  before the R5/FE intake. Phrasing note: slice-1's text-layer DE-count reader is tuned to the common
+  *"N differentially expressed (X up, Y down)"* form (JEV) — papers using bespoke wording (RPGRIP1's
+  *"signature"* genes) need the vision/semantic layer (X1 slice-2); the methods-digest lexicon already
+  generalizes cross-paper (RPGRIP1 recipe recovered from `mmc1.pdf`).
 
 ## Module layout
 
@@ -154,6 +164,18 @@ extract/
   → chart-classify + scope-classify (vision) → golden-extract (text-layer + vision) + methods-digest
   → emit the typed golden-target table + inconsistencies. This alone replaces SOP steps 1–4 and feeds
   the whole engine; **no reconstruction yet.**
+  - **X1 slice-1 — SHIPPED 2026-06-18** (`app/backend/extract/`, pytest +14): the **text-derivable
+    core, no live vision** — `ingest.py` (papers.py wrapper) · `models.py` (GoldenTarget /
+    MethodsDigest / PanelDraft / ExtractedSpec) · `golden.py` (**text-layer-exact** DE-count
+    extraction E2 — sentence-bounded, `total = up+down`; the methods-digest lexicon, word-boundary
+    matched; guard-2 inconsistency capture; `to_golden`/`to_engine_panels` bridge) · `classify.py`
+    (rule scope-classify guard 7 + a pluggable `Classifier`; vision **gated** = `VisionUnavailable`).
+    Verified on the real JEV PDF: recovers Fig 1 12/23/35 + Fig 4 61/119/180 + the recipe
+    (edgeR/limma/fgsea/TMM). **Open-Q#1 → manual-assist first** (panel-letter assignment is
+    best-effort text-only; segmentation deferred). **Open-Q#2 → the vision LLM is gated** (no gateway
+    wired; degrades to the rule classifier, R-oracle pattern).
+  - **X1 slice-2 — NEXT:** wire the live vision call (chart-classify + semantic label association)
+    through the shared AI gateway, behind the `VisionClassifier` already in place.
 - **X2 — Track B (editable reconstruction + SSIM).** Redraw via the existing skills + theme; validate
   by SSIM; attach confidence. Unblocks the product figure surface and self-QA.
 - **X3 — Track A (vector-faithful lift).** XObject lifter + re-emitter for vector panels — the
