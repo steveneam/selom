@@ -11,6 +11,15 @@
 > **Supersedes the prior version of this file, which reported "✅ reproduced" against
 > *proxy/adjacent* data (EYG_28 RPGRIP1_cpdHet bulk + the `rpgrip1_merged.h5ad` WT/C3/FS/PT
 > atlas) — those are NOT the paper's samples.**
+>
+> **Codified through the Reproduction Engine (session 15, 2026-06-17).** This record is now the
+> structured `app/backend/reproduction_rpgrip1.py` ledger (`build_ledger()` = 13 panels with
+> goldens/method-subs/scopes/structural flags). `drive_captured()` replays these verified numbers
+> through the engine → findings-first scorecard (paper-irreproducible 2 · structural-limit 2 ·
+> engine-delta 1 · upstream-delta 1 · **0 Selom bugs**); `drive_live_fig5()` re-derives Fig 5 on the
+> real GSE293982 deposit (`sweep` + gated edgeR oracle + `revalidate`) — universe 1133 / signature 19
+> / down_both 13, matching the edgeR oracle exactly. R4's extraction subsystem will eventually
+> auto-generate `build_ledger()` from the PDF (clean-rooming the ClawBio data-extractor, decision E6).
 
 ## Data (real, this run)
 
