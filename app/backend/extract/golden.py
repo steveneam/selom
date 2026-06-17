@@ -191,12 +191,22 @@ def find_figures_vs_methods(metric: str, values: list[int | float], *,
 def build_extracted_spec(ingested, paper_id: str, *, classifier: Classifier | None = None,
                          text: str | None = None) -> ExtractedSpec:
     """Assemble the slice-1 target spec from an ingested paper: methods digest + DE-count
-    goldens + coarse per-panel drafts (scope + chart form). ``ingested`` is an
-    :class:`~extract.ingest.IngestedPaper` (or pass ``text=`` directly in tests)."""
-    body = text if text is not None else ingested.text
+    goldens + coarse per-panel drafts (scope + chart form).
+
+    ``ingested`` is an :class:`~extract.ingest.IngestedPaper`, an
+    :class:`~extract.ingest.PaperBundle` (E7 — DE counts read the main paper's figures, the
+    methods digest reads the whole corpus incl. supplement extended-methods), or pass ``text=``
+    directly in tests."""
+    if text is not None:
+        methods_body = counts_body = text
+    elif hasattr(ingested, "main"):  # PaperBundle: counts from the figures, methods from the corpus
+        counts_body = ingested.main.text
+        methods_body = ingested.text
+    else:                            # single IngestedPaper
+        methods_body = counts_body = ingested.text
     classifier = classifier or CaptionRuleClassifier()
-    methods = [extract_methods_digest(body)]
-    goldens = extract_de_counts(body, paper_id)
+    methods = [extract_methods_digest(methods_body)]
+    goldens = extract_de_counts(counts_body, paper_id)
     panels: list[PanelDraft] = []
     seen: set[str] = set()
     for g in goldens:

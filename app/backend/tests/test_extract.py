@@ -13,6 +13,9 @@ import pytest
 import reproduction as R
 from extract import (
     CaptionRuleClassifier,
+    IngestedPaper,
+    IngestedSupplement,
+    PaperBundle,
     VisionClassifier,
     VisionUnavailable,
     build_extracted_spec,
@@ -20,6 +23,8 @@ from extract import (
     extract_de_counts,
     extract_methods_digest,
     find_figures_vs_methods,
+    ingest_paper,
+    ingest_supplement,
     to_engine_panels,
     to_golden,
 )
@@ -155,11 +160,69 @@ def test_build_extracted_spec_assembles_bundle():
     assert spec.panels  # one coarse panel draft per distinct (figure, panel)
 
 
+# --- E7: two-input intake (main + N supplements, format-plural) ---------------
+
+
+def _bundle(main_text: str, supp_text: str) -> PaperBundle:
+    """A PaperBundle with no files — a main PDF + one PDF supplement (extended methods)."""
+    return PaperBundle(
+        paper_id="p",
+        main=IngestedPaper(path="main.pdf", n_pages=1, text=main_text),
+        supplements=[IngestedSupplement(path="mmc1.pdf", kind="pdf", role="methods", text=supp_text)],
+    )
+
+
+def test_bundle_text_is_main_plus_pdf_supplements():
+    b = _bundle(PROTEIN, METHODS)
+    assert PROTEIN in b.text and METHODS in b.text  # corpus = main + supplement
+
+
+def test_build_extracted_spec_over_bundle_counts_from_main_methods_from_corpus():
+    # The DE counts live in the main figures; the recipe lives in the supplement's extended methods.
+    spec = build_extracted_spec(_bundle(PROTEIN, METHODS), "p")
+    totals = {g.value for g in spec.goldens if g.metric == "de_total"}
+    assert totals == {180}                       # counts recovered from the MAIN paper
+    assert "edgeR" in spec.methods[0].tools      # recipe recovered from the SUPPLEMENT
+    assert "TMM" in spec.methods[0].normalizations
+
+
+def test_ingest_supplement_csv_inventories_table(tmp_path):
+    # Hani ships csv supplements (JEV ships xlsx) — the contract must read both.
+    csv = tmp_path / "mmc2.csv"
+    csv.write_text("gene,Rod,Cone,Muller\nRHO,1,0,0\nOPN1SW,0,1,0\n", encoding="utf-8")
+    s = ingest_supplement(csv, role="tables")
+    assert s.kind == "csv" and s.role == "tables"
+    assert s.sheets == {"mmc2": ["gene", "Rod", "Cone", "Muller"]}
+
+
+def test_ingest_supplement_unknown_type_is_recorded_not_crashed(tmp_path):
+    odd = tmp_path / "readme.txt"
+    odd.write_text("notes", encoding="utf-8")
+    s = ingest_supplement(odd)
+    assert s.kind == "unknown" and "unrecognised" in s.note
+
+
+def test_paper_bundle_find_table_locates_golden_sheet_by_name():
+    b = PaperBundle(
+        main=IngestedPaper(path="m.pdf", n_pages=1, text=""),
+        supplements=[IngestedSupplement(path="s001.xlsx", kind="xlsx",
+                                        sheets={"ST2": ["miRNA"], "ST6": ["Protein"]})],
+    )
+    assert b.find_table("st6") == ("s001.xlsx", "ST6")   # case-insensitive
+    assert b.find_table("ST99") is None
+
+
 # --- integration: the real JEV PDF (slow, opt-in; skipped if absent) ----------
 
 DATA = Path("C:/Users/seamegdool/Desktop/Claude code and website tips/Data")
 JEV_PDF = DATA / "Adrian" / "JEV2-12-12393.pdf"
+JEV_XLSX = DATA / "Adrian" / "JEV2-12-12393-s001.xlsx"
 RPGRIP1_PDF = DATA / "THL" / "mmc1.pdf"  # RPGRIP1 (Loi) main paper + supplement, combined
+HANI_MAIN = DATA / "Hani" / "1-s2.0-S2213671122005914-main.pdf"
+HANI_SUPPS = [
+    (DATA / "Hani" / "1-s2.0-S2213671122005914-mmc1.pdf", "methods"),
+    (DATA / "Hani" / "1-s2.0-S2213671122005914-mmc2.csv", "tables"),
+]
 
 
 @pytest.mark.skipif(not JEV_PDF.exists(), reason="JEV PDF not present (owner machine only)")
@@ -189,3 +252,31 @@ def test_integration_rpgrip1_methods_digest_generalizes_cross_paper():
     tools = set(spec.methods[0].tools)
     assert {"edgeR", "fgsea", "Cepo", "GLM-PCA", "Louvain"} <= tools
     assert "TMM" in spec.methods[0].normalizations
+
+
+@pytest.mark.skipif(not (JEV_PDF.exists() and JEV_XLSX.exists()),
+                    reason="JEV main+supplement not present (owner machine only)")
+def test_integration_jev_two_input_intake_main_pdf_plus_xlsx():
+    # E7: main PDF (figures/counts) + a SEPARATE xlsx supplement (the golden tables ST2/ST6).
+    bundle = ingest_paper(JEV_PDF, [(JEV_XLSX, "tables")], paper_id="jev")
+    assert bundle.main.n_pages > 0 and bundle.supplements[0].kind == "xlsx"
+    # The supplement carries the deposited golden tables, findable by name without a full read.
+    assert bundle.find_table("ST6") is not None and bundle.find_table("ST2") is not None
+    # The DE counts still come from the main paper's figures.
+    spec = build_extracted_spec(bundle, "jev")
+    de = {(g.figure, g.metric): g.value for g in spec.goldens}
+    assert de[("4", "de_total")] == 180 and de[("1", "de_total")] == 35
+
+
+@pytest.mark.skipif(not HANI_MAIN.exists(),
+                    reason="Hani main not present (owner machine only)")
+def test_integration_hani_two_input_intake_main_pdf_plus_csv():
+    # E7 cross-format: Hani ships csv supplements (not xlsx) + a separate methods PDF.
+    supps = [s for s in HANI_SUPPS if s[0].exists()]
+    bundle = ingest_paper(HANI_MAIN, supps, paper_id="hani")
+    assert bundle.main.n_pages > 0
+    kinds = {s.kind for s in bundle.supplements}
+    assert "csv" in kinds  # the mmc2 Cepo marker matrix is a csv supplement
+    # The methods digest reads the whole corpus (main + the methods-PDF supplement).
+    spec = build_extracted_spec(bundle, "hani")
+    assert spec.methods[0].tools  # a recipe is recovered from the corpus

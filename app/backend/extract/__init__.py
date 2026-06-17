@@ -31,7 +31,15 @@ from .golden import (
     to_engine_panels,
     to_golden,
 )
-from .ingest import IngestedPaper, ingest_pdf, page_raster
+from .ingest import (
+    IngestedPaper,
+    IngestedSupplement,
+    PaperBundle,
+    ingest_paper,
+    ingest_pdf,
+    ingest_supplement,
+    page_raster,
+)
 from .models import ExtractedSpec, GoldenTarget, MethodsDigest, PanelDraft
 
 __all__ = [
@@ -47,7 +55,11 @@ __all__ = [
     "to_engine_panels",
     "to_golden",
     "IngestedPaper",
+    "IngestedSupplement",
+    "PaperBundle",
+    "ingest_paper",
     "ingest_pdf",
+    "ingest_supplement",
     "page_raster",
     "ExtractedSpec",
     "GoldenTarget",
