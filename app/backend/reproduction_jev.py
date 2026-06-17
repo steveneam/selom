@@ -129,7 +129,7 @@ def _mirna_panels() -> list[Panel]:
         # target). The figure's 35 vs ST2's 34 is a 1-miRNA boundary/typo → Fig1c still faithful.
         Panel(
             paper_id=PAPER_ID, figure="1", panel="c", chart_form="heatmap", skill_id="deg",
-            data_source="Table S1/S2 (OpenArray miRNA)", method_subs=[de_sub],
+            data_source="Table S1/S2 (OpenArray miRNA)", method_subs=[de_sub], weight=2.0,
             sources=[
                 R.SourceTag(ref="ST2", faithful=True, note="complete miRNA DE table reproduced exactly"),
                 R.SourceTag(ref="Fig1c", faithful=True,
@@ -149,7 +149,7 @@ def _mirna_panels() -> list[Panel]:
         # Fig 3 — same ST2 data recast as a Selom volcano (a presentation the editor offers).
         Panel(
             paper_id=PAPER_ID, figure="3", panel="", chart_form="volcano", skill_id="volcano",
-            data_source="Table S2",
+            data_source="Table S2", weight=0.5,  # a recast re-plot of the same ST2 data as Fig 1c
             sources=[R.SourceTag(ref="ST2", faithful=True),
                      R.SourceTag(ref="Fig3", faithful=True, note="recast as volcano (paper: CDF+MA)")],
             golden=[
@@ -179,7 +179,7 @@ def _proteome_panels() -> list[Panel]:
         # Fig 4d — top-50 DE protein heatmap (re-plot of the deposited table).
         Panel(
             paper_id=PAPER_ID, figure="4", panel="d", chart_form="heatmap", skill_id="heatmap",
-            data_source="Table S6",
+            data_source="Table S6", weight=0.5,  # form re-plot (top-50 heatmap of the deposited ST6)
             sources=[R.SourceTag(ref="ST6", faithful=True),
                      R.SourceTag(ref="Fig4d", faithful=True, note="top-50 DE heatmap")],
             golden=[Golden(metric="n_proteins", value=SEL_N_TOP50, source=R.SOURCE_FIGURE,
@@ -191,7 +191,7 @@ def _proteome_panels() -> list[Panel]:
         # different replicate). Recorded transparently as ST6+ Fig4e−, not as a paper error.
         Panel(
             paper_id=PAPER_ID, figure="4", panel="e", chart_form="volcano", skill_id="deg",
-            data_source="Table S6",
+            data_source="Table S6", weight=2.0,  # the figure's central quantitative claim (DE counts)
             sources=[
                 R.SourceTag(ref="ST6", faithful=True,
                             note="complete EV-proteome DE table reproduced exactly (172/275/447 @p<0.05)"),
@@ -225,7 +225,7 @@ def _ev_and_deconv_panels() -> list[Panel]:
         # Fig 5D — EV-mediator functional-protein heatmap (ST10 functional list × ST5).
         Panel(
             paper_id=PAPER_ID, figure="5", panel="D", chart_form="heatmap", skill_id="heatmap",
-            data_source="Table S5 × Table S10",
+            data_source="Table S5 × Table S10", weight=0.5,  # form re-plot (EV-mediator heatmap)
             sources=[R.SourceTag(ref="ST5", faithful=True), R.SourceTag(ref="ST10", faithful=True),
                      R.SourceTag(ref="Fig5D", faithful=True, note="EV-mediator heatmap")],
             golden=[Golden(metric="n_ev_proteins", value=SEL_N_EV_FUNC, source=R.SOURCE_FIGURE,
@@ -455,6 +455,10 @@ def format_scorecard(ledger: Ledger) -> str:
         "  source provenance (reconstructed-from / diverges-from):",
         *[f"    {p.key:4s} {p.provenance}" for p in ledger.panels if p.sources],
         f"  figure divergences (shown, not blamed): {sc.provenance_divergences or 'none'}",
+        "",
+        f"  {R.format_score(sc.score)}",
+        "  per-panel Reproducibility Score:",
+        *R.format_panel_scores(sc.panel_scores),
     ])
 
 

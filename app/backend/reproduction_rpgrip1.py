@@ -98,7 +98,7 @@ def _fig5_panels() -> list[Panel]:
             paper_id=PAPER_ID, figure="5", panel="sig", chart_form="count", skill_id="deg",
             data_source="GSE293982 (bulk featureCounts)",
             params={"normalization": "tmm", "reference": "Control1", "treatment": "MSVUS"},
-            method_subs=[edger_sub],
+            method_subs=[edger_sub], weight=2.0,  # the figure's central quantitative claim
             golden=[
                 Golden(metric="universe", value=GOLD_UNIVERSE, source=R.SOURCE_METHODS,
                        deterministic=True,
@@ -501,6 +501,10 @@ def format_scorecard(ledger: Ledger) -> str:
         f"  verdicts : {dict(sc.totals_by_verdict)}",
         f"  blame    : {dict(sc.totals_by_blame)}",
         f"  inconsistencies recorded: {len(ledger.paper.inconsistencies)}",
+        "",
+        f"  {R.format_score(sc.score)}",
+        "  per-panel Reproducibility Score:",
+        *R.format_panel_scores(sc.panel_scores),
     ]
     return "\n".join(lines)
 

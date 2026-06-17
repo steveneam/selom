@@ -64,6 +64,34 @@ OUT_OF_SCOPE_SCOPES = frozenset({WET_LAB, DATA_NOT_DEPOSITED})
 DEPOSITED_RAW = "deposited_raw"          # authors' full method on the deposited data
 SELOM_INTERMEDIATE = "selom_intermediate"  # the right engine on Selom's upstream output
 
+# --- Reproducibility Score (the graded 0–100 layer over verdict/blame/provenance) -------------
+# Selom-unique: turns the engine's verdict + blame + provenance into one number per
+# panel→figure→paper. Two axes, kept SEPARATE so a paper-irreproducible figure (a WIN to detect)
+# never reads as a Selom failure: ``reproducibility`` = "can the figure be regenerated?" (a
+# paper+data property, the heatmap headline); ``selom_confidence`` = "is Selom's reconstruction
+# trustworthy?" (an our-tool property). They diverge exactly when the story is interesting
+# (JEV 4e: reproducibility 58 — the figure differs from its deposit — but selom_confidence 100).
+VERIFIED = "verified"                  # 95–100  exact from deposited data + stated method
+REPRODUCED = "reproduced"              # 80–94   within tolerance / reproduces the backing table
+RECOVERABLE = "recoverable"            # 65–79   matches only at an engine-recovered setting/engine
+DEPOSIT_FAITHFUL = "deposit-faithful"  # 50–64   reproduces the deposit; the figure diverges (D14)
+IRREPRODUCIBLE = "irreproducible"      # 30–49   authors' own data/tool can't reach it / structural
+DISCREPANT = "discrepant"              # 1–29    a Selom-side defect
+OUT_OF_SCOPE_TIER = "out-of-scope"     # N/A     wet-lab / data-not-deposited (grey, excluded)
+
+# Red→green heatmap colors (Tailwind-ish hex; FE-ready for the deferred Reproduction view).
+TIER_COLORS = {
+    VERIFIED: "#15803d", REPRODUCED: "#22c55e", RECOVERABLE: "#84cc16",
+    DEPOSIT_FAITHFUL: "#f59e0b", IRREPRODUCIBLE: "#f97316", DISCREPANT: "#ef4444",
+    OUT_OF_SCOPE_TIER: "#9ca3af",
+}
+
+# Attribution chip — WHO a residual is on, so the color is never accusatory by default.
+ATTR_SELOM = "selom"    # ✓ Selom-correct / ✗ Selom-side defect
+ATTR_ENGINE = "engine"  # ⚙ a measured engine substitution
+ATTR_PAPER = "paper"    # 📄 paper-side (irreproducible / a different replicate)
+ATTR_DATA = "data"      # 🗄 data-side (structural / upstream / not deposited)
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -188,6 +216,9 @@ class Panel(BaseModel):
     method_subs: list[MethodSub] = Field(default_factory=list)
     golden: list[Golden] = Field(default_factory=list)
     sources: list[SourceTag] = Field(default_factory=list)  # provenance (+/−) per source (D14)
+    # Reproducibility-Score rollup weight: the figure's numeric "heart" panel (the central DE /
+    # signature claim) outweighs a form re-plot of a deposited table (≈0.5). Default 1.0.
+    weight: float = 1.0
     note: str = ""  # form/claim panels (no printed number) record why there's no golden here
     vector_copy_ref: str | None = None
     status: str = "pending"  # pending|extracted|mapped|anchored|run|validated|blocked
@@ -241,6 +272,50 @@ class Validation(BaseModel):
     guards_fired: list[str] = Field(default_factory=list)
 
 
+class PanelScore(BaseModel):
+    """The graded Reproducibility Score for one panel (the FE heatmap cell).
+
+    ``reproducibility`` answers "can the figure be regenerated?" (paper+data property);
+    ``selom_confidence`` answers "is Selom's reconstruction trustworthy?" (our-tool property).
+    They diverge exactly when the story is interesting — JEV 4e scores reproducibility 58 (the
+    figure differs from its own deposit) but selom_confidence 100 (Selom nailed the deposited
+    table). The ``attribution`` chip + ``provenance`` badge keep the color from ever reading as
+    accusatory."""
+
+    panel_key: str
+    reproducibility: int | None = None   # None == out of scope (grey, excluded from denominator)
+    selom_confidence: int | None = None
+    tier: str
+    color: str
+    attribution: str = ATTR_SELOM
+    provenance: str = ""                 # the +/− source badge (e.g. "ST6+ Fig4e−")
+    in_scope: bool = True
+    weight: float = 1.0
+    note: str = ""
+
+    @property
+    def attribution_icon(self) -> str:
+        if self.attribution == ATTR_SELOM:
+            return "✓" if (self.reproducibility or 0) >= 30 else "✗"
+        return {ATTR_ENGINE: "⚙", ATTR_PAPER: "📄", ATTR_DATA: "🗄"}.get(self.attribution, "·")
+
+
+class PaperScore(BaseModel):
+    """The weighted rollup over a paper's in-scope scored panels + a coverage stat. Heart panels
+    (the figure's central numeric claim) outweigh form re-plots via :attr:`Panel.weight`."""
+
+    paper_id: str
+    reproducibility: int | None = None
+    selom_confidence: int | None = None
+    tier: str
+    color: str
+    n_scored: int = 0
+    n_in_scope: int = 0
+    n_out_of_scope: int = 0
+    n_form_only: int = 0
+    coverage: str = ""
+
+
 class Scorecard(BaseModel):
     paper_id: str
     n_panels: int = 0
@@ -253,6 +328,9 @@ class Scorecard(BaseModel):
     # diverging from the published figure — surfaced transparently (e.g. "4e: ST6+ Fig4e−"),
     # never as a blame. Usually a benign different-replicate difference.
     provenance_divergences: list[str] = Field(default_factory=list)
+    # Reproducibility Score (the graded 0–100 layer): per-panel cells + the weighted paper rollup.
+    panel_scores: list[PanelScore] = Field(default_factory=list)
+    score: PaperScore | None = None
     generated_at: str = Field(default_factory=_now)
 
 
@@ -512,6 +590,16 @@ def build_scorecard(ledger: Ledger) -> Scorecard:
         for p in ledger.panels
         if p.scope not in OUT_OF_SCOPE_SCOPES and p.diverges_from
     ]
+    # Reproducibility Score (the graded layer): one cell per validated panel + the paper rollup.
+    val_by_key = {v.panel_key: v for v in ledger.validations}
+    sweep_by_key: dict[str, Sweep] = {}
+    for s in ledger.sweeps:
+        sweep_by_key.setdefault(s.panel_key, s)  # first sweep per panel
+    panel_scores = [
+        score_panel(p, val_by_key[p.key], sweep_by_key.get(p.key))
+        for p in ledger.panels
+        if p.key in val_by_key
+    ]
     return Scorecard(
         paper_id=ledger.paper.id,
         n_panels=len(ledger.panels),
@@ -520,7 +608,122 @@ def build_scorecard(ledger: Ledger) -> Scorecard:
         totals_by_blame=by_blame,
         findings=findings,
         provenance_divergences=divergences,
+        panel_scores=panel_scores,
+        score=score_paper(ledger, panel_scores),
     )
+
+
+# --- Reproducibility Score (graded layer over verdict/blame/provenance, Selom-unique) ----------
+
+
+def score_to_tier(score: int | None) -> tuple[str, str]:
+    """Map a 0–100 reproducibility score to its named tier + heatmap color (``None`` → grey)."""
+    if score is None:
+        return OUT_OF_SCOPE_TIER, TIER_COLORS[OUT_OF_SCOPE_TIER]
+    for tier, lo in ((VERIFIED, 95), (REPRODUCED, 80), (RECOVERABLE, 65),
+                     (DEPOSIT_FAITHFUL, 50), (IRREPRODUCIBLE, 30)):
+        if score >= lo:
+            return tier, TIER_COLORS[tier]
+    return DISCREPANT, TIER_COLORS[DISCREPANT]
+
+
+def _metric_score(verdict: str, blame: str | None, *, substituted: bool) -> tuple[int, int, str]:
+    """One metric → ``(reproducibility, selom_confidence, attribution)``. The panel takes its
+    worst-reproducibility metric (matching the panel-verdict "as good as its worst" rule).
+
+    Blame drives the tier; the two axes split so the headline color is never accusatory:
+    a paper-irreproducible or structural miss scores LOW on reproducibility but HIGH on
+    selom_confidence (Selom did its job — the gap is the paper's or the data's)."""
+    if blame == SELOM_ENGINE:
+        return 15, 15, ATTR_SELOM        # Discrepant — a genuine Selom defect
+    if blame == ENGINE_DELTA:
+        return 72, 70, ATTR_ENGINE       # Recoverable — figure reachable with the gold-standard engine
+    if blame == PAPER_IRREPRODUCIBLE:
+        return 40, 100, ATTR_PAPER       # Irreproducible — authors' own tool misses too (Selom ✓)
+    if blame == UPSTREAM_DELTA:
+        return 45, 85, ATTR_DATA         # Irreproducible — right engine on our intermediate still misses
+    if blame == STRUCTURAL_LIMIT:
+        return 38, 100, ATTR_DATA        # Irreproducible — the deposit can't reach it (Selom ✓)
+    # blame is None (exact) or DELTA_UNMEASURED (missed/in-band but unattributed).
+    if verdict == EXACT:
+        return (92 if substituted else 100), 100, ATTR_SELOM
+    if verdict == CLOSE:
+        return 84, 90, ATTR_SELOM
+    return 50, 60, ATTR_SELOM            # FAIL with no oracle — honest uncertainty about our own value
+
+
+def score_panel(panel: Panel, validation: Validation, sweep: Sweep | None = None) -> PanelScore:
+    """Grade one panel 0–100 from its verdict + blame + provenance + sweep (pure).
+
+    Out-of-scope panels (wet-lab / data-not-deposited) score ``None`` (grey, excluded from the
+    denominator). Otherwise the panel takes its worst in-scope metric, then two overlays apply:
+    a panel that faithfully matches its deposit but diverges from the published figure caps at
+    Deposit-faithful (D14, selom_confidence stays high); a value reachable only at an
+    engine-recovered unstated setting caps at Recoverable."""
+    if panel.scope in OUT_OF_SCOPE_SCOPES:
+        tier, color = score_to_tier(None)
+        return PanelScore(panel_key=panel.key, tier=tier, color=color, attribution=ATTR_DATA,
+                          provenance=panel.provenance, in_scope=False, weight=panel.weight,
+                          note=f"out of scope ({panel.scope}) — excluded from the denominator")
+    substituted = bool(panel.method_subs)
+    scored = [_metric_score(r.verdict, r.blame, substituted=substituted)
+              for r in validation.results]
+    if not scored:
+        tier, color = score_to_tier(None)
+        return PanelScore(panel_key=panel.key, tier=tier, color=color, weight=panel.weight,
+                          provenance=panel.provenance, note="no numeric target to score")
+    repro, _, attribution = min(scored, key=lambda t: t[0])  # panel = its worst in-scope metric
+    confidence = min(t[1] for t in scored)
+    if panel.diverges_from and repro >= 50:
+        repro, attribution = min(repro, 58), ATTR_PAPER       # Deposit-faithful overlay (D14)
+    elif sweep is not None and sweep.reproducing_setting is not None and repro >= 80:
+        repro, attribution = min(repro, 78), ATTR_ENGINE      # Recoverable overlay (unstated setting)
+    tier, color = score_to_tier(repro)
+    return PanelScore(panel_key=panel.key, reproducibility=repro, selom_confidence=confidence,
+                      tier=tier, color=color, attribution=attribution,
+                      provenance=panel.provenance, weight=panel.weight)
+
+
+def score_paper(ledger: Ledger, panel_scores: list[PanelScore]) -> PaperScore:
+    """Weighted rollup over in-scope scored panels + a coverage stat (heart > form via weight)."""
+    scored = [ps for ps in panel_scores if ps.reproducibility is not None]
+    n_in_scope = sum(1 for p in ledger.panels if p.scope not in OUT_OF_SCOPE_SCOPES)
+    n_out = sum(1 for p in ledger.panels if p.scope in OUT_OF_SCOPE_SCOPES)
+    n_form = sum(1 for p in ledger.panels
+                 if p.scope not in OUT_OF_SCOPE_SCOPES and not p.golden)
+    if scored:
+        wsum = sum(ps.weight for ps in scored) or 1.0
+        repro = round(sum(ps.reproducibility * ps.weight for ps in scored) / wsum)
+        conf = round(sum((ps.selom_confidence or 0) * ps.weight for ps in scored) / wsum)
+    else:
+        repro = conf = None
+    tier, color = score_to_tier(repro)
+    parts = [f"{len(scored)} scored / {n_in_scope} in-scope"]
+    if n_out:
+        parts.append(f"{n_out} out-of-scope")
+    if n_form:
+        parts.append(f"{n_form} form-only")
+    return PaperScore(paper_id=ledger.paper.id, reproducibility=repro, selom_confidence=conf,
+                      tier=tier, color=color, n_scored=len(scored), n_in_scope=n_in_scope,
+                      n_out_of_scope=n_out, n_form_only=n_form, coverage=" · ".join(parts))
+
+
+def format_score(score: PaperScore | None) -> str:
+    """One-line headline for a paper's Reproducibility Score."""
+    if score is None or score.reproducibility is None:
+        return "Reproducibility Score: N/A (no scored panels)"
+    return (f"Reproducibility Score: {score.reproducibility}/100 ({score.tier}) · "
+            f"Selom-confidence {score.selom_confidence}/100 · {score.coverage}")
+
+
+def format_panel_scores(panel_scores: list[PanelScore]) -> list[str]:
+    """Per-panel heatmap lines: ``<key>  <score>  <tier>  <attr-icon>  <provenance>``."""
+    lines = []
+    for ps in panel_scores:
+        val = "N/A" if ps.reproducibility is None else str(ps.reproducibility)
+        lines.append(f"    {ps.panel_key:5s} {val:>4}  {ps.tier:16s} "
+                     f"{ps.attribution_icon} {ps.provenance}".rstrip())
+    return lines
 
 
 # --- metric extraction from a skill's output ----------------------------------
