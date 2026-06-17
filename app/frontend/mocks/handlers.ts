@@ -6,6 +6,7 @@ import { mockBundle, mockTable } from "./stub-bundle";
 import { compileFixture, getFixtureSet, searchFixture } from "./gene-sets-fixture";
 import { EXPORT_PRESETS, mockExportFile } from "./export-fixture";
 import { FIGURE_STYLES, mockApplyStyle } from "./styles-fixture";
+import { REPRO_LEDGERS, REPRO_PAPERS } from "@/lib/reproduction/fixture";
 
 // Mirrors the live contract from app/backend/main.py:
 //   GET  /skills                 -> SkillCatalogEntry[]  (live registry, B3)
@@ -58,6 +59,20 @@ export const handlers = [
     const body = (await request.json()) as { figure?: FigureSpec; style?: string };
     if (!body.figure?.data) return new HttpResponse(null, { status: 400 });
     return HttpResponse.json({ figure: mockApplyStyle(body.figure, body.style ?? "selom") });
+  }),
+  // Reproduction view (read-only, R5): the 3-paper reproducibility spectrum + each
+  // paper's full driven ledger. The fixture is the real engine output, so dev:mock and
+  // the live backend render identically.
+  http.get("/api/papers", () => HttpResponse.json({ papers: REPRO_PAPERS })),
+  http.get("/api/papers/:slug", ({ params }) => {
+    const led = REPRO_LEDGERS[String(params.slug)];
+    return led ? HttpResponse.json(led) : new HttpResponse(null, { status: 404 });
+  }),
+  http.get("/api/papers/:slug/scorecard", ({ params }) => {
+    const led = REPRO_LEDGERS[String(params.slug)];
+    return led?.scorecard
+      ? HttpResponse.json(led.scorecard)
+      : new HttpResponse(null, { status: 404 });
   }),
   http.post("/api/skills/:skillId/run", async ({ params, request }) => {
     // A real upload would parse `matrix`; the stub is input-independent by design,

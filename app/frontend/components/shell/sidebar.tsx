@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Dna, Home, PanelLeftClose, PanelLeftOpen, Plus, Settings, Store } from "lucide-react";
+import { Dna, Home, PanelLeftClose, PanelLeftOpen, Plus, ScanSearch, Settings, Store } from "lucide-react";
 import { SelomMark, SelomWordmark } from "@/components/brand/selom-mark";
 import { cn } from "@/lib/cn";
 import { projectStore, useProjects } from "@/lib/projects/store";
@@ -60,6 +60,7 @@ export function Sidebar({
         <RailLink href="/" icon={<Home />} label="Home" active={pathname === "/"} collapsed={collapsed} onNavigate={onNavigate} />
         <RailLink href="/store" icon={<Store />} label="Skill Store" active={pathname.startsWith("/store")} collapsed={collapsed} onNavigate={onNavigate} />
         <RailLink href="/gene-sets" icon={<Dna />} label="Gene Sets" active={pathname.startsWith("/gene-sets")} collapsed={collapsed} onNavigate={onNavigate} />
+        <RailLink href="/reproduction" icon={<ScanSearch />} label="Reproduction" active={pathname.startsWith("/reproduction")} collapsed={collapsed} onNavigate={onNavigate} />
       </nav>
 
       <div className={cn("mt-2 flex items-center pb-1", collapsed ? "justify-center px-2" : "justify-between px-4")}>
