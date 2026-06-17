@@ -26,7 +26,6 @@ needs PDFium and is the owner-machine dogfood; the unit tests assert the lift me
 from __future__ import annotations
 
 import io
-from pathlib import Path
 
 from pydantic import BaseModel
 
