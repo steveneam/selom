@@ -67,6 +67,13 @@ def test_blame_wet_lab_and_structural():
     assert R.assign_blame(R.FAIL, structural=True) == R.STRUCTURAL_LIMIT
 
 
+def test_blame_data_not_deposited_is_out_of_scope():
+    # JEV Fig 8: a real modality Selom handles, but the study's data was never deposited —
+    # reproducible only as a pipeline demo, so out-of-scope (not wet-lab, not structural).
+    assert R.assign_blame(R.FAIL, scope=R.DATA_NOT_DEPOSITED) == R.OUT_OF_SCOPE
+    assert R.WET_LAB in R.OUT_OF_SCOPE_SCOPES and R.DATA_NOT_DEPOSITED in R.OUT_OF_SCOPE_SCOPES
+
+
 def test_blame_paper_irreproducible():
     # Fig 5 78/181/49: edgeR on the deposited raw data misses the golden too.
     oracle = OracleResult(tool="edgeR", ran_on=R.DEPOSITED_RAW, agrees_with_paper=False)
@@ -148,8 +155,42 @@ def test_scorecard_is_findings_first():
     assert sc.n_panels == 2
     assert sc.n_in_scope == 1  # the wet-lab panel is excluded from the denominator
     assert sc.findings["paper_irreproducible"] == 1
+    assert sc.findings["reproduced"] == 2  # universe (exact) + RHO.delta_pct (close, unattributed)
     assert sc.totals_by_blame[R.OUT_OF_SCOPE] == 1
     assert sc.totals_by_verdict[R.EXACT] == 1
+
+
+def test_scorecard_reproduced_excludes_out_of_scope_panels():
+    # A faithful match in a data-not-deposited panel is NOT a reproduction (no paper data to match).
+    paper = Paper(id="p", slug="p", title="P")
+    good = Panel(paper_id="p", figure="1", panel="a",
+                 golden=[Golden(metric="pc1", value=39.8, ints_exact=False)])
+    demo = Panel(paper_id="p", figure="8", panel="a", scope=R.DATA_NOT_DEPOSITED,
+                 golden=[Golden(metric="umap", value=1)])
+    ledger = Ledger(paper=paper, panels=[good, demo])
+    ledger.validations.append(R.validate_panel(good, {"pc1": 39.7}, run_id="r1"))
+    ledger.validations.append(R.validate_panel(demo, {"umap": 1}, run_id="r2"))
+    sc = R.build_scorecard(ledger)
+    assert sc.n_in_scope == 1
+    assert sc.findings["reproduced"] == 1  # only the in-scope PCA match counts
+
+
+def test_source_provenance_tags_and_divergence_surface():
+    # D14: a panel reconstructed from a deposit but diverging from the published figure reads as
+    # "ST6+ Fig4e−" and is surfaced transparently, never as a blame.
+    paper = Paper(id="p", slug="p", title="P")
+    panel = Panel(paper_id="p", figure="4", panel="e",
+                  sources=[R.SourceTag(ref="ST6", faithful=True),
+                           R.SourceTag(ref="Fig4e", faithful=False, note="different replicate")],
+                  golden=[Golden(metric="de_total", value=447)])
+    ledger = Ledger(paper=paper, panels=[panel])
+    ledger.validations.append(R.validate_panel(panel, {"de_total": 447}, run_id="r1"))
+    sc = R.build_scorecard(ledger)
+    assert panel.provenance == "ST6+ Fig4e−"
+    assert panel.diverges_from == ["Fig4e"]
+    assert sc.findings["reproduced"] == 1            # faithful to the deposit = a win
+    assert sc.findings["paper_irreproducible"] == 0  # the figure gap is provenance, not a blame
+    assert sc.provenance_divergences == ["4e: ST6+ Fig4e−"]
 
 
 # --- metric extraction --------------------------------------------------------

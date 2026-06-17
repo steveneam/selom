@@ -47,6 +47,7 @@ def test_captured_scorecard_matches_the_dogfood_verdicts():
     assert sc.n_panels == 13
     assert sc.n_in_scope == 10
     # Findings-first headline — what the engine SURFACED (not buried under failures).
+    assert sc.findings["reproduced"] == 9             # faithful in-scope metrics (universe/5C/6A/6F/6G)
     assert sc.findings["paper_irreproducible"] == 2   # signature.count + signature.down_both
     assert sc.findings["structural_limit"] == 2       # 6D rod2_fold LCA-1 + MS-VUS
     assert sc.findings["engine_delta"] == 1           # 6E rod2_enriched_terms (gseapy << fgsea)

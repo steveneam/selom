@@ -38,15 +38,27 @@ STRUCTURAL_LIMIT = "structural-limit"  # the deposited data cannot reach the num
 OUT_OF_SCOPE = "out-of-scope"          # not derivable from the sequencing data (wet-lab)
 DELTA_UNMEASURED = "delta-unmeasured"  # no oracle available to assign blame (honest fallback)
 
+# A discrepancy that means the metric did NOT reproduce (the headline failure modes). A miss
+# blamed only on DELTA_UNMEASURED (or no blame at all) still counts as a faithful reproduction —
+# the value landed in band; the residual is just unattributed.
+FAILURE_BLAMES = frozenset(
+    {SELOM_ENGINE, ENGINE_DELTA, UPSTREAM_DELTA, PAPER_IRREPRODUCIBLE, STRUCTURAL_LIMIT, OUT_OF_SCOPE}
+)
+
 # Golden provenance (a value comes only from the PDF).
 SOURCE_FIGURE = "figure"
 SOURCE_LEGEND = "legend"
 SOURCE_METHODS = "methods"
 SOURCE_EXTRACTED = "extracted"
 
-# Panel scope (guard 7).
+# Panel scope (guard 7). Some panels can't be numerically reproduced against the paper —
+# either the readout isn't in the sequencing data (wet-lab) or the study's own data was never
+# deposited, so a run is only a pipeline DEMO on a reference dataset (no exact data match).
 TRANSCRIPTOMIC = "transcriptomic"
 WET_LAB = "wet_lab"
+DATA_NOT_DEPOSITED = "data_not_deposited"
+# Scopes a numeric reproduction can't apply to: excluded from the denominator, blame OUT_OF_SCOPE.
+OUT_OF_SCOPE_SCOPES = frozenset({WET_LAB, DATA_NOT_DEPOSITED})
 
 # Where the oracle ran — the hinge of the blame procedure.
 DEPOSITED_RAW = "deposited_raw"          # authors' full method on the deposited data
@@ -99,6 +111,24 @@ class MethodSub(BaseModel):
     selom_tool: str
     reason: str = ""
     delta_measured: str | None = None  # None == not yet measured (guard 8 fires)
+
+
+class SourceTag(BaseModel):
+    """Source provenance + transparency for a reconstructed panel (D14): which source the
+    panel faithfully reproduces (``+``) vs diverges from (``−``).
+
+    A panel rebuilt from a deposited table that differs from the published figure reads as
+    ``ST6+ Fig4e−`` — honest and neutral, not accusatory. The common cause is benign (the
+    figure is a different biological/experimental replicate than what was deposited); the tag
+    records the provenance without editorialising about the paper."""
+
+    ref: str               # "ST6", "Fig4e", "GSE153674", …
+    faithful: bool = True  # + reproduced faithfully ; − reconstructed but diverges
+    note: str = ""
+
+    @property
+    def badge(self) -> str:
+        return f"{self.ref}{'+' if self.faithful else '−'}"
 
 
 class OracleResult(BaseModel):
@@ -157,6 +187,7 @@ class Panel(BaseModel):
     params: dict = Field(default_factory=dict)
     method_subs: list[MethodSub] = Field(default_factory=list)
     golden: list[Golden] = Field(default_factory=list)
+    sources: list[SourceTag] = Field(default_factory=list)  # provenance (+/−) per source (D14)
     note: str = ""  # form/claim panels (no printed number) record why there's no golden here
     vector_copy_ref: str | None = None
     status: str = "pending"  # pending|extracted|mapped|anchored|run|validated|blocked
@@ -164,6 +195,16 @@ class Panel(BaseModel):
     @property
     def key(self) -> str:
         return f"{self.figure}{self.panel}"
+
+    @property
+    def provenance(self) -> str:
+        """The rendered source-provenance badge, e.g. ``ST6+ Fig4e−`` (empty if untagged)."""
+        return " ".join(t.badge for t in self.sources)
+
+    @property
+    def diverges_from(self) -> list[str]:
+        """Sources this panel reconstructs but does not match (the ``−`` tags)."""
+        return [t.ref for t in self.sources if not t.faithful]
 
 
 class ReproRun(BaseModel):
@@ -208,6 +249,10 @@ class Scorecard(BaseModel):
     totals_by_blame: dict = Field(default_factory=dict)
     # Findings-first (D10): the headline "what the engine found", not buried under failures.
     findings: dict = Field(default_factory=dict)
+    # Source provenance (D14): in-scope panels reconstructed faithfully from a source but
+    # diverging from the published figure — surfaced transparently (e.g. "4e: ST6+ Fig4e−"),
+    # never as a blame. Usually a benign different-replicate difference.
+    provenance_divergences: list[str] = Field(default_factory=list)
     generated_at: str = Field(default_factory=_now)
 
 
@@ -317,7 +362,7 @@ def assign_blame(
     """
     if verdict == EXACT:
         return None
-    if scope == WET_LAB:
+    if scope in OUT_OF_SCOPE_SCOPES:
         return OUT_OF_SCOPE
     if structural:
         return STRUCTURAL_LIMIT
@@ -439,20 +484,34 @@ def validate_panel(
 def build_scorecard(ledger: Ledger) -> Scorecard:
     by_verdict: dict[str, int] = {EXACT: 0, CLOSE: 0, FAIL: 0}
     by_blame: dict[str, int] = {}
-    in_scope = sum(1 for p in ledger.panels if p.scope != WET_LAB)
+    scope_of = {p.key: p.scope for p in ledger.panels}
+    in_scope = sum(1 for p in ledger.panels if p.scope not in OUT_OF_SCOPE_SCOPES)
+    reproduced = 0
     for val in ledger.validations:
+        panel_in_scope = scope_of.get(val.panel_key) not in OUT_OF_SCOPE_SCOPES
         for r in val.results:
             by_verdict[r.verdict] = by_verdict.get(r.verdict, 0) + 1
             if r.blame:
                 by_blame[r.blame] = by_blame.get(r.blame, 0) + 1
-    # Findings-first headline: discoveries, not failures.
+            if panel_in_scope and r.verdict in (EXACT, CLOSE) and r.blame not in FAILURE_BLAMES:
+                reproduced += 1
+    # Findings-first headline: discoveries, not failures — led by what Selom faithfully
+    # reproduced, so a paper that DOES reproduce reads as a win (not an empty failure board).
     findings = {
+        "reproduced": reproduced,
         "paper_irreproducible": by_blame.get(PAPER_IRREPRODUCIBLE, 0),
         "structural_limit": by_blame.get(STRUCTURAL_LIMIT, 0),
         "engine_delta": by_blame.get(ENGINE_DELTA, 0),
         "upstream_delta": by_blame.get(UPSTREAM_DELTA, 0),
         "selom_engine_bugs": by_blame.get(SELOM_ENGINE, 0),
     }
+    # Provenance transparency (D14): in-scope panels that reconstruct a source faithfully but
+    # diverge from the published figure — shown, not blamed.
+    divergences = [
+        f"{p.key}: {p.provenance}"
+        for p in ledger.panels
+        if p.scope not in OUT_OF_SCOPE_SCOPES and p.diverges_from
+    ]
     return Scorecard(
         paper_id=ledger.paper.id,
         n_panels=len(ledger.panels),
@@ -460,6 +519,7 @@ def build_scorecard(ledger: Ledger) -> Scorecard:
         totals_by_verdict=by_verdict,
         totals_by_blame=by_blame,
         findings=findings,
+        provenance_divergences=divergences,
     )
 
 

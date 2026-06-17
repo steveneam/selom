@@ -492,6 +492,7 @@ def format_scorecard(ledger: Ledger) -> str:
     lines = [
         f"RPGRIP1 reproduction scorecard  ({sc.n_panels} panels, {sc.n_in_scope} in scope)",
         "  findings (what the engine surfaced):",
+        f"    reproduced (faithful): {sc.findings['reproduced']}",
         f"    paper-irreproducible : {sc.findings['paper_irreproducible']}",
         f"    structural-limit     : {sc.findings['structural_limit']}",
         f"    engine-delta         : {sc.findings['engine_delta']}",
