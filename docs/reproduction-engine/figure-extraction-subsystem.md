@@ -216,6 +216,14 @@ extract/
   E4 human-confirm gate). Validated exact-by-construction on synthetic charts with known ground truth
   (bars ±1.5, line ±3, scatter ±0.5). Honest ceiling: needs calibration + clean marks; does NOT
   recover dense point clouds (UMAP/tSNE). Future: ML route for messy scans + auto axis-tick detection.
+  - **X4 wired into the intake layer — SHIPPED 2026-06-18** (`extract/chart_intake.py` + `POST
+    /extract/chart`, pytest +9): the `data-extractor` capability **end-to-end** — "drop a bar/line/
+    scatter panel image + an axis calibration → editable data." `recovered_to_table` (→ the S2.1
+    Statistics table) + `recovered_to_figure` (→ an editable Plotly `{data, layout}`) + an
+    `extract_chart()` orchestrator, so a recovered panel lands in the editor like any skill output.
+    Calibration-first + vision-grade (0.7) carries through; the table/figure titles surface the
+    confidence. Verified live (4-genotype bar panel → [25,50,75,90]). **Remaining = the FE calibration
+    picker** (click two ticks/axis on the dropped image, WPD-style) — the last UI slice.
 
 ## Open questions
 
