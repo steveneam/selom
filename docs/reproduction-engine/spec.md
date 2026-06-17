@@ -1,6 +1,6 @@
 # Reproduction Engine — spec
 
-> Selom's 4th pillar. Status: **APPROVED (owner, 2026-06-17) — building first slice R0+R1+R2** — revised against **two completed
+> Selom's 4th pillar. Status: **APPROVED (owner, 2026-06-17) — R0+R1+R2+R3 SHIPPED** (R3 oracle+sweep verified live on real GSE293982/GSE293984) — revised against **two completed
 > real dogfoods** (RPGRIP1 Fig 5 bulk on GSE293982 + Fig 6 scRNA on GSE293984, both 2026-06-17). The
 > pillar process: research → interview → design → **saved spec** → plan → build (memory
 > `selom-prism-pillar-phases`). Cross-lane (backend + frontend); Codex away, Claude covering both.
@@ -267,7 +267,7 @@ verdict until the applicable guards have run.** Full prose: `figure-repro-sop.md
 
 The engine automates the SOP loop. Build in dependency order; each phase is independently shippable and
 testable, and **deterministic glue + guards come before the novel extraction subsystem** (which has its
-own X1–X4 phasing in the sub-spec). **Spec approved 2026-06-17; building R0+R1+R2.** v1 is the internal
+own X1–X4 phasing in the sub-spec). **Spec approved 2026-06-17; R0+R1+R2+R3 shipped.** v1 is the internal
 dogfood tool (D12), so **R5 (frontend) is deferred** and R3's oracle is always available.
 
 | Phase | Scope | Reuses | New | Verifies on |
@@ -275,7 +275,7 @@ dogfood tool (D12), so **R5 (frontend) is deferred** and R3's oracle is always a
 | **R0 — Ledger + verdict + blame core** | `reproduction.py`: Pydantic models, JSON load/save, verdict logic + tolerances (D4), **blame decision procedure** (D10), scorecard incl. `totals_by_blame`. No extraction, no live skills. | provenance/methods shapes | models, validate, blame, scorecard | unit + composition (fake skill + fixture oracle) |
 | **R1 — Guard registry** | The 14 guards (table above) as named, testable checks wired into stages 5/8/9; `guards_fired[]` + `Inconsistency` capture. | — | `extract/guards.py` (or `reproduction/guards.py`) | each guard's trigger fixture |
 | **R2 — Run + validate, real skills** | Stages 4–6,8: anchor (deterministic ID-sets) → prepare (guards) → `run_skill_with_table` → validate+blame, end-to-end on a **mapped** panel. | `contract.run_skill_with_table`, jobs queue | map glue, anchor, prepare | RPGRIP1 Fig 5 panels (skills already exist) |
-| **R3 — Oracle + sweep (dev profile)** | Stage 7 oracle runner (R edgeR/fgsea, gated) + stage 9 sweep; wire blame disambiguation (`engine-delta`/`upstream-delta`/`paper-irreproducible`). | R oracle (`selom-r-validation-oracle`) | `oracle.py` (dev CLI), `sweep.py` | RPGRIP1 78/181/49 → paper-irreproducible; 6E → engine/upstream split |
+| **R3 — Oracle + sweep (dev profile)** ✅ SHIPPED | Stage 7 oracle runner (R edgeR/fgsea, gated `SELOM_ORACLE`, ADR 0002) + stage 9 sweep; `oracle_agreement` + `revalidate_panel` wire blame disambiguation (`engine-delta`/`upstream-delta`/`paper-irreproducible`). Running gated+isolated, parsing+verdict pure (fast suite has no R). | R oracle (`selom-r-validation-oracle`) | `oracle.py` (+`oracle_templates/*.R`, dev CLI), `sweep.py`, typed `Sweep` model | **VERIFIED LIVE:** edgeR on real GSE293982 → 19/125/13 (golden 181/78/49) ⇒ paper-irreproducible; fgsea on real Rod1/2/3 rankings → 62/95/85 + 52-core 0 ⇒ engine/upstream split |
 | **R4 — Extraction subsystem X1** | Target-extraction MVP (sub-spec X1): ingest → classify → golden-target table + methods digest + inconsistencies. Replaces SOP steps 1–4. | `papers.py`, AI gateway | `extract/` (ingest/detect/classify/golden) | RPGRIP1 PDFs → golden table matches the hand-written spec |
 | **R5 — Frontend read-only view + reconstruction** _(DEFERRED — internal-first, D12)_ | Read-only Reproduction view (scorecard + panel table + verdict/blame chips + figure grades); extraction X2 (Track B + SSIM), then X3 (Track A). | editor, theme | FE Reproduction route; `reconstruct.py` | browser-verify on the RPGRIP1 ledger |
 
