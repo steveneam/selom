@@ -84,6 +84,26 @@ def test_self_qa_resizes_reconstruction_to_original():
     assert qa.ssim > 0.9   # same gradient, different resolution → still structurally equivalent
 
 
+def test_self_qa_registered_identity_accepts_with_recalibrated_band():
+    # open-Q#3 calibration: a registered comparison gates; identity is equivalent + accepted.
+    png = _png(_gradient())
+    qa = self_qa(png, png, registered=True)
+    assert qa.registered is True
+    assert qa.band == "equivalent" and qa.accepted is True
+
+
+def test_self_qa_unregistered_scan_is_advisory_never_gates():
+    # open-Q#3: against an UNREGISTERED publisher scan, SSIM cannot gate — verdict is advisory.
+    # Even an identical image returns accepted=None when declared unregistered (the score is real,
+    # but the contract forbids using it as a pass/fail for a redraw-vs-scan comparison).
+    png = _png(_gradient())
+    qa = self_qa(png, png, registered=False)
+    assert qa.registered is False
+    assert qa.accepted is None
+    assert qa.ssim == pytest.approx(1.0, abs=1e-3)
+    assert "ADVISORY" in qa.note and "golden-target" in qa.note
+
+
 # --- editable redraw (Track B) ------------------------------------------------
 
 
