@@ -17,6 +17,9 @@ Slice-1 = the **text-derivable** target-extraction core; slice-2 adds the **visi
 * ``vision`` (slice-2) — the live vision layer with **Claude acting as the gateway** for the
   dev/dogfood profile (``OperatorVisionGateway`` replays operator reads; CI-safe). Recovers chart
   forms and counts stated only graphically that the text reader misses; manual-assist segmentation.
+* ``reconstruct`` (X2, Track B) — redraw a panel as an editable Plotly spec + **SSIM self-QA**
+  against the original raster (pure-numpy SSIM; Kaleido render gated). Imported on demand
+  (``from extract.reconstruct import …``) since it pulls ``skills.theme`` + (lazily) plotly.
 
 One-directional dependency: ``extract`` may import ``reproduction``; never the reverse.
 """
