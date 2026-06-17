@@ -1,7 +1,9 @@
 # Figure Extraction Subsystem — sub-spec
 
-> Sub-spec of the **Reproduction Engine** pillar (`spec.md`). Status: **X1 (slice-1+2 + E7), X2,
-> and X3 SHIPPED 2026-06-18** (`app/backend/extract/`); X4 pending. Split out from `spec.md` 2026-06-17 per the
+> Sub-spec of the **Reproduction Engine** pillar (`spec.md`). Status: **X1 (slice-1+2 + E7), X2, X3,
+> and X4 all SHIPPED 2026-06-18** (`app/backend/extract/`) — the figure-extraction subsystem is
+> feature-complete for the build phase (remaining: panel-segment automation, SVG re-emit, the ML
+> chart→data route — all fast-follows). Split out from `spec.md` 2026-06-17 per the
 > owner steer. Cross-lane (backend-led extraction + thin frontend surfacing). Grounded in two
 > completed real dogfoods — RPGRIP1 Fig 5 (bulk, GSE293982) + Fig 6 (scRNA, GSE293984) — whose
 > front-half (PDF → panel inventory → methods digest → golden-target table) was run **by hand** and
@@ -203,8 +205,17 @@ extract/
   a vector region → rendered (PDFium) → **SSIM(registered)=1.0** vs the same region of the source —
   the registered regime where SSIM is valid (the open-Q#3 finding). SVG re-emit (svgpathtools) is a
   future extension; the PDF crop is the faithful artifact.
-- **X4 — chart→data recovery** (bar/line via DePlot/LineFormer) for panels where the data must be
-  recovered rather than recomputed from raw inputs.
+- **X4 — chart→data recovery — SHIPPED 2026-06-18** (`extract/chart_to_data.py`, pytest +7): the
+  clean-room, Selom-native build of the WebPlotDigitizer / ClawBio `data-extractor` model (E6) —
+  library-only (numpy + scipy.ndimage + Pillow, all BSD/HPND); DePlot/MatCha/LineFormer (the ML route)
+  deliberately **not** a dependency. An explicit `Calibration` (two reference points per `Axis`,
+  linear **or** log) + per-form pixel readers: `recover_bars` (group foreground columns → bar tops →
+  values), `recover_line` (per-column mean row → traced `(x, y)`), `recover_scatter` (scipy connected
+  components → marker centroids). All return a typed `RecoveredSeries` tagged **vision-grade**
+  (`confidence` 0.7, never text-layer-exact — feeds the golden table as `source: extracted` under the
+  E4 human-confirm gate). Validated exact-by-construction on synthetic charts with known ground truth
+  (bars ±1.5, line ±3, scatter ±0.5). Honest ceiling: needs calibration + clean marks; does NOT
+  recover dense point clouds (UMAP/tSNE). Future: ML route for messy scans + auto axis-tick detection.
 
 ## Open questions
 
