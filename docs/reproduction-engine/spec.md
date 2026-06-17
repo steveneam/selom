@@ -92,8 +92,10 @@ as data for everyone (lift vectors or keep as image; do not trust LLM-fabricated
 ### Data model (Pydantic; JSON per paper)
 ```
 Paper      { id, slug, title, doi, pdf_path, geo[], methods_digest, inconsistencies[], created_at }
-Panel      { paper_id, figure, panel, chart_form, scope: transcriptomic|wet_lab, data_source,
-             skill_id, params, method_subs[]: { paper_tool, selom_tool, reason, delta_measured? },
+Panel      { paper_id, figure, panel, chart_form, scope: transcriptomic|wet_lab|data_not_deposited,
+             data_source, skill_id, params, weight,
+             method_subs[]: { paper_tool, selom_tool, reason, delta_measured? },
+             sources[]: { ref, faithful, note },     # source provenance +/− (D14): "ST6+ Fig4e−"
              golden[]: { metric, value, unit, source: figure|legend|methods|extracted, confidence, note,
                          inconsistency_ref? },
              vector_copy_ref, status: pending|extracted|mapped|anchored|run|validated|blocked }
@@ -104,8 +106,25 @@ Oracle     { run_id, tool, version, computed[]: {metric,value}, agrees_with_selo
 Sweep      { panel_id, axes[], grid[]: { setting, value }, reproducing_setting?, irreproducible: bool }
 Validation { run_id, results[]: { metric, golden, computed, oracle?, delta, verdict, blame, note },
              panel_verdict, guards_fired[] }
-Scorecard  { paper_id, totals_by_verdict, totals_by_blame, n_panels, n_in_scope, generated_at }
+PanelScore { panel_key, reproducibility: 0–100|null, selom_confidence: 0–100|null, tier, color,
+             attribution: selom|engine|paper|data, provenance, in_scope, weight }   # D15
+PaperScore { paper_id, reproducibility, selom_confidence, tier, color,
+             n_scored, n_in_scope, n_out_of_scope, n_form_only, coverage }
+Scorecard  { paper_id, totals_by_verdict, totals_by_blame, n_panels, n_in_scope,
+             provenance_divergences[], panel_scores[]: PanelScore, score: PaperScore, generated_at }
 ```
+**Reproducibility Score (D15)** — the graded 0–100 layer over verdict/blame/provenance, derived
+by `score_panel(panel, validation, sweep)` + the weighted `score_paper` rollup (Selom-unique: no
+tool grades *figure* reproducibility from raw data). **Two axes kept SEPARATE** so a
+paper-irreproducible figure (a WIN to detect) never reads as a Selom failure: `reproducibility`
+("can the figure be regenerated?", the heatmap headline) vs `selom_confidence` ("is Selom's
+reconstruction trustworthy?"). Tiers (red→green): **Verified** 95–100 · **Reproduced** 80–94 ·
+**Recoverable** 65–79 (engine-recovered setting / engine-delta) · **Deposit-faithful** 50–64
+(reproduces the deposit, the figure diverges — JEV 4e) · **Irreproducible** 30–49 (paper-side or
+structural) · **Discrepant** 1–29 (Selom defect) · **Out-of-scope** grey (excluded). Plus an
+attribution chip (✓ Selom / ⚙ engine / 📄 paper / 🗄 data) + the provenance badge. Heart panels
+outweigh form re-plots via `Panel.weight`. Backfilled fixtures: **JEV 86/100 (Reproduced, 100
+confidence)**, **RPGRIP1 63/100 (Deposit-faithful, 92 confidence, 0 Selom defects)**.
 `verdict`: **exact** (ints equal / floats within declared rel-tol) · **close** (right direction/
 magnitude, within a stated band, delta recorded) · **fail** (outside band or structurally impossible).
 
@@ -120,7 +139,7 @@ magnitude, within a stated band, delta recorded) · **fail** (outside band or st
  7 oracle    authors' actual tool (R), measure delta -> Oracle (blame instrument)         [dev/gated]
  8 validate  computed vs golden + guards -> verdict  -> Validation (+blame)               [glue+guards]
  9 sweep     on count-miss, scan the setting grid    -> Sweep (reproducing setting | irrep)[glue]
-10 report    aggregate -> Scorecard + skills-report  -> scorecard, backlog               [glue]
+10 report    aggregate -> Scorecard + Reproducibility Score + skills-report -> scorecard   [glue]
 ```
 Steps 1, 6 reuse existing modules; 3, 4, 5, 8, 9, 10 are deterministic glue + guards; 2 is the
 subsystem; 7 is the gated oracle.
@@ -230,6 +249,18 @@ verdict until the applicable guards have run.** Full prose: `figure-repro-sop.md
 - **D13 — Reproduction Engine is a sibling pillar that *feeds* the Skill Foundry (CONFIRMED owner
   2026-06-17)** — it reproduces + reports skill gaps as a backlog the Foundry consumes; it is **not** a
   sub-phase of the Foundry.
+- **D14 — Source-provenance (+/−) tagging over accusation (CONFIRMED owner 2026-06-17).** When a
+  reconstructed panel faithfully matches its deposited source but diverges from the published figure
+  (commonly a different biological/experimental replicate), reproduce the DEPOSIT faithfully (the win)
+  and record the figure divergence as neutral provenance (`SourceTag`, e.g. `ST6+ Fig4e−`) +
+  `Scorecard.provenance_divergences` — **never a paper-error blame**. JEV Fig 4e is the worked example.
+- **D15 — Reproducibility Score = the graded 0–100 headline (owner-agreed 2026-06-17).** A
+  Selom-unique score per panel→figure→paper over the existing verdict/blame/provenance (`score_panel`
+  + weighted `score_paper`). **Two axes kept SEPARATE** (the design's load-bearing rule):
+  `reproducibility` (paper+data property — the heatmap) vs `selom_confidence` (our-tool property), so a
+  paper-irreproducible figure scores LOW reproducibility but HIGH confidence — a discovery, never a
+  Selom failure. Named tiers + colors + an attribution chip (✓/⚙/📄/🗄) + the provenance badge; heart
+  panels outweigh form re-plots via `Panel.weight`. Natural headline for the deferred FE view (R5).
 
 ## Invariants
 
@@ -242,7 +273,9 @@ verdict until the applicable guards have run.** Full prose: `figure-repro-sop.md
   `delta-unmeasured` flag — never an assumed one.
 - Track B output is never labelled pixel-identical; Track A is the only "pixel-faithful" claim, vector
   panels only. The R oracle never appears on the shipped path.
-- Ledger is source of truth; scorecard (incl. `totals_by_blame`) is derived.
+- Ledger is source of truth; scorecard (incl. `totals_by_blame`, `panel_scores`, the Reproducibility
+  `score`) is derived. The score never invents signal — it is a pure function of verdict/blame/
+  provenance/sweep, so a low reproducibility with high `selom_confidence` is a discovery, not a defect.
 
 ## Error Behavior
 - Missing `--extra pdf` deps → `papers.py`'s actionable message. Unmappable panel → `status: blocked` +
