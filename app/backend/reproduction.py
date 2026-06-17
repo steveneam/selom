@@ -83,6 +83,9 @@ class Golden(BaseModel):
     rel_tol: float = 0.01
     close_tol: float = 0.25
     direction_close: bool = False  # for fold-changes/abundance: sign-agreement counts as close
+    # Counts/ID-sets are strict-exact (round-equal). Set False for a *continuous* metric whose
+    # value happens to be integer-valued (e.g. a "2x" fold) so it uses the float tolerance bands.
+    ints_exact: bool = True
     # Set by the deterministic-anchor stage (SOP rule 3): a must-be-exact ID-set value.
     deterministic: bool = False
     # Set by the prepare stage / guards: the deposited data structurally can't reach this.
@@ -154,6 +157,7 @@ class Panel(BaseModel):
     params: dict = Field(default_factory=dict)
     method_subs: list[MethodSub] = Field(default_factory=list)
     golden: list[Golden] = Field(default_factory=list)
+    note: str = ""  # form/claim panels (no printed number) record why there's no golden here
     vector_copy_ref: str | None = None
     status: str = "pending"  # pending|extracted|mapped|anchored|run|validated|blocked
 
@@ -398,6 +402,7 @@ def validate_panel(
             got,
             rel_tol=gold.rel_tol,
             close_tol=gold.close_tol,
+            ints_exact=gold.ints_exact,
             direction_close=gold.direction_close,
         )
         oracle = oracles.get(gold.metric)
