@@ -5,6 +5,12 @@ counts table). The scRNA + 2-group bulk paths emit a horizontal bar of the top-N
 genes by signed score (up = cyan, down = rose); the time-course path emits
 mean-expression trajectories across timepoints for the top trending genes.
 
+``mode="pseudobulk"`` is the statistically correct way to compare CONDITIONS on
+single-cell data: per-cell tests treat each cell as a biological replicate, which is
+pseudoreplication and inflates false positives (Lun & Marioni 2017; Squair 2021). So we
+sum each sample's raw counts (optionally within one cell-type) into one profile per
+biological replicate, then run the same bulk DESeq2 engine on those pseudo-bulk samples.
+
 Bulk input contract: a CSV/XLSX of raw integer counts, genes in rows (first column
 = gene id), samples in columns. The sample->condition design is taken from a design
 sheet when supplied (``_design_path``, joined on sample id), else inferred from each
@@ -25,6 +31,8 @@ def run(data_path: str, params: dict) -> dict:
     mode = (params.get("mode") or "auto").lower()
     if mode == "auto":
         mode = "scrna" if str(data_path).lower().endswith((".h5ad", ".h5")) else "bulk"
+    if mode in ("pseudobulk", "pseudo-bulk", "pseudo_bulk"):
+        return _pseudobulk(data_path, params)
     if mode in ("timecourse", "time-course", "time_course"):
         return _timecourse(data_path, params)
     if mode == "bulk":
@@ -111,6 +119,178 @@ def _scrna(data_path: str, params: dict) -> dict:
     scores = [float(res["scores"][group0][i]) for i in range(top_n)]
     title = f"Top markers — {groupby} group {group0}"
     return _bar(names, scores, title, jsonable)
+
+
+# Common obs columns that carry the biological-replicate / condition labels, tried in
+# order when the requested column is absent (real h5ads disagree on the name).
+_SAMPLE_FALLBACKS = ("sample", "Sample", "sample_id", "donor", "orig.ident", "library", "batch")
+_CONDITION_FALLBACKS = ("condition", "Condition", "genotype", "group", "treatment", "disease", "status")
+
+
+def _resolve_obs_col(obs, requested, fallbacks, label: str) -> str:
+    """The requested obs column if present, else the first known alias; raise otherwise."""
+    requested = str(requested or "").strip()
+    if requested:
+        if requested in obs.columns:
+            return requested
+        raise ValueError(f"{label} '{requested}' not in obs columns {list(obs.columns)}")
+    for c in fallbacks:
+        if c in obs.columns:
+            return c
+    raise ValueError(f"{label} not given and no known alias found in obs columns {list(obs.columns)}")
+
+
+def _looks_like_counts(matrix) -> bool:
+    """True if the matrix looks like raw integer counts (non-negative, ~integer-valued).
+
+    Sampled (first 10k stored values) so it stays cheap on big sparse matrices. DESeq2
+    models raw counts, so a normalized/log matrix must be rejected before aggregation.
+    """
+    import numpy as np
+    import scipy.sparse as sp
+
+    # scipy-sparse `.data` is the stored nonzero values; a dense ndarray's `.data` is a raw
+    # buffer (not values), so only trust `.data` for sparse and flatten dense explicitly.
+    vals = np.asarray(matrix.data if sp.issparse(matrix) else np.asarray(matrix).ravel())
+    if vals.size == 0:
+        return False
+    sample = np.asarray(vals[:10000], dtype=float)
+    return bool(np.all(sample >= 0) and np.allclose(sample, np.round(sample), atol=1e-6))
+
+
+def _raw_counts(adata):
+    """Return (counts matrix [cells x genes], var_names, provenance note) of RAW counts.
+
+    Prefer a ``counts`` layer, then ``.X``, then ``.raw`` (only when its genes match) —
+    taking the FIRST source that looks like integer counts. Raise a clear error if only
+    normalized values are available, since pseudo-bulk + DESeq2 need raw counts.
+    """
+    candidates = []
+    layers = getattr(adata, "layers", None)
+    if layers is not None and "counts" in layers:
+        candidates.append(("layers['counts']", layers["counts"], list(adata.var_names)))
+    candidates.append(("X", adata.X, list(adata.var_names)))
+    raw = getattr(adata, "raw", None)
+    if raw is not None and raw.shape[0] == adata.n_obs and list(raw.var_names) == list(adata.var_names):
+        candidates.append((".raw", raw.X, list(adata.var_names)))
+
+    for note, matrix, var_names in candidates:
+        if _looks_like_counts(matrix):
+            return matrix, var_names, note
+    raise ValueError(
+        "pseudobulk DE needs RAW integer counts, but the AnnData only has normalized/log "
+        "values (checked layers['counts'], .X, .raw). Provide raw counts — e.g. store them "
+        "in a 'counts' layer before running."
+    )
+
+
+def _pseudobulk(data_path: str, params: dict) -> dict:
+    """Pseudo-bulk DE between conditions: sum raw counts per biological replicate (within
+    one cell-type if ``label_col``/``label`` are given) into one profile per sample, then
+    run the bulk DESeq2 engine on those pseudo-bulk samples. Aggregating to the replicate
+    level is what makes a multi-sample comparison statistically valid (samples, not cells,
+    are the unit of replication).
+    """
+    import numpy as np
+    import pandas as pd
+
+    from skills._genes import read_anndata
+    from skills._plotly import jsonable
+
+    adata = read_anndata(data_path)
+    obs = adata.obs
+
+    sample_col = _resolve_obs_col(obs, params.get("sample_col"), _SAMPLE_FALLBACKS, "sample_col")
+    condition_col = _resolve_obs_col(obs, params.get("condition_col"), _CONDITION_FALLBACKS, "condition_col")
+
+    # Optional: restrict the contrast to a single cell-type / cluster.
+    label_col = str(params.get("label_col") or "").strip()
+    label_val = str(params.get("label") or params.get("label_val") or "").strip()
+    label_note = ""
+    if label_col:
+        if label_col not in obs.columns:
+            raise ValueError(f"label_col '{label_col}' not in obs columns {list(obs.columns)}")
+        if not label_val:
+            raise ValueError(
+                f"label_col '{label_col}' given without `label` — set `label` to one "
+                f"{label_col} value to restrict the pseudobulk contrast to a single cell type"
+            )
+        mask = obs[label_col].astype(str).to_numpy() == label_val
+        if not mask.any():
+            raise ValueError(f"no cells with {label_col} == '{label_val}'")
+        adata = adata[mask].copy()
+        obs = adata.obs
+        label_note = f" · {label_col}={label_val}"
+
+    counts, var_names, _src = _raw_counts(adata)
+    samples = obs[sample_col].astype(str).to_numpy()
+    conds = obs[condition_col].astype(str).to_numpy()
+    order = list(dict.fromkeys(samples.tolist()))  # stable unique sample order
+
+    # Sum raw counts per sample -> one pseudo-bulk profile; track cell count + condition.
+    pb, n_cells, cond_of = {}, {}, {}
+    for s in order:
+        idx = np.where(samples == s)[0]
+        n_cells[s] = int(idx.size)
+        block = counts[idx]
+        pb[s] = np.asarray(block.sum(axis=0)).ravel()
+        here = set(conds[idx].tolist())
+        if len(here) != 1:
+            raise ValueError(
+                f"sample '{s}' spans multiple {condition_col} values {sorted(here)} — "
+                "each biological replicate must map to exactly one condition"
+            )
+        cond_of[s] = here.pop()
+
+    min_cells = int(params.get("min_cells", 10))
+    kept = [s for s in order if n_cells[s] >= min_cells]
+    dropped = [s for s in order if n_cells[s] < min_cells]
+    if len(kept) < 2:
+        raise ValueError(
+            f"pseudobulk needs >=2 samples with >={min_cells} cells "
+            f"(kept {len(kept)} of {len(order)}{label_note})"
+        )
+
+    reference = str(params.get("reference") or "").strip()
+    treatment = str(params.get("treatment") or "").strip()
+    groups = sorted({cond_of[s] for s in kept})
+    if not reference and not treatment:
+        if len(groups) == 2:
+            reference, treatment = groups[0], groups[1]
+        else:
+            raise ValueError(
+                f"pseudobulk DE needs a 2-group contrast but {len(groups)} {condition_col} "
+                f"groups were found ({groups}); set `reference` and `treatment` to two of them "
+                "(logFC = treatment vs reference)."
+            )
+    for role, g in (("reference", reference), ("treatment", treatment)):
+        if g not in groups:
+            raise ValueError(f"{role} group '{g}' not among {condition_col} groups {groups}")
+    if reference == treatment:
+        raise ValueError("reference and treatment must be different groups")
+
+    keep_cols = [s for s in kept if cond_of[s] in (reference, treatment)]
+    cond = [cond_of[s] for s in keep_cols]
+    n_ref, n_treat = cond.count(reference), cond.count(treatment)
+    if min(n_ref, n_treat) < 2:
+        raise ValueError(
+            f"each condition needs >=2 sample-replicates for pseudobulk DE "
+            f"(got {reference}={n_ref}, {treatment}={n_treat})"
+        )
+
+    mat = np.vstack([pb[s] for s in keep_cols]).T  # genes x samples
+    sub = pd.DataFrame(mat, index=[str(g) for g in var_names], columns=keep_cols)
+    sub = sub[sub.sum(axis=1) >= int(params.get("min_count", 10))]  # drop near-zero genes
+
+    top_n = int(params["top_n"])
+    normalization = str(params.get("normalization") or "deseq2").strip().lower()
+    names, scores, engine = _bulk_deseq(sub, cond, reference, treatment, top_n, normalization)
+    drop_note = f" · dropped {len(dropped)} sample(s) <{min_cells} cells" if dropped else ""
+    subtitle = (
+        f"pseudobulk · {engine} · {treatment} (n={n_treat}) vs {reference} (n={n_ref})"
+        f"{label_note} · {sub.shape[0]} genes{drop_note}"
+    )
+    return _bar(names, scores, f"Pseudobulk DE — {treatment} vs {reference}", jsonable, subtitle)
 
 
 def _bulk(data_path: str, params: dict) -> dict:

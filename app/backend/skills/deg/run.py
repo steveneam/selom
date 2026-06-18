@@ -1,11 +1,15 @@
 """Differential expression — top-gene ranking, scRNA / bulk / time-course.
 
-Three real paths (``run_real.py``), chosen by ``mode``:
+Four real paths (``run_real.py``), chosen by ``mode``:
   * scRNA       — scanpy ``rank_genes_groups`` (Wilcoxon by default) per cluster.
   * bulk        — pyDESeq2 Wald on a raw-count table; the sample->group design comes
                   from a design sheet (joined on sample id) or from the column names
                   (trailing replicate suffix stripped); ``reference``/``treatment``
                   pick the contrast.
+  * pseudobulk  — single-cell condition contrast done right: sum raw counts per
+                  biological replicate (``sample_col``, optionally within one
+                  ``label_col``/``label`` cell-type) then run the bulk pyDESeq2 path,
+                  avoiding the pseudoreplication of per-cell tests.
   * time-course — pyDESeq2 with time as a continuous covariate, Wald-testing the time
                   coefficient (maSigPro-style linear trend); needs a design sheet.
 The scRNA + bulk figures are a horizontal bar of the top-N genes by signed score

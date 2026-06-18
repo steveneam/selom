@@ -19,7 +19,12 @@
     "time_col":  { "type": "str", "default": "time" },
     "covariate_col": { "type": "str", "default": "" },
     "min_count": { "type": "int", "default": 10, "min": 0, "max": 1000 },
-    "normalization": { "type": "str", "default": "deseq2", "options": ["deseq2", "tmm"] }
+    "normalization": { "type": "str", "default": "deseq2", "options": ["deseq2", "tmm"] },
+    "sample_col":    { "type": "str", "default": "", "note": "pseudobulk: obs column = biological replicate id" },
+    "condition_col": { "type": "str", "default": "", "note": "pseudobulk: obs column = condition to contrast" },
+    "label_col":     { "type": "str", "default": "", "note": "pseudobulk: optional obs column = cell-type/cluster" },
+    "label":         { "type": "str", "default": "", "note": "pseudobulk: restrict to this label_col value" },
+    "min_cells":     { "type": "int", "default": 10, "min": 0, "max": 1000, "note": "pseudobulk: drop samples with fewer cells" }
   },
   "inputs_optional": [
     { "name": "design", "kind": "csv", "required": false, "note": "sample id + condition/time columns; bulk + time-course" }
@@ -29,7 +34,7 @@
     { "name": "table",  "kind": "csv" }
   ],
   "catalog": {
-    "summary": "Bulk DE (pyDESeq2) or marker ranking (Wilcoxon) per contrast.",
+    "summary": "Bulk / pseudo-bulk DE (pyDESeq2) or marker ranking (Wilcoxon) per contrast.",
     "category": "differential-expression",
     "tier": "verified",
     "status": "production",

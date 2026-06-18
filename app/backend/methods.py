@@ -22,6 +22,7 @@ LEIDEN = "Traag, V.A., Waltman, L. & van Eck, N.J. From Louvain to Leiden: guara
 SILHOUETTE = "Rousseeuw, P.J. Silhouettes: a graphical aid to the interpretation and validation of cluster analysis. Journal of Computational and Applied Mathematics 20, 53-65 (1987)."
 PYDESEQ2 = "Muzellec, B., Telenczuk, M., Cabeli, V. & Andreux, M. PyDESeq2: a python package for bulk RNA-seq differential expression analysis. Bioinformatics 39, btad547 (2023)."
 DESEQ2 = "Love, M.I., Huber, W. & Anders, S. Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. Genome Biology 15, 550 (2014)."
+SQUAIR = "Squair, J.W. et al. Confronting false discoveries in single-cell differential expression. Nature Communications 12, 5692 (2021)."
 BH = "Benjamini, Y. & Hochberg, Y. Controlling the false discovery rate: a practical and powerful approach to multiple testing. Journal of the Royal Statistical Society B 57, 289-300 (1995)."
 GO = "Ashburner, M. et al. Gene Ontology: tool for the unification of biology. Nature Genetics 25, 25-29 (2000)."
 REACTOME = "Milacic, M. et al. The Reactome Pathway Knowledgebase 2024. Nucleic Acids Research 52, D672-D678 (2024)."
@@ -115,6 +116,23 @@ def _violin(p: dict):
 
 def _deg(p: dict):
     mode = str(p.get("mode") or "auto").lower()
+    if mode in ("pseudobulk", "pseudo-bulk", "pseudo_bulk"):
+        sample_col = str(p.get("sample_col") or "sample")
+        reference, treatment = str(p.get("reference") or "").strip(), str(p.get("treatment") or "").strip()
+        contrast = f" ({treatment} versus {reference})" if reference and treatment else ""
+        label = str(p.get("label") or "").strip()
+        within = f" within {label}" if label else ""
+        text = (
+            f"Differential expression between conditions{contrast} was assessed with a pseudo-bulk "
+            f"approach to avoid pseudoreplication: single-cell raw counts were summed per biological "
+            f"replicate ({sample_col}){within} to form one expression profile per sample, which were "
+            "then modelled as bulk RNA-seq with PyDESeq2 (a Python reimplementation of DESeq2) and "
+            "tested with the Wald test. Aggregating to the replicate level treats samples — not "
+            "individual cells — as the unit of replication, the statistically valid design for "
+            f"multi-sample comparisons. The top {p['top_n']} genes are reported, with p-values "
+            "corrected by the Benjamini-Hochberg procedure."
+        )
+        return text, [SCANPY, PYDESEQ2, DESEQ2, SQUAIR, BH]
     if mode in ("timecourse", "time-course", "time_course"):
         text = (
             "Time-course differential expression was assessed by modelling raw counts against the "
