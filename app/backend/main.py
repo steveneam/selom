@@ -198,22 +198,31 @@ def compose_methods_endpoint(req: ComposeMethodsRequest):
     return section.model_dump()
 
 
+_CITATION_SOURCES = ("both", "pubmed", "biorxiv")
+
+
 @app.get("/citations/search")
-def citations_search(q: str = "", max_results: int = 20, min_year: int | None = None):
-    # lit-synthesizer Phase B: topical PubMed lookup (NCBI E-utilities, cached, self-throttled).
+def citations_search(q: str = "", source: str = "both", max_results: int = 20, min_year: int | None = None):
+    # lit-synthesizer Phase B/C: topical PubMed lookup (NCBI E-utilities, cached, self-throttled).
     # Advisory tier-3 (off by default in the synthesizer); degrades to [] + degraded=True on any
-    # network/parse failure — a lookup must never break the caller. See docs/lit-synthesizer-scope.md.
+    # network/parse failure — a lookup must never break the caller. bioRxiv has no free-text search
+    # API (Phase C), so source=biorxiv returns []. See docs/lit-synthesizer-scope.md.
+    if source not in _CITATION_SOURCES:
+        raise HTTPException(status_code=400, detail=f"source must be one of {_CITATION_SOURCES}")
     if not q.strip():
         return {"results": [], "degraded": False}
-    return citations_lookup.search_citations(q, max_results=max_results, min_year=min_year)
+    return citations_lookup.search_citations(q, source=source, max_results=max_results, min_year=min_year)
 
 
 @app.get("/citations/by-doi")
-def citations_by_doi(doi: str = ""):
-    # Deterministic DOI -> bibliographic Citation (PubMed), cached. degraded=True on failure.
+def citations_by_doi(doi: str = "", source: str = "both"):
+    # Deterministic DOI -> bibliographic Citation, cached. source=both tries PubMed then
+    # bioRxiv/medRxiv (the latter also captures the preprint's per-record license). Phase C.
+    if source not in _CITATION_SOURCES:
+        raise HTTPException(status_code=400, detail=f"source must be one of {_CITATION_SOURCES}")
     if not doi.strip():
         raise HTTPException(status_code=400, detail="doi is required")
-    return citations_lookup.citation_by_doi(doi)
+    return citations_lookup.citation_by_doi(doi, source=source)
 
 
 @app.post("/skills/{skill_id}/jobs")

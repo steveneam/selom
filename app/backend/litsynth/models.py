@@ -34,8 +34,9 @@ class Citation(BaseModel):
     """A structured bibliographic record (Phase B citation lookup).
 
     Bibliographic fields only — these are not copyrightable (PubMed metadata is US-gov).
-    ``metadata_license`` is reserved for bioRxiv's per-record license tag (Phase C);
-    it stays None for PubMed. ``source`` is the index the record came from.
+    ``metadata_license`` carries bioRxiv/medRxiv's per-record license tag (Phase C, e.g.
+    ``cc_by`` / ``cc_by_nc_nd`` / ``cc_no``); it stays None for PubMed (US-gov, no per-record
+    license). ``source`` is the index the record came from (``pubmed`` | ``biorxiv`` | ``medrxiv``).
     """
 
     title: str
@@ -45,5 +46,5 @@ class Citation(BaseModel):
     doi: str | None = None
     pmid: str | None = None
     url: str | None = None
-    source: str = "pubmed"            # pubmed | biorxiv | canonical
-    metadata_license: str | None = None  # bioRxiv per-record license (Phase C); None for PubMed
+    source: str = "pubmed"            # pubmed | biorxiv | medrxiv | canonical
+    metadata_license: str | None = None  # bioRxiv/medRxiv per-record license (Phase C); None for PubMed

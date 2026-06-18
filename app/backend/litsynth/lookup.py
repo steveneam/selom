@@ -13,21 +13,30 @@ import pathlib
 import tempfile
 import xml.etree.ElementTree as ET
 
-from litsynth import pubmed
+from litsynth import biorxiv, pubmed
 from litsynth.cache import JsonCache
 
 _CONFIG = pubmed.NcbiConfig.from_env()
 _FETCHER = pubmed.default_fetcher(_CONFIG)
+_BIORXIV_FETCHER = biorxiv.default_fetcher()
 _CACHE = JsonCache(
     os.environ.get("SELOM_CITATION_CACHE")
     or (pathlib.Path(tempfile.gettempdir()) / "selom-citation-cache.json")
 )
 
-# Realistic lookup failures: network (OSError covers URLError/HTTPError/timeout) + XML parse.
+# Realistic lookup failures: network (OSError covers URLError/HTTPError/timeout) + JSON/XML
+# parse (json.JSONDecodeError subclasses ValueError, so bioRxiv parse errors are covered too).
 _LOOKUP_ERRORS = (OSError, ValueError, ET.ParseError)
 
 
-def search_citations(q, *, max_results=20, min_year=None, fetch=None, cache=None, cfg=None) -> dict:
+def search_citations(
+    q, *, source="both", max_results=20, min_year=None, fetch=None, cache=None, cfg=None
+) -> dict:
+    # bioRxiv/medRxiv have no free-text search API (Phase C, verified) — topical search is
+    # PubMed-only. 'biorxiv' source is therefore an honest empty result, not a fabricated one;
+    # 'both'/'pubmed' both resolve via PubMed (which already indexes many preprints).
+    if source == "biorxiv":
+        return {"results": [], "degraded": False}
     fetch = fetch or _FETCHER
     cache = cache or _CACHE
     cfg = cfg or _CONFIG
@@ -43,17 +52,44 @@ def search_citations(q, *, max_results=20, min_year=None, fetch=None, cache=None
     return {"results": dumped, "degraded": False}
 
 
-def citation_by_doi(doi, *, fetch=None, cache=None, cfg=None) -> dict:
+def citation_by_doi(
+    doi, *, source="both", fetch=None, biorxiv_fetch=None, cache=None, cfg=None
+) -> dict:
+    """Resolve a DOI to one bibliographic Citation, cached, degrade-safe.
+
+    ``source`` selects the index trust order: ``pubmed`` first (richer, peer-reviewed venue),
+    then bioRxiv/medRxiv as a fallback that *also* captures the preprint's per-record license
+    (``both``). ``biorxiv`` consults only the preprint servers. ``degraded`` is True only when a
+    consulted source raised (network/parse) and we got no hit; a clean "not found" is a cached
+    ``None`` with ``degraded=False``.
+    """
     fetch = fetch or _FETCHER
+    biorxiv_fetch = biorxiv_fetch or _BIORXIV_FETCHER
     cache = cache or _CACHE
     cfg = cfg or _CONFIG
-    key = f"doi:{(doi or '').strip().lower()}"
+    key = f"doi:{source}:{(doi or '').strip().lower()}"
     if cache.has(key):
         return {"citation": cache.get(key), "degraded": False}
-    try:
-        c = pubmed.by_doi(doi, fetch=fetch, cfg=cfg)
-    except _LOOKUP_ERRORS:
-        return {"citation": None, "degraded": True}
-    dumped = c.model_dump() if c else None
+
+    citation = None
+    degraded = False
+    if source in ("pubmed", "both"):
+        try:
+            c = pubmed.by_doi(doi, fetch=fetch, cfg=cfg)
+        except _LOOKUP_ERRORS:
+            degraded = True
+        else:
+            citation = c
+    if citation is None and source in ("biorxiv", "both"):
+        try:
+            c = biorxiv.by_doi(doi, fetch=biorxiv_fetch)
+        except _LOOKUP_ERRORS:
+            degraded = True
+        else:
+            citation = c
+
+    if degraded and citation is None:
+        return {"citation": None, "degraded": True}  # transient failure — don't pin it in cache
+    dumped = citation.model_dump() if citation else None
     cache.set(key, dumped)
     return {"citation": dumped, "degraded": False}
