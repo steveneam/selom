@@ -56,10 +56,10 @@ GIT STATE / FIRST ACTION: PUSHED through `40a109b` (session-21 + hani Fig6 label
 
 WHAT HAPPENED (session 22): owner "do 1,2,3" → ★1+★2+★3 DONE, each scoped first. **★1** per-skill Methods prose for gsea/go_graph/cepo (off the generic param-dump the Phase-D QA lens surfaced). **★2 Hani skill gaps — 3 of 5 SHIPPED** (library-only, no new deps): `boxplot` (Fig 2C, replaced the `box` placeholder → real scored panel + Phase-D prose), `pvca` (Fig 2B, numpy ANOVA variance), `regression` (Fig 4C, scipy OLS). **DEFERRED 2** (scoped doc): `integration`/Harmony (needs the harmonypy dep — ASK; overlaps ★3) + violin+PubMed annotation. pvca/regression are CAPABILITIES, not yet wired as ledger panels. **★3 HANI LIVE (organoid side)** `drive_live_organoid` on GSE201356: 4 libraries · 10k cells · 19 clusters · rod-dominant 88.5%; renders Fig 6A via Selom's own umap_scrna; Reproducibility 96/100 verified · confidence 100 · 0 defects. captured reproduced 9→11. pytest BE 391 (+ skipif live-organoid = 392); ruff clean; no new deps. Owner steer holds: LEARN + compounding infra, distill to memory ([[compound-capability-each-task]] — the live-verifiable-deposit-facts vs figure-borne-cohort-facts pattern; a ledger's placeholder skill_ids = a buildable skill backlog).
 
-OWNER TANGENT (open 2026-06-19): owner may supply RESOURCES to help engine/skills capability — discuss before next build. Likely feeds the harmonypy/integration decision, the deferred skills, and atlas data-staging for full Hani (Fig 1C/4B/6C-D).
+OWNER RESOURCES (resolved 2026-06-19, ALL next session): (a) **harmonypy/integration dep APPROVED** → build the integration skill next session (★A). (b) **NCBI API key incoming** (SELOM_NCBI_API_KEY) → violin+PubMed real counts. (c) **Reference atlases (Cowan/Lu/Lukowski/Orozco/Yan) ARE in the Hani folder** but slow (Yan = citation rabbit hole) → full-Hani data staging = a PRE-LAUNCH hardening task, on hold. (d) **Study github.com/OSCA-source** (Orchestrating Single-Cell Analysis, ~6 repos) to improve Selom's scRNA workflow — translate methods to Python, don't ship R. [[osca-source-sc-workflow]] docs/hani-skill-gap-roadmap.md.
 
 GO (scope each before building — charter; priority order):
- ★A integration/Harmony skill (the biggest Hani unlock — Fig 1C/4B/6 atlas + real batch correction for an extended ★3) — needs adding harmonypy 0.0.10 to the [omics] extra (NEW DEP — ASK; not Docker but a runtime dep; in-env install may hit EDR). Stub+lazy-real pattern like the other heavy skills. [[selom-hani-figure-reproduction]] docs/hani-skill-gap-roadmap.md
+ ★A integration/Harmony skill (the biggest Hani unlock — Fig 1C/4B/6 atlas + real batch correction for an extended ★3) — **harmonypy dep APPROVED by owner 2026-06-19**; promote harmonypy 0.0.10 → [omics] extra (stub+lazy-real like the other heavy skills; in-env install may hit EDR). Pair with the OSCA-source study. [[selom-hani-figure-reproduction]] [[osca-source-sc-workflow]] docs/hani-skill-gap-roadmap.md
  ★B violin+PubMed annotation skill (Fig 3A/B) — wire existing `violin` + lit-synth B/C PubMed counts (known vs novel marker); network-bound, degrade-to-unannotated.
  ★C wire pvca/regression as Hani ledger panels (Fig 2B/4C) with directional goldens (cell-type dominates variance / score rises with age) — grows the curated subset toward fuller Hani coverage.
  ★D extract↔Reproduction bridge — paper panels as thumbnails in the read-only R5 view → "Digitize this panel" opens the picker on the X3-lifted panel. FE+BE → SPEC FIRST. digitize≠reproduce, NEVER scores. [[selom-extract-reproduction-bridge]]
@@ -87,7 +87,7 @@ Roles are explicit; any swap is written here before work proceeds.
 ## Log Edit-Lock
 
 UNLOCKED
-<!-- session-22 update by Claude 2026-06-19 00:40 +10:00; released. -->
+<!-- session-22 update by Claude 2026-06-19 00:40 +10:00; + tangent-resolved follow-up 00:58; released. -->
 
 ## Shared File Locks
 

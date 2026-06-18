@@ -44,11 +44,26 @@ across the 4 organoid samples / 3 batches.
   `[omics]` extra in `pyproject.toml` (lazy real-engine import behind the existing stub/real
   split, exactly like the other heavy skills). An in-env install may be slow and could trip
   EDR (see memory `selom-backend-python-exec`).
-- **Decision:** deferred pending an owner go-ahead on the dependency. Not Docker/WSL, so it
-  is in-lane, but it is the one ★2 skill that adds a third-party runtime dep, so it is called
-  out rather than added silently. The biggest reproduction unlock is still the **data staging**
-  (curating + integrating the public fetal/mature retinal sets), which is data engineering, not
-  this skill.
+- **Decision (owner, 2026-06-19): APPROVED — build next session.** The owner OK'd adding the
+  harmonypy dependency. Promote `harmonypy 0.0.10` from scratch into the `[omics]` extra (lazy
+  real-engine import behind the existing stub/real split); a slow/EDR-prone in-env install is the
+  only friction (memory `selom-backend-python-exec`). The biggest reproduction unlock is still the
+  **data staging** (below), which is data engineering, not this skill.
+
+## Resources & next-session plan (owner, 2026-06-19)
+
+- **Reference-atlas datasets are in hand but on hold.** Cowan, Lu, Lukowski, **Orozco**, and Yan
+  are all in the Hani folder — but each is a separate paper + supplement, slow to curate, and
+  **Yan is a citation rabbit hole** (its supplement is just references to further papers). So the
+  full-Hani data staging (Fig 1C / 4B / 6C-D, which needs these integrated) is a **last pre-launch
+  HARDENING task**, not a now-build. This is the dominant blocker and it is data engineering.
+- **`integration` / Harmony skill — build next session** (dep approved, above). Unblocks the
+  organoid-side batch correction and is the prerequisite skill for the atlas work when it happens.
+- **NCBI API key incoming** (`SELOM_NCBI_API_KEY`) → unblocks the violin+PubMed real counts (10/s).
+- **OSCA-source books** (github.com/OSCA-source, ~6 repos) — study next session to tighten Selom's
+  scRNA workflow (QC → normalize → integrate → cluster → annotate → DE/markers → trajectory);
+  translate the Bioconductor methods to our Python skills, don't ship R. Memory:
+  `osca-source-sc-workflow`.
 
 ## Deferred 2 — violin + PubMed annotation
 
