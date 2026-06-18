@@ -1,7 +1,14 @@
 # Extract ↔ Reproduction bridge — spec (★D)
 
-> Status: **DRAFT — awaiting owner review** (the central fork in §4 needs a decision before build).
-> Stamped 2026-06-19 +10:00. Owner steer: memory `selom-extract-reproduction-bridge` (2026-06-18).
+> Status: **Phase 1 (BE) + Phase 2 (FE) SHIPPED** — owner picked **Option A (staged assets)** at the
+> §4 fork. Phase 3 (automated panel segmentation) remains a fast-follow. Stamped 2026-06-19 +10:00.
+> Owner steer: memory `selom-extract-reproduction-bridge` (2026-06-18).
+>
+> **Shipped:** `PanelLift` + `repro_assets.attach_lifts` + `/repro-assets` static mount +
+> `scripts/stage_panel_assets.py` (3 real Hani thumbnails: 2A/2C/4C) + the digitize≠reproduce
+> invariant (mechanically tested); FE thumbnails + the "Digitize this panel" entry (gated to
+> traceable forms) + the picker's lifted-image preload + not-scored banner. Browser-verified at
+> desktop 1440. Commits: `fc4b23f`/`886394b` (BE) · `3c6c8f7` (FE).
 
 ## 1. Goal
 
