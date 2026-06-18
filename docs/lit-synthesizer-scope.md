@@ -1,10 +1,12 @@
 # lit-synthesizer — scope (verified, warm; build next session)
 
-> Status: **Phase A SHIPPED 2026-06-18** (`2a982be`) — `litsynth/` + `POST /methods/compose` are
-> live: a deterministic multi-skill methods synthesizer, offline, no new deps, `methods.build_body`
-> single-sourcing the citations. **Phases B/C (network PubMed/bioRxiv lookup) NOT built** — re-verify
-> the two external facts below before building them. The 2nd ClawBio platform capability (sibling of
-> the shipped `data-extractor`/X4); scoped by a research subagent, external claims verified by Claude.
+> Status: **Phase A + B SHIPPED 2026-06-18** (A `2a982be`, B `e460fd5`) — `litsynth/` + `POST
+> /methods/compose` (deterministic multi-skill methods synthesizer, offline, no new deps,
+> `methods.build_body` single-sourcing the citations) **+** `GET /citations/search` · `/citations/by-doi`
+> (NCBI E-utilities PubMed lookup: stdlib `urllib`+`xml.etree`, self-throttled + on-disk cache, fetcher
+> behind a single seam → offline-tested AND live-verified against the real API). **Phase C (bioRxiv
+> per-record `license`) NOT built.** NCBI facts re-verified 2026-06-18 (NBK25497: **3 req/s keyless,
+> 10 with a key**). The 2nd ClawBio platform capability (sibling of the shipped `data-extractor`/X4).
 
 ## What it is
 
@@ -99,13 +101,19 @@ app/backend/litsynth/
   gained `build_body()` (prose + citations, no attribution) so `build()` stays byte-identical and
   `/skills/{id}/run` is untouched. Dedups citations first-seen; one consolidated Selom attribution
   names all skills+versions. pytest 349 (+9); ruff clean; `tests/test_litsynth.py`.
-- **Phase B:** `pubmed.py` + `cache.py` + `GET /citations/by-doi` + `/citations/search` (offline-tested
-  against committed fixtures; network injected as a fetcher param, not monkeypatched).
+- **Phase B — SHIPPED `e460fd5` (PubMed lookup):** `pubmed.py` (NCBI E-utilities, `esearch`→`esummary`;
+  `ThrottledFetcher` 3/s keyless · 10/s keyed, injectable clock/sleep/opener) + `cache.py` (tolerant
+  on-disk JSON, `has()` ≠ miss vs cached-None) + `lookup.py` (env-wired singletons, all injectable,
+  degrade to `[]`/None + `degraded=True`) + `GET /citations/search` · `/citations/by-doi`. Network behind
+  one fetcher seam → 13 offline cases (real-format fixtures) **and** live-verified (real SCANPY parse).
+  Stdlib only. pytest 362 (+13); ruff clean; `tests/test_litsynth_citations.py`.
 - **Phase C:** `biorxiv.py` (per-record `license` capture) wired into `/citations/*` (`source=both`).
 - **Phase D (later):** feed a full reproduction `Ledger` → a paper-level `MethodsSection`.
 
 ## Open questions (owner)
 1. Keep `/skills/{id}/run` returning the bare `{text, citations}` dict in Phase A (recommend: yes).
-2. NCBI contact `email` to register + key now vs keyless (recommend: keyless Phase A).
+2. NCBI contact `email` to register + key now vs keyless — _Resolved Phase B: keyless (3/s + self-throttle
+   + `tool=selom`); `email` + `api_key` read from `SELOM_NCBI_EMAIL` / `SELOM_NCBI_API_KEY` (unset in dev).
+   Registering a key/email is a pre-launch gate, not needed to build/test._
 3. Topical lookups off-by-default (recommend: yes).
 4. Include medRxiv alongside bioRxiv (recommend: yes — one server param).
