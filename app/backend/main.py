@@ -16,6 +16,7 @@ import provenance
 from extract import chart_intake
 from gene_sets import library as gene_sets
 from litsynth import SkillRunRef, compose_methods
+from litsynth import from_ledger as ledger_methods
 from litsynth import lookup as citations_lookup
 from jobs.queue import get_job, result_store, submit
 from jobs.store import TERMINAL
@@ -100,6 +101,22 @@ def get_scorecard(slug: str):
     if slug not in papers_api.SLUGS:
         raise HTTPException(status_code=404, detail=f"unknown paper '{slug}'")
     return papers_api.driven_ledger(slug).scorecard.model_dump()
+
+
+@app.get("/papers/{slug}/methods")
+def get_paper_methods(slug: str, modality: str = ""):
+    # lit-synthesizer Phase D: turn this paper's driven ledger into ONE publication Methods
+    # section + deduped citations (deterministic, offline). Walks the in-scope analysis panels
+    # in figure order, reusing each skill's existing methods prose. `modality` overrides the
+    # ledger's declared paper.modality for the intro framing. See docs/lit-synthesizer-scope.md.
+    if slug not in papers_api.SLUGS:
+        raise HTTPException(status_code=404, detail=f"unknown paper '{slug}'")
+    ledger = papers_api.driven_ledger(slug)
+    try:
+        section = ledger_methods.compose_ledger_methods(ledger, modality=(modality or None))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return section.model_dump()
 
 
 def _save_upload(matrix: UploadFile) -> str:

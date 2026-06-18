@@ -184,6 +184,7 @@ def build_ledger() -> Ledger:
               "the fidelity of retinal organoids (Kim, Gonzalez-Cordero, Yang et al. 2023, "
               "Stem Cell Reports)",
         doi="10.1016/j.stemcr.2022.12.002",
+        modality="scrna",  # rod-dominant organoid scRNA-seq (GSE201356) — single modality
         geo=["GSE201356"],
         methods_digest={
             "atlas": "curation + Harmony integration of public mature/fetal retinal scRNA-seq -> "

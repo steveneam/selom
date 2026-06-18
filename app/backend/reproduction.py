@@ -340,6 +340,10 @@ class Paper(BaseModel):
     title: str = ""
     doi: str = ""
     pdf_path: str = ""
+    # The paper's primary data modality (scrna | bulk | proteomics | …), used to frame the
+    # auto-generated Methods intro (lit-synth Phase D). Empty = mixed/unknown -> a neutral lead;
+    # skill `omics` is a capability list, not a run modality, so this is declared, never inferred.
+    modality: str = ""
     geo: list[str] = Field(default_factory=list)
     methods_digest: dict = Field(default_factory=dict)
     inconsistencies: list[Inconsistency] = Field(default_factory=list)
