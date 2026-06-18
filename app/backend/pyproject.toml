@@ -95,6 +95,10 @@ omics = [
   # "match the paper's normalization" when the reference used edgeR/limma-voom. Apache-2.0;
   # the complete edgeR port edgePython is GPL-3.0 and is deliberately NOT used (DECISIONS #9).
   "rnanorm>=2.1",
+  # Harmony batch correction for the `integration` skill (multi-library co-embedding).
+  # MIT (github.com/slowkow/harmonypy); driven via scanpy's external.pp.harmony_integrate,
+  # lazy-imported behind the stub/real split like every other heavy engine.
+  "harmonypy>=0.0.10",
 ]
 # Async job path (B3): arq + Redis queue (DECISIONS #6) + boto3 for the R2 result
 # store. OPTIONAL — the default inline executor + local-filesystem result store need

@@ -1,0 +1,30 @@
+{
+  "id": "integration",
+  "version": "0.1.0",
+  "title": "scRNA integration (Harmony)",
+  "engine": "python",
+  "omics": "scrna-seq",
+  "entrypoint": "skills.integration.run:run",
+  "inputs": [{ "name": "matrix", "kind": "anndata|10x_mtx|h5ad", "required": true }],
+  "param_spec": {
+    "batch_key":         { "type": "str",   "default": "sample" },
+    "n_neighbors":       { "type": "int",   "default": 15, "min": 2, "max": 100 },
+    "n_pcs":             { "type": "int",   "default": 50, "min": 2, "max": 200 },
+    "color_by":          { "type": "str",   "default": "" },
+    "normalize":         { "type": "bool",  "default": true },
+    "theta":             { "type": "float", "default": 2.0, "min": 0.0, "max": 10.0 },
+    "max_iter_harmony":  { "type": "int",   "default": 10, "min": 1, "max": 50 }
+  },
+  "outputs": [{ "name": "figure", "kind": "plotly_spec" }],
+  "catalog": {
+    "name": "Selom Integration (Harmony)",
+    "summary": "Batch-correct and co-embed multiple single-cell libraries with Harmony: QC → normalize → PCA → Harmony on the chosen batch key → neighbours/Leiden/UMAP on the corrected embedding. Mixes batches while preserving cell-type structure — the prerequisite for building or benchmarking against a reference atlas.",
+    "category": "single-cell",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".h5ad", ".csv"],
+    "chains_with": ["umap_scrna", "composition", "deg"],
+    "license": "MIT",
+    "popularity": 70
+  }
+}

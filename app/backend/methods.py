@@ -37,6 +37,7 @@ GSEA = "Subramanian, A. et al. Gene set enrichment analysis: a knowledge-based a
 GSEAPY = "Fang, Z., Liu, X. & Peltz, G. GSEApy: a comprehensive package for performing gene set enrichment analysis in Python. Bioinformatics 39, btac757 (2023)."
 CEPO = "Kim, H.J., Wang, K., Chen, C. et al. Uncovering cell identity through differential stability with Cepo. Nature Computational Science 1, 784-790 (2021)."
 PVCA = "Boedigheimer, M.J. et al. Sources of variation in baseline gene expression levels from toxicogenomics study control animals across multiple laboratories. BMC Genomics 9, 285 (2008)."
+HARMONY = "Korsunsky, I. et al. Fast, sensitive and accurate integration of single-cell data with Harmony. Nature Methods 16, 1289-1296 (2019)."
 
 
 def _umap(p: dict):
@@ -59,6 +60,26 @@ def _umap(p: dict):
         f"dimensions with UMAP, and cells were coloured by {p['color_by']} cluster."
     )
     return text, [SCANPY, UMAP]
+
+
+def _integration(p: dict):
+    batch = str(p.get("batch_key") or "").strip() or "the library/batch covariate"
+    if p.get("normalize", True):
+        prep = "Counts were normalized to 10,000 per cell and log1p-transformed, "
+    else:
+        prep = "The provided log-normalized expression was used directly, and "
+    color = str(p.get("color_by") or "").strip() or batch
+    text = (
+        "Multiple single-cell libraries were integrated with Scanpy and Harmony. "
+        f"{prep}principal-component analysis was computed, and batch effects across "
+        f"{batch} were corrected by running Harmony on the top {p['n_pcs']} principal "
+        f"components (diversity penalty theta = {float(p.get('theta', 2.0)):g}, up to "
+        f"{int(p.get('max_iter_harmony', 10))} iterations). A nearest-neighbour graph "
+        f"({p['n_neighbors']} neighbours) was built on the Harmony-corrected embedding, "
+        "Leiden-clustered, and embedded in two dimensions with UMAP; cells are coloured "
+        f"by {color}."
+    )
+    return text, [SCANPY, HARMONY, LEIDEN, UMAP]
 
 
 def _cluster(p: dict):
@@ -414,6 +435,7 @@ def _cepo(p: dict):
 
 _TEMPLATES = {
     "umap_scrna": _umap,
+    "integration": _integration,
     "boxplot": _boxplot,
     "pvca": _pvca,
     "regression": _regression,
