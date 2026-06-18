@@ -30,9 +30,5 @@ data/
 .env.*
 !.env.example
 
-# Graphify volatile outputs
-graphify-out/cache/
-graphify-out/converted/
-graphify-out/cost.json
-graphify-out/memory/
-graphify-out/.graphify_*
+# Graphify's own outputs — never scan them back into the graph
+graphify-out/
