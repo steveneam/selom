@@ -25,12 +25,15 @@ def test_build_ledger_shape():
     assert ledger.paper.id == "hani"
     assert ledger.paper.doi == "10.1016/j.stemcr.2022.12.002"
     assert ledger.paper.geo == ["GSE201356"]
-    assert len(ledger.panels) == 8
+    assert len(ledger.panels) == 7
     in_scope = [p for p in ledger.panels if p.scope not in R.OUT_OF_SCOPE_SCOPES]
-    assert len(in_scope) == 7
-    # The pvca/regression panels (Fig 2B/4C) are wired in with directional figure-read goldens.
-    assert ledger.panel("2B").skill_id == "pvca"
+    assert len(in_scope) == 6
+    # Fig 4C (maturation scatter) is wired to the regression skill with a directional figure-read
+    # golden. Fig 2B is deliberately NOT wired — its caption (pairwise PVCA batch-effect heatmap)
+    # does not match the pvca-bar skill or a "cell type dominates" claim (figure-repro discipline).
     assert ledger.panel("4C").skill_id == "regression"
+    assert ledger.panel("4C").golden[0].metric == "age_association"
+    assert all(p.key != "2B" for p in ledger.panels)
     # The IHC panel (Fig 6E) is the one wet-lab readout (guard 7), excluded from the denominator.
     assert ledger.panel("6E").scope == R.WET_LAB
     # Every panel carries source provenance; nothing diverges from its figure (a clean paper).
@@ -44,9 +47,9 @@ def test_build_ledger_shape():
 def test_captured_scorecard_is_a_clean_reproducible_paper():
     ledger = HN.drive_captured()
     sc = ledger.scorecard
-    assert sc.n_panels == 8
-    assert sc.n_in_scope == 7                          # the IHC panel is out of the denominator
-    assert sc.findings["reproduced"] == 13            # faithful golden metrics across in-scope panels
+    assert sc.n_panels == 7
+    assert sc.n_in_scope == 6                          # the IHC panel is out of the denominator
+    assert sc.findings["reproduced"] == 12            # faithful golden metrics across in-scope panels
     assert sc.findings["paper_irreproducible"] == 0
     assert sc.findings["structural_limit"] == 0
     assert sc.findings["engine_delta"] == 0
@@ -71,13 +74,12 @@ def test_cepo_marker_matrix_is_deposit_faithful():
     assert _blame(ledger, "6E", "ihc") == R.OUT_OF_SCOPE
 
 
-def test_variance_and_maturation_panels_reproduce_directionally():
-    # Fig 2B (PVCA) + Fig 4C (regression) are directional figure-read goldens: the engine
-    # confirms cell type dominates the variance and the maturation score rises with age — both
-    # faithful (un-blamed) string matches, not exact numbers.
+def test_maturation_panel_reproduces_directionally():
+    # Fig 4C (regression scatter) is a directional figure-read golden read off the caption: Cepo
+    # cell-identity statistics are associated with developmental age in BOTH directions — a faithful
+    # (un-blamed) string match, not an exact number, and not the (unsupported) single-positive trend.
     ledger = HN.drive_captured()
-    assert _blame(ledger, "2B", "dominant_factor") is None
-    assert _blame(ledger, "4C", "trend") is None
+    assert _blame(ledger, "4C", "age_association") is None
 
 
 def test_reproducibility_score_is_high_and_zero_defect():
@@ -92,10 +94,10 @@ def test_captured_ledger_round_trips(tmp_path):
     ledger = HN.drive_captured()
     assert R.save_ledger(ledger, root=tmp_path).exists()
     again = R.load_ledger("hani", root=tmp_path)
-    assert again.scorecard.findings["reproduced"] == 13
+    assert again.scorecard.findings["reproduced"] == 12
     assert again.panel("3B").provenance == "mmc2+ Fig3+"
     assert _blame(again, "3B", "n_marker_genes") is None
-    assert len(again.panels) == 8
+    assert len(again.panels) == 7
 
 
 # --- live marker recount from the deposited mmc2.csv (skipped if absent) -------
