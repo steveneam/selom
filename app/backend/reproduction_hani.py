@@ -99,7 +99,7 @@ def _atlas_panels() -> list[Panel]:
         ),
         # Fig 2C — mean-correlation boxplots: Cepo vs Limma vs HVG; Cepo is most concordant.
         Panel(
-            paper_id=PAPER_ID, figure="2", panel="C", chart_form="box", skill_id="box",
+            paper_id=PAPER_ID, figure="2", panel="C", chart_form="box", skill_id="boxplot",
             data_source="mean correlation of cell-identity statistics per dataset pair", weight=0.5,
             sources=[R.SourceTag(ref="Fig2C", faithful=True,
                                  note="Cepo has the highest cross-dataset concordance vs Limma/HVG")],

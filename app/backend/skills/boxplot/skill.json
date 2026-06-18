@@ -1,0 +1,30 @@
+{
+  "id": "boxplot",
+  "version": "0.1.0",
+  "title": "Grouped box-and-whisker",
+  "engine": "python",
+  "omics": "scrna-seq|bulk-rna-seq|proteomics|metabolomics",
+  "entrypoint": "skills.boxplot.run:run",
+  "inputs": [{ "name": "table", "kind": "csv", "required": true }],
+  "param_spec": {
+    "group":       { "type": "str",  "default": "" },
+    "value":       { "type": "str",  "default": "" },
+    "points":      { "type": "str",  "default": "outliers", "options": ["outliers", "all", "none", "suspectedoutliers"] },
+    "orientation": { "type": "str",  "default": "v", "options": ["v", "h"] },
+    "notched":     { "type": "bool", "default": false }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "name": "Selom Box Plot",
+    "summary": "Grouped box-and-whisker distributions — compare a numeric measure across categories (quartiles, median, 1.5×IQR whiskers, outliers), with optional point overlay. The distribution-comparison companion to violin and composition.",
+    "category": "visualization",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".csv"],
+    "chains_with": ["deg", "corr_heatmap", "violin"],
+    "license": "MIT",
+    "popularity": 55
+  }
+}

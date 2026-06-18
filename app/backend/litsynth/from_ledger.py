@@ -24,7 +24,7 @@ from skills.contract import load_skill
 
 def _loadable(skill_id: str) -> bool:
     # A hand-encoded ledger may name a skill that isn't an installed spec — a chart-form
-    # placeholder (e.g. skill_id="box" for a boxplot) or a not-yet-built skill. Such a panel
+    # placeholder or a not-yet-built skill (e.g. an unported "pvca" panel). Such a panel
     # has no method prose to emit, so skip it rather than crash the whole section.
     try:
         load_skill(skill_id)

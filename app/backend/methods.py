@@ -310,6 +310,22 @@ def _proteomics_de(p: dict):
     return text, ([SMYTH, BH, SCIPY] if moderated else [BH, SCIPY])
 
 
+def _boxplot(p: dict):
+    horizontal = str(p.get("orientation", "v")).lower().startswith("h")
+    axis = "horizontally" if horizontal else "vertically"
+    group = str(p.get("group") or "").strip()
+    value = str(p.get("value") or "").strip()
+    what = (
+        f"{value or 'the measured value'} across {group or 'each group'}"
+    )
+    text = (
+        f"The distribution of {what} was summarized as {axis}-oriented box-and-whisker plots, each "
+        "box spanning the interquartile range with the median marked and whiskers extending to 1.5× "
+        "the IQR; groups are ordered by descending median."
+    )
+    return text, []
+
+
 def _gsea(p: dict):
     pasted = str(p.get("gene_set") or "").strip()
     weight = p.get("weight", 1.0)
@@ -371,6 +387,7 @@ def _cepo(p: dict):
 
 _TEMPLATES = {
     "umap_scrna": _umap,
+    "boxplot": _boxplot,
     "gsea": _gsea,
     "go_graph": _go_graph,
     "cepo": _cepo,
