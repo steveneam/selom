@@ -1,0 +1,29 @@
+{
+  "id": "regression",
+  "version": "0.1.0",
+  "title": "Regression scatter with fit",
+  "engine": "python",
+  "omics": "scrna-seq|bulk-rna-seq|proteomics|metabolomics",
+  "entrypoint": "skills.regression.run:run",
+  "inputs": [{ "name": "table", "kind": "csv", "required": true }],
+  "param_spec": {
+    "x":     { "type": "str",  "default": "" },
+    "y":     { "type": "str",  "default": "" },
+    "group": { "type": "str",  "default": "" },
+    "label": { "type": "str",  "default": "" }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "name": "Selom Regression",
+    "summary": "Scatter of two continuous variables with an ordinary-least-squares fit line and R²/slope/p annotation — e.g. a maturation/identity score against developmental age (Kim 2023 Fig 4C). Optional point labels and group coloring.",
+    "category": "visualization",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".csv"],
+    "chains_with": ["pca", "corr_heatmap", "scorecard"],
+    "license": "MIT",
+    "popularity": 53
+  }
+}

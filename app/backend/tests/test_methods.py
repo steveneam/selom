@@ -57,6 +57,21 @@ def test_cepo_methods_template_is_specific():
     assert any("Cepo" in c for c in out["citations"])
 
 
+def test_pvca_methods_template_is_specific():
+    out = methods.build(load_skill("pvca"), {"factors": "batch, cell_type"})
+    assert "Principal Variance Component Analysis" in out["text"]
+    assert "batch, cell_type" in out["text"]
+    assert "factors=" not in out["text"]  # not the raw-param dump
+    assert any("Sources of variation" in c for c in out["citations"])  # Boedigheimer 2008
+
+
+def test_regression_methods_template_is_specific():
+    out = methods.build(load_skill("regression"), {"x": "age", "y": "score"})
+    assert "ordinary-least-squares" in out["text"]
+    assert "score" in out["text"] and "age" in out["text"]
+    assert any("SciPy" in c for c in out["citations"])
+
+
 def test_unknown_skill_falls_back_to_generic():
     spec = SkillSpec(
         id="mystery",

@@ -36,6 +36,7 @@ SMYTH = "Smyth, G.K. Linear models and empirical Bayes methods for assessing dif
 GSEA = "Subramanian, A. et al. Gene set enrichment analysis: a knowledge-based approach for interpreting genome-wide expression profiles. PNAS 102, 15545-15550 (2005)."
 GSEAPY = "Fang, Z., Liu, X. & Peltz, G. GSEApy: a comprehensive package for performing gene set enrichment analysis in Python. Bioinformatics 39, btac757 (2023)."
 CEPO = "Kim, H.J., Wang, K., Chen, C. et al. Uncovering cell identity through differential stability with Cepo. Nature Computational Science 1, 784-790 (2021)."
+PVCA = "Boedigheimer, M.J. et al. Sources of variation in baseline gene expression levels from toxicogenomics study control animals across multiple laboratories. BMC Genomics 9, 285 (2008)."
 
 
 def _umap(p: dict):
@@ -310,6 +311,32 @@ def _proteomics_de(p: dict):
     return text, ([SMYTH, BH, SCIPY] if moderated else [BH, SCIPY])
 
 
+def _pvca(p: dict):
+    factors = ", ".join(s.strip() for s in str(p.get("factors") or "").split(",") if s.strip())
+    factor_txt = f"the {factors} factors" if factors else "the annotated sample factors"
+    text = (
+        "The contribution of known sources of variation was quantified by Principal Variance "
+        "Component Analysis. Features were standardized and decomposed by principal-component "
+        f"analysis; the leading components explaining {float(p.get('pct_threshold', 0.6)):g} of the "
+        f"total variance were retained, and for each the variance attributable to {factor_txt} was "
+        "estimated by one-way analysis of variance. The per-component fractions were weighted by "
+        "each component's share of the total variance and summed, apportioning the overall variance "
+        "across factors (the remainder being unexplained residual)."
+    )
+    return text, [PVCA, SKLEARN]
+
+
+def _regression(p: dict):
+    x = str(p.get("x") or "").strip() or "the predictor"
+    y = str(p.get("y") or "").strip() or "the response"
+    text = (
+        f"The relationship between {y} and {x} was assessed by ordinary-least-squares linear "
+        "regression (SciPy), with the fitted line shown over the scatter and the coefficient of "
+        "determination (R²), slope, and regression p-value reported."
+    )
+    return text, [SCIPY]
+
+
 def _boxplot(p: dict):
     horizontal = str(p.get("orientation", "v")).lower().startswith("h")
     axis = "horizontally" if horizontal else "vertically"
@@ -388,6 +415,8 @@ def _cepo(p: dict):
 _TEMPLATES = {
     "umap_scrna": _umap,
     "boxplot": _boxplot,
+    "pvca": _pvca,
+    "regression": _regression,
     "gsea": _gsea,
     "go_graph": _go_graph,
     "cepo": _cepo,

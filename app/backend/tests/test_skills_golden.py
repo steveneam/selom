@@ -20,7 +20,7 @@ SKILLS = [
     "cluster", "violin", "deg", "volcano", "heatmap", "enrichment", "go_graph", "pathway",
     "markers", "annotate", "trajectory", "pca", "composition", "proteomics_de", "gsea",
     "corr_heatmap", "upset", "scorecard", "normalization_qc", "sankey", "string_network",
-    "cepo", "boxplot",
+    "cepo", "boxplot", "pvca", "regression",
 ]
 GOLDEN_DIR = pathlib.Path(__file__).parent / "golden"
 
