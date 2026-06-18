@@ -8,7 +8,9 @@
   "inputs": [{ "name": "matrix", "kind": "anndata|h5ad", "required": true }],
   "param_spec": {
     "groupby":   { "type": "str", "default": "sample" },
-    "max_cells": { "type": "int", "default": 6000, "min": 500, "max": 50000 }
+    "max_cells": { "type": "int", "default": 6000, "min": 500, "max": 50000 },
+    "filter":    { "type": "bool", "default": false, "note": "apply adaptive MAD outlier filtering + report kept/removed" },
+    "nmads":     { "type": "number", "default": 3.0, "min": 1.0, "max": 10.0, "note": "MAD multiplier for the adaptive thresholds" }
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" }

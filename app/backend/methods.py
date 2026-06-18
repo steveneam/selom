@@ -23,6 +23,7 @@ SILHOUETTE = "Rousseeuw, P.J. Silhouettes: a graphical aid to the interpretation
 PYDESEQ2 = "Muzellec, B., Telenczuk, M., Cabeli, V. & Andreux, M. PyDESeq2: a python package for bulk RNA-seq differential expression analysis. Bioinformatics 39, btad547 (2023)."
 DESEQ2 = "Love, M.I., Huber, W. & Anders, S. Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. Genome Biology 15, 550 (2014)."
 SQUAIR = "Squair, J.W. et al. Confronting false discoveries in single-cell differential expression. Nature Communications 12, 5692 (2021)."
+SCATER = "McCarthy, D.J., Campbell, K.R., Lun, A.T.L. & Wills, Q.F. Scater: pre-processing, quality control, normalization and visualization of single-cell RNA-seq data in R. Bioinformatics 33, 1179-1186 (2017)."
 BH = "Benjamini, Y. & Hochberg, Y. Controlling the false discovery rate: a practical and powerful approach to multiple testing. Journal of the Royal Statistical Society B 57, 289-300 (1995)."
 GO = "Ashburner, M. et al. Gene Ontology: tool for the unification of biology. Nature Genetics 25, 25-29 (2000)."
 REACTOME = "Milacic, M. et al. The Reactome Pathway Knowledgebase 2024. Nucleic Acids Research 52, D672-D678 (2024)."
@@ -316,12 +317,25 @@ def _scorecard(p: dict):
 
 
 def _normalization_qc(p: dict):
+    groupby = p.get("groupby", "sample")
     text = (
         "Per-cell quality-control metrics — total counts, genes detected per cell, and the "
         "percentage of mitochondrial reads — were computed with Scanpy and displayed as violin "
-        f"distributions split by {p.get('groupby', 'sample')}."
+        f"distributions split by {groupby}."
     )
-    return text, [SCANPY]
+    citations = [SCANPY]
+    if str(p.get("filter")).lower() in ("true", "1", "yes"):
+        nmads = p.get("nmads", 3.0)
+        text += (
+            " Low-quality cells were then removed with an adaptive outlier procedure (scater/OSCA): "
+            f"within each {groupby}, cells whose log-transformed library size or number of detected "
+            f"genes fell more than {nmads} median absolute deviations (MADs) below the median, or "
+            f"whose mitochondrial percentage exceeded {nmads} MADs above the median, were discarded. "
+            "Adaptive thresholds adjust to per-batch sequencing depth and capture efficiency without "
+            "manual cutoffs."
+        )
+        citations = [SCANPY, SCATER, SCIPY]
+    return text, citations
 
 
 def _sankey(p: dict):
