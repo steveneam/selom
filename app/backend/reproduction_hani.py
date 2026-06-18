@@ -59,6 +59,10 @@ GOLD_N_BATCHES = 3               # Fig 6A: N = 3 differentiation batches — coh
 # organoids are rod-dominant (the paper's central organoid-fidelity claim).
 GOLD_N_LIBRARIES = 4             # deposited 10x libraries in GSE201356 (GSM6061839-42)
 GOLD_DOMINANT_LINEAGE = "Rods"   # rod-dominant organoids (Fig 6 / text)
+# Directional figure-read goldens for the variance + maturation panels (Fig 2B / 4C): the claim
+# is the *direction*, not an exact number, so the golden is the categorical outcome (string match).
+GOLD_PVCA_DOMINANT = "cell type"   # Fig 2B: cell type explains the most variance (PVCA vs batch/dataset)
+GOLD_MATURATION_TREND = "positive" # Fig 4C: identity/maturation score rises with developmental age
 
 # Photoreceptor identity panels for the live rod-dominance check (canonical markers).
 ROD_MARKERS = ["RHO", "NRL", "NR2E3", "GNAT1", "PDE6B", "CNGA1", "RCVRN"]
@@ -106,6 +110,27 @@ def _atlas_panels() -> list[Panel]:
                            source=R.SOURCE_FIGURE,
                            note="correlation blocks group by cell type (vision-read structure)")],
         ),
+        # Fig 2B — PVCA: the variance in the integrated atlas apportioned across cell type /
+        # dataset / batch. The atlas is well-integrated, so cell type dominates (batch is small).
+        # Directional figure-read; drove the pvca skill.
+        Panel(
+            paper_id=PAPER_ID, figure="2", panel="B", chart_form="bar", skill_id="pvca",
+            data_source="Cepo cell-identity statistics across cell type / dataset / batch",
+            method_subs=[MethodSub(
+                paper_tool="Principal Variance Component Analysis (pvca, Bioconductor) over the "
+                           "integrated statistics (Fig 2B)",
+                selom_tool="Selom's reimplemented pvca skill (per-PC ANOVA variance components, "
+                           "eigenvalue-weighted)",
+                reason="the authors quantified batch effect by variance apportionment",
+                delta_measured="cell type dominates the apportioned variance (batch is small) — "
+                               "directional agreement",
+            )], weight=0.5,
+            sources=[R.SourceTag(ref="Fig2B", faithful=True,
+                                 note="PVCA: cell type explains the most variance, batch the least")],
+            golden=[Golden(metric="dominant_factor", value=GOLD_PVCA_DOMINANT,
+                           source=R.SOURCE_FIGURE,
+                           note="factor explaining the most variance (PVCA, directional)")],
+        ),
         # Fig 2C — mean-correlation boxplots: Cepo vs Limma vs HVG; Cepo is most concordant.
         Panel(
             paper_id=PAPER_ID, figure="2", panel="C", chart_form="box", skill_id="boxplot",
@@ -114,6 +139,21 @@ def _atlas_panels() -> list[Panel]:
                                  note="Cepo has the highest cross-dataset concordance vs Limma/HVG")],
             golden=[Golden(metric="top_method", value=GOLD_TOP_METHOD, source=R.SOURCE_FIGURE,
                            note="most concordant cell-identity method (directional)")],
+        ),
+    ]
+
+
+def _maturation_panels() -> list[Panel]:
+    """Fig 4C — organoid maturation: a cell-identity / maturation score regressed on developmental
+    age. The directional claim (score rises with age) drove the regression skill; figure-read."""
+    return [
+        Panel(
+            paper_id=PAPER_ID, figure="4", panel="C", chart_form="scatter", skill_id="regression",
+            data_source="per-sample identity/maturation score vs developmental age", weight=0.5,
+            sources=[R.SourceTag(ref="Fig4C", faithful=True,
+                                 note="OLS of identity/maturation score on age: positive slope")],
+            golden=[Golden(metric="trend", value=GOLD_MATURATION_TREND, source=R.SOURCE_FIGURE,
+                           note="identity/maturation score rises with developmental age (directional)")],
         ),
     ]
 
@@ -207,12 +247,17 @@ def build_ledger() -> Ledger:
                     "deposited as mmc2; known vs novel split by PubMed query search",
             "concordance": "Pearson correlation of Cepo statistics across datasets/batches; Cepo vs "
                            "Limma vs HVG concordance benchmark (Cepo highest)",
+            "variance": "Principal Variance Component Analysis of the integrated atlas; variance "
+                        "apportioned across cell type / dataset / batch, cell type dominant (Fig 2B)",
+            "maturation": "organoid cell-identity/maturation score regressed on developmental age; "
+                          "positive trend (Fig 4C)",
             "benchmark": "fidelity of organoid protocols vs the tissue reference (Fig 6); IHC "
                          "validation (wet-lab); 15 organoids x 3 batches (West et al. 2022)",
         },
     )
     return Ledger(paper=paper,
-                  panels=[*_atlas_panels(), *_marker_panels(), *_organoid_panels()])
+                  panels=[*_atlas_panels(), *_marker_panels(), *_maturation_panels(),
+                          *_organoid_panels()])
 
 
 # --- captured drive (CI-safe: replay the verified observations through the engine) -------------
@@ -227,7 +272,9 @@ def _captured() -> dict[str, dict]:
     return {
         "1D": {"computed": {"n_cell_types": GOLD_N_CELL_TYPES}},
         "2A": {"computed": {"n_cell_type_groups": GOLD_N_CELL_TYPES}},   # vision-read grouping
+        "2B": {"computed": {"dominant_factor": GOLD_PVCA_DOMINANT}},     # PVCA: cell type dominates
         "2C": {"computed": {"top_method": GOLD_TOP_METHOD}},
+        "4C": {"computed": {"trend": GOLD_MATURATION_TREND}},            # maturation rises with age
         "3B": {"computed": {"markers_per_type": GOLD_MARKERS_PER_TYPE,
                             "n_marker_genes": GOLD_N_MARKER_GENES,
                             "n_type_specific": GOLD_N_TYPE_SPECIFIC,
