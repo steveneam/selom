@@ -19,15 +19,14 @@ blocker types and are not skills.
 | `pvca` | 2B | Principal Variance Component Analysis — variance apportioned across batch/cell-type/dataset | numpy/pandas | **SHIPPED** `7a5171d` |
 | `regression` | 4C | OLS scatter + fit (maturation/identity score vs developmental age) | scipy/pandas | **SHIPPED** `7a5171d` |
 | `integration` (Harmony) | 1C / 4B / 6 atlas | multi-dataset batch correction as a shipped skill | harmonypy (MIT) + scanpy/anndata | **SHIPPED** — Harmony co-embedding; live on the 4 Hani libraries (iLISI 2.10→3.18) |
-| violin + PubMed annotation | 3A / 3B | existing `violin` + a PubMed-count "known vs novel marker" annotation layer | existing `violin` + lit-synth network | **DEFERRED** — see below |
+| violin + PubMed annotation | 3A / 3B | existing `violin` + a PubMed-count "known vs novel marker" annotation layer | existing `violin` + lit-synth network | **SHIPPED** — `annotate=pubmed`; live RHO→656 hits/retina = known, ZZZ3→0 = novel |
 
 `boxplot` is wired into the live `reproduction_hani` ledger (Fig 2C, replacing the old
 `box` placeholder), so lit-synth Phase D now emits its Methods paragraph. `pvca` and
-`regression` are shipped **as capabilities** (registered, golden-tested, methods-described)
-but are **not yet wired as Hani ledger panels** — Fig 2B and Fig 4C are not in the curated
-ledger subset yet, and adding them needs golden targets (directional: cell-type dominates
-variance / score rises with age). Wiring them is a ledger-expansion step (★3/★4 territory),
-not a skill gap.
+`regression` are now **also wired as Hani ledger panels** (Fig 2B / 4C) with directional
+figure-read goldens (cell type dominates the variance / maturation score rises with age),
+so the curated subset is 8 panels / 7 in-scope and lit-synth Phase D emits their Methods
+paragraphs too. The captured scorecard reads reproducibility 96 / confidence 100, 0 defects.
 
 ## Shipped — multi-dataset integration (Harmony)
 
@@ -68,20 +67,22 @@ is staged, and gives ★3 (Hani-live) real batch correction across the organoid 
   translate the Bioconductor methods to our Python skills, don't ship R. Memory:
   `osca-source-sc-workflow`.
 
-## Deferred 2 — violin + PubMed annotation
+## Shipped — violin + PubMed annotation (★B, 2026-06-19)
 
 Fig 3A/B overlay a "known vs novel marker" split derived from a **PubMed query count** on top
-of a scatter/violin of the Cepo statistics.
+of a scatter/violin of the Cepo statistics. **Now SHIPPED** as the wiring of two existing pieces.
 
-- **Both halves already exist:** the `violin` skill ships, and the PubMed-count half is now
-  feasible via lit-synth Phase B/C (`/citations/search`, the NCBI E-utilities `ThrottledFetcher`
-  behind one injectable seam). This is therefore an **enhancement/wiring** of two shipped pieces,
-  not a from-scratch skill: per gene, query PubMed → bucket as known (hits ≥ k) vs novel → colour
-  the violin/scatter points by that bucket.
-- **Why deferred:** lower leverage than the variance/regression gaps, and the real annotation is
-  network-bound (every gene = an esearch). The clean design is a `violin` param (e.g.
-  `annotate=pubmed`) that calls `litsynth.lookup` with the cache, degrading to "unannotated" when
-  offline — consistent with the lit-synth honest-empty-over-fabricate rule.
+- **As built:** a `violin` param `annotate=pubmed` (+ `context`, `known_min`). After the gene is
+  picked, the real engine queries PubMed for `GENE[Title/Abstract]` (optionally `AND
+  context[Title/Abstract]`) through lit-synth's cached/throttled seam (`lookup.pubmed_count`,
+  built on a new `pubmed.count` reading the esearch `<Count>`), buckets known (hits ≥ `known_min`)
+  vs novel, tints every violin by the bucket colour, and adds a corner badge. Pure helpers
+  (`pubmed_query`, `annotate_pubmed`) keep query-building + annotation unit-testable; the network
+  call is best-effort and **degrades to an unannotated figure** when offline (honest-empty rule).
+- **Methods + cite:** `methods._violin` gains the annotation clause + the NCBI Entrez (Sayers)
+  citation when `annotate=pubmed`, so lit-synth emits it.
+- **Verified live** on the deposited GSE201356 organoid h5ad: RHO → 656 PubMed hits in 'retina'
+  ⇒ known (blue) across 19 cluster violins; ZZZ3 → 0 ⇒ novel. Stub golden byte-identical.
 
 ## Out of scope (not skills)
 
