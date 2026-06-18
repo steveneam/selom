@@ -89,6 +89,14 @@ of a scatter/violin of the Cepo statistics. **Now SHIPPED** as the wiring of two
   citation when `annotate=pubmed`, so lit-synth emits it.
 - **Verified live** on the deposited GSE201356 organoid h5ad: RHO → 656 PubMed hits in 'retina'
   ⇒ known (blue) across 19 cluster violins; ZZZ3 → 0 ⇒ novel. Stub golden byte-identical.
+- **Wired as the real Fig 3A** ledger panel (owner screenshots, 2026-06-19): Fig 3A is literally
+  "log PubMed query count" with known markers more cited than novel — exactly what `annotate=pubmed`
+  produces (golden `known_vs_novel_citations="known_higher"`). Same pass corrected a mislabel: the
+  paper has **no UpSet** (3A = query count, 3B = Cepo stats, 3C = per-type marker dotplots, 3D =
+  accuracy; only 4F is a set-overlap viz, a petal-Venn). The deposited mmc2 Cepo marker matrix is
+  now panel **3C** (skill `cepo`, the deposited per-type markers; counts 405/360/45 unchanged); the
+  UpSet was Selom's own membership rendering, not a paper figure. Ledger = 8 panels / 7 in-scope /
+  13 reproduced, reproducibility 96.
 
 ## Out of scope (not skills)
 
