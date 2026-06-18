@@ -55,9 +55,11 @@ def _umap(p: dict):
         prep = "Gene counts were normalized to 10,000 counts per cell and log1p-transformed, "
     else:
         prep = "The provided log-normalized expression was used directly, and "
+    n_hvg = int(p.get("n_hvg", 0) or 0)
+    hvg = f"the top {n_hvg} highly variable genes were selected, " if n_hvg > 0 else ""
     text = (
         "Single-cell RNA-seq data were processed with Scanpy. "
-        f"{prep}principal-component "
+        f"{prep}{hvg}principal-component "
         f"analysis was computed, and a nearest-neighbour graph was built on the top {p['n_pcs']} "
         f"principal components using {p['n_neighbors']} neighbours. The graph was embedded in two "
         f"dimensions with UMAP, and cells were coloured by {p['color_by']} cluster."
@@ -72,17 +74,20 @@ def _integration(p: dict):
     else:
         prep = "The provided log-normalized expression was used directly, and "
     color = str(p.get("color_by") or "").strip() or batch
+    n_hvg = int(p.get("n_hvg", 0) or 0)
+    hvg = f"the top {n_hvg} highly variable genes were selected, " if n_hvg > 0 else ""
     text = (
         "Multiple single-cell libraries were integrated with Scanpy and Harmony. "
-        f"{prep}principal-component analysis was computed, and batch effects across "
+        f"{prep}{hvg}principal-component analysis was computed, and batch effects across "
         f"{batch} were corrected by running Harmony on the top {p['n_pcs']} principal "
         f"components (diversity penalty theta = {float(p.get('theta', 2.0)):g}, up to "
         f"{int(p.get('max_iter_harmony', 10))} iterations). A nearest-neighbour graph "
         f"({p['n_neighbors']} neighbours) was built on the Harmony-corrected embedding, "
         "Leiden-clustered, and embedded in two dimensions with UMAP; cells are coloured "
-        f"by {color}."
+        f"by {color}. Integration quality was assessed as the change in the mean per-cell "
+        "k-nearest-neighbour batch-mixing entropy before versus after correction."
     )
-    return text, [SCANPY, HARMONY, LEIDEN, UMAP]
+    return text, [SCANPY, HARMONY, LEIDEN, UMAP, SKLEARN]
 
 
 def _cluster(p: dict):

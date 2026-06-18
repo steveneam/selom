@@ -10,6 +10,7 @@
     "batch_key":         { "type": "str",   "default": "sample" },
     "n_neighbors":       { "type": "int",   "default": 15, "min": 2, "max": 100 },
     "n_pcs":             { "type": "int",   "default": 50, "min": 2, "max": 200 },
+    "n_hvg":             { "type": "int",   "default": 0, "min": 0, "max": 10000, "note": "select top-N highly variable genes before PCA (0 = all genes; OSCA suggests more HVGs for integration, ~2000-5000)" },
     "color_by":          { "type": "str",   "default": "" },
     "normalize":         { "type": "bool",  "default": true },
     "theta":             { "type": "float", "default": 2.0, "min": 0.0, "max": 10.0 },

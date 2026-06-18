@@ -47,6 +47,11 @@ def run(data_path: str, params: dict) -> dict:
         sc.pp.normalize_total(adata, target_sum=1e4)
         sc.pp.log1p(adata)
 
+    # Optional feature selection before PCA (OSCA step). Off by default (n_hvg=0); ~2000
+    # is standard, and OSCA recommends more HVGs for multi-batch integration.
+    from skills._scrna import select_hvg
+    adata = select_hvg(adata, params.get("n_hvg", 0))
+
     # Guard n_comps so PCA never exceeds the data's rank (small inputs / tiny demos).
     n_pcs = max(2, min(int(params["n_pcs"]), adata.n_obs - 1, adata.n_vars - 1))
     sc.pp.pca(adata, n_comps=n_pcs)
@@ -65,6 +70,16 @@ def run(data_path: str, params: dict) -> dict:
     else:
         use_rep = "X_pca"
         title = "scRNA UMAP — no batch correction (single batch)"
+
+    # Over-correction diagnostic (OSCA): quantify batch mixing BEFORE (raw PCA) vs AFTER
+    # (Harmony) as the mean normalized kNN batch-label entropy (1 = fully mixed, 0 = each
+    # cell's neighbours are all one batch). A real rise is the number that proves Harmony
+    # mixed batches; no rise means correction didn't take (or there was nothing to mix).
+    if integrated:
+        before = _batch_mixing(adata.obsm["X_pca"], adata.obs[batch_key].to_numpy())
+        after = _batch_mixing(adata.obsm["X_pca_harmony"], adata.obs[batch_key].to_numpy())
+        if before is not None and after is not None:
+            title = f"{title}<br><sub>batch mixing {before:.2f} → {after:.2f} (kNN entropy, 1=fully mixed)</sub>"
 
     sc.pp.neighbors(adata, n_neighbors=int(params["n_neighbors"]), use_rep=use_rep)
     sc.tl.leiden(adata, flavor="igraph", n_iterations=2, directed=False)
@@ -86,3 +101,31 @@ def run(data_path: str, params: dict) -> dict:
     # Plain JSON arrays + native scalars (see umap_scrna.run_scanpy) so mock and live
     # render byte-for-byte the same spec.
     return jsonable(fig.to_plotly_json())
+
+
+def _batch_mixing(embedding, labels, k: int = 30):
+    """Mean normalized kNN batch-label entropy over cells — a cheap mixing diagnostic.
+
+    For each cell, look at its ``k`` nearest neighbours in ``embedding`` and compute the
+    Shannon entropy of their batch labels, normalized by ``log(n_batches)`` so it lands in
+    ``[0, 1]``: 1 = neighbours span batches evenly (well mixed), 0 = neighbours are all one
+    batch (unmixed). Returns the mean over all cells, or ``None`` with fewer than 2 batches.
+    """
+    import numpy as np
+    from sklearn.neighbors import NearestNeighbors
+
+    labels = np.asarray(labels)
+    cats, codes = np.unique(labels, return_inverse=True)
+    if len(cats) < 2:
+        return None
+    k = min(int(k), len(labels) - 1)
+    if k < 1:
+        return None
+    _, idx = NearestNeighbors(n_neighbors=k + 1).fit(embedding).kneighbors(embedding)
+    neigh = codes[idx[:, 1:]]  # drop self-neighbour
+    ent = np.zeros(len(labels))
+    for c in range(len(cats)):
+        p = (neigh == c).mean(axis=1)
+        nz = p > 0  # take logs only where defined (avoids log(0) warnings; 0·log0 ≡ 0)
+        ent[nz] -= p[nz] * np.log(p[nz])
+    return float((ent / np.log(len(cats))).mean())

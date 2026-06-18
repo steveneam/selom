@@ -42,6 +42,12 @@ def run(data_path: str, params: dict) -> dict:
         sc.pp.normalize_total(adata, target_sum=1e4)
         sc.pp.log1p(adata)
 
+    # Optional feature selection: focus PCA on the top-N highly variable genes (OSCA's
+    # feature-selection step). Off by default (n_hvg=0) to keep the pipeline unchanged;
+    # ~2000 is the standard choice. No-op when the data has fewer genes.
+    from skills._scrna import select_hvg
+    adata = select_hvg(adata, params.get("n_hvg", 0))
+
     # Guard n_comps so PCA never exceeds the data's rank (small inputs / tiny demos).
     n_pcs = max(2, min(int(params["n_pcs"]), adata.n_obs - 1, adata.n_vars - 1))
     sc.pp.pca(adata, n_comps=n_pcs)
