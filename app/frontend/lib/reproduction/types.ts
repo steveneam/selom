@@ -74,6 +74,19 @@ export interface Golden {
   note: string;
 }
 
+/**
+ * A staged X3-lifted panel thumbnail (★D bridge). Purely presentational — it NEVER influences
+ * the Reproducibility Score (digitize ≠ reproduce). `digitizable` gates the "Digitize this panel"
+ * entry to traceable chart forms (bar/line/scatter).
+ */
+export interface PanelLift {
+  page_index: number;
+  bbox: [number, number, number, number] | null;
+  kind: string; // "vector" | "raster"
+  thumbnail_url: string;
+  digitizable: boolean;
+}
+
 export interface Panel {
   paper_id: string;
   figure: string;
@@ -85,6 +98,7 @@ export interface Panel {
   golden: Golden[];
   weight: number;
   note: string;
+  lift?: PanelLift | null;
   status: string;
 }
 

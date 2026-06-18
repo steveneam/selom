@@ -50,6 +50,25 @@ export const ATTRIBUTION_META: Record<Attribution, { icon: string; label: string
   data: { icon: "🗄", label: "Data-side" },
 };
 
+/**
+ * Resolve a staged panel thumbnail (`/repro-assets/...`, served by the backend) through the
+ * `/api` proxy so it loads in dev and prod alike. Empty in, empty out.
+ */
+export function panelAssetUrl(thumbnailUrl: string | undefined | null): string {
+  return thumbnailUrl ? `/api${thumbnailUrl}` : "";
+}
+
+/**
+ * The in-paper "Digitize this panel" link: opens the chart-extractor on the lifted panel.
+ * Carries the raw thumbnail path (the picker re-resolves it through the proxy), the panel
+ * identity (for the not-scored banner), and the traceable form. Digitize ≠ reproduce — this
+ * never feeds the score; the picker says so.
+ */
+export function digitizeHref(slug: string, panelKey: string, thumbnailUrl: string, form: string): string {
+  const q = new URLSearchParams({ img: thumbnailUrl, panel: `${slug}:${panelKey}`, form });
+  return `/extract?${q.toString()}`;
+}
+
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { headers: { accept: "application/json" } });
   if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`);

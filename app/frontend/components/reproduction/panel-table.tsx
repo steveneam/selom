@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
+import { ScanLine } from "lucide-react";
 
-import { tierLabel } from "@/lib/reproduction/api";
+import { digitizeHref, panelAssetUrl, tierLabel } from "@/lib/reproduction/api";
 import type { Ledger, Panel, PanelScore, Validation } from "@/lib/reproduction/types";
 import { AttributionChip, BlameChip, ProvenanceBadge, TierChip, VerdictChip } from "./atoms";
 
@@ -24,6 +26,7 @@ export function PanelTable({ ledger }: { ledger: Ledger }) {
           v={v}
           panel={panelByKey.get(v.panel_key)}
           score={scoreByKey.get(v.panel_key)}
+          slug={ledger.paper.slug}
         />
       ))}
 
@@ -54,14 +57,18 @@ function PanelRow({
   v,
   panel,
   score,
+  slug,
 }: {
   v: Validation;
   panel?: Panel;
   score?: PanelScore;
+  slug: string;
 }) {
+  const lift = panel?.lift ?? null;
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card">
       <div className="flex flex-wrap items-center gap-2 border-b border-border bg-card/60 px-4 py-2.5">
+        {lift?.thumbnail_url && <PanelThumb lift={lift} slug={slug} panelKey={v.panel_key} />}
         <span className="tabular text-sm font-semibold text-foreground">{v.panel_key}</span>
         {panel?.skill_id && (
           <span className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
@@ -71,9 +78,14 @@ function PanelRow({
         {score && <TierChip tier={score.tier} color={score.color} />}
         {score && <AttributionChip attribution={score.attribution} />}
         {score?.provenance && <ProvenanceBadge provenance={score.provenance} />}
-        <span className="ml-auto tabular text-xs text-muted-foreground">
-          {score?.reproducibility != null ? `${score.reproducibility} · ${tierLabel(score.tier)}` : ""}
-        </span>
+        <div className="ml-auto flex items-center gap-2.5">
+          {lift?.digitizable && panel && (
+            <DigitizeLink slug={slug} panelKey={v.panel_key} lift={lift} form={panel.chart_form} />
+          )}
+          <span className="tabular text-xs text-muted-foreground">
+            {score?.reproducibility != null ? `${score.reproducibility} · ${tierLabel(score.tier)}` : ""}
+          </span>
+        </div>
       </div>
       <table className="w-full text-sm">
         <thead>
@@ -113,6 +125,69 @@ function PanelRow({
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** The lifted published-figure panel, shown as a small reference thumbnail next to its key.
+ *  Click opens the full lift in a new tab. Purely a visual reference — never scored. */
+function PanelThumb({
+  lift,
+  slug,
+  panelKey,
+}: {
+  lift: NonNullable<Panel["lift"]>;
+  slug: string;
+  panelKey: string;
+}) {
+  const [ok, setOk] = React.useState(true);
+  const src = panelAssetUrl(lift.thumbnail_url);
+  if (!ok) return null; // graceful: if the asset can't load (e.g. mock mode), show nothing
+  return (
+    <a
+      href={src}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={`Published ${slug} Fig ${panelKey} panel (opens full image)`}
+      className="group relative block h-11 w-16 shrink-0 overflow-hidden rounded border border-border bg-white transition-shadow hover:ring-1 hover:ring-primary/40"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- backend-served asset, not a static import */}
+      <img
+        src={src}
+        alt={`Published ${slug} figure ${panelKey} panel`}
+        width={64}
+        height={44}
+        loading="lazy"
+        onError={() => setOk(false)}
+        className="h-full w-full object-contain transition-transform duration-200 group-hover:scale-105"
+      />
+    </a>
+  );
+}
+
+/** The understated "Digitize this panel" entry — opens the picker on the lifted panel.
+ *  Dashed + muted so it never competes with the scored tier chips; the tooltip and the picker
+ *  banner both spell out that digitized values are vision-grade and NOT part of the score. */
+function DigitizeLink({
+  slug,
+  panelKey,
+  lift,
+  form,
+}: {
+  slug: string;
+  panelKey: string;
+  lift: NonNullable<Panel["lift"]>;
+  form: string;
+}) {
+  return (
+    <Link
+      href={digitizeHref(slug, panelKey, lift.thumbnail_url, form)}
+      title="Trace this panel's data — vision-grade, never counted in the Reproducibility Score"
+      className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-border bg-transparent px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+    >
+      <ScanLine className="size-3.5" aria-hidden />
+      Digitize
+      <span className="sr-only"> this panel (vision-grade, not part of the score)</span>
+    </Link>
   );
 }
 
