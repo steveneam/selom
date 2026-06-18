@@ -18,7 +18,7 @@ blocker types and are not skills.
 | `boxplot` | 2C | grouped box-and-whisker; method/condition concordance (Cepo>Limma>HVG) | pandas | **SHIPPED** `46ebb96` |
 | `pvca` | 2B | Principal Variance Component Analysis — variance apportioned across batch/cell-type/dataset | numpy/pandas | **SHIPPED** `7a5171d` |
 | `regression` | 4C | OLS scatter + fit (maturation/identity score vs developmental age) | scipy/pandas | **SHIPPED** `7a5171d` |
-| `integration` (Harmony) | 1C / 4B / 6 atlas | multi-dataset batch correction as a shipped skill | **harmonypy (NEW DEP)** + scanpy/anndata | **DEFERRED** — see below |
+| `integration` (Harmony) | 1C / 4B / 6 atlas | multi-dataset batch correction as a shipped skill | harmonypy (MIT) + scanpy/anndata | **SHIPPED** — Harmony co-embedding; live on the 4 Hani libraries (iLISI 2.10→3.18) |
 | violin + PubMed annotation | 3A / 3B | existing `violin` + a PubMed-count "known vs novel marker" annotation layer | existing `violin` + lit-synth network | **DEFERRED** — see below |
 
 `boxplot` is wired into the live `reproduction_hani` ledger (Fig 2C, replacing the old
@@ -29,26 +29,27 @@ ledger subset yet, and adding them needs golden targets (directional: cell-type 
 variance / score rises with age). Wiring them is a ledger-expansion step (★3/★4 territory),
 not a skill gap.
 
-## Deferred 1 — multi-dataset integration (Harmony)
+## Shipped — multi-dataset integration (Harmony)
 
-The strategically biggest gap: it unblocks the **reference-atlas** figures (1C, 4B) and the
-organoid fidelity benchmark (6C/6D), and would give ★3 (Hani-live) real batch correction
-across the 4 organoid samples / 3 batches.
+The strategically biggest skill gap, now **SHIPPED** (★A, 2026-06-19). It unblocks the
+**reference-atlas** figures (1C, 4B) and the organoid fidelity benchmark (6C/6D) once the data
+is staged, and gives ★3 (Hani-live) real batch correction across the organoid libraries.
 
-- **Method:** scanpy ingest of the per-sample 10x matrices → concat → PCA → Harmony
-  (`harmonypy.run_harmony` on the PCA embedding by a batch key) → neighbors/UMAP on the
-  corrected embedding. The skill emits the integrated UMAP (colour by dataset/batch/cell type)
-  the same editable Plotly shape `umap_scrna` already produces.
-- **Blocker — a new dependency.** `harmonypy 0.0.10` lives only in the scratch lib path
-  (`D:/tmp-thl/pylibs/`), not in the repo. Shipping the skill means adding `harmonypy` to the
-  `[omics]` extra in `pyproject.toml` (lazy real-engine import behind the existing stub/real
-  split, exactly like the other heavy skills). An in-env install may be slow and could trip
-  EDR (see memory `selom-backend-python-exec`).
-- **Decision (owner, 2026-06-19): APPROVED — build next session.** The owner OK'd adding the
-  harmonypy dependency. Promote `harmonypy 0.0.10` from scratch into the `[omics]` extra (lazy
-  real-engine import behind the existing stub/real split); a slow/EDR-prone in-env install is the
-  only friction (memory `selom-backend-python-exec`). The biggest reproduction unlock is still the
-  **data staging** (below), which is data engineering, not this skill.
+- **Method (as built):** `read → filter → normalize → PCA → Harmony` via scanpy's
+  `external.pp.harmony_integrate` (wraps `harmonypy.run_harmony` on the PCA embedding by a
+  `batch_key`) `→ neighbors on X_pca_harmony → Leiden → UMAP`. The skill emits the integrated UMAP
+  in the same editable Plotly shape `umap_scrna` produces (default colour = batch key, to show the
+  mixing). Graceful single-batch fallback: missing / one-level batch key ⇒ plain PCA→UMAP, no error.
+- **Dependency — done.** `harmonypy 0.0.10` (MIT, github.com/slowkow/harmonypy) is now declared in
+  the `[omics]` extra in `pyproject.toml`. In-env it was promoted from the scratch lib by a plain
+  file-copy into `.venv` (the `uv` install path can trip EDR — memory `selom-backend-python-exec`);
+  a deploy box gets the identical package via `uv sync --extra omics`.
+- **Verified live on the 4 deposited GSE201356 libraries** (10k cells): iLISI (effective #libraries
+  among each cell's 30 nearest neighbours, 1 = segregated … 4 = fully mixed) rose **2.10 → 3.18**
+  (+1.08) after Harmony — measurable batch correction, not just "it ran". Stub golden-tested;
+  real path guarded by a skipif live test (`tests/test_integration_skill.py`).
+- **Still the dominant reproduction blocker: data staging** (below) — that is data engineering, not
+  this skill. The skill is the prerequisite that makes the atlas work runnable once the data lands.
 
 ## Resources & next-session plan (owner, 2026-06-19)
 
@@ -57,9 +58,11 @@ across the 4 organoid samples / 3 batches.
   **Yan is a citation rabbit hole** (its supplement is just references to further papers). So the
   full-Hani data staging (Fig 1C / 4B / 6C-D, which needs these integrated) is a **last pre-launch
   HARDENING task**, not a now-build. This is the dominant blocker and it is data engineering.
-- **`integration` / Harmony skill — build next session** (dep approved, above). Unblocks the
-  organoid-side batch correction and is the prerequisite skill for the atlas work when it happens.
-- **NCBI API key incoming** (`SELOM_NCBI_API_KEY`) → unblocks the violin+PubMed real counts (10/s).
+- **`integration` / Harmony skill — SHIPPED** (★A, 2026-06-19; see the section above). The
+  prerequisite skill for the atlas work is done; what remains for the atlas figures is data staging.
+- **NCBI API key — RECEIVED & live** (2026-06-19): `SELOM_NCBI_API_KEY` is set in the gitignored
+  `.claude/settings.local.json` (keyed ~10/s, verified). This unblocks the violin+PubMed real counts
+  (★B) whenever it's built next.
 - **OSCA-source books** (github.com/OSCA-source, ~6 repos) — study next session to tighten Selom's
   scRNA workflow (QC → normalize → integrate → cluster → annotate → DE/markers → trajectory);
   translate the Bioconductor methods to our Python skills, don't ship R. Memory:
