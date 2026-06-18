@@ -1,6 +1,6 @@
-# lit-synthesizer — scope (Phase A+B+C SHIPPED; D remains)
+# lit-synthesizer — scope (Phase A+B+C+D ALL SHIPPED)
 
-> Status: **Phase A + B + C SHIPPED 2026-06-18** (A `2a982be`, B `e460fd5`, C this commit) — `litsynth/`
+> Status: **Phase A + B + C + D ALL SHIPPED 2026-06-18** (A `2a982be`, B `e460fd5`, C `0d9eb6a`, D this commit) — `litsynth/`
 > + `POST /methods/compose` (deterministic multi-skill methods synthesizer, offline, no new deps,
 > `methods.build_body` single-sourcing the citations) **+** `GET /citations/search` · `/citations/by-doi`
 > (NCBI E-utilities PubMed lookup **+ bioRxiv/medRxiv preprint lookup with per-record `license`**: stdlib
@@ -8,7 +8,8 @@
 > offline-tested AND live-verified against the real APIs). bioRxiv `license` field + the **no-free-text-
 > search-API** constraint re-verified live at build 2026-06-18. NCBI facts (NBK25497: **3 req/s keyless,
 > 10 with a key**). The 2nd ClawBio platform capability (sibling of the shipped `data-extractor`/X4).
-> **Phase D (reproduction `Ledger` → paper-level `MethodsSection`) NOT built.**
+> **Phase D SHIPPED** — `GET /papers/{slug}/methods` turns a driven reproduction `Ledger` into one
+> paper-level `MethodsSection` (`litsynth/from_ledger.py`), the headline reproduction-engine tie-in.
 
 ## What it is
 
@@ -62,7 +63,8 @@ app/backend/litsynth/
   (deterministic, offline). **The headline.**
 - `GET /citations/search` — `q, source=both|pubmed|biorxiv, max_results, min_year?` →
   `{results:[Citation], degraded}`. Network, cached.
-- `GET /citations/by-doi` — `doi=...` → one `Citation`.
+- `GET /citations/by-doi` — `doi=..., source=both|pubmed|biorxiv` → one `Citation`.
+- `GET /papers/{slug}/methods` — `?modality=` → paper-level `MethodsSection` from the driven ledger (Phase D).
 - **Do NOT** change the shipped `/skills/{id}/run` response shape in Phase A (FE contract = cross-lane).
 
 ## Citation sourcing (trust order)
@@ -126,8 +128,19 @@ app/backend/litsynth/
   Network behind the shared fetcher seam → 8 offline cases (real-format fixtures) **and** live-verified
   (real preprint: PubMed-miss → bioRxiv fallback resolved `cc_by_nc_nd`). Stdlib only. pytest 370 (+8);
   ruff clean; `tests/test_litsynth_citations.py`.
-- **Phase D (next):** feed a full reproduction `Ledger` → a paper-level `MethodsSection` (the headline
-  tie-in of lit-synth to the reproduction engine — `methods.build_body` is already the reusable unit).
+- **Phase D — SHIPPED (Ledger → paper-level Methods):** `litsynth/from_ledger.py` — `compose_ledger_methods(ledger)`
+  walks a driven `reproduction.Ledger`'s panels in figure order, drops out-of-scope panels
+  (`scope ∈ OUT_OF_SCOPE_SCOPES`), skill-less form panels, **and panels naming a non-loadable skill**
+  (e.g. hani Fig 2C `skill_id="box"` — a chart form, not a spec), dedups identical `(skill_id, params)`
+  first-seen, and delegates to the Phase A `compose_methods`. Dataset descriptor auto-derives from
+  `paper.geo`/`title`. **Modality is DECLARED, never inferred** — skill `omics` is a capability list
+  (often multi-valued) so it can't tell a paper's run modality; added an optional `Paper.modality`
+  (default `""` → neutral lead; set `scrna` on hani; rpgrip1/jev are genuinely mixed bulk+scRNA → honest
+  generic intro), with a `?modality=` endpoint override. Surface: `GET /papers/{slug}/methods`. Import
+  direction litsynth → reproduction (no cycle; not re-exported from `__init__` to keep the package light).
+  Verified live on all three real ledgers (RPGRIP1 / JEV generic · Hani scRNA-framed; deduped citations).
+  pytest 380 (+10); ruff clean; no new deps. **Discovered QA lens:** the feature exposes which skills use
+  `methods.py`'s generic fallback template (here `gsea`) — a fast-follow to add per-skill prose, tracked separately.
 
 ## Open questions (owner)
 1. Keep `/skills/{id}/run` returning the bare `{text, citations}` dict in Phase A (recommend: yes).
