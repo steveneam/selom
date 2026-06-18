@@ -15,6 +15,7 @@ import papers_api
 import provenance
 from extract import chart_intake
 from gene_sets import library as gene_sets
+from litsynth import SkillRunRef, compose_methods
 from jobs.queue import get_job, result_store, submit
 from jobs.store import TERMINAL
 from skills import styles, theme
@@ -173,6 +174,27 @@ async def extract_chart(figure: UploadFile, request: Request):
         "confidence": series.confidence,     # vision-grade; gate before trusting as golden (E4)
         "note": series.note,
     }
+
+
+class ComposeMethodsRequest(BaseModel):
+    runs: list[SkillRunRef]            # the analysis story, in run order (or with explicit `order`)
+    modality: str = ""                 # frames the lead sentence (scrna|bulk|proteomics|…)
+    dataset: str | None = None         # optional dataset descriptor; leads the intro when given
+
+
+@app.post("/methods/compose")
+def compose_methods_endpoint(req: ComposeMethodsRequest):
+    # lit-synthesizer Phase A: stitch an ordered sequence of skill runs into ONE publication
+    # Methods section + deduped citations (deterministic, offline, no LLM). Promotes the
+    # per-figure methods engine (used at /skills/{id}/run) to the project/story level without
+    # touching that response shape. See docs/lit-synthesizer-scope.md.
+    if not req.runs:
+        raise HTTPException(status_code=400, detail="runs is required")
+    try:
+        section = compose_methods(req.runs, req.modality, req.dataset)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return section.model_dump()
 
 
 @app.post("/skills/{skill_id}/jobs")
