@@ -28,3 +28,22 @@ class MethodsSection(BaseModel):
     modality: str               # the dataset modality the story was framed for
     skill_ids: list[str]        # skills covered, in run order
     degraded: bool = False      # reserved for Phase B (a citation lookup failed); always False offline
+
+
+class Citation(BaseModel):
+    """A structured bibliographic record (Phase B citation lookup).
+
+    Bibliographic fields only — these are not copyrightable (PubMed metadata is US-gov).
+    ``metadata_license`` is reserved for bioRxiv's per-record license tag (Phase C);
+    it stays None for PubMed. ``source`` is the index the record came from.
+    """
+
+    title: str
+    authors: list[str] = Field(default_factory=list)
+    year: int | None = None
+    venue: str | None = None          # journal / source
+    doi: str | None = None
+    pmid: str | None = None
+    url: str | None = None
+    source: str = "pubmed"            # pubmed | biorxiv | canonical
+    metadata_license: str | None = None  # bioRxiv per-record license (Phase C); None for PubMed

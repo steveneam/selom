@@ -16,6 +16,7 @@ import provenance
 from extract import chart_intake
 from gene_sets import library as gene_sets
 from litsynth import SkillRunRef, compose_methods
+from litsynth import lookup as citations_lookup
 from jobs.queue import get_job, result_store, submit
 from jobs.store import TERMINAL
 from skills import styles, theme
@@ -195,6 +196,24 @@ def compose_methods_endpoint(req: ComposeMethodsRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return section.model_dump()
+
+
+@app.get("/citations/search")
+def citations_search(q: str = "", max_results: int = 20, min_year: int | None = None):
+    # lit-synthesizer Phase B: topical PubMed lookup (NCBI E-utilities, cached, self-throttled).
+    # Advisory tier-3 (off by default in the synthesizer); degrades to [] + degraded=True on any
+    # network/parse failure — a lookup must never break the caller. See docs/lit-synthesizer-scope.md.
+    if not q.strip():
+        return {"results": [], "degraded": False}
+    return citations_lookup.search_citations(q, max_results=max_results, min_year=min_year)
+
+
+@app.get("/citations/by-doi")
+def citations_by_doi(doi: str = ""):
+    # Deterministic DOI -> bibliographic Citation (PubMed), cached. degraded=True on failure.
+    if not doi.strip():
+        raise HTTPException(status_code=400, detail="doi is required")
+    return citations_lookup.citation_by_doi(doi)
 
 
 @app.post("/skills/{skill_id}/jobs")

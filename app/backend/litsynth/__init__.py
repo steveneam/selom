@@ -7,7 +7,7 @@ offline, no LLM, no new deps. Phases B/C add the stdlib PubMed/bioRxiv citation-
 layer (network injected as a fetcher, mockable). See ``docs/lit-synthesizer-scope.md``.
 """
 
-from litsynth.models import MethodsSection, SkillRunRef
+from litsynth.models import Citation, MethodsSection, SkillRunRef
 from litsynth.synth import compose_methods
 
-__all__ = ["MethodsSection", "SkillRunRef", "compose_methods"]
+__all__ = ["Citation", "MethodsSection", "SkillRunRef", "compose_methods"]
