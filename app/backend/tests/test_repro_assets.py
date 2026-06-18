@@ -56,19 +56,19 @@ def test_attach_sets_lift_only_on_matching_panels(tmp_path):
     assert ledger.panel("2C").lift is not None
     assert ledger.panel("2C").lift.thumbnail_url.endswith("2C.png")
     # an unstaged panel keeps lift=None
-    assert ledger.panel("3B").lift is None
+    assert ledger.panel("3C").lift is None
 
 
 def test_digitizable_is_gated_to_chart_forms(tmp_path):
-    # Fig 3B is an UpSet and Fig 2C a boxplot (no point series to trace): even if the manifest claims
+    # Fig 3C is a dotplot and Fig 2C a boxplot (no point series to trace): even if the manifest claims
     # digitizable, attach forces it off against the ledger's chart_form. Fig 4C is a scatter -> stays.
     _write_manifest(tmp_path, "hani", {
-        "3B": {"thumbnail_url": "/r/3B.png", "digitizable": True},
+        "3C": {"thumbnail_url": "/r/3C.png", "digitizable": True},
         "2C": {"thumbnail_url": "/r/2C.png", "digitizable": True},
         "4C": {"thumbnail_url": "/r/4C.png", "digitizable": True},
     })
     ledger = repro_assets.attach_lifts(HN.drive_captured(), root=tmp_path)
-    assert ledger.panel("3B").lift.digitizable is False   # upset: not traceable
+    assert ledger.panel("3C").lift.digitizable is False   # dotplot: not traceable
     assert ledger.panel("2C").lift.digitizable is False   # boxplot: not traceable
     assert ledger.panel("4C").lift.digitizable is True    # scatter: traceable
 

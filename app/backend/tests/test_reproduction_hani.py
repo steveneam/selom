@@ -25,19 +25,24 @@ def test_build_ledger_shape():
     assert ledger.paper.id == "hani"
     assert ledger.paper.doi == "10.1016/j.stemcr.2022.12.002"
     assert ledger.paper.geo == ["GSE201356"]
-    assert len(ledger.panels) == 7
+    assert len(ledger.panels) == 8
     in_scope = [p for p in ledger.panels if p.scope not in R.OUT_OF_SCOPE_SCOPES]
-    assert len(in_scope) == 6
+    assert len(in_scope) == 7
     # Fig 4C (maturation scatter) is wired to the regression skill with a directional figure-read
     # golden. Fig 2B is deliberately NOT wired — its caption (pairwise PVCA batch-effect heatmap)
     # does not match the pvca-bar skill or a "cell type dominates" claim (figure-repro discipline).
     assert ledger.panel("4C").skill_id == "regression"
     assert ledger.panel("4C").golden[0].metric == "age_association"
     assert all(p.key != "2B" for p in ledger.panels)
+    # Fig 3 (verified against the panel screenshots): there is NO UpSet in the paper. 3A is the
+    # PubMed known/novel split (the violin skill, ★B); 3C is the deposited Cepo marker matrix.
+    assert ledger.panel("3A").skill_id == "violin"
+    assert ledger.panel("3C").skill_id == "cepo" and ledger.panel("3C").chart_form == "dotplot"
+    assert all(p.key != "3B" for p in ledger.panels)  # 3B is the Cepo-stats violin, not wired
     # The IHC panel (Fig 6E) is the one wet-lab readout (guard 7), excluded from the denominator.
     assert ledger.panel("6E").scope == R.WET_LAB
     # Every panel carries source provenance; nothing diverges from its figure (a clean paper).
-    assert ledger.panel("3B").provenance == "mmc2+ Fig3+"
+    assert ledger.panel("3C").provenance == "mmc2+ Fig3C+"
     assert all(p.diverges_from == [] for p in ledger.panels)
 
 
@@ -47,9 +52,9 @@ def test_build_ledger_shape():
 def test_captured_scorecard_is_a_clean_reproducible_paper():
     ledger = HN.drive_captured()
     sc = ledger.scorecard
-    assert sc.n_panels == 7
-    assert sc.n_in_scope == 6                          # the IHC panel is out of the denominator
-    assert sc.findings["reproduced"] == 12            # faithful golden metrics across in-scope panels
+    assert sc.n_panels == 8
+    assert sc.n_in_scope == 7                          # the IHC panel is out of the denominator
+    assert sc.findings["reproduced"] == 13            # faithful golden metrics across in-scope panels
     assert sc.findings["paper_irreproducible"] == 0
     assert sc.findings["structural_limit"] == 0
     assert sc.findings["engine_delta"] == 0
@@ -65,13 +70,20 @@ def _blame(ledger, panel_key, metric):
 
 
 def test_cepo_marker_matrix_is_deposit_faithful():
-    # Fig 3B: the deposited Cepo marker matrix (mmc2) reproduced exactly — the headline win
-    # (Selom's cepo skill was validated against this oracle; the upset skill renders it).
+    # Fig 3C: the deposited Cepo marker matrix (mmc2) reproduced exactly — the headline win
+    # (Selom's proprietary cepo skill was validated against this deposited oracle).
     ledger = HN.drive_captured()
     for metric in ("markers_per_type", "n_marker_genes", "n_type_specific", "n_shared"):
-        assert _blame(ledger, "3B", metric) is None
+        assert _blame(ledger, "3C", metric) is None
     # The wet-lab IHC panel (Fig 6E) is out of scope, not a blame.
     assert _blame(ledger, "6E", "ihc") == R.OUT_OF_SCOPE
+
+
+def test_known_novel_marker_split_reproduces():
+    # Fig 3A: the known-vs-novel literature split (★B's annotate=pubmed) — known markers carry
+    # higher PubMed query counts than novel markers. A faithful directional figure-read.
+    ledger = HN.drive_captured()
+    assert _blame(ledger, "3A", "known_vs_novel_citations") is None
 
 
 def test_maturation_panel_reproduces_directionally():
@@ -94,10 +106,10 @@ def test_captured_ledger_round_trips(tmp_path):
     ledger = HN.drive_captured()
     assert R.save_ledger(ledger, root=tmp_path).exists()
     again = R.load_ledger("hani", root=tmp_path)
-    assert again.scorecard.findings["reproduced"] == 12
-    assert again.panel("3B").provenance == "mmc2+ Fig3+"
-    assert _blame(again, "3B", "n_marker_genes") is None
-    assert len(again.panels) == 7
+    assert again.scorecard.findings["reproduced"] == 13
+    assert again.panel("3C").provenance == "mmc2+ Fig3C+"
+    assert _blame(again, "3C", "n_marker_genes") is None
+    assert len(again.panels) == 8
 
 
 # --- live marker recount from the deposited mmc2.csv (skipped if absent) -------
@@ -116,7 +128,7 @@ def test_live_marker_recount_matches_the_deposit():
     assert mm["n_type_specific"] == 360 and mm["n_shared"] == 45
     assert mm["n_assignments"] == 450
     # Driven live, the deposit panel is still a faithful (un-blamed) reproduction.
-    assert _blame(ledger, "3B", "n_marker_genes") is None
+    assert _blame(ledger, "3C", "n_marker_genes") is None
 
 
 # --- live organoid drive on the deposited GSE201356 scRNA (skipped if absent) --

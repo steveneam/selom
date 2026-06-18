@@ -4,10 +4,12 @@ The second cross-paper overfit check of the Reproduction Engine, and the first w
 content is mostly **figure- and deposit-borne** rather than printed as DE counts. RPGRIP1 was
 bulk + scRNA DE; JEV was EV proteomics/miRNA DE; Kim 2023 is a **retinal-cell-identity meta-atlas
 and an organoid-fidelity benchmark** (Stem Cell Reports 18:175-189, doi 10.1016/j.stemcr.2022.
-12.002, GEO GSE201356 — same CMRI lab as RPGRIP1). Its figures are correlation heatmaps, an UpSet
-of Cepo cell-identity markers, marker-validation violins, and a protocol-fidelity benchmark — a
-third, distinct figure vocabulary, so it stress-tests whether ``build_ledger`` / the blame
-taxonomy / the scorecard generalize beyond the DE-count shape.
+12.002, GEO GSE201356 — same CMRI lab as RPGRIP1). Its figures are correlation heatmaps, Cepo
+cell-identity marker violins/dotplots (the known-vs-novel split by PubMed query count), maturation
+scatterplots, and a protocol-fidelity benchmark — a third, distinct figure vocabulary, so it
+stress-tests whether ``build_ledger`` / the blame taxonomy / the scorecard generalize beyond the
+DE-count shape. (NB: there is no UpSet anywhere in the paper — the panel letters/forms here were
+re-checked against the actual panel screenshots, see ``_marker_panels``.)
 
 It also exercises the two R4/X1 slice-2 capabilities shipped alongside it:
 
@@ -18,10 +20,11 @@ It also exercises the two R4/X1 slice-2 capabilities shipped alongside it:
   borne; Claude-as-gateway reads them off the rasters (out of band; recorded in the captured drive).
 
 The headline is a GENUINE faithful reproduction: Selom's proprietary ``cepo`` skill was validated
-against this paper's deposited marker matrix (``mmc2.csv``), and the ``upset`` + ``corr_heatmap``
-skills were built to render its Fig 2/3. ``drive_live_markers`` re-derives the marker-matrix counts
-from the deposited csv directly (50 markers/cell type × 9 types = 450 assignments; 405 unique genes;
-360 type-specific + 45 shared) — captured == live, the JEV ``drive_live_de`` pattern.
+against this paper's deposited marker matrix (``mmc2.csv``, Fig 3C), and the ``corr_heatmap`` skill
+renders its Fig 2A. ``drive_live_markers`` re-derives the marker-matrix counts from the deposited
+csv directly (50 markers/cell type × 9 types = 450 assignments; 405 unique genes; 360 type-specific
++ 45 shared) — captured == live, the JEV ``drive_live_de`` pattern. (Selom can also render the
+matrix membership as an UpSet, but that is a Selom-original view, not a paper figure.)
 
 Library-only (D12); no HTTP. The paper PDF + supplements live outside the repo (Hani/ share).
 
@@ -48,8 +51,9 @@ GOLD_N_CELL_TYPES = 9            # atlas cell types (mmc2 columns): Amacrine/Rod
 #                                  RGC/Macroglial/Bipolar/RPE/Microglial
 GOLD_MARKERS_PER_TYPE = 50       # top-50 Cepo cell-identity genes per cell type (Fig 3 / mmc2)
 GOLD_N_MARKER_GENES = 405        # unique cell-identity genes in the deposited matrix
-GOLD_N_TYPE_SPECIFIC = 360       # genes marking exactly one cell type (UpSet singletons)
-GOLD_N_SHARED = 45               # genes marking exactly two cell types (UpSet shared)
+GOLD_N_TYPE_SPECIFIC = 360       # genes marking exactly one cell type (matrix membership singletons)
+GOLD_N_SHARED = 45               # genes marking exactly two cell types (matrix membership shared)
+GOLD_KNOWN_QUERY = "known_higher"  # Fig 3A: known markers carry higher PubMed query counts than novel
 GOLD_N_MARKER_ASSIGN = 450       # total True marker assignments (360*1 + 45*2)
 GOLD_TOP_METHOD = "Cepo"         # Fig 2C: Cepo has the highest cross-dataset concordance vs Limma/HVG
 GOLD_N_ORGANOIDS = 15            # Fig 6A: n = 15 organoids (West et al. 2022 protocol) — cohort
@@ -147,36 +151,71 @@ def _maturation_panels() -> list[Panel]:
 
 
 def _marker_panels() -> list[Panel]:
-    """Fig 3 — the Cepo cell-identity marker matrix (deposited as mmc2.csv) + its UpSet. The
-    headline faithful reproduction: Selom's proprietary cepo skill was VALIDATED against this very
-    deposit, and the upset skill renders the membership. drive_live_markers re-derives the counts."""
+    """Fig 3 — the Cepo cell-identity marker analysis. Two faithful panels, read off the actual
+    figures (verified against the panel screenshots; NB the paper has no UpSet anywhere):
+
+    * **3A** — the known-vs-novel literature split: log PubMed query count per marker, where KNOWN
+      markers carry more citations than NEW (novel) markers. This is exactly what the ``violin``
+      skill's ``annotate=pubmed`` (★B) produces, so it is wired as a faithful Fig 3A reproduction.
+    * **3C** — the deposited Cepo marker matrix (mmc2.csv): top-50 markers/type across 9 cell types.
+      The headline faithful reproduction — Selom's proprietary ``cepo`` skill was VALIDATED against
+      this very deposit; ``drive_live_markers`` re-derives the counts. The membership (type-specific
+      vs shared) is a property of the deposited matrix, NOT a paper UpSet: the paper visualizes this
+      matrix as the 3A/3B new-vs-known violins and the 3C per-type marker dotplots. Selom can render
+      the membership as an UpSet, but that is a Selom-original view, not a reproduction of a paper
+      panel — so this panel claims the deposit (mmc2 + Fig 3C), never an UpSet figure."""
     cepo_sub = MethodSub(
-        paper_tool="Cepo cell-identity gene statistics (Kim et al. 2021) -> top-50 markers/type "
-                   "(deposited mmc2); known/novel split via PubMed query search",
-        selom_tool="Selom's reimplemented Cepo skill (validated vs the deposited mmc2 oracle) + "
-                   "the upset skill over the boolean marker membership",
+        paper_tool="Cepo cell-identity gene statistics (Kim et al. 2021) -> top-50 markers/type, "
+                   "deposited as the mmc2 marker matrix and shown per cell type in Fig 3C",
+        selom_tool="Selom's reimplemented Cepo skill (validated vs the deposited mmc2 oracle); "
+                   "membership optionally rendered as a Selom UpSet (not a paper figure)",
         reason="the authors deposited the complete Cepo marker matrix; Selom re-derives it",
         delta_measured="marker-matrix counts reproduced exactly from mmc2 (50/type, 405 unique, "
                        "360 type-specific + 45 shared)",
     )
+    pubmed_sub = MethodSub(
+        paper_tool="PubMed query-count per marker gene -> known vs novel marker split (Fig 3A)",
+        selom_tool="the violin skill's annotate=pubmed (★B) over the same gene list "
+                   "(lit-synth PubMed lookup, cached/throttled)",
+        reason="the authors split markers by literature support via a PubMed query count",
+        delta_measured="directional: known markers carry more citations than novel markers",
+    )
     return [
+        # Fig 3A — the known/novel literature split (log PubMed query count; known > new). ★B's
+        # annotate=pubmed reproduces this exact panel. Directional figure-read.
         Panel(
-            paper_id=PAPER_ID, figure="3", panel="B", chart_form="upset", skill_id="upset",
-            data_source="mmc2.csv (Cepo marker matrix, 405 genes x 9 cell types)",
+            paper_id=PAPER_ID, figure="3", panel="A", chart_form="violin", skill_id="violin",
+            params={"annotate": "pubmed", "gene": "each Cepo marker gene",
+                    "groupby": "marker class (known vs novel)"},
+            data_source="PubMed query counts per Cepo marker gene (known vs novel)",
+            method_subs=[pubmed_sub], weight=0.5,
+            sources=[R.SourceTag(ref="Fig3A", faithful=True,
+                                 note="log PubMed query count: known markers more cited than novel")],
+            golden=[Golden(metric="known_vs_novel_citations", value=GOLD_KNOWN_QUERY,
+                           source=R.SOURCE_FIGURE,
+                           note="known markers carry higher PubMed query counts than novel "
+                                "(directional; the validation that the split is real)")],
+        ),
+        # Fig 3C — the deposited Cepo marker matrix (mmc2), per cell type. The headline cepo
+        # validation. The membership counts are deposit-derived (drive_live_markers); NOT an UpSet.
+        Panel(
+            paper_id=PAPER_ID, figure="3", panel="C", chart_form="dotplot", skill_id="cepo",
+            data_source="mmc2.csv (deposited Cepo marker matrix, 405 genes x 9 cell types)",
             method_subs=[cepo_sub], weight=2.0,  # the paper's central quantitative resource
             sources=[R.SourceTag(ref="mmc2", faithful=True,
-                                 note="complete Cepo marker matrix reproduced exactly"),
-                     R.SourceTag(ref="Fig3", faithful=True,
-                                 note="top-50 markers/type; known/novel via PubMed")],
+                                 note="complete deposited Cepo marker matrix reproduced exactly"),
+                     R.SourceTag(ref="Fig3C", faithful=True,
+                                 note="per-cell-type cell-identity markers (paper form: dotplots)")],
             golden=[
                 Golden(metric="markers_per_type", value=GOLD_MARKERS_PER_TYPE,
                        source=R.SOURCE_EXTRACTED, note="top-50 Cepo cell-identity genes per type"),
                 Golden(metric="n_marker_genes", value=GOLD_N_MARKER_GENES,
                        source=R.SOURCE_EXTRACTED, note="unique cell-identity genes in mmc2"),
                 Golden(metric="n_type_specific", value=GOLD_N_TYPE_SPECIFIC,
-                       source=R.SOURCE_EXTRACTED, note="genes marking exactly 1 cell type (UpSet)"),
+                       source=R.SOURCE_EXTRACTED,
+                       note="genes marking exactly 1 cell type (matrix membership)"),
                 Golden(metric="n_shared", value=GOLD_N_SHARED, source=R.SOURCE_EXTRACTED,
-                       note="genes marking exactly 2 cell types (UpSet)"),
+                       note="genes marking exactly 2 cell types (matrix membership)"),
             ],
         ),
     ]
@@ -250,7 +289,7 @@ def build_ledger() -> Ledger:
 
 
 def _captured() -> dict[str, dict]:
-    """Per-panel ``{computed}`` — the verified observations. The Cepo/UpSet panel (3B) is the
+    """Per-panel ``{computed}`` — the verified observations. The Cepo marker-matrix panel (3C) is the
     deposit re-derived from mmc2.csv (drive_live_markers proves it live); the atlas/benchmark
     panels are faithful reproductions of the deposited atlas + the figure-borne structure; Fig 6E
     is the wet-lab IHC readout (out of scope). Every value is substantiated by the paper text, the
@@ -260,7 +299,8 @@ def _captured() -> dict[str, dict]:
         "2A": {"computed": {"n_cell_type_groups": GOLD_N_CELL_TYPES}},   # vision-read grouping
         "2C": {"computed": {"top_method": GOLD_TOP_METHOD}},
         "4C": {"computed": {"age_association": GOLD_MATURATION_DIR}},    # maturation genes both ±
-        "3B": {"computed": {"markers_per_type": GOLD_MARKERS_PER_TYPE,
+        "3A": {"computed": {"known_vs_novel_citations": GOLD_KNOWN_QUERY}},  # known > novel (PubMed)
+        "3C": {"computed": {"markers_per_type": GOLD_MARKERS_PER_TYPE,
                             "n_marker_genes": GOLD_N_MARKER_GENES,
                             "n_type_specific": GOLD_N_TYPE_SPECIFIC,
                             "n_shared": GOLD_N_SHARED}},                  # == mmc2 -> exact
@@ -319,7 +359,7 @@ def _count_markers(csv_path: str) -> dict:
 
 
 def drive_live_markers(ledger: Ledger | None = None, *, csv_path: str | pathlib.Path) -> tuple[Ledger, dict]:
-    """Re-derive the Cepo marker matrix from the deposited mmc2.csv and revalidate Fig 3B.
+    """Re-derive the Cepo marker matrix from the deposited mmc2.csv and revalidate Fig 3C.
 
     Proves captured == live: Selom re-derives 50 markers/type, 405 unique genes, 360 type-specific
     + 45 shared straight from the authors' deposited matrix. Needs pandas + the external csv
@@ -329,7 +369,7 @@ def drive_live_markers(ledger: Ledger | None = None, *, csv_path: str | pathlib.
     live = _count_markers(csv_path)
 
     cap = _captured()
-    cap["3B"]["computed"] = {"markers_per_type": live["markers_per_type"],
+    cap["3C"]["computed"] = {"markers_per_type": live["markers_per_type"],
                              "n_marker_genes": live["n_marker_genes"],
                              "n_type_specific": live["n_type_specific"],
                              "n_shared": live["n_shared"]}
