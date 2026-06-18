@@ -204,6 +204,22 @@ class MetricValue(BaseModel):
     value: float | int | str | None = None
 
 
+class PanelLift(BaseModel):
+    """A staged X3-lifted panel image for the extract↔Reproduction bridge (★D).
+
+    Pure presentation metadata: where the panel sits in the source PDF (``page_index``/``bbox``),
+    the lift ``kind`` (vector crop vs raster extract), and the served ``thumbnail_url``. ``digitizable``
+    gates the in-paper "Digitize this panel" entry — only chart panels (bar/line/scatter) can be
+    traced. **This never influences the Reproducibility Score** (digitize ≠ reproduce): it carries no
+    golden/computed value and the scorecard ignores it entirely."""
+
+    page_index: int = 0
+    bbox: tuple[float, float, float, float] | None = None
+    kind: str = "raster"          # "vector" | "raster"
+    thumbnail_url: str = ""        # served static asset, e.g. /repro-assets/hani/2B.png
+    digitizable: bool = False      # only chart forms (bar/line/scatter) can be traced
+
+
 class Panel(BaseModel):
     paper_id: str
     figure: str
@@ -221,6 +237,10 @@ class Panel(BaseModel):
     weight: float = 1.0
     note: str = ""  # form/claim panels (no printed number) record why there's no golden here
     vector_copy_ref: str | None = None
+    # ★D bridge: an optional staged thumbnail/lift for the read-only view. Purely presentational —
+    # attached by the serving layer (repro_assets), never by the reproduction logic, and the
+    # scorecard is byte-identical whether or not it is present (digitize ≠ reproduce).
+    lift: PanelLift | None = None
     status: str = "pending"  # pending|extracted|mapped|anchored|run|validated|blocked
 
     @property

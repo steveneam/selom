@@ -1,0 +1,28 @@
+{
+  "panels": {
+    "2A": {
+      "page_index": 3,
+      "bbox": [
+        35.0,
+        425.0,
+        298.0,
+        702.0
+      ],
+      "kind": "vector",
+      "thumbnail_url": "/repro-assets/hani/2A.png",
+      "digitizable": false
+    },
+    "2C": {
+      "page_index": 3,
+      "bbox": [
+        338.0,
+        262.0,
+        588.0,
+        500.0
+      ],
+      "kind": "vector",
+      "thumbnail_url": "/repro-assets/hani/2C.png",
+      "digitizable": true
+    }
+  }
+}

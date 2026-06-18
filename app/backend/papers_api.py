@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+import repro_assets
 import reproduction as R
 
 # slug -> the ledger module that builds + drives it. Imported lazily (inside the cache) so app
@@ -32,9 +33,12 @@ SLUGS: tuple[str, ...] = ("rpgrip1", "jev", "hani")
 
 @lru_cache(maxsize=None)
 def driven_ledger(slug: str) -> R.Ledger:
-    """The captured-and-driven ledger for ``slug`` (cached). KeyError if unknown."""
+    """The captured-and-driven ledger for ``slug`` (cached). KeyError if unknown.
+
+    Staged X3 panel thumbnails (★D bridge) are attached presentationally after driving — they
+    never touch the scorecard the drive produced (digitize ≠ reproduce)."""
     module = __import__(_LEDGER_MODULES[slug])
-    return module.drive_captured()
+    return repro_assets.attach_lifts(module.drive_captured())
 
 
 def _strip(ledger: R.Ledger) -> dict:

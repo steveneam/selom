@@ -6,6 +6,7 @@ import tempfile
 
 from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import export
@@ -25,6 +26,13 @@ from skills.contract import load_skill, run_skill_with_table
 from skills.registry import list_catalog, list_skill_ids
 
 app = FastAPI(title="Selom API")
+
+# ★D bridge: serve the staged X3 panel thumbnails (repro_assets) as read-only static files at
+# /repro-assets/{slug}/{panel_key}.png. Presentational only — never a score input. Mounted only
+# when the tree exists so a fresh clone without staged assets still boots.
+_REPRO_ASSETS = pathlib.Path(__file__).resolve().parent / "repro-assets"
+if _REPRO_ASSETS.is_dir():
+    app.mount("/repro-assets", StaticFiles(directory=str(_REPRO_ASSETS)), name="repro-assets")
 
 
 @app.get("/health")
