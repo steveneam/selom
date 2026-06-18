@@ -6,6 +6,7 @@ import { mockBundle, mockTable } from "./stub-bundle";
 import { compileFixture, getFixtureSet, searchFixture } from "./gene-sets-fixture";
 import { EXPORT_PRESETS, mockExportFile } from "./export-fixture";
 import { FIGURE_STYLES, mockApplyStyle } from "./styles-fixture";
+import { mockExtractChart } from "./extract-fixture";
 import { REPRO_LEDGERS, REPRO_PAPERS } from "@/lib/reproduction/fixture";
 
 // Mirrors the live contract from app/backend/main.py:
@@ -73,6 +74,17 @@ export const handlers = [
     return led?.scorecard
       ? HttpResponse.json(led.scorecard)
       : new HttpResponse(null, { status: 404 });
+  }),
+  // Chart extractor (X4 calibration picker): recover a panel's series from an image +
+  // axis calibration. The live backend reads the actual image; the mock returns a
+  // representative recovered series so the picker's full flow renders offline. 400 when
+  // the calibration is missing, mirroring extract/chart_intake.calibration_from_params.
+  http.post("/api/extract/chart", ({ request }) => {
+    const url = new URL(request.url);
+    if (!url.searchParams.get("x_px0")) {
+      return HttpResponse.json({ detail: "missing calibration param 'x_px0'" }, { status: 400 });
+    }
+    return HttpResponse.json(mockExtractChart(url.searchParams.get("form") ?? "bar", url.searchParams));
   }),
   http.post("/api/skills/:skillId/run", async ({ params, request }) => {
     // A real upload would parse `matrix`; the stub is input-independent by design,
