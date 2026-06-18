@@ -65,7 +65,30 @@ def run(data_path: str, params: dict) -> dict:
             "yaxis": {"title": {"text": "expression (log1p)"}},
         },
     }
+    if str(params.get("annotate") or "none").lower() == "pubmed":
+        spec = _annotate_with_pubmed(spec, gene, params)
     return jsonable(spec)
+
+
+def _annotate_with_pubmed(spec: dict, gene: str, params: dict) -> dict:
+    """Overlay the known/novel literature split (Fig 3A/B) — network-bound, degrade-safe.
+
+    Queries PubMed for the marker gene (optionally scoped to ``context``) through the lit-synth
+    cache/throttle seam; a degraded/offline lookup returns count=None and the violin renders
+    unannotated. Any unexpected failure is swallowed to the same unannotated outcome — an
+    annotation must never break the figure."""
+    from skills.violin.run import annotate_pubmed, pubmed_query
+
+    context = str(params.get("context") or "")
+    try:
+        from litsynth import lookup
+
+        res = lookup.pubmed_count(pubmed_query(gene, context))
+        count = res.get("count")
+    except Exception:  # noqa: BLE001 — annotation is best-effort; degrade to unannotated
+        count = None
+    return annotate_pubmed(spec, gene, count, known_min=int(params.get("known_min", 5)),
+                           context=context)
 
 
 def _argmax_variance(X, np) -> int:

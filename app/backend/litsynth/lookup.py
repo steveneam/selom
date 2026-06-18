@@ -52,6 +52,28 @@ def search_citations(
     return {"results": dumped, "degraded": False}
 
 
+def pubmed_count(term, *, fetch=None, cache=None, cfg=None) -> dict:
+    """How many PubMed records match ``term`` — the literature-support count, cached + degrade-safe.
+
+    The primitive behind the violin "known vs novel marker" annotation. A blank term is a clean
+    0 (no fetch); a network/parse failure degrades to ``{"count": None, "degraded": True}`` so the
+    annotation simply drops rather than breaking the figure (the lit-synth honest-empty rule)."""
+    if not (term or "").strip():
+        return {"count": 0, "degraded": False}
+    fetch = fetch or _FETCHER
+    cache = cache or _CACHE
+    cfg = cfg or _CONFIG
+    key = f"count:{term.strip().lower()}"
+    if cache.has(key):
+        return {"count": cache.get(key), "degraded": False}
+    try:
+        n = pubmed.count(term, fetch=fetch, cfg=cfg)
+    except _LOOKUP_ERRORS:
+        return {"count": None, "degraded": True}
+    cache.set(key, n)
+    return {"count": n, "degraded": False}
+
+
 def citation_by_doi(
     doi, *, source="both", fetch=None, biorxiv_fetch=None, cache=None, cfg=None
 ) -> dict:

@@ -10,7 +10,10 @@
     "gene":       { "type": "str",   "default": "" },
     "groupby":    { "type": "str",   "default": "leiden" },
     "resolution": { "type": "float", "default": 1.0, "min": 0.1, "max": 4.0 },
-    "normalize":  { "type": "bool",  "default": true }
+    "normalize":  { "type": "bool",  "default": true },
+    "annotate":   { "type": "str",   "default": "none" },
+    "context":    { "type": "str",   "default": "" },
+    "known_min":  { "type": "int",   "default": 5, "min": 1, "max": 100000 }
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" }

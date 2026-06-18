@@ -65,6 +65,62 @@ def test_by_doi_resolves_one():
     assert c is not None and c.pmid == "29409532"
 
 
+# --- PubMed hit count (the violin known/novel marker primitive) ---------------
+
+COUNT_XML = b'<?xml version="1.0"?><eSearchResult><Count>12431</Count><IdList></IdList></eSearchResult>'
+
+
+def test_count_parses_total_hits():
+    # The top-level <Count> is the full hit count regardless of retmax (we ask retmax=0).
+    assert pubmed.count("RHO[Title/Abstract]", fetch=lambda u: COUNT_XML) == 12431
+    # A result with no <Count> reads as zero, not an error.
+    no_count = b'<?xml version="1.0"?><eSearchResult><IdList></IdList></eSearchResult>'
+    assert pubmed.count("nothing", fetch=lambda u: no_count) == 0
+
+
+def test_count_blank_term_skips_fetch():
+    def boom(url):
+        raise AssertionError("should not fetch on a blank term")
+
+    assert pubmed.count("   ", fetch=boom) == 0
+
+
+def test_count_url_requests_retmax_zero():
+    url = pubmed.esearch_url("RHO[Title/Abstract]", NcbiConfig(), retmax=0, min_year=None)
+    assert "retmax=0" in url  # count-only: one esearch, no esummary, no id list fetched
+
+
+def test_lookup_pubmed_count_caches_and_degrades(tmp_path):
+    cache = JsonCache(tmp_path / "c.json")
+    cfg = NcbiConfig()
+    calls = {"n": 0}
+
+    def fetch(url):
+        calls["n"] += 1
+        return COUNT_XML
+
+    r1 = lookup.pubmed_count("RHO[Title/Abstract]", fetch=fetch, cache=cache, cfg=cfg)
+    assert r1 == {"count": 12431, "degraded": False}
+    after_first = calls["n"]
+    r2 = lookup.pubmed_count("RHO[Title/Abstract]", fetch=fetch, cache=cache, cfg=cfg)
+    assert r2 == r1 and calls["n"] == after_first  # cache hit: no extra fetch
+
+    # Blank term is a clean 0 with no fetch.
+    def boom(url):
+        raise AssertionError("blank term must not fetch")
+
+    assert lookup.pubmed_count("  ", fetch=boom, cache=cache, cfg=cfg) == {"count": 0, "degraded": False}
+
+    # Network failure degrades to count=None (annotation drops, figure still renders).
+    def down(url):
+        raise OSError("network down")
+
+    assert lookup.pubmed_count("NOVELX[Title/Abstract]", fetch=down, cache=cache, cfg=cfg) == {
+        "count": None,
+        "degraded": True,
+    }
+
+
 def test_doi_from_elocation():
     assert pubmed._doi_from_elocation("doi: 10.1/x") == "10.1/x"
     assert pubmed._doi_from_elocation("10.2/y") == "10.2/y"

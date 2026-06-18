@@ -123,6 +123,14 @@ def _parse_ids(xml_bytes: bytes) -> list[str]:
     return [el.text for el in root.findall("IdList/Id") if el.text]
 
 
+def _parse_count(xml_bytes: bytes) -> int:
+    """The total number of matches an esearch reports, from the top-level <Count> (which
+    is the full hit count regardless of retmax). Missing/blank <Count> ⇒ 0."""
+    root = ET.fromstring(xml_bytes)
+    txt = (root.findtext("Count") or "").strip()
+    return int(txt) if txt.isdigit() else 0
+
+
 def _text(item: ET.Element | None) -> str | None:
     if item is None:
         return None
@@ -193,6 +201,18 @@ def search(
     if not ids:
         return []
     return _parse_summaries(fetch(esummary_url(ids, cfg)))
+
+
+def count(term: str, *, fetch: Fetcher, cfg: NcbiConfig | None = None) -> int:
+    """Total number of PubMed records matching ``term`` — one esearch (retmax=0), no esummary.
+
+    This is the literature-support primitive behind the violin "known vs novel marker"
+    annotation: query a gene (optionally ANDed with a domain context) and read the hit count.
+    A blank term is 0 hits without a fetch."""
+    cfg = cfg or NcbiConfig()
+    if not term.strip():
+        return 0
+    return _parse_count(fetch(esearch_url(term, cfg, retmax=0, min_year=None)))
 
 
 def by_doi(doi: str, *, fetch: Fetcher, cfg: NcbiConfig | None = None) -> Citation | None:

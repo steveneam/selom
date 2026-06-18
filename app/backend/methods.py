@@ -38,6 +38,7 @@ GSEAPY = "Fang, Z., Liu, X. & Peltz, G. GSEApy: a comprehensive package for perf
 CEPO = "Kim, H.J., Wang, K., Chen, C. et al. Uncovering cell identity through differential stability with Cepo. Nature Computational Science 1, 784-790 (2021)."
 PVCA = "Boedigheimer, M.J. et al. Sources of variation in baseline gene expression levels from toxicogenomics study control animals across multiple laboratories. BMC Genomics 9, 285 (2008)."
 HARMONY = "Korsunsky, I. et al. Fast, sensitive and accurate integration of single-cell data with Harmony. Nature Methods 16, 1289-1296 (2019)."
+ENTREZ = "Sayers, E.W. et al. Database resources of the National Center for Biotechnology Information. Nucleic Acids Research 50, D20-D26 (2022)."
 
 
 def _umap(p: dict):
@@ -98,7 +99,18 @@ def _violin(p: dict):
         f"Per-group expression of {gene} was visualized as log1p-normalized violin "
         f"distributions grouped by {p['groupby']} (Scanpy)."
     )
-    return text, [SCANPY]
+    citations = [SCANPY]
+    if str(p.get("annotate") or "none").lower() == "pubmed":
+        context = str(p.get("context") or "").strip()
+        scope = f" co-occurring with '{context}'" if context else ""
+        text += (
+            f" Each marker's literature support was assessed by querying PubMed (NCBI E-utilities) "
+            f"for the gene symbol{scope} in the title/abstract; markers with at least "
+            f"{int(p.get('known_min', 5))} matching records were annotated as known and the "
+            "remainder as novel."
+        )
+        citations.append(ENTREZ)
+    return text, citations
 
 
 def _deg(p: dict):
