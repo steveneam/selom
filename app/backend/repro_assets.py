@@ -23,9 +23,10 @@ import reproduction as R
 # repo-relative; the same tree the staging script writes and the FastAPI static mount serves.
 ASSETS_ROOT = pathlib.Path(__file__).resolve().parent / "repro-assets"
 
-# Chart forms a reader can actually trace tick-by-tick in the picker (everything else — heatmaps,
-# UpSet, micrographs, schematics — has no axes to calibrate, so it gets a thumbnail but no button).
-DIGITIZABLE_FORMS = {"bar", "box", "scatter", "line"}
+# Chart forms a reader can actually trace tick-by-tick in the picker. This is exactly the X4
+# chart-extractor's recoverable set (bar/line/scatter) — a boxplot or heatmap has no point series to
+# read back, so it gets a thumbnail but no "Digitize" button.
+DIGITIZABLE_FORMS = {"bar", "line", "scatter"}
 
 
 def _manifest_path(slug: str, root: pathlib.Path | None = None) -> pathlib.Path:

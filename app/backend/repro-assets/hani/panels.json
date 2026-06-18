@@ -22,6 +22,18 @@
       ],
       "kind": "vector",
       "thumbnail_url": "/repro-assets/hani/2C.png",
+      "digitizable": false
+    },
+    "4C": {
+      "page_index": 6,
+      "bbox": [
+        24.0,
+        414.0,
+        586.0,
+        524.0
+      ],
+      "kind": "vector",
+      "thumbnail_url": "/repro-assets/hani/4C.png",
       "digitizable": true
     }
   }

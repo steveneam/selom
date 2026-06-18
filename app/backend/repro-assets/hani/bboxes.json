@@ -3,6 +3,7 @@
   "pdf": "C:/Users/seamegdool/Desktop/Claude code and website tips/Data/Hani/1-s2.0-S2213671122005914-main.pdf",
   "panels": {
     "2A": {"page_index": 3, "bbox": [35, 425, 298, 702], "chart_form": "corr_heatmap"},
-    "2C": {"page_index": 3, "bbox": [338, 262, 588, 500], "chart_form": "box"}
+    "2C": {"page_index": 3, "bbox": [338, 262, 588, 500], "chart_form": "box"},
+    "4C": {"page_index": 6, "bbox": [24, 414, 586, 524], "chart_form": "scatter"}
   }
 }

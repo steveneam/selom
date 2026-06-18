@@ -50,25 +50,27 @@ def test_load_lifts_parses_rows_and_skips_bad_ones(tmp_path):
 
 def test_attach_sets_lift_only_on_matching_panels(tmp_path):
     _write_manifest(tmp_path, "hani", {
-        "2B": {"thumbnail_url": "/repro-assets/hani/2B.png", "digitizable": True, "kind": "bar"},
+        "2C": {"thumbnail_url": "/repro-assets/hani/2C.png", "digitizable": False, "kind": "vector"},
     })
     ledger = repro_assets.attach_lifts(HN.drive_captured(), root=tmp_path)
-    assert ledger.panel("2B").lift is not None
-    assert ledger.panel("2B").lift.thumbnail_url.endswith("2B.png")
+    assert ledger.panel("2C").lift is not None
+    assert ledger.panel("2C").lift.thumbnail_url.endswith("2C.png")
     # an unstaged panel keeps lift=None
     assert ledger.panel("3B").lift is None
 
 
 def test_digitizable_is_gated_to_chart_forms(tmp_path):
-    # Fig 3B is an UpSet (no axes to trace): even if the manifest claims digitizable, attach
-    # forces it off. Fig 2B is a bar -> stays digitizable.
+    # Fig 3B is an UpSet and Fig 2C a boxplot (no point series to trace): even if the manifest claims
+    # digitizable, attach forces it off against the ledger's chart_form. Fig 4C is a scatter -> stays.
     _write_manifest(tmp_path, "hani", {
         "3B": {"thumbnail_url": "/r/3B.png", "digitizable": True},
-        "2B": {"thumbnail_url": "/r/2B.png", "digitizable": True},
+        "2C": {"thumbnail_url": "/r/2C.png", "digitizable": True},
+        "4C": {"thumbnail_url": "/r/4C.png", "digitizable": True},
     })
     ledger = repro_assets.attach_lifts(HN.drive_captured(), root=tmp_path)
     assert ledger.panel("3B").lift.digitizable is False   # upset: not traceable
-    assert ledger.panel("2B").lift.digitizable is True    # bar: traceable
+    assert ledger.panel("2C").lift.digitizable is False   # boxplot: not traceable
+    assert ledger.panel("4C").lift.digitizable is True    # scatter: traceable
 
 
 # --- the invariant: digitize ≠ reproduce -------------------------------------
