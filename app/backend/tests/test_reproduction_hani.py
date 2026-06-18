@@ -28,8 +28,8 @@ def test_build_ledger_shape():
     assert len(ledger.panels) == 6
     in_scope = [p for p in ledger.panels if p.scope not in R.OUT_OF_SCOPE_SCOPES]
     assert len(in_scope) == 5
-    # The IHC panel is the one wet-lab readout (guard 7), excluded from the denominator.
-    assert ledger.panel("6D").scope == R.WET_LAB
+    # The IHC panel (Fig 6E) is the one wet-lab readout (guard 7), excluded from the denominator.
+    assert ledger.panel("6E").scope == R.WET_LAB
     # Every panel carries source provenance; nothing diverges from its figure (a clean paper).
     assert ledger.panel("3B").provenance == "mmc2+ Fig3+"
     assert all(p.diverges_from == [] for p in ledger.panels)
@@ -64,8 +64,8 @@ def test_cepo_marker_matrix_is_deposit_faithful():
     ledger = HN.drive_captured()
     for metric in ("markers_per_type", "n_marker_genes", "n_type_specific", "n_shared"):
         assert _blame(ledger, "3B", metric) is None
-    # The wet-lab IHC panel is out of scope, not a blame.
-    assert _blame(ledger, "6D", "ihc") == R.OUT_OF_SCOPE
+    # The wet-lab IHC panel (Fig 6E) is out of scope, not a blame.
+    assert _blame(ledger, "6E", "ihc") == R.OUT_OF_SCOPE
 
 
 def test_reproducibility_score_is_high_and_zero_defect():

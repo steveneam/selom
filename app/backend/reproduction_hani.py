@@ -52,8 +52,8 @@ GOLD_N_TYPE_SPECIFIC = 360       # genes marking exactly one cell type (UpSet si
 GOLD_N_SHARED = 45               # genes marking exactly two cell types (UpSet shared)
 GOLD_N_MARKER_ASSIGN = 450       # total True marker assignments (360*1 + 45*2)
 GOLD_TOP_METHOD = "Cepo"         # Fig 2C: Cepo has the highest cross-dataset concordance vs Limma/HVG
-GOLD_N_ORGANOIDS = 15            # Fig 6E: n = 15 organoids (West et al. 2022 protocol)
-GOLD_N_BATCHES = 3               # Fig 6E: N = 3 differentiation batches
+GOLD_N_ORGANOIDS = 15            # Fig 6A: n = 15 organoids (West et al. 2022 protocol)
+GOLD_N_BATCHES = 3               # Fig 6A: N = 3 differentiation batches
 
 # Mature retinal-tissue datasets curated into the reference atlas (Fig 1).
 MATURE_DATASETS = ["Cowan et al. (2020)", "Lu et al. (2020)", "Lukowski et al. (2019)",
@@ -147,22 +147,22 @@ def _marker_panels() -> list[Panel]:
 
 def _organoid_panels() -> list[Panel]:
     return [
-        # Fig 6D — IHC validation of marker presence in organoids: a wet-lab readout, not derivable
+        # Fig 6E — IHC validation of marker presence in organoids: a wet-lab readout, not derivable
         # from the sequencing data (guard 7, out of scope). mmc3.csv = the IHC antibody table.
         Panel(
-            paper_id=PAPER_ID, figure="6", panel="D", chart_form="micrograph", skill_id="",
+            paper_id=PAPER_ID, figure="6", panel="E", chart_form="micrograph", skill_id="",
             scope=R.WET_LAB, data_source="immunohistochemistry (mmc3 antibodies)",
-            sources=[R.SourceTag(ref="Fig6D", faithful=True, note="IHC confirmation (wet-lab)")],
+            sources=[R.SourceTag(ref="Fig6E", faithful=True, note="IHC confirmation (wet-lab)")],
             golden=[Golden(metric="ihc", value="confirmed", source=R.SOURCE_FIGURE,
                            note="protein-level marker validation — out of scope (guard 7)")],
         ),
-        # Fig 6E — organoid benchmarking cohort: 15 organoids over 3 differentiation batches
-        # (West et al. 2022 protocol). Text-exact.
+        # Fig 6A — organoid UMAP (benchmarking cohort): 15 organoids over 3 differentiation
+        # batches (West et al. 2022 protocol). Text-exact.
         Panel(
-            paper_id=PAPER_ID, figure="6", panel="E", chart_form="umap", skill_id="umap_scrna",
+            paper_id=PAPER_ID, figure="6", panel="A", chart_form="umap", skill_id="umap_scrna",
             data_source="GSE201356 organoid scRNA-seq (West et al. 2022 protocol)", weight=1.0,
             sources=[R.SourceTag(ref="GSE201356", faithful=True),
-                     R.SourceTag(ref="Fig6E", faithful=True, note="organoid fidelity cohort")],
+                     R.SourceTag(ref="Fig6A", faithful=True, note="organoid fidelity cohort")],
             golden=[
                 Golden(metric="n_organoids", value=GOLD_N_ORGANOIDS, source=R.SOURCE_FIGURE,
                        note="n = 15 organoids"),
@@ -207,7 +207,7 @@ def build_ledger() -> Ledger:
 def _captured() -> dict[str, dict]:
     """Per-panel ``{computed}`` — the verified observations. The Cepo/UpSet panel (3B) is the
     deposit re-derived from mmc2.csv (drive_live_markers proves it live); the atlas/benchmark
-    panels are faithful reproductions of the deposited atlas + the figure-borne structure; Fig 6D
+    panels are faithful reproductions of the deposited atlas + the figure-borne structure; Fig 6E
     is the wet-lab IHC readout (out of scope). Every value is substantiated by the paper text, the
     deposited mmc2, or a figure raster — none is a fabricated pipeline run."""
     return {
@@ -218,8 +218,8 @@ def _captured() -> dict[str, dict]:
                             "n_marker_genes": GOLD_N_MARKER_GENES,
                             "n_type_specific": GOLD_N_TYPE_SPECIFIC,
                             "n_shared": GOLD_N_SHARED}},                  # == mmc2 -> exact
-        "6D": {"computed": {"ihc": None}},                               # wet-lab, out of scope
-        "6E": {"computed": {"n_organoids": GOLD_N_ORGANOIDS, "n_batches": GOLD_N_BATCHES}},
+        "6E": {"computed": {"ihc": None}},                               # wet-lab IHC, out of scope
+        "6A": {"computed": {"n_organoids": GOLD_N_ORGANOIDS, "n_batches": GOLD_N_BATCHES}},
     }
 
 
