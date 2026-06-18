@@ -222,8 +222,15 @@ extract/
     Statistics table) + `recovered_to_figure` (→ an editable Plotly `{data, layout}`) + an
     `extract_chart()` orchestrator, so a recovered panel lands in the editor like any skill output.
     Calibration-first + vision-grade (0.7) carries through; the table/figure titles surface the
-    confidence. Verified live (4-genotype bar panel → [25,50,75,90]). **Remaining = the FE calibration
-    picker** (click two ticks/axis on the dropped image, WPD-style) — the last UI slice.
+    confidence. Verified live (4-genotype bar panel → [25,50,75,90]).
+  - **FE calibration picker — SHIPPED 2026-06-18** (`d2acde4`): the `/extract` surface — drop a
+    bar/line/scatter panel → click two reference ticks per axis (cyan = X, violet = Y; guided 4-step
+    sequence, crosshair targeting + live guides) → type each tick's value → `POST /api/extract/chart`
+    → the recovered figure loads into the real `EditorWorkspace` (`useFigureStore`), the Statistics
+    table docks alongside, a vision-grade banner surfaces the E4 confirm-before-trusting gate.
+    `lib/extract/calibrate.ts` is the pure px→natural mapping (10 vitest cases). Browser-verified at
+    desktop (px mapped 76/576/377.5/43.5 → editable bars 25/50/75/90; console clean). **The
+    "drop a figure → editable data" loop is now complete end-to-end (BE + FE).**
 
 ## Open questions
 
