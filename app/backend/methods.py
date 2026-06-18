@@ -33,6 +33,9 @@ SKLEARN = "Pedregosa, F. et al. Scikit-learn: Machine Learning in Python. Journa
 UPSET = "Lex, A., Gehlenborg, N., Strobelt, H., Vuillemot, R. & Pfister, H. UpSet: Visualization of Intersecting Sets. IEEE Transactions on Visualization and Computer Graphics 20, 1983-1992 (2014)."
 STRING = "Szklarczyk, D. et al. The STRING database in 2023: protein-protein association networks and functional enrichment analyses for any sequenced genome of interest. Nucleic Acids Research 51, D638-D646 (2023)."
 SMYTH = "Smyth, G.K. Linear models and empirical Bayes methods for assessing differential expression in microarray experiments. Statistical Applications in Genetics and Molecular Biology 3, Article 3 (2004)."
+GSEA = "Subramanian, A. et al. Gene set enrichment analysis: a knowledge-based approach for interpreting genome-wide expression profiles. PNAS 102, 15545-15550 (2005)."
+GSEAPY = "Fang, Z., Liu, X. & Peltz, G. GSEApy: a comprehensive package for performing gene set enrichment analysis in Python. Bioinformatics 39, btac757 (2023)."
+CEPO = "Kim, H.J., Wang, K., Chen, C. et al. Uncovering cell identity through differential stability with Cepo. Nature Computational Science 1, 784-790 (2021)."
 
 
 def _umap(p: dict):
@@ -307,8 +310,70 @@ def _proteomics_de(p: dict):
     return text, ([SMYTH, BH, SCIPY] if moderated else [BH, SCIPY])
 
 
+def _gsea(p: dict):
+    pasted = str(p.get("gene_set") or "").strip()
+    weight = p.get("weight", 1.0)
+    n_perm = p.get("n_perm", 1000)
+    if pasted:
+        target = f"a single gene set ('{p.get('set_name') or 'Gene set'}')"
+        lib_cite: list[str] = []
+    else:
+        source = {"go": "the Gene Ontology", "wikipathways": "WikiPathways",
+                  "curated": "a curated pathway collection", "reference": "a reference gene-set collection",
+                  "all": "the combined gene-set library"}.get(str(p.get("gene_sets") or "go").lower(),
+                                                              "the Gene Ontology")
+        target = f"every gene set in {source}"
+        lib_cite = [GO]
+    text = (
+        "Genes were ranked by their signed differential-expression metric (log2 fold change or a "
+        "signed test statistic) and tested for coordinated enrichment by pre-ranked Gene Set "
+        f"Enrichment Analysis (gseapy.prerank) against {target}. A running enrichment score was "
+        f"accumulated along the ranked list with the Kolmogorov-Smirnov statistic weighted by the "
+        f"metric (exponent {weight:g}); significance was assessed against {n_perm} gene-set "
+        "permutations to yield a normalized enrichment score (NES) and empirical p-value, with "
+        "false-discovery rates corrected across sets by the Benjamini-Hochberg procedure. The "
+        "running enrichment curve, leading-edge hits, and ranked metric are shown."
+    )
+    return text, [GSEA, GSEAPY, *lib_cite, BH]
+
+
+def _go_graph(p: dict):
+    ns = str(p.get("namespace") or "").strip()
+    ns_txt = (
+        f" restricted to the {ns} namespace" if ns
+        else " across the biological-process, cellular-component and molecular-function namespaces"
+    )
+    text = (
+        f"Differentially expressed genes (|log2FC| >= {p['fc_threshold']}, FDR <= {p['fdr_threshold']}) "
+        "were tested for over-representation against Gene Ontology terms using the hypergeometric "
+        "distribution, with p-values corrected across terms by the Benjamini-Hochberg procedure. The "
+        f"top {p['top_n']} enriched terms{ns_txt} are drawn in their is_a/part_of hierarchy as an "
+        "editable node-link graph, each node coloured by its -log10 adjusted p-value."
+    )
+    return text, [GO, BH]
+
+
+def _cepo(p: dict):
+    norm = (
+        "Counts were normalized to 10,000 per cell and log1p-transformed, and "
+        if p.get("normalize", True) else ""
+    )
+    text = (
+        f"Cell-identity marker genes were identified per {p.get('group_key') or 'cell-type'} group with "
+        "Cepo, which ranks genes by differential stability — combining how highly and how stably each "
+        f"gene is expressed within a group relative to the rest — rather than by mean difference. {norm}"
+        f"genes detected in at least {p['min_cells']} cells and expressed in at least "
+        f"{float(p['exprs_pct']):g} of cells were scored, and the top {p['n_genes']} differential-stability "
+        "genes per group are reported. This is a clean-room Python reimplementation of the Cepo method."
+    )
+    return text, [CEPO, SCANPY]
+
+
 _TEMPLATES = {
     "umap_scrna": _umap,
+    "gsea": _gsea,
+    "go_graph": _go_graph,
+    "cepo": _cepo,
     "proteomics_de": _proteomics_de,
     "cluster": _cluster,
     "violin": _violin,

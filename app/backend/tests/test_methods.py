@@ -26,6 +26,37 @@ def test_methods_quote_resolved_params():
     assert any("false discovery rate" in c for c in volcano["citations"])
 
 
+def test_gsea_methods_template_is_specific_not_generic():
+    # Library mode (no pasted gene_set) names the GO library + permutation NES + FDR.
+    lib = methods.build(load_skill("gsea"), {"n_perm": "500"})
+    assert "Gene Set Enrichment Analysis" in lib["text"]
+    assert "gene=" not in lib["text"] and "gene_set=" not in lib["text"]  # not the raw-param dump
+    assert "500 gene-set permutations" in lib["text"]
+    assert any("PNAS" in c for c in lib["citations"])      # Subramanian 2005
+    assert any("GSEApy" in c for c in lib["citations"])    # Fang 2023
+    assert any("Gene Ontology" in c for c in lib["citations"])
+
+    # Single-set mode (pasted members) names the set, drops the GO-library citation.
+    single = methods.build(load_skill("gsea"), {"gene_set": "RHO,PRPH2,NRL", "set_name": "Rod set"})
+    assert "Rod set" in single["text"]
+    assert not any("Gene Ontology" in c for c in single["citations"])
+
+
+def test_go_graph_methods_template_is_specific():
+    out = methods.build(load_skill("go_graph"), {"top_n": "15", "namespace": "BP"})
+    assert "is_a/part_of hierarchy" in out["text"]
+    assert "top 15" in out["text"] and "BP namespace" in out["text"]
+    assert any("Gene Ontology" in c for c in out["citations"])
+    assert any("false discovery rate" in c for c in out["citations"])
+
+
+def test_cepo_methods_template_is_specific():
+    out = methods.build(load_skill("cepo"), {"n_genes": "12"})
+    assert "differential stability" in out["text"]
+    assert "top 12 differential-stability genes" in out["text"]
+    assert any("Cepo" in c for c in out["citations"])
+
+
 def test_unknown_skill_falls_back_to_generic():
     spec = SkillSpec(
         id="mystery",
