@@ -1,12 +1,14 @@
-# lit-synthesizer — scope (verified, warm; build next session)
+# lit-synthesizer — scope (Phase A+B+C SHIPPED; D remains)
 
-> Status: **Phase A + B SHIPPED 2026-06-18** (A `2a982be`, B `e460fd5`) — `litsynth/` + `POST
-> /methods/compose` (deterministic multi-skill methods synthesizer, offline, no new deps,
+> Status: **Phase A + B + C SHIPPED 2026-06-18** (A `2a982be`, B `e460fd5`, C this commit) — `litsynth/`
+> + `POST /methods/compose` (deterministic multi-skill methods synthesizer, offline, no new deps,
 > `methods.build_body` single-sourcing the citations) **+** `GET /citations/search` · `/citations/by-doi`
-> (NCBI E-utilities PubMed lookup: stdlib `urllib`+`xml.etree`, self-throttled + on-disk cache, fetcher
-> behind a single seam → offline-tested AND live-verified against the real API). **Phase C (bioRxiv
-> per-record `license`) NOT built.** NCBI facts re-verified 2026-06-18 (NBK25497: **3 req/s keyless,
+> (NCBI E-utilities PubMed lookup **+ bioRxiv/medRxiv preprint lookup with per-record `license`**: stdlib
+> `urllib`+`xml.etree`+`json`, self-throttled + on-disk cache, fetcher behind a single shared seam →
+> offline-tested AND live-verified against the real APIs). bioRxiv `license` field + the **no-free-text-
+> search-API** constraint re-verified live at build 2026-06-18. NCBI facts (NBK25497: **3 req/s keyless,
 > 10 with a key**). The 2nd ClawBio platform capability (sibling of the shipped `data-extractor`/X4).
+> **Phase D (reproduction `Ledger` → paper-level `MethodsSection`) NOT built.**
 
 ## What it is
 
@@ -80,10 +82,18 @@ app/backend/litsynth/
   (≥0.34 s spacer keyless) + set `tool=selom` + a contact `email` on every request. API key optional
   via env (`SELOM_NCBI_API_KEY`). Bibliographic metadata (title/PMID/DOI) is US-gov, not copyrightable;
   do not redistribute abstract corpora without checking terms.
-- **bioRxiv API** (verified against api.biorxiv.org): endpoint `details/{server}/{doi}/na/{format}`;
-  **each record carries its own `license` field** (e.g. `cc_by`, `cc_by_nc_nd`, `cc_no`=all-rights-
-  reserved) — surface it on `Citation.metadata_license`, never assume CC; **no documented rate limit**
-  (apply a polite self-throttle + a descriptive `User-Agent` anyway — some CDNs 403 a bare UA).
+- **bioRxiv API** (re-verified live at build against api.biorxiv.org): endpoint
+  `details/{server}/{doi}/na/{format}`, `server ∈ {biorxiv, medrxiv}` (shared `10.1101` DOI prefix →
+  `by_doi` tries biorxiv then medrxiv). Response is `{messages, collection}`; **each record carries its
+  own `license` field** (confirmed live: `cc_by_nc_nd`, `cc_no`=all-rights-reserved) — surfaced on
+  `Citation.metadata_license`, never assumed CC. Quirks handled: `authors` is one `"Last, F.; …"` string
+  (not a list), `date` is ISO `YYYY-MM-DD`, `collection` holds one record **per version** (take the max),
+  a miss is `{"status":"no posts found"}` + empty collection (clean `None`, not an error). **No documented
+  rate limit** (polite 0.5 s self-throttle + descriptive `User-Agent`, reusing Phase B's `ThrottledFetcher`).
+- **bioRxiv has NO free-text search API** (verified): the public API is DOI/date/interval-addressed only.
+  So bioRxiv's role is **DOI resolution + license capture** (deterministic tier-2), not topical search —
+  `/citations/search?source=biorxiv` returns `[]` honestly rather than fabricating results (`source=both`
+  topical search resolves via PubMed, which already indexes many preprints).
 
 ## Risks
 - NCBI rate-limit/IP-block → mandatory throttle + tool/email + cache.
@@ -107,8 +117,17 @@ app/backend/litsynth/
   degrade to `[]`/None + `degraded=True`) + `GET /citations/search` · `/citations/by-doi`. Network behind
   one fetcher seam → 13 offline cases (real-format fixtures) **and** live-verified (real SCANPY parse).
   Stdlib only. pytest 362 (+13); ruff clean; `tests/test_litsynth_citations.py`.
-- **Phase C:** `biorxiv.py` (per-record `license` capture) wired into `/citations/*` (`source=both`).
-- **Phase D (later):** feed a full reproduction `Ledger` → a paper-level `MethodsSection`.
+- **Phase C — SHIPPED (bioRxiv/medRxiv lookup):** `biorxiv.py` (DOI-addressed `details` client, stdlib
+  `urllib`+`json`, **reusing Phase B's `ThrottledFetcher`/`Fetcher` seam** — no new transport code; parses
+  the `; `-joined author string, ISO date, multi-version `collection` → latest; captures the per-record
+  `license` on `Citation.metadata_license`) wired into `/citations/by-doi` + `lookup.citation_by_doi`
+  via a `source ∈ {both, pubmed, biorxiv}` selector (both = PubMed first, bioRxiv/medRxiv fallback that
+  also carries the license). `/citations/search` gained `source` too (biorxiv → honest `[]`; no term API).
+  Network behind the shared fetcher seam → 8 offline cases (real-format fixtures) **and** live-verified
+  (real preprint: PubMed-miss → bioRxiv fallback resolved `cc_by_nc_nd`). Stdlib only. pytest 370 (+8);
+  ruff clean; `tests/test_litsynth_citations.py`.
+- **Phase D (next):** feed a full reproduction `Ledger` → a paper-level `MethodsSection` (the headline
+  tie-in of lit-synth to the reproduction engine — `methods.build_body` is already the reusable unit).
 
 ## Open questions (owner)
 1. Keep `/skills/{id}/run` returning the bare `{text, citations}` dict in Phase A (recommend: yes).
@@ -116,4 +135,5 @@ app/backend/litsynth/
    + `tool=selom`); `email` + `api_key` read from `SELOM_NCBI_EMAIL` / `SELOM_NCBI_API_KEY` (unset in dev).
    Registering a key/email is a pre-launch gate, not needed to build/test._
 3. Topical lookups off-by-default (recommend: yes).
-4. Include medRxiv alongside bioRxiv (recommend: yes — one server param).
+4. Include medRxiv alongside bioRxiv — _Resolved Phase C: yes; `by_doi` tries `biorxiv` then `medrxiv`
+   (shared `10.1101` prefix), `source` selector exposes both._
