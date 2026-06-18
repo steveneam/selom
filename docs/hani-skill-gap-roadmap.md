@@ -22,11 +22,17 @@ blocker types and are not skills.
 | violin + PubMed annotation | 3A / 3B | existing `violin` + a PubMed-count "known vs novel marker" annotation layer | existing `violin` + lit-synth network | **SHIPPED** — `annotate=pubmed`; live RHO→656 hits/retina = known, ZZZ3→0 = novel |
 
 `boxplot` is wired into the live `reproduction_hani` ledger (Fig 2C, replacing the old
-`box` placeholder), so lit-synth Phase D now emits its Methods paragraph. `pvca` and
-`regression` are now **also wired as Hani ledger panels** (Fig 2B / 4C) with directional
-figure-read goldens (cell type dominates the variance / maturation score rises with age),
-so the curated subset is 8 panels / 7 in-scope and lit-synth Phase D emits their Methods
-paragraphs too. The captured scorecard reads reproducibility 96 / confidence 100, 0 defects.
+`box` placeholder), so lit-synth Phase D now emits its Methods paragraph. **`regression` is
+wired as Fig 4C** (developmental-age vs Cepo-statistic scatterplots) with a faithful,
+caption-exact directional golden — `age_association="both"` (maturation genes are positively
+AND negatively associated with age; not the single "positive" the roadmap first assumed).
+**`pvca` is deliberately NOT wired**: on inspection Fig 2B is a *pairwise PVCA batch-effect
+heatmap* ("proportion of variance contributed by batch per dataset pair"), not a variance-
+fraction bar, and shows no "cell type dominates" claim — so the pvca-bar skill does not
+faithfully reproduce it (pvca stays a shipped capability). Curated subset = 7 panels /
+6 in-scope; captured scorecard reproducibility 96 / confidence 100, 0 defects. _(The 2B/4C
+goldens were corrected after the ★D bridge's figure-rendering surfaced that they had been
+wired from assumed descriptions rather than the panels — figure-repro discipline working.)_
 
 ## Shipped — multi-dataset integration (Harmony)
 
