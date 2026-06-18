@@ -52,8 +52,17 @@ GOLD_N_TYPE_SPECIFIC = 360       # genes marking exactly one cell type (UpSet si
 GOLD_N_SHARED = 45               # genes marking exactly two cell types (UpSet shared)
 GOLD_N_MARKER_ASSIGN = 450       # total True marker assignments (360*1 + 45*2)
 GOLD_TOP_METHOD = "Cepo"         # Fig 2C: Cepo has the highest cross-dataset concordance vs Limma/HVG
-GOLD_N_ORGANOIDS = 15            # Fig 6A: n = 15 organoids (West et al. 2022 protocol)
-GOLD_N_BATCHES = 3               # Fig 6A: N = 3 differentiation batches
+GOLD_N_ORGANOIDS = 15            # Fig 6A: n = 15 organoids (West et al. 2022 protocol) — cohort
+GOLD_N_BATCHES = 3               # Fig 6A: N = 3 differentiation batches — cohort
+# Deposit-grounded, live-verifiable facts of the organoid scRNA (drive_live_organoid re-derives
+# them from GSE201356): the 15-organoid / 3-batch cohort is deposited as 4 10x libraries, and the
+# organoids are rod-dominant (the paper's central organoid-fidelity claim).
+GOLD_N_LIBRARIES = 4             # deposited 10x libraries in GSE201356 (GSM6061839-42)
+GOLD_DOMINANT_LINEAGE = "Rods"   # rod-dominant organoids (Fig 6 / text)
+
+# Photoreceptor identity panels for the live rod-dominance check (canonical markers).
+ROD_MARKERS = ["RHO", "NRL", "NR2E3", "GNAT1", "PDE6B", "CNGA1", "RCVRN"]
+CONE_MARKERS = ["ARR3", "OPN1SW", "OPN1MW", "GNAT2", "PDE6H", "GNGT2"]
 
 # Mature retinal-tissue datasets curated into the reference atlas (Fig 1).
 MATURE_DATASETS = ["Cowan et al. (2020)", "Lu et al. (2020)", "Lukowski et al. (2019)",
@@ -165,9 +174,14 @@ def _organoid_panels() -> list[Panel]:
                      R.SourceTag(ref="Fig6A", faithful=True, note="organoid fidelity cohort")],
             golden=[
                 Golden(metric="n_organoids", value=GOLD_N_ORGANOIDS, source=R.SOURCE_FIGURE,
-                       note="n = 15 organoids"),
+                       note="n = 15 organoids (cohort)"),
                 Golden(metric="n_batches", value=GOLD_N_BATCHES, source=R.SOURCE_FIGURE,
-                       note="N = 3 differentiation batches"),
+                       note="N = 3 differentiation batches (cohort)"),
+                Golden(metric="n_libraries", value=GOLD_N_LIBRARIES, source=R.SOURCE_EXTRACTED,
+                       note="10x libraries deposited in GSE201356 (live: obs['sample'])"),
+                Golden(metric="dominant_lineage", value=GOLD_DOMINANT_LINEAGE,
+                       source=R.SOURCE_FIGURE,
+                       note="rod-dominant organoids (live: rod vs cone marker expression)"),
             ],
         ),
     ]
@@ -219,7 +233,9 @@ def _captured() -> dict[str, dict]:
                             "n_type_specific": GOLD_N_TYPE_SPECIFIC,
                             "n_shared": GOLD_N_SHARED}},                  # == mmc2 -> exact
         "6E": {"computed": {"ihc": None}},                               # wet-lab IHC, out of scope
-        "6A": {"computed": {"n_organoids": GOLD_N_ORGANOIDS, "n_batches": GOLD_N_BATCHES}},
+        "6A": {"computed": {"n_organoids": GOLD_N_ORGANOIDS, "n_batches": GOLD_N_BATCHES,
+                            "n_libraries": GOLD_N_LIBRARIES,             # deposit fact
+                            "dominant_lineage": GOLD_DOMINANT_LINEAGE}}, # rod-dominant (figure)
     }
 
 
@@ -307,6 +323,100 @@ def drive_live_markers(ledger: Ledger | None = None, *, csv_path: str | pathlib.
     return ledger, summary
 
 
+# --- live organoid drive (re-derive Fig 6A from the deposited GSE201356 scRNA) -----------------
+
+
+def _rod_dominance(adata) -> tuple[str, float, dict]:
+    """Per-cell rod vs cone identity from canonical photoreceptor markers → dominant lineage.
+
+    Normalizes (CP10k + log1p) a copy, takes the mean panel expression per cell for rods and
+    cones, and reports the fraction of cells where the rod signal exceeds the cone signal. The
+    organoids are described as rod-dominant; this is the data-level confirmation."""
+    import numpy as np
+    import scanpy as sc
+
+    a = adata.copy()
+    sc.pp.normalize_total(a, target_sum=1e4)
+    sc.pp.log1p(a)
+
+    def panel_mean(genes):
+        present = [g for g in genes if g in a.var_names]
+        if not present:
+            return None, []
+        X = a[:, present].X
+        X = X.toarray() if hasattr(X, "toarray") else np.asarray(X)
+        return X.mean(axis=1), present
+
+    rod, rod_present = panel_mean(ROD_MARKERS)
+    cone, cone_present = panel_mean(CONE_MARKERS)
+    if rod is None or cone is None:
+        return "unknown", 0.0, {"rod_markers": rod_present, "cone_markers": cone_present}
+    frac = float((np.asarray(rod).ravel() > np.asarray(cone).ravel()).mean())
+    lineage = "Rods" if frac > 0.5 else "Cones"
+    return lineage, frac, {"rod_markers": rod_present, "cone_markers": cone_present}
+
+
+def drive_live_organoid(
+    ledger: Ledger | None = None, *, h5ad_path: str | pathlib.Path,
+) -> tuple[Ledger, dict]:
+    """Drive Fig 6A live on the deposited GSE201356 organoid scRNA (the organoid side).
+
+    Reproduces the organoid-fidelity panel from the data we actually hold (4 of the cohort's
+    libraries): re-derives the deposited library count + rod-dominance straight from the h5ad,
+    and renders the Fig 6A UMAP through Selom's own ``umap_scrna`` skill (proving the editable
+    figure + styling). The cohort facts (15 organoids / 3 batches) stay figure-read — they are
+    not in the 4-library deposit, so the live drive does not claim to derive them. NOT the
+    reference-dependent fidelity benchmark (6C/6D), which needs an atlas we do not hold.
+
+    Needs scanpy + the external h5ad (not CI-safe). Returns (driven ledger, live summary)."""
+    import os
+
+    from skills._genes import read_anndata
+
+    h5ad_path = str(h5ad_path)
+    ledger = ledger or build_ledger()
+
+    adata = read_anndata(h5ad_path)
+    n_libraries = int(adata.obs["sample"].nunique()) if "sample" in adata.obs else 1
+    n_cells = int(adata.n_obs)
+    lineage, rod_frac, markers = _rod_dominance(adata)
+
+    # Render Fig 6A through Selom's own skill (forces the real scanpy engine); colouring by the
+    # leiden clustering yields one trace per cluster, so the trace count = n_clusters.
+    os.environ["SELOM_UMAP_ENGINE"] = "scanpy"
+    from skills.contract import run_skill
+
+    fig = run_skill("umap_scrna", h5ad_path,
+                    {"n_pcs": 50, "n_neighbors": 15, "color_by": "leiden"})
+    n_clusters = len(fig.get("data", []))
+
+    cap = _captured()
+    cap["6A"]["computed"]["n_libraries"] = n_libraries
+    cap["6A"]["computed"]["dominant_lineage"] = lineage
+    for panel in ledger.panels:
+        if not panel.golden:
+            continue
+        entry = cap.get(panel.key, {})
+        guards = ["wet_lab_out_of_scope"] if panel.scope == R.WET_LAB else []
+        ledger.validations.append(
+            R.validate_panel(panel, entry.get("computed", {}), run_id=f"live-organoid-{panel.key}",
+                             guards_fired=guards))
+        panel.status = "validated"
+    ledger.scorecard = R.build_scorecard(ledger)
+
+    summary = {
+        "organoid_scrna": {"n_libraries": n_libraries, "n_cells": n_cells,
+                           "n_clusters": n_clusters},
+        "rod_dominance": {"dominant_lineage": lineage, "rod_gt_cone_fraction": round(rod_frac, 4),
+                          **markers},
+        "deposit_vs_cohort": (f"{n_libraries} deposited 10x libraries of the "
+                              f"{GOLD_N_ORGANOIDS}-organoid / {GOLD_N_BATCHES}-batch cohort"),
+        "live_matches_deposit": (n_libraries == GOLD_N_LIBRARIES
+                                 and lineage == GOLD_DOMINANT_LINEAGE),
+    }
+    return ledger, summary
+
+
 # --- pretty-print + persistence ---------------------------------------------------------------
 
 
@@ -341,13 +451,22 @@ if __name__ == "__main__":  # pragma: no cover — dev/validation harness (ADR 0
         description="Kim/Hani reproduction ledger — drive it through the engine (validation-only)")
     p.add_argument("--live", action="store_true",
                    help="re-derive the Cepo marker matrix from the deposited mmc2.csv")
+    p.add_argument("--live-organoid", action="store_true",
+                   help="drive Fig 6A live on the deposited GSE201356 organoid scRNA (h5ad)")
     p.add_argument("--csv",
                    default="C:/Users/seamegdool/Desktop/Claude code and website tips/Data/"
                            "Hani/1-s2.0-S2213671122005914-mmc2.csv")
+    p.add_argument("--h5ad", default="D:/selom-data/hani/processed/hani_irpe_subset.h5ad")
     p.add_argument("--save", action="store_true", help="save the ledger JSON under data_dir/repro")
     args = p.parse_args()
 
-    if args.live:
+    if args.live_organoid:
+        ledger, summary = drive_live_organoid(h5ad_path=args.h5ad)
+        print("LIVE organoid drive (deposited GSE201356 scRNA):")
+        for k, v in summary.items():
+            print(f"  {k:20s} {v}")
+        print()
+    elif args.live:
         ledger, summary = drive_live_markers(csv_path=args.csv)
         print("LIVE marker-matrix recount (deposited mmc2.csv):")
         for k, v in summary.items():

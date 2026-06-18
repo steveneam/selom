@@ -43,7 +43,7 @@ def test_captured_scorecard_is_a_clean_reproducible_paper():
     sc = ledger.scorecard
     assert sc.n_panels == 6
     assert sc.n_in_scope == 5                          # the IHC panel is out of the denominator
-    assert sc.findings["reproduced"] == 9             # faithful golden metrics across in-scope panels
+    assert sc.findings["reproduced"] == 11            # faithful golden metrics across in-scope panels
     assert sc.findings["paper_irreproducible"] == 0
     assert sc.findings["structural_limit"] == 0
     assert sc.findings["engine_delta"] == 0
@@ -80,7 +80,7 @@ def test_captured_ledger_round_trips(tmp_path):
     ledger = HN.drive_captured()
     assert R.save_ledger(ledger, root=tmp_path).exists()
     again = R.load_ledger("hani", root=tmp_path)
-    assert again.scorecard.findings["reproduced"] == 9
+    assert again.scorecard.findings["reproduced"] == 11
     assert again.panel("3B").provenance == "mmc2+ Fig3+"
     assert _blame(again, "3B", "n_marker_genes") is None
     assert len(again.panels) == 6
@@ -103,3 +103,23 @@ def test_live_marker_recount_matches_the_deposit():
     assert mm["n_assignments"] == 450
     # Driven live, the deposit panel is still a faithful (un-blamed) reproduction.
     assert _blame(ledger, "3B", "n_marker_genes") is None
+
+
+# --- live organoid drive on the deposited GSE201356 scRNA (skipped if absent) --
+
+ORGANOID_H5AD = Path("D:/selom-data/hani/processed/hani_irpe_subset.h5ad")
+
+
+@pytest.mark.skipif(not ORGANOID_H5AD.exists(),
+                    reason="Hani organoid h5ad not present (owner machine only)")
+def test_live_organoid_drive_reproduces_fig6a():
+    ledger, summary = HN.drive_live_organoid(h5ad_path=ORGANOID_H5AD)
+    # The 4 deposited 10x libraries + rod-dominance are re-derived straight from the data.
+    assert summary["organoid_scrna"]["n_libraries"] == 4
+    assert summary["organoid_scrna"]["n_cells"] > 0
+    assert summary["organoid_scrna"]["n_clusters"] >= 2
+    assert summary["rod_dominance"]["dominant_lineage"] == "Rods"
+    assert summary["live_matches_deposit"] is True
+    # The live-derived Fig 6A metrics are faithful (un-blamed); the cohort facts stay figure-read.
+    assert _blame(ledger, "6A", "n_libraries") is None
+    assert _blame(ledger, "6A", "dominant_lineage") is None
