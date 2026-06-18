@@ -1,9 +1,10 @@
 # lit-synthesizer — scope (verified, warm; build next session)
 
-> Status: **SCOPED + externally-verified 2026-06-18 — NOT built.** The 2nd ClawBio platform
-> capability (sibling of the shipped `data-extractor`/X4). Scoped by a research subagent; the two
-> load-bearing external claims were verified by Claude (below). Build Phase A first (charter:
-> present per-item scope before coding — this doc IS that scope).
+> Status: **Phase A SHIPPED 2026-06-18** (`2a982be`) — `litsynth/` + `POST /methods/compose` are
+> live: a deterministic multi-skill methods synthesizer, offline, no new deps, `methods.build_body`
+> single-sourcing the citations. **Phases B/C (network PubMed/bioRxiv lookup) NOT built** — re-verify
+> the two external facts below before building them. The 2nd ClawBio platform capability (sibling of
+> the shipped `data-extractor`/X4); scoped by a research subagent, external claims verified by Claude.
 
 ## What it is
 
@@ -92,9 +93,12 @@ app/backend/litsynth/
   (single algorithm); don't write `MethodsSection` back into the ledger in Phase A.
 
 ## Phased build
-- **Phase A (build first — deterministic core, zero deps, zero network):** `models.py` + `synth.py` +
-  `citations.py` (single-source refs from `methods.py`) + `POST /methods/compose`. Ships the
-  "auto-methods text" promise at the project/story level. Fully offline, fully tested.
+- **Phase A — SHIPPED `2a982be` (deterministic core, zero deps, zero network):** `litsynth/`
+  (`models.py` `SkillRunRef`/`MethodsSection` + `synth.py` `compose_methods` + `citations.py`
+  single-sourcing `methods.build_body`) + `POST /methods/compose`. The one refactor: `methods.py`
+  gained `build_body()` (prose + citations, no attribution) so `build()` stays byte-identical and
+  `/skills/{id}/run` is untouched. Dedups citations first-seen; one consolidated Selom attribution
+  names all skills+versions. pytest 349 (+9); ruff clean; `tests/test_litsynth.py`.
 - **Phase B:** `pubmed.py` + `cache.py` + `GET /citations/by-doi` + `/citations/search` (offline-tested
   against committed fixtures; network injected as a fetcher param, not monkeypatched).
 - **Phase C:** `biorxiv.py` (per-record `license` capture) wired into `/citations/*` (`source=both`).
