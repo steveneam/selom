@@ -53,6 +53,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setNavOpen(false);
   }, [pathname]);
 
+  // Skill Match is a width-hungry two-pane view (PDF viewer + matched skills) — auto-collapse the
+  // desktop rail to its icon spine there so both panes get room (nav stays reachable as icons).
+  const forceCollapsed = pathname.startsWith("/skill-match");
+  const collapsed = railCollapsed || forceCollapsed;
+
   // ⌘K / Ctrl-K toggles the command palette from anywhere.
   React.useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -77,8 +82,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       )}
       <Sidebar
         open={navOpen}
-        collapsed={railCollapsed}
-        onToggleCollapse={toggleRail}
+        collapsed={collapsed}
+        onToggleCollapse={forceCollapsed ? undefined : toggleRail}
         onNavigate={() => setNavOpen(false)}
       />
       <div className="flex min-w-0 flex-1 flex-col">

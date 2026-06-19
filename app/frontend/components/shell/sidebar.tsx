@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Crosshair, Dna, Home, PanelLeftClose, PanelLeftOpen, Plus, ScanSearch, Settings, Store } from "lucide-react";
+import { Crosshair, Dna, Home, ListChecks, PanelLeftClose, PanelLeftOpen, Plus, ScanSearch, Settings, Store } from "lucide-react";
 import { SelomMark, SelomWordmark } from "@/components/brand/selom-mark";
 import { cn } from "@/lib/cn";
 import { projectStore, useProjects } from "@/lib/projects/store";
@@ -61,6 +61,7 @@ export function Sidebar({
         <RailLink href="/store" icon={<Store />} label="Skill Store" active={pathname.startsWith("/store")} collapsed={collapsed} onNavigate={onNavigate} />
         <RailLink href="/gene-sets" icon={<Dna />} label="Gene Sets" active={pathname.startsWith("/gene-sets")} collapsed={collapsed} onNavigate={onNavigate} />
         <RailLink href="/reproduction" icon={<ScanSearch />} label="Reproduction" active={pathname.startsWith("/reproduction")} collapsed={collapsed} onNavigate={onNavigate} />
+        <RailLink href="/skill-match" icon={<ListChecks />} label="Skill Match" active={pathname.startsWith("/skill-match")} collapsed={collapsed} onNavigate={onNavigate} />
         <RailLink href="/extract" icon={<Crosshair />} label="Recover data" active={pathname.startsWith("/extract")} collapsed={collapsed} onNavigate={onNavigate} />
       </nav>
 
