@@ -14,12 +14,13 @@ const TIMEOUT_MS = 8000;
 
 export function UndoToast() {
   const entry = React.useSyncExternalStore(subscribeUndo, getUndo, () => null);
+  const entryId = entry?.id;
 
   React.useEffect(() => {
-    if (!entry) return;
-    const id = setTimeout(() => clearUndo(entry.id), TIMEOUT_MS);
+    if (!entryId) return;
+    const id = setTimeout(() => clearUndo(entryId), TIMEOUT_MS);
     return () => clearTimeout(id);
-  }, [entry?.id]);
+  }, [entryId]);
 
   if (!entry) return null;
 

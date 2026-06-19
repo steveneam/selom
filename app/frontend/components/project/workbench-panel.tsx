@@ -54,12 +54,14 @@ export function WorkbenchPanel({
 
   // Select a skill when the command palette / Gene Sets surface deep-links one in.
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- select a skill when one is deep-linked in
     if (preselect?.id) setSelected(preselect.id);
   }, [preselect]);
 
   // Initialise inline params when the selected skill changes; if a *fresh* preselect
   // carried prefills for this skill (e.g. a gene-set applied as a volcano highlight),
   // merge them once over the defaults.
+  /* eslint-disable react-hooks/set-state-in-effect -- reset/merge inline params when the selected skill or its prefill changes */
   React.useEffect(() => {
     if (!selected) {
       setParams({});
@@ -73,6 +75,7 @@ export function WorkbenchPanel({
       setParams(base);
     }
   }, [selected, preselect]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const selectedSkill = selected ? getSkill(selected) : undefined;
   const schema = selected ? skillParamSchema(selected) : [];
@@ -297,7 +300,6 @@ function SkillTile({ skillId, small }: { skillId: string; small?: boolean }) {
   const skill = getSkill(skillId);
   if (!skill) return null;
   const color = skillColor(skill);
-  const Icon = skillIcon(skill);
   return (
     <span
       aria-hidden
@@ -311,7 +313,7 @@ function SkillTile({ skillId, small }: { skillId: string; small?: boolean }) {
         color,
       }}
     >
-      <Icon />
+      {React.createElement(skillIcon(skill))}
     </span>
   );
 }

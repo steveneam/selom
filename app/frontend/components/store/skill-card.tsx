@@ -1,5 +1,6 @@
 "use client";
 
+import { createElement } from "react";
 import { Check, Download, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,6 @@ export function SkillCard({
   const src = SOURCE_META[skill.source];
   const verified = skill.tier === "verified";
   const color = skillColor(skill);
-  const Icon = skillIcon(skill);
 
   return (
     <Card
@@ -60,7 +60,7 @@ export function SkillCard({
             color,
           }}
         >
-          <Icon />
+          {createElement(skillIcon(skill))}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">

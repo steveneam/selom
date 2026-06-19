@@ -259,7 +259,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       { id: "figures", label: "Figures", items: figures },
       { id: "skills", label: currentProjectId ? "Apply a skill" : "Skills", items: skills },
     ];
-  }, [catalog, state, router, currentProjectId, currentProject]);
+  }, [catalog, state, router, currentProjectId]);
 
   // ── Filter + score ────────────────────────────────────────────────────────
   const filtered = React.useMemo<Section[]>(() => {
@@ -286,9 +286,11 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
 
   // Reset highlight to the top whenever the result set changes.
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the highlighted row when the query changes
     setActive(0);
   }, [query]);
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clamp the highlight when the result count shrinks
     if (active >= flat.length) setActive(0);
   }, [flat.length, active]);
 
@@ -479,6 +481,5 @@ function Hint({ keys, children }: { keys: string; children: React.ReactNode }) {
 function SkillGlyph({ skillId }: { skillId: string }) {
   const skill = getSkill(skillId);
   if (!skill) return <Boxes />;
-  const Icon = skillIcon(skill);
-  return <Icon />;
+  return React.createElement(skillIcon(skill));
 }

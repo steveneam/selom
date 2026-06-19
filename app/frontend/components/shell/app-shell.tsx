@@ -30,6 +30,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     projectStore.hydrate();
     try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time hydrate of a persisted UI pref on mount (SSR-safe)
       if (localStorage.getItem(RAIL_COLLAPSED_KEY) === "1") setRailCollapsed(true);
     } catch {
       /* storage unavailable */
@@ -50,6 +51,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // Close the mobile drawer whenever the route changes.
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- close the mobile drawer on navigation
     setNavOpen(false);
   }, [pathname]);
 
