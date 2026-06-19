@@ -58,12 +58,12 @@ session restart. Supersedes the prior Fable-5 default.
 
 ## Resume Prompt (next session)
 
-> Stamped 2026-06-19 22:40 +10:00. Paste at session start; re-stamp date+time before reuse.
+> Stamped 2026-06-19 22:51 +10:00. Paste at session start; re-stamp date+time before reuse.
 
 ```
-Resume · 2026-06-19 22:40 +10:00 (Australia/Sydney) · Selom · Claude (FE+BE, acting) · Opus 4.8 (xhigh)
+Resume · 2026-06-19 22:51 +10:00 (Australia/Sydney) · Selom · Claude (FE+BE, acting) · Opus 4.8 (xhigh)
 
-THIS SESSION STARTS WITH: nothing pre-assigned — **Selom Melody (clean-room Harmony) SHIPPED + VALIDATED in s29** (GPL off the integration shipped path; validated == harmonypy oracle on real GSE201356). Pick the next task WITH THE OWNER from the MENU at the bottom — likely lead = the **4th figure-repro LEDGER** (the headline open thread). Whatever you build: per-item scope first, code/docs split commits, ASK before push.
+THIS SESSION STARTS WITH (owner-directed): **SCOPE HARMONY2 and assess whether to fold it into Melody** to upgrade/future-proof our integration engine. Selom Melody (clean-room Harmony) SHIPPED + VALIDATED in s29; it implements the 2019 method. It's been 7 years — Harmony2 (2026) is the successor and should carry real improvements; the owner wants Melody to stay novel + functional for a long time, so scope Harmony2's deltas, judge the fit, write a scope doc + recommendation, and PAUSE for the owner's build decision (DON'T build yet). Same discipline as the Melody build (clean-room from the PAPER, validate-by-metric). Per-item scope first, code/docs split commits, ASK before push.
 
 Selom build repo D:/selom. CLAUDE.md auto-loads. Read FIRST: agent_handoff/README.md + agent_handoff/CURRENT.md + docs/selom-integrate/spec.md (the Melody spec — BUILT s29, reference) + memory (selom-harmony-reimplementation, selom-uv-sync-footgun ← READ BEFORE ANY uv COMMAND, selom-backend-python-exec, selom-gsea-engine-sensitivity ← validate-by-METRIC-not-pixels, selom-rpgrip1-gap-tooling + selom-proprietary-skills-folder ← the clean-room/proprietary pattern, selom-hani-figure-reproduction, selom-real-datasets, compound-capability-each-task, ask-before-docker-wsl) + git status.
 
@@ -71,12 +71,18 @@ ROLE: Codex away → Claude owns BOTH lanes. Per-lane EXPLICIT scoped commits (N
 
 GIT STATE: clean, s29 all pushed (verify `git log --oneline -8`). Per-push rule applies to all NEW work.
 
-NEXT-TASK MENU (Melody is DONE — pick ONE with the owner, scope it first; details also in the AFTER line below):
+THE TASK (lead) — SCOPE HARMONY2 → fit-assessment for upgrading Melody (scope+recommend, then PAUSE; do it PROPERLY):
+ • SOURCE (owner-supplied; clean-room from the PAPER, NOT the GPL code): `C:\Users\seamegdool\Desktop\Claude code and website tips\Data\Harmony\Harmony 2\` = "Integration of large complex single-cell datasets with Harmony2.pdf" + Supplementary Figure 1/2.jpg. Harmony2 = Patikas, Yao, Madhu, Raychaudhuri, Hemberg, Korsunsky (bioRxiv 2026, DOI 10.64898/2026.03.16.711825). Dogfood our OWN extractor (`papers.extract_text`, pypdf/PDFium) to pull the algorithm + deltas. ⚠ Harmony2 is ALSO GPL-3.0 (the preprint code + harmonypy 2.0.0 C++/Armadillo) — read the paper, NOT the source ([[license-decision-framework]] [[selom-harmony-reimplementation]]).
+ • EXTRACT THE ALGORITHMIC DELTAS vs the 2019 method melody.py already implements: what specifically changed? Headline = anti-OVER-integration in biologically heterogeneous data + scale to >100M cells/>1K datasets (C++/Armadillo). SEPARATE the scale engineering (irrelevant to Selom's ~10k-cell workloads — don't chase it) from the ALGORITHMIC quality improvements (the part worth folding into Melody). Capture exact new/changed update rules + params + defaults; flag anything only in the GPL code (not clean-room-able → out of scope).
+ • ASSESS FIT: which improvements are (a) clean-room-able from the preprint, (b) worth it for Selom's scale + the figure-repro mission, (c) low-risk to add to melody.py BEHIND A FLAG (default-off → preserve the validated s29 behavior/numbers)? Effort/risk/sequencing; does it give Melody real novelty + longevity?
+ • DELIVERABLE: a `docs/<slug>/` scope doc (deltas table + fit verdict + recommended subset + validation plan) + a memory; then PAUSE for the owner to pick what (if anything) to build. If approved → /spec → build behind a flag → validate-by-metric vs BOTH the 2019 melody AND (if installable) the harmonypy-2.0.0 oracle — ASK before any build/Docker (the C++ one), never regress s29.
+
+LATER MENU (after the Harmony2 scope — pick with owner, scope each first):
  • 4th figure-repro LEDGER (headline open thread) — owner supplies the paper; paper_metadata.py can auto-ingest the bib; follow figures→methods→numbers ([[figure-repro-look-at-figures-first]] / [[figure-repro-match-numbers-exactly]]).
  • OSCA Gap E — reference-based cell-type annotation (last OSCA gap; owner deferred the route: E1 clean-room SingleR-correlation [recommended, no dep] vs E2 celltypist — pick first) ([[osca-source-sc-workflow]]).
  • FE intake wiring for paper_metadata (drop PDF → extract → auto-rename → labels) — the Papers/EndNote spinoff seed ([[selom-paper-metadata]]).
  • uv.lock proper regen — now MORE tractable: harmonypy is off the runtime closure (s29, quarantined in the new `oracle` extra); remaining blocker = scvi-tools/torch exclusion ([[selom-uv-sync-footgun]]).
- • Melody fast-follows (optional): fold in Harmony2's anti-over-integration idea from the 2026 preprint (concept-only — it's GPL); flip n_hvg→2000 then re-verify the Hani live reproduction.
+ • Melody fast-follows: flip n_hvg→2000 then re-verify the Hani live reproduction; expose the per-iteration objective/mixing as provenance (trust-as-output). (Harmony2's algorithmic improvements are the LEAD task above, not a fast-follow.)
 
 ⚠ ENV/DEP RULE ([[selom-uv-sync-footgun]]): backend venv is HAND-SEWN (harmonypy/gseapy/etc NOT in uv.lock). Add deps with `uv pip install <pkg>` — NEVER `uv sync --extra X` (reconciles + destroys the venv). Keep harmonypy==0.0.10 (pinned <1) installed for the oracle. Known-good pins: pandas==3.0.3, anndata==0.12.6, scipy==1.17.1, scanpy==1.12.1, harmonypy==0.0.10, gseapy 1.2.1, kaleido + pdf(pypdf/pypdfium2/pillow/pikepdf) + dev(pytest/ruff/httpx); scvi-tools ABSENT. After any reinstall verify `pandas.__version__ == 3.0.3`. uv.lock regen = DEFERRED.
 
