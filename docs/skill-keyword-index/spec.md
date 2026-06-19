@@ -242,7 +242,41 @@ No network, no heavy deps for the unit/backtest suite (the PDFs/text are local f
 
 ## Out of scope (this spec)
 
-- Building the layer (this is the spec; build follows owner review + a plan).
 - The LLM/RAG full-paper reading path and OCR/vision (the paid tier — separate spec when prioritised).
 - A new FE Reproduction/feasibility view (pairs with the paper-metadata intake wiring; deferred).
 - Auto-*generating* a skill from an unmatched term (Skill Foundry's job; this layer only *reports* the gap).
+
+---
+
+## Built + validated (session 32, 2026-06-20)
+
+v1 shipped exactly to the resolved decisions — `app/backend/extract/routing/` (`vocab.py` +
+`synonyms.json`, `segment.py`, `index.py`, `route.py`, `models.py`) + `POST /papers/route`.
+Deterministic, library-only, no new deps. `feat(backend)` commit `9834f09`.
+
+**Validated by backtest against all four hand-built ledgers** (`tests/test_routing.py`): the router
+reproduces each ledger's per-figure in-scope skills + out-of-scope modality verdicts —
+- **Dorgau**: Fig 1 → {umap_scrna, trajectory, markers} in-scope; Fig 2 spatial / 4 atac / 6 grn /
+  7 wet_lab out-of-scope; Harmony → `skill:integration` (the Melody dogfood signal).
+- **Hani**: Fig 1 composition · 2 {corr_heatmap, boxplot} · 3 {violin, cepo} · 4 regression · 6 umap.
+- **JEV**: Fig 3 volcano · Fig 4 pca · paper-level {deg, gsea, pca}.
+- **RPGRIP1**: paper-level {deg, gsea, pca} + annotate + wet_lab.
+
+Plus guard tests: word-boundary (PCA ∉ PVCA), longest-match (ssGSEA ≠ GSEA), negation ("did not
+use Monocle" → no route), **references-exclusion** (Harmony in the bibliography only → no route),
+registry-extensibility, curated-target validation, and the endpoint.
+
+**Live dogfood on the real JEV PDF text** (`D:/selom-data/_jev_text.txt`, 105k chars): recovers the
+JEV ledger skill set (deg/pca/trajectory/markers/composition/enrichment/umap/gsea/volcano) + flags
+`oos:wet_lab` (immunohistochemistry), **zero false skill-gaps**. `MATERIALS AND METHODS` / `Results`
+headers segmented correctly.
+
+**Honest limitation surfaced (the next iteration):** paper-level routing is reliable on real PDFs;
+**per-figure routing degrades to results-attribution when the PDF has no detectable "Figure legends"
+section** (the JEV dump had none → a mixed figure can mis-top to wet_lab). Section/legend
+segmentation hardening on legend-less real PDFs is the highest-leverage follow-up (already flagged as
+K3's deeper form). Fast-follows, in order: (1) legend-segmentation hardening; (2) wire the suggested
+`skill_id` into `to_engine_panels`/`build_ledger` (the engine front-half); (3) the gated AI-verify +
+synonym-mining seam; (4) the FE feasibility surface.
+
+pytest **BE 509** (495 + 14); ruff clean.
