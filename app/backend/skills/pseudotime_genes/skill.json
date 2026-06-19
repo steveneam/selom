@@ -1,0 +1,29 @@
+{
+  "id": "pseudotime_genes",
+  "version": "0.1.0",
+  "title": "Genes along pseudotime",
+  "engine": "python",
+  "omics": "scrna-seq",
+  "entrypoint": "skills.pseudotime_genes.run:run",
+  "inputs": [{ "name": "matrix", "kind": "anndata|h5ad", "required": true }],
+  "param_spec": {
+    "top_n":     { "type": "int",  "default": 10, "min": 1, "max": 50 },
+    "groupby":   { "type": "str",  "default": "leiden", "note": "cluster column used only to place the trajectory root" },
+    "root":      { "type": "str",  "default": "", "note": "root cluster (else the diffusion-component extreme)" },
+    "n_bins":    { "type": "int",  "default": 20, "min": 5, "max": 100, "note": "pseudotime bins for the smoothed curves" },
+    "normalize": { "type": "bool", "default": true }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "summary": "Genes whose expression changes along diffusion pseudotime — Spearman gene-vs-pseudotime trend test (OSCA testPseudotime), drawn as smoothed expression curves.",
+    "category": "single-cell",
+    "tier": "verified",
+    "status": "production",
+    "input_formats": [".h5ad"],
+    "chains_with": ["trajectory", "umap_scrna", "cluster"],
+    "license": "MIT",
+    "popularity": 54
+  }
+}

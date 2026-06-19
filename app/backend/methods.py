@@ -268,6 +268,21 @@ def _trajectory(p: dict):
     return text, [SCANPY, PAGA, DPT]
 
 
+def _pseudotime_genes(p: dict):
+    root = str(p.get("root") or "").strip()
+    root_txt = f"a root at cluster {root}" if root else "a root at the diffusion-component extreme"
+    text = (
+        "Genes varying along the inferred trajectory were identified by assigning each cell a "
+        f"diffusion pseudotime (DPT) from {root_txt} and correlating every gene's expression with "
+        "pseudotime by Spearman's rank correlation, with p-values corrected across genes by the "
+        f"Benjamini-Hochberg procedure. The top {p['top_n']} trending genes are shown as mean "
+        "log1p expression binned along pseudotime. Because pseudotime is derived from the same "
+        "expression data, these associations characterize the trajectory rather than providing an "
+        "independent statistical test."
+    )
+    return text, [SCANPY, DPT, SCIPY, BH]
+
+
 def _pca(p: dict):
     scaled = "standardized features and " if p.get("scale", True) else ""
     text = (
@@ -529,6 +544,7 @@ _TEMPLATES = {
     "markers": _markers,
     "annotate": _annotate,
     "trajectory": _trajectory,
+    "pseudotime_genes": _pseudotime_genes,
     "pca": _pca,
     "composition": _composition,
     "corr_heatmap": _corr_heatmap,
