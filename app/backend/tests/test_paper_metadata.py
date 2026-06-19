@@ -196,6 +196,54 @@ def test_api_endpoint(monkeypatch):
     assert client.get("/papers/metadata/by-doi", params={"doi": ""}).status_code == 400
 
 
+def test_metadata_for_pdf_delegates_and_is_degrade_safe(monkeypatch, tmp_path):
+    import paper_metadata as pm
+    import papers
+
+    pdf = tmp_path / "p.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+    # No DOI / title resolvable from a bare PDF, fetchers raise -> record None, never raises.
+    boom = lambda *a, **k: (_ for _ in ()).throw(OSError("network"))  # noqa: E731
+    monkeypatch.setattr(papers, "pdf_info", lambda p: {"metadata": {}})
+    monkeypatch.setattr(papers, "extract_text", lambda *a, **k: "")
+    out = pm.metadata_for_pdf(pdf, openalex_fetch=boom, crossref_fetch=boom, pubmed_fetch=boom)
+    assert out["record"] is None and "provenance" in out
+
+
+def test_extract_endpoint_returns_text_and_metadata(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import main
+    import paper_metadata as pm
+    import papers
+
+    monkeypatch.setattr(
+        papers, "extract_text",
+        lambda p, **k: "Methods\nUMAP and edgeR.\nFigure legends\nFigure 1. UMAP.\n")
+    monkeypatch.setattr(
+        pm, "metadata_for_pdf",
+        lambda p, **k: {"record": {"title": "X", "authors": ["A. Roe"], "pmid": "123",
+                                   "volume": "12", "issue": "3"},
+                        "provenance": {"degraded": False}, "degraded": False})
+    client = TestClient(main.app)
+    resp = client.post("/papers/extract",
+                       files={"file": ("paper.pdf", b"%PDF-1.4", "application/pdf")})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "UMAP" in body["text"] and body["filename"] == "paper.pdf"
+    assert body["metadata"]["pmid"] == "123" and body["metadata"]["issue"] == "3"
+
+
+def test_openalex_parses_biblio_volume_issue_pages():
+    import paper_metadata as pm
+
+    rec = pm._openalex_work({
+        "id": "https://openalex.org/W1", "display_name": "T", "publication_year": 2023,
+        "biblio": {"volume": "12", "issue": "12", "first_page": "175", "last_page": "189"},
+    })
+    assert rec.volume == "12" and rec.issue == "12" and rec.pages == "175-189"
+
+
 def test_suggest_filename_variants():
     import paper_metadata as pm
 

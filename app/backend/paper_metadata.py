@@ -66,6 +66,9 @@ class PaperMetadata(BaseModel):
     authors: list[str] = Field(default_factory=list)
     year: int | None = None
     venue: str | None = None            # journal / source
+    volume: str | None = None
+    issue: str | None = None
+    pages: str | None = None            # "1289-1296" or a single page
     doi: str | None = None
     pmid: str | None = None
     openalex_id: str | None = None
@@ -204,6 +207,15 @@ def openalex_search(title: str, *, fetch: pubmed.Fetcher, email: str | None = No
     return [w for w in (_openalex_work(r) for r in data.get("results", [])) if w]
 
 
+def _pages(first, last) -> str | None:
+    """Join a first/last page into a range ("1289-1296"), or a single page, or None."""
+    first = str(first).strip() if first not in (None, "") else ""
+    last = str(last).strip() if last not in (None, "") else ""
+    if first and last and first != last:
+        return f"{first}-{last}"
+    return first or last or None
+
+
 def _openalex_work(w: dict | None) -> PaperMetadata | None:
     if not w or not isinstance(w, dict) or not (w.get("id") or w.get("doi")):
         return None
@@ -214,6 +226,7 @@ def _openalex_work(w: dict | None) -> PaperMetadata | None:
         pmid = str(pmid).rstrip("/").rsplit("/", 1)[-1] or None
     loc = (w.get("primary_location") or {})
     src = (loc.get("source") or {})
+    biblio = w.get("biblio") or {}
     authors = [a.get("author", {}).get("display_name") for a in (w.get("authorships") or [])]
     is_preprint = (
         str(w.get("type") or "").lower() == "preprint"
@@ -225,6 +238,9 @@ def _openalex_work(w: dict | None) -> PaperMetadata | None:
         authors=[a for a in authors if a],
         year=w.get("publication_year"),
         venue=src.get("display_name"),
+        volume=biblio.get("volume") or None,
+        issue=biblio.get("issue") or None,
+        pages=_pages(biblio.get("first_page"), biblio.get("last_page")),
         doi=doi,
         pmid=pmid,
         openalex_id=(w.get("id") or "").rsplit("/", 1)[-1] or None,
@@ -259,6 +275,9 @@ def _crossref_work(m: dict | None) -> PaperMetadata | None:
         authors=[a for a in authors if a.strip()],
         year=int(year) if year else None,
         venue=(venue[0] if venue else None),
+        volume=str(m["volume"]) if m.get("volume") else None,
+        issue=str(m["issue"]) if m.get("issue") else None,
+        pages=str(m["page"]) if m.get("page") else None,
         doi=doi,
         url=(f"https://doi.org/{doi}" if doi else None),
         is_preprint=is_preprint,
@@ -320,7 +339,7 @@ def _merge(primary: PaperMetadata, other: PaperMetadata) -> PaperMetadata:
     Keeps the primary's source/matched_by/confidence; only bib gaps are filled."""
     d = primary.model_dump()
     o = other.model_dump()
-    for f in ("title", "year", "venue", "doi", "pmid", "openalex_id", "url"):
+    for f in ("title", "year", "venue", "volume", "issue", "pages", "doi", "pmid", "openalex_id", "url"):
         if not d.get(f) and o.get(f):
             d[f] = o[f]
     if not d.get("authors") and o.get("authors"):
@@ -382,6 +401,14 @@ def enrich_from_ids(
             primary = rec if primary is None else _merge(primary, rec)
             if _complete(primary):
                 break
+        # PMID back-fill: OpenAlex often satisfies _complete() without carrying a PMID, so the loop
+        # stops before PubMed. PMID is a distinct identifier users expect — fetch it directly from
+        # PubMed-by-DOI when missing (fail-soft; only if PubMed wasn't already consulted).
+        if primary is not None and not primary.pmid and "pubmed" not in tried:
+            tried.append("pubmed")
+            pm_rec = _call(lambda: pubmed_by_doi(ids.doi, fetch=pubmed_fetch, cfg=cfg))
+            if pm_rec is not None:
+                primary = _merge(primary, pm_rec)
         if primary is not None:
             primary.matched_by = "doi"
             primary.confidence = 0.97
@@ -580,3 +607,22 @@ def metadata_by_doi(doi, *, openalex_fetch=None, crossref_fetch=None, pubmed_fet
     if not prov.get("degraded"):  # don't pin a transient failure in the cache
         cache.set(key, payload)
     return {**payload, "degraded": bool(prov.get("degraded"))}
+
+
+def metadata_for_pdf(pdf_path, *, openalex_fetch=None, crossref_fetch=None, pubmed_fetch=None,
+                     cfg=None, email=None) -> dict:
+    """Resolve a dropped PDF to an enriched record — the upload counterpart of
+    :func:`metadata_by_doi` (what ``POST /papers/extract`` calls). Extracts candidate IDs from the
+    PDF (XMP / DOI regex / filename) then resolves them via the fail-soft OpenAlex→CrossRef→PubMed
+    chain. Degrade-safe: a missing record / network failure returns ``record: None`` with the
+    provenance flagging it, never raising."""
+    rec, prov = enrich_pdf(
+        pdf_path,
+        openalex_fetch=openalex_fetch or _JSON_FETCH,
+        crossref_fetch=crossref_fetch or _JSON_FETCH,
+        pubmed_fetch=pubmed_fetch or _PUBMED_FETCH,
+        cfg=cfg or _CFG,
+        email=email if email is not None else _EMAIL,
+    )
+    return {"record": rec.model_dump() if rec else None, "provenance": prov,
+            "degraded": bool(prov.get("degraded"))}

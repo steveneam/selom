@@ -142,6 +142,24 @@ def route_paper(req: RouteRequest):
     return routing.route_text(req.text, paper_id=req.paper_id).model_dump()
 
 
+@app.post("/papers/extract")
+async def extract_paper(file: UploadFile):
+    # Skill-Match intake step: drop a paper PDF -> its text layer (for the deterministic router) +
+    # an enriched bibliographic record (paper_metadata, degrade-safe OpenAlex->CrossRef->PubMed).
+    # The FE shows the metadata immediately, then routes the returned text via POST /papers/route on
+    # "Run". Library-only; no LLM. The temp PDF is removed after extraction.
+    import papers
+
+    path = _save_upload(file)
+    try:
+        text = papers.extract_text(path)
+        meta = paper_metadata.metadata_for_pdf(path)
+        return {"text": text, "filename": file.filename or "",
+                "metadata": meta["record"], "provenance": meta["provenance"]}
+    finally:
+        pathlib.Path(path).unlink(missing_ok=True)
+
+
 def _save_upload(matrix: UploadFile) -> str:
     # Preserve the upload's extension so skills can tell .h5ad (scRNA) from .csv (bulk).
     suffix = pathlib.Path(matrix.filename or "").suffix or ".h5ad"
