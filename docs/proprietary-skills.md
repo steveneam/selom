@@ -6,7 +6,7 @@
 > curation / UX / verified-reproducibility), #10 (win the analysis→editable-figure last
 > mile), and #11 (gene-set builder = open-core by design).
 >
-> _Last updated: 2026-06-16 (Claude, acting FE+BE)._
+> _Last updated: 2026-06-19 (Claude, acting FE+BE) — Selom Melody gained the clean-room Harmony2 mode._
 
 ## The honest headline
 
@@ -44,7 +44,7 @@ would be dishonest and would dilute the real signal. So:
 | `string_network` (**Selom STRING Network**) | Live STRING PPI turned into an **editable** node-link figure. |
 | `gsea` (**Selom GSEA**) | In-house running-enrichment GSEA with leading-edge viz over our own GO library. The engine may wrap `gseapy.prerank` (BSD-3) / `blitzgsea` (Apache-2.0), but the **editable figure + license-clean set library + provenance** are ours. |
 | `cepo` (**Selom Cepo**) | **Clean-room Python reimplementation** of Cepo differential-stability markers — no Python port exists anywhere upstream (R-only, MIT). Real algorithmic IP. Validated against the Hani `mmc2` Cepo oracle on real RPGRIP1 data (top-DS genes recover the published markers far above chance — Amacrine p=4e-14, Glial p=1e-6, Bipolar p=2e-8). Cites Kim 2021. First resident of `skills/proprietary/`. |
-| `integration` (**Selom Melody**) | **Clean-room pure-numpy reimplementation** of the Harmony batch-integration *method* (Korsunsky et al. 2019), built from the published Online Methods — `skills/integration/melody.py`. The whole upstream Harmony lineage (`harmonypy`, R `harmony`) is **GPL-3.0**; Melody copies none of it (only code expression is copyrightable, a published algorithm is not), so it removes a GPL dependency from the shipped path. Deterministic (seeded), `numpy`/`scikit-learn` only — no C++/CMake build. Validated by the batch-mixing METRIC vs. the harmonypy oracle on real GSE201356 (kept installed as oracle only). Cites Korsunsky 2019. (Ships flat at `skills/integration/`, marked by the `origin` flag.) |
+| `integration` (**Selom Melody**) | **Clean-room pure-numpy reimplementation** of the Harmony batch-integration *method* (Korsunsky et al. 2019), built from the published Online Methods — `skills/integration/melody.py`. The whole upstream Harmony lineage (`harmonypy`, R `harmony`) is **GPL-3.0**; Melody copies none of it (only code expression is copyrightable, a published algorithm is not), so it removes a GPL dependency from the shipped path. Deterministic (seeded), `numpy`/`scikit-learn` only — no C++/CMake build. Validated by the batch-mixing METRIC vs. the harmonypy oracle on real GSE201356 (kept installed as oracle only). **s30: an opt-in `harmony2` mode (default off) folds in the two *Harmony2* (Patikas et al., bioRxiv 2026) anti-over-integration improvements — the stabilized scale-invariant diversity penalty + dynamic per-batch ridge — clean-room from the 2026 preprint (also GPL-3.0; read paper not source). This deepens the moat: there is no permissively-licensed Harmony2 anywhere (the canonical Harmony2 is the GPL R/C++ package), and ours is validated to MATCH it on metric (vs the R `harmony` 2.0.5 oracle).** Cites Korsunsky 2019 + Patikas 2026. (Ships flat at `skills/integration/`, marked by the `origin` flag; v0.3.0.) |
 
 ### Flagship module (not a figure-skill)
 
