@@ -60,10 +60,10 @@ session restart. Supersedes the prior Fable-5 default.
 
 ## Resume Prompt (next session)
 
-> Stamped 2026-06-19 23:43 +10:00. Paste at session start; re-stamp date+time before reuse.
+> Stamped 2026-06-19 23:50 +10:00. Paste at session start; re-stamp date+time before reuse.
 
 ```
-Resume · 2026-06-19 23:43 +10:00 (Australia/Sydney) · Selom · Claude (FE+BE, acting) · Opus 4.8 (xhigh)
+Resume · 2026-06-19 23:50 +10:00 (Australia/Sydney) · Selom · Claude (FE+BE, acting) · Opus 4.8 (xhigh)
 
 THIS SESSION STARTS WITH: pick the next thread WITH the owner (scope each first, then build — no forced lead). **Harmony2 mode is DONE (s30): the 2 algorithmic anti-over-integration deltas were folded into Selom Melody behind a default-off `harmony2` flag and VALIDATED vs the R harmony 2.0.5 (Harmony2) oracle.** The MENU below is the backlog. Same discipline throughout: clean-room from the PAPER, validate-by-metric, per-item scope first, code/docs split commits, ASK before push.
 
@@ -71,7 +71,7 @@ Selom build repo D:/selom. CLAUDE.md auto-loads. Read FIRST: agent_handoff/READM
 
 ROLE: Codex away → Claude owns BOTH lanes. Per-lane EXPLICIT scoped commits (NEVER git add -A; feat(backend:)/fix(...)/docs(...); separate code from doc commits). Opus 4.8 xhigh. ASK before Docker/WSL. ASK before every push (per-push authorization). Commit multi-line messages via a file + `git commit -F`.
 
-GIT STATE: VERIFY `git log --oneline -6` / `git status`. The s30 commits — the scope doc (`58ba657`, pushed), the `feat(backend)` Harmony2-mode code, and the s30 docs commit — may be LOCAL if the s30 push was owner-gated; ASK before pushing. Per-push rule applies to all NEW work.
+GIT STATE: 2 commits are LOCAL — the owner HELD the s30 push. `5aa7399` (feat(backend) Harmony2-mode code) + `7975ae8` (docs) are ahead of origin/main; the scope doc `58ba657` + handoff `18c6f9d` are already pushed. VERIFY `git log --oneline -6` / `git rev-list --count origin/main..main` → expect 2; ASK before pushing those 2 (and any new work). Per-push rule applies.
 
 MENU (pick with owner, scope each first):
  • 4th figure-repro LEDGER (headline open thread) — owner supplies the paper; paper_metadata.py can auto-ingest the bib; follow figures→methods→numbers ([[figure-repro-look-at-figures-first]] / [[figure-repro-match-numbers-exactly]]).
