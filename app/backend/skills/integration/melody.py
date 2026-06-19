@@ -36,6 +36,12 @@ objective converges:
      original ``Z`` (never the running corrected embedding) so the transform stays a single
      linear model of the input, which the authors found avoids over-correction (§1.1).
 
+An optional ``harmony2=True`` mode (default off — the shipped/validated path is the 2019
+method) folds in the two clean-room **Harmony2** (Patikas et al., bioRxiv 2026) quality
+improvements — a stabilized scale-invariant diversity penalty and dynamic per-batch ridge
+(``lambda_hat = alpha * E``) — both aimed at avoiding over-integration in large,
+heterogeneous data. See ``melody`` / ``docs/harmony2-scope/scope.md``.
+
 Determinism: with a fixed ``random_state`` the KMeans initialisation and the block update
 order are both seeded, so ``melody`` is bit-stable across runs. Pure
 ``numpy`` + ``scikit-learn`` (KMeans init) — no C/C++/CMake, no ``harmonypy``, no
@@ -50,10 +56,12 @@ import numpy as np
 # are the established values, matched to the harmonypy oracle so validation is apples-to-apples.
 _SIGMA = 0.1          # entropy weight (cluster fuzziness)
 _LAMBDA = 1.0         # ridge penalty on batch coefficients (intercept unpenalised)
+_ALPHA = 0.2          # Harmony2 dynamic-lambda scale: lambda_hat_kb = alpha * E_kb (§"Dynamic lambda")
 _MAX_ITER_CLUSTER = 20
 _EPS_CLUSTER = 1e-5
 _EPS_HARMONY = 1e-4
 _TINY = 1e-12
+_RIDGE_FLOOR = 1e-8   # floor on the dynamic ridge so an empty (cluster,batch) cell stays invertible
 
 
 def melody(
@@ -71,6 +79,8 @@ def melody(
     epsilon_cluster: float = _EPS_CLUSTER,
     epsilon_harmony: float = _EPS_HARMONY,
     random_state: int = 0,
+    harmony2: bool = False,
+    alpha: float = _ALPHA,
 ):
     """Batch-correct a PCA embedding with Melody. ``Z`` is ``(N, d)`` (cells x PCs, the
     orientation scanpy stores in ``obsm['X_pca']``); returns a corrected ``(N, d)`` array.
@@ -80,6 +90,18 @@ def melody(
     penalty (higher = stronger mixing); ``nclust`` defaults to ``min(100, N // 30)`` per the
     paper's heuristic (§2.6.5). ``tau`` > 0 enables the small-batch theta-discounting of
     §2.6.4 (default off).
+
+    ``harmony2`` (default ``False`` — preserves the validated 2019-method behaviour exactly)
+    turns on the two clean-room **Harmony2** (Patikas et al., bioRxiv 2026) quality
+    improvements, both targeting over-integration in large/heterogeneous data:
+      * **stabilized diversity penalty** — the soft-assignment diversity factor's denominator
+        gains an ``E_kb`` term, ``(E+1)/(O+E+1)`` instead of ``(E+1)/(O+1)``, so as a batch
+        empties out of a cluster the penalty decays to ``log(1)=0`` rather than diverging;
+      * **dynamic lambda** — the ridge penalty becomes per-(cluster,batch)
+        ``lambda_hat_kb = alpha * E_kb`` (``alpha`` default 0.2) instead of the fixed
+        ``lamb``, shrinking outlier-batch corrections toward 0.
+    Both are folded in from the published preprint (not the GPL source); see
+    ``docs/harmony2-scope/scope.md``.
     """
     Z = np.asarray(Z, dtype=np.float64)
     if Z.ndim != 2:
@@ -129,9 +151,9 @@ def melody(
         Z_cos = _normalize_cols(Z_bar)
         R, obs, exp, Y = _cluster(
             Z_cos, phi, Pr_b, theta_b, sigma, R, obs, exp,
-            blocks, max_iter_cluster, epsilon_cluster,
+            blocks, max_iter_cluster, epsilon_cluster, harmony2,
         )
-        Z_bar = _correct(Z_orig, R, phi, lamb)       # regress the ORIGINAL Z (§1.1)
+        Z_bar = _correct(Z_orig, R, phi, lamb, harmony2, alpha, exp)  # regress the ORIGINAL Z (§1.1)
 
         obj = _objective(Z_cos, Y, R, obs, exp, sigma, theta_b)
         if abs(obj_old - obj) / (abs(obj_old) + _TINY) < epsilon_harmony:
@@ -178,13 +200,14 @@ def _soft_assign(Z_cos, Y, sigma):
     return R / R.sum(axis=0, keepdims=True)
 
 
-def _cluster(Z_cos, phi, Pr_b, theta_b, sigma, R, obs, exp, blocks, max_iter, epsilon):
+def _cluster(Z_cos, phi, Pr_b, theta_b, sigma, R, obs, exp, blocks, max_iter, epsilon, harmony2=False):
     """Algorithm 2 — maximum-diversity soft clustering on the (already normalised) embedding.
 
     Alternates centroid re-estimation (``Y = Z_cos R^T``, normalised) with online block
     updates of ``R`` (eq 8), keeping the observed/expected co-occurrence (``obs``/``exp``)
     consistent by leaving each block out before its update and adding it back after. Iterates
-    until the clustering objective converges.
+    until the clustering objective converges. ``harmony2`` switches the diversity factor's
+    denominator from ``(1+O)`` (2019) to the scale-invariant ``(1+O+E)`` (Harmony2).
     """
     Y = _normalize_cols(Z_cos @ R.T)
     obj_old = _objective(Z_cos, Y, R, obs, exp, sigma, theta_b)
@@ -199,8 +222,12 @@ def _cluster(Z_cos, phi, Pr_b, theta_b, sigma, R, obs, exp, blocks, max_iter, ep
             # Remove the block (compute the penalty context on the held-out cells).
             obs -= Rb @ phib.T
             exp -= np.outer(Rb.sum(axis=1), Pr_b)
-            # Per-(cluster,batch) diversity factor with +1 smoothing (§2.6.3), raised to theta_b.
-            penalty = ((1.0 + exp) / (1.0 + obs)) ** theta_b  # K x B
+            # Per-(cluster,batch) diversity factor raised to theta_b. Harmony1 uses the +1
+            # smoothing (§2.6.3) denominator (1+O); Harmony2's stabilized penalty adds E to it
+            # so that as O_kb -> 0 the factor -> (E+1)/(E+1) = 1 (penalty -> log(1)=0) instead
+            # of diverging and forcing over-integration.
+            denom = (1.0 + obs + exp) if harmony2 else (1.0 + obs)
+            penalty = ((1.0 + exp) / denom) ** theta_b  # K x B
             # Update R on the block: distance term * diversity term, renormalised per cell.
             dblk = dist[:, blk]
             num = np.exp(-(dblk - dblk.min(axis=0, keepdims=True)) / sigma)
@@ -219,23 +246,35 @@ def _cluster(Z_cos, phi, Pr_b, theta_b, sigma, R, obs, exp, blocks, max_iter, ep
     return R, obs, exp, Y
 
 
-def _correct(Z_orig, R, phi, lamb):
+def _correct(Z_orig, R, phi, lamb, harmony2=False, alpha=_ALPHA, exp=None):
     """Algorithm 3 — mixture-of-experts ridge correction of the ORIGINAL embedding.
 
     For each cluster k, ridge-fit ``Z`` on the augmented design ``phi* = [1; phi]`` weighted
-    by ``R[k]`` (eq 14; ``lamb`` penalises batch rows, intercept unpenalised), zero the
+    by ``R[k]`` (eq 14; the ridge penalises batch rows, intercept unpenalised), zero the
     intercept row, and subtract the batch-explained part. Returns the corrected ``d x N``.
+
+    Harmony1 uses a fixed scalar ridge ``lamb`` on every batch. In ``harmony2`` mode it is
+    replaced by Harmony2's **dynamic** per-(cluster,batch) penalty
+    ``lambda_hat_kb = alpha * E_kb`` (``exp`` is the K x B expected co-occurrence; default
+    ``alpha = 0.2``), which shrinks the correction of batches with only outlier soft
+    assignments toward 0 to prevent over-integration. A tiny ``_RIDGE_FLOOR`` keeps the
+    (B+1)x(B+1) solve non-singular when a (cluster,batch) cell is empty (``E_kb -> 0``).
     """
     d, N = Z_orig.shape
     K = R.shape[0]
     B = phi.shape[0]
     phi_star = np.vstack([np.ones((1, N)), phi])     # (B+1) x N
-    ridge = np.diag(np.concatenate([[0.0], np.full(B, lamb)]))  # 0 on intercept
+    static_ridge = np.concatenate([[0.0], np.full(B, lamb)])  # 0 on intercept (Harmony1)
 
     Z_bar = Z_orig.copy()
     for k in range(K):
         phi_Rk = phi_star * R[k]                      # (B+1) x N  == phi* @ diag(Rk)
-        lhs = phi_Rk @ phi_star.T + ridge            # (B+1) x (B+1)
+        if harmony2:
+            # Dynamic ridge lambda_hat_kb = alpha * E_kb, intercept unpenalised, floored.
+            ridge_diag = np.concatenate([[0.0], np.maximum(alpha * exp[k], _RIDGE_FLOOR)])
+        else:
+            ridge_diag = static_ridge
+        lhs = phi_Rk @ phi_star.T + np.diag(ridge_diag)  # (B+1) x (B+1)
         rhs = phi_Rk @ Z_orig.T                       # (B+1) x d
         W = np.linalg.solve(lhs, rhs)                 # (B+1) x d
         W[0] = 0.0                                     # keep intercept, remove batch terms

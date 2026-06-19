@@ -65,14 +65,18 @@ def run(data_path: str, params: dict) -> dict:
         # obsm["X_pca_melody"], the analogue of scanpy/harmonypy's X_pca_harmony.
         from skills.integration.melody import melody
 
+        harmony2 = to_bool(params.get("harmony2", False))
         adata.obsm["X_pca_melody"] = melody(
             adata.obsm["X_pca"],
             adata.obs[batch_key].to_numpy(),
             theta=float(params.get("theta", 2.0)),
             max_iter_harmony=int(params.get("max_iter_harmony", 10)),
+            harmony2=harmony2,
+            alpha=float(params.get("alpha", 0.2)),
         )
         use_rep = "X_pca_melody"
-        title = f"Integrated scRNA UMAP — Melody (batch: {batch_key})"
+        mode = " (Harmony2 mode)" if harmony2 else ""
+        title = f"Integrated scRNA UMAP — Melody{mode} (batch: {batch_key})"
     else:
         use_rep = "X_pca"
         title = "scRNA UMAP — no batch correction (single batch)"

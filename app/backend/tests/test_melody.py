@@ -149,3 +149,101 @@ def test_rejects_batch_length_mismatch():
     Z, _, batch, _ = _two_batch_with_shift()
     with pytest.raises(ValueError):
         melody(Z, batch[:-5])
+
+
+# --------------------------------------------------------------- Harmony2 mode (A + B, opt-in)
+#
+# ``harmony2=True`` folds in the two clean-room Harmony2 (Patikas et al., bioRxiv 2026) quality
+# improvements — the stabilized scale-invariant diversity penalty and the dynamic per-batch ridge
+# (lambda_hat = alpha * E) — both aimed at avoiding OVER-integration in heterogeneous data. The
+# default path (harmony2=False) is exercised — and pinned bit-for-bit — by every test above; these
+# add the new branch. Validated by metric vs the R harmony 2.0.5 oracle in the s30 dogfood
+# (Melody-on batch-mixing/purity matched the oracle; see docs/harmony2-scope/scope.md).
+
+
+def _nonoverlapping_stress(seed=0, per=120):
+    """Two imbalanced groups of batches with DISJOINT cell types (the Harmony2 Fig-2 design):
+    group-i batches carry only lineages {0,1}, group-ii only {2,3}. Each batch gets its own
+    additive technical shift (the batch effect to remove). A correct method mixes the batches
+    WITHIN a group while keeping the four lineages apart; over-integration collapses them."""
+    rng = np.random.default_rng(seed)
+    centers = rng.normal(0, 6, size=(4, D))
+    g_i, g_ii = ["i1", "i2"], ["ii1", "ii2", "ii3"]  # imbalanced
+    shifts = {s: rng.normal(0, 2.5, size=D) for s in g_i + g_ii}
+    Z, ct, samp = [], [], []
+    for s in g_i:
+        for c in (0, 1):
+            Z.append(centers[c] + rng.normal(0, 0.7, size=(per, D)) + shifts[s])
+            ct += [c] * per
+            samp += [s] * per
+    for s in g_ii:
+        for c in (2, 3):
+            Z.append(centers[c] + rng.normal(0, 0.7, size=(per, D)) + shifts[s])
+            ct += [c] * per
+            samp += [s] * per
+    return np.vstack(Z), np.array(ct), np.array(samp)
+
+
+def _purity(emb, celltype, k=30):
+    """1 - mean normalized kNN cell-type entropy (the paper's cell-type-purity metric);
+    1 = each cell's neighbours are all one lineage (lineages preserved), lower = merged."""
+    from sklearn.neighbors import NearestNeighbors
+
+    cats, codes = np.unique(celltype, return_inverse=True)
+    _, idx = NearestNeighbors(n_neighbors=k + 1).fit(emb).kneighbors(emb)
+    neigh = codes[idx[:, 1:]]
+    ent = np.zeros(len(celltype))
+    for c in range(len(cats)):
+        p = (neigh == c).mean(axis=1)
+        nz = p > 0
+        ent[nz] -= p[nz] * np.log(p[nz])
+    return float((1.0 - ent / np.log(min(k, len(cats)))).mean())
+
+
+def test_harmony2_default_off_matches_default():
+    """The flag defaults to off: passing harmony2=False is identical to not passing it — the
+    validated 2019 path is untouched (the rest of this file pins that path's behaviour)."""
+    Z, _, batch, _ = _two_batch_with_shift()
+    assert np.array_equal(
+        melody(Z, batch, theta=2.0, random_state=0),
+        melody(Z, batch, theta=2.0, random_state=0, harmony2=False),
+    )
+
+
+def test_harmony2_still_removes_known_shift():
+    """Harmony2 mode must still do the basic job: a pure additive batch offset is regressed out."""
+    Z, celltype, batch, shift_norm = _two_batch_with_shift()
+    before = _batch_gap(Z, celltype, batch)
+    after = _batch_gap(melody(Z, batch, random_state=0, harmony2=True), celltype, batch)
+    assert before > 0.8 * shift_norm
+    assert after < 0.2 * before
+
+
+def test_harmony2_preserves_purity_vs_harmony1():
+    """The defining property: on a non-overlapping stress test (distinct lineages across groups),
+    Harmony2 mode integrates batches WITHOUT over-merging lineages — its cell-type purity is at
+    least as high as Harmony1's, while batch mixing still rises. Deterministic (seeded)."""
+    Z, ct, samp = _nonoverlapping_stress()
+    off = melody(Z, samp, theta=4.0, random_state=0, harmony2=False)
+    on = melody(Z, samp, theta=4.0, random_state=0, harmony2=True)
+    # both actually integrate (mix the within-group batches above the raw baseline)
+    assert _knn_mixing(off, samp) > _knn_mixing(Z, samp)
+    assert _knn_mixing(on, samp) > _knn_mixing(Z, samp)
+    # Harmony2 does not sacrifice lineage purity to do it (anti-over-integration)
+    assert _purity(on, ct) >= _purity(off, ct)
+    assert _purity(on, ct) > 0.9
+
+
+def test_harmony2_alpha_is_wired():
+    """The dynamic-lambda scale alpha actually influences the result (param is plumbed through)."""
+    Z, _, samp = _nonoverlapping_stress()
+    a = melody(Z, samp, theta=4.0, random_state=0, harmony2=True, alpha=0.2)
+    b = melody(Z, samp, theta=4.0, random_state=0, harmony2=True, alpha=1.0)
+    assert not np.allclose(a, b)
+
+
+def test_harmony2_deterministic_with_seed():
+    Z, _, batch, _ = _two_batch_with_shift()
+    a = melody(Z, batch, theta=2.0, random_state=0, harmony2=True)
+    b = melody(Z, batch, theta=2.0, random_state=0, harmony2=True)
+    assert np.allclose(a, b)

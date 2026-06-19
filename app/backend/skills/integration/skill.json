@@ -1,6 +1,6 @@
 {
   "id": "integration",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "title": "scRNA integration (Melody)",
   "engine": "python",
   "omics": "scrna-seq",
@@ -15,12 +15,14 @@
     "color_by":          { "type": "str",   "default": "" },
     "normalize":         { "type": "bool",  "default": true },
     "theta":             { "type": "float", "default": 2.0, "min": 0.0, "max": 10.0 },
-    "max_iter_harmony":  { "type": "int",   "default": 10, "min": 1, "max": 50 }
+    "max_iter_harmony":  { "type": "int",   "default": 10, "min": 1, "max": 50 },
+    "harmony2":          { "type": "bool",  "default": false, "note": "opt-in Harmony2 mode: stabilized scale-invariant diversity penalty + dynamic per-batch ridge (lambda_hat=alpha*E), reducing over-integration in heterogeneous data (default off = the validated 2019 method)" },
+    "alpha":             { "type": "float", "default": 0.2, "min": 0.0, "max": 5.0, "note": "Harmony2 dynamic-lambda scale (only used when harmony2=true)" }
   },
   "outputs": [{ "name": "figure", "kind": "plotly_spec" }],
   "catalog": {
     "name": "Selom Melody",
-    "summary": "Batch-correct and co-embed multiple single-cell libraries with Selom Melody — our clean-room, pure-numpy implementation of the Harmony integration method (Korsunsky et al. 2019), with no GPL dependency. QC → normalize → PCA → Melody on the chosen batch key → neighbours/Leiden/UMAP on the corrected embedding. Mixes batches while preserving cell-type structure — the prerequisite for building or benchmarking against a reference atlas. Emits the before→after batch-mixing score as provenance.",
+    "summary": "Batch-correct and co-embed multiple single-cell libraries with Selom Melody — our clean-room, pure-numpy implementation of the Harmony integration method (Korsunsky et al. 2019), with no GPL dependency. QC → normalize → PCA → Melody on the chosen batch key → neighbours/Leiden/UMAP on the corrected embedding. Mixes batches while preserving cell-type structure — the prerequisite for building or benchmarking against a reference atlas. Emits the before→after batch-mixing score as provenance. Optional harmony2=true folds in the Harmony2 (2026) anti-over-integration improvements for large, heterogeneous data.",
     "category": "single-cell",
     "tier": "verified",
     "status": "beta",
