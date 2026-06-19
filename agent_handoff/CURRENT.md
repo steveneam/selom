@@ -71,7 +71,7 @@ Selom build repo D:/selom. CLAUDE.md auto-loads. Read FIRST: agent_handoff/READM
 
 ROLE: Codex away → Claude owns BOTH lanes. Per-lane EXPLICIT scoped commits (NEVER git add -A; feat(backend:)/fix(...)/docs(...); separate code from doc commits). Opus 4.8 xhigh. ASK before Docker/WSL. ASK before every push (per-push authorization). Commit multi-line messages via a file + `git commit -F`.
 
-GIT STATE: 2 commits are LOCAL — the owner HELD the s30 push. `5aa7399` (feat(backend) Harmony2-mode code) + `7975ae8` (docs) are ahead of origin/main; the scope doc `58ba657` + handoff `18c6f9d` are already pushed. VERIFY `git log --oneline -6` / `git rev-list --count origin/main..main` → expect 2; ASK before pushing those 2 (and any new work). Per-push rule applies.
+GIT STATE: several s30 commits are LOCAL — the owner HELD the s30 push. Ahead of origin/main: `5aa7399` (feat(backend) Harmony2-mode code) + `7975ae8` (docs scope/spec/handoff) + `ecdfa87` (handoff re-stamp) + `da7d317` (docs proprietary) [+ later handoff edits]; the scope doc `58ba657` + handoff `18c6f9d` are already pushed. RUN `git rev-list --count origin/main..main` for the exact number; ASK before pushing those (and any new work). Per-push rule applies.
 
 MENU (pick with owner, scope each first):
  • 4th figure-repro LEDGER (headline open thread) — owner supplies the paper; paper_metadata.py can auto-ingest the bib; follow figures→methods→numbers ([[figure-repro-look-at-figures-first]] / [[figure-repro-match-numbers-exactly]]).
