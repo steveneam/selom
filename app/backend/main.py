@@ -12,6 +12,7 @@ from pydantic import BaseModel
 import export
 import guardrails
 import methods
+import paper_metadata
 import papers_api
 import provenance
 from extract import chart_intake
@@ -248,6 +249,17 @@ def citations_by_doi(doi: str = "", source: str = "both"):
     if not doi.strip():
         raise HTTPException(status_code=400, detail="doi is required")
     return citations_lookup.citation_by_doi(doi, source=source)
+
+
+@app.get("/papers/metadata/by-doi")
+def paper_metadata_by_doi(doi: str = ""):
+    # Article-Matcher enrichment (external-tools study §4 BUILD #2): a DOI -> resolved
+    # bibliographic record via the fail-soft chain OpenAlex(CC0) primary -> CrossRef cross-check
+    # -> PubMed fill, cached + degrade-safe (a lookup never breaks the caller). The full
+    # PDF -> candidate-IDs -> record path lives in paper_metadata.enrich_pdf (local/dogfood).
+    if not doi.strip():
+        raise HTTPException(status_code=400, detail="doi is required")
+    return paper_metadata.metadata_by_doi(doi)
 
 
 @app.post("/skills/{skill_id}/jobs")
