@@ -216,12 +216,29 @@ def _pathway(p: dict):
 
 def _markers(p: dict):
     scaled = " (scaled to [0,1] per gene)" if p.get("standard_scale", True) else ""
+    dotplot = (
+        "Expression is summarized as a dotplot in which colour encodes the mean log1p "
+        f"expression within each group{scaled} and dot size encodes the fraction of cells "
+        "expressing the gene."
+    )
+    rank_by = str(p.get("rank_by") or "wilcoxon").strip().lower()
+    if rank_by in ("cohens_d", "cohen", "cohens", "d", "auc"):
+        effect = (
+            "the area under the ROC curve (Mann-Whitney AUC)"
+            if rank_by == "auc"
+            else "Cohen's d (the standardized mean difference)"
+        )
+        text = (
+            f"Marker genes were identified per {p['groupby']} group by a one-versus-rest effect "
+            f"size, {effect}, rather than by a p-value (following the OSCA scoreMarkers rationale "
+            "that p-values computed on data-derived clusters are circular). The top "
+            f"{p['n_genes']} genes per group by effect size are reported. {dotplot}"
+        )
+        return text, [SCANPY, SCATER]
     text = (
         f"Marker genes were identified per {p['groupby']} group with the {p['method']} test "
         f"(Scanpy rank_genes_groups), reporting the top {p['n_genes']} genes per group. "
-        "Expression is summarized as a dotplot in which colour encodes the mean log1p "
-        f"expression within each group{scaled} and dot size encodes the fraction of cells "
-        "expressing the gene; p-values are corrected by the Benjamini-Hochberg procedure."
+        f"{dotplot} P-values are corrected by the Benjamini-Hochberg procedure."
     )
     return text, [SCANPY, BH]
 

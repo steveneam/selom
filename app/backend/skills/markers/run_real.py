@@ -36,21 +36,40 @@ def run(data_path: str, params: dict) -> dict:
     # rank_genes_groups needs a categorical grouping (a user-supplied label column may be object).
     adata.obs[groupby] = adata.obs[groupby].astype("category")
 
-    method = params.get("method") or "wilcoxon"
-    sc.tl.rank_genes_groups(
-        adata, groupby, method=method, pts=True, tie_correct=(method == "wilcoxon")
-    )
-    names = adata.uns["rank_genes_groups"]["names"]
-    groups = list(names.dtype.names)
-
-    # Top-N markers per group, in group order, de-duplicated (a gene can rank in two).
     n_genes = int(params["n_genes"])
-    genes: list[str] = []
-    for g in groups:
-        for i in range(min(n_genes, len(names[g]))):
-            sym = str(names[g][i])
-            if sym in adata.var_names and sym not in genes:
-                genes.append(sym)
+    rank_by = str(params.get("rank_by") or "wilcoxon").strip().lower()
+    method = params.get("method") or "wilcoxon"
+
+    # Selection: by an effect size (OSCA scoreMarkers — honest, rankable) or by the
+    # classic Wilcoxon p-value (the default; note cluster p-values are circular).
+    selection: list[tuple[str, str, float]] = []  # (group, gene, effect) for the stats table
+    if rank_by in ("cohens_d", "cohen", "cohens", "d", "auc"):
+        metric = "auc" if rank_by == "auc" else "cohens_d"
+        effects = _effect_sizes(adata, groupby, metric)            # groups x genes
+        groups = [str(g) for g in effects.index]
+        genes = []
+        for g in groups:
+            top = effects.loc[g].sort_values(ascending=False).head(n_genes)
+            for gene, val in top.items():
+                selection.append((str(g), str(gene), float(val)))
+                if str(gene) not in genes:
+                    genes.append(str(gene))
+        rank_label = {"auc": "AUC", "cohens_d": "Cohen's d"}[metric]
+    else:
+        metric = None
+        sc.tl.rank_genes_groups(
+            adata, groupby, method=method, pts=True, tie_correct=(method == "wilcoxon")
+        )
+        names = adata.uns["rank_genes_groups"]["names"]
+        groups = list(names.dtype.names)
+        # Top-N markers per group, in group order, de-duplicated (a gene can rank in two).
+        genes = []
+        for g in groups:
+            for i in range(min(n_genes, len(names[g]))):
+                sym = str(names[g][i])
+                if sym in adata.var_names and sym not in genes:
+                    genes.append(sym)
+        rank_label = method
     if not genes:
         raise ValueError("no marker genes found — is the input clustered and non-empty?")
 
@@ -91,10 +110,100 @@ def run(data_path: str, params: dict) -> dict:
     scale_note = "scaled mean" if to_bool(params.get("standard_scale", True)) else "mean expr (log1p)"
     spec = _dotplot_spec(
         xs, ys, color, size, frac_vals, genes, [str(g) for g in group_order],
-        title=f"Marker genes — top {n_genes} per {groupby} ({method})",
+        title=f"Marker genes — top {n_genes} per {groupby} ({rank_label})",
     )
     spec["data"][0]["marker"]["colorbar"]["title"]["text"] = scale_note
+
+    # Pillar-1 Statistics table for the effect-size modes — the metric each gene was
+    # ranked by, per cluster (one-vs-rest), strongest first within each cluster.
+    if metric is not None and selection:
+        from skills._table import table
+
+        rows = [
+            [g, gene, round(val, 4), round(float(fracs.loc[g, gene]), 4)]
+            for g, gene, val in selection
+            if g in fracs.index and gene in fracs.columns
+        ]
+        spec["table"] = table(
+            ["cluster", "gene", rank_label, "frac expressing"],
+            rows,
+            f"Marker effect sizes ({rank_label}, one-vs-rest)",
+        )
     return jsonable(spec)
+
+
+def _effect_sizes(adata, groupby, metric):
+    """One-vs-rest marker effect sizes per (group, gene): Cohen's d or Mann-Whitney AUC.
+
+    OSCA's ``scoreMarkers`` ranks markers by effect size rather than by a p-value, because
+    p-values from data-derived clusters are circular (the clusters were defined from the
+    same expression). ``cohens_d`` = the standardized mean difference (group vs the rest,
+    pooled SD); ``auc`` = P(expression in group > expression in the rest), recovered from
+    the rank-sum (Mann-Whitney U / n_group·n_rest), so >0.5 means up-regulated in the group.
+    Returns a (groups x genes) DataFrame. Computed on the (log-normalized) ``adata.X``;
+    AUC is rank-based so it is invariant to that transform.
+    """
+    import numpy as np
+    import pandas as pd
+    import scipy.sparse as sp
+
+    X = adata.X
+    genes = [str(g) for g in adata.var_names]
+    grp = adata.obs[groupby].astype(str).to_numpy()
+    order = list(dict.fromkeys(grp.tolist()))
+    masks = {g: (grp == g) for g in order}
+    ng = {g: int(masks[g].sum()) for g in order}
+    n_total = adata.n_obs
+    is_sparse = sp.issparse(X)
+
+    if metric == "cohens_d":
+        sums, sqs = {}, {}
+        for g in order:
+            sub = X[masks[g]]
+            if is_sparse:
+                sums[g] = np.asarray(sub.sum(axis=0)).ravel()
+                sqs[g] = np.asarray(sub.multiply(sub).sum(axis=0)).ravel()
+            else:
+                sub = np.asarray(sub, dtype=float)
+                sums[g] = sub.sum(axis=0)
+                sqs[g] = (sub * sub).sum(axis=0)
+        total_s = np.sum(list(sums.values()), axis=0)
+        total_sq = np.sum(list(sqs.values()), axis=0)
+        out = {}
+        for g in order:
+            n1, n2 = ng[g], n_total - ng[g]
+            if n1 < 1 or n2 < 1:
+                out[g] = np.zeros(len(genes))
+                continue
+            m1 = sums[g] / n1
+            m2 = (total_s - sums[g]) / n2
+            v1 = np.maximum(sqs[g] / n1 - m1**2, 0.0) * (n1 / max(n1 - 1, 1))
+            v2 = np.maximum((total_sq - sqs[g]) / n2 - m2**2, 0.0) * (n2 / max(n2 - 1, 1))
+            pooled = np.sqrt(((n1 - 1) * v1 + (n2 - 1) * v2) / max(n1 + n2 - 2, 1))
+            d = np.divide(m1 - m2, pooled, out=np.zeros_like(pooled), where=pooled > 0)
+            out[g] = d
+        return pd.DataFrame(out, index=genes).T
+
+    # AUC — chunk over genes so the dense rank matrix stays bounded (a full densify of a
+    # big sparse matrix would blow memory). One full-column ranking serves every group,
+    # since group-vs-rest shares the same union of all cells.
+    from scipy.stats import rankdata
+
+    out = {g: np.zeros(len(genes)) for g in order}
+    chunk = 1000
+    for start in range(0, len(genes), chunk):
+        sl = slice(start, start + chunk)
+        block = X[:, sl]
+        block = np.asarray(block.todense(), dtype=float) if is_sparse else np.asarray(block, dtype=float)
+        ranks = rankdata(block, axis=0)  # average ranks for ties
+        for g in order:
+            n1, n2 = ng[g], n_total - ng[g]
+            if n1 >= 1 and n2 >= 1:
+                rg = ranks[masks[g]].sum(axis=0)
+                out[g][sl] = (rg - n1 * (n1 + 1) / 2.0) / (n1 * n2)
+            else:
+                out[g][sl] = 0.5
+    return pd.DataFrame(out, index=genes).T
 
 
 def _dendrogram_order(means):
