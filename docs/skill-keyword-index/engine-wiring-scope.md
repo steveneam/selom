@@ -53,10 +53,19 @@ panel-letter knowledge.
 
 | route fact | engine `Panel` |
 |---|---|
-| `fr.in_scope` (top is `skill:<id>`) | `skill_id=<id>`, `scope=TRANSCRIPTOMIC`, `status="mapped"` |
-| oos (top is `oos:<reason>`) | `skill_id=None`, `scope=scope_of(top)` (`MODALITY_UNSUPPORTED`/`WET_LAB`/`DATA_NOT_DEPOSITED`), `note` carries the reason |
+| figure has **any** in-scope skill candidate | `skill_id=<top-ranked in-scope skill>`, `scope=TRANSCRIPTOMIC`, `status="mapped"` |
+| figure has **no** in-scope skill (purely spatial/atac/grn/wet-lab) | `skill_id=None`, `scope=scope_of(top)` (`MODALITY_UNSUPPORTED`/`WET_LAB`/`DATA_NOT_DEPOSITED`) |
 | in-scope suggestion set | the ranked in-scope skill ids in `note` |
+| a co-present out-of-scope readout on an in-scope figure | noted (`"out-of-scope readout also present: wet_lab"`) + stays in the paper-level inventory |
 | `tier` / `attribution` / `confidence` | summarised in `note` (the provenance trail; never silently asserted) |
+
+**Mixed-figure rule (load-bearing).** The branch is on "does the figure have *any* in-scope skill",
+**not** on whether the figure's overall top routed in-scope. A figure that runs an analysis *and*
+validates it with IHC/qPCR in the same figure is extremely common; its wet-lab terms can out-score
+each single analysis skill, so branching on `fr.top` would route the whole figure to `wet_lab` and
+**drop the reproducible skills** (caught live on RPGRIP1 Fig 5 — 2 wet-lab terms beat each of
+deg/gsea/pca). Any in-scope skill ⇒ the figure stays in-scope; the out-of-scope readout is noted and
+remains in the L3 inventory.
 
 `scope_of` / `is_skill` / `skill_id` / `oos_reason` are the existing helpers in
 `extract/routing/models.py` — no new scope vocabulary (K5). `chart_form` is left empty (the router
@@ -96,3 +105,30 @@ Library-only; no new deps; no network. pytest + ruff green before any push.
 - The L4 AI-verify + synonym-mining seam (fast-follow #2).
 - Auto-resolving real sub-panel letters / chart forms (needs vision/segmentation — the paid tier).
 - Touching the four hand ledgers (validated ground truth — read-only here).
+
+---
+
+## Built + validated (session 34, 2026-06-20)
+
+Shipped exactly to the approved breadth. `feat(backend)` commit `3358497`.
+
+- **`extract/routing/engine.py`** — `route_to_panels(fmap)` (one figure-level `Panel` per routed
+  figure, unique key, top in-scope skill + suggestion-set note, mapped oos scope) +
+  `build_auto_ledger(text, paper_id, *, paper, index)` (text → engine-ready `Ledger` skeleton; the
+  L3 inventory rides in `Paper.methods_digest`). Exported from `extract/routing/__init__.py`.
+- **`extract/golden.to_engine_panels(spec, *, feasibility=None)`** — stamps `skill_id` (+ oos
+  scope) on the DE-count panels from the route; `feasibility=None` is byte-identical to before.
+- **Mixed-figure fix** (above) — surfaced and fixed during validation: RPGRIP1 Fig 5 was being
+  mislabelled a pure `wet_lab` panel, dropping deg/gsea/pca.
+
+**Validated by metric** (`tests/test_routing.py`, +9 cases): per-figure overlap with all four hand
+ledgers (parametrized), the mixed-figure regression guard, unique-keys, `build_auto_ledger` drives
+through `build_scorecard` (Dorgau `n_in_scope=1`), `to_engine_panels` backward-compat + stamping,
+and a real-JEV skeleton skipif test. pytest **BE 527**; ruff clean; library-only, no new deps.
+
+**Honest limitation (next iteration).** The auto-map is figure-granular: it surfaces the right
+skill *set* per figure but not which sub-panel uses which (the L4 AI tier / vision resolves that),
+and it does not extract goldens (numbers) — that stays `extract.golden`'s job. The top in-scope
+skill can be a chart-form alternative (heatmap) where the hand author chose the underlying analysis
+(deg / pseudotime_genes); both are surfaced, the human/AI picks. Next fast-follows unchanged:
+(2) the L4 AI-verify + synonym-mining seam; (3) the FE feasibility surface.

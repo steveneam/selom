@@ -280,3 +280,10 @@ K3's deeper form). Fast-follows, in order: (1) legend-segmentation hardening; (2
 synonym-mining seam; (4) the FE feasibility surface.
 
 pytest **BE 509** (495 + 14); ruff clean.
+
+**Fast-follow #1 (engine wiring) SHIPPED — session 34.** Both legend-segmentation hardening (s33,
+the 4-layer core) and the engine wiring are now done. The router's L3 inventory + per-figure routes
+feed the reproduction engine via `extract/routing/engine.route_to_panels` / `build_auto_ledger` +
+`extract/golden.to_engine_panels(feasibility=)` — a dropped paper auto-produces the figure→skill
+ledger skeleton the four ledgers hand-encode. See `docs/skill-keyword-index/engine-wiring-scope.md`.
+Remaining: (3) the L4 AI-verify + synonym-mining seam; (4) the FE feasibility surface.
