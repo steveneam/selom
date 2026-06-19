@@ -59,6 +59,12 @@ def run(data_path: str, params: dict) -> dict:
     batch_key = _resolve_batch_key(adata, str(params.get("batch_key") or "").strip())
     integrated = batch_key is not None
     if integrated:
+        # harmonypy builds its batch design with pd.get_dummies; a pandas *categorical* batch
+        # column (anndata stores obs categoricals as `category` by default) yields pandas 3.0's
+        # nullable `boolean` dtype, whose .to_numpy() is an OBJECT array — which then breaks
+        # harmonypy's np.log (TypeError: ufunc 'log' on object). Cast to plain str so get_dummies
+        # returns a native bool matrix. Behaviour-preserving (the labels are unchanged).
+        adata.obs[batch_key] = adata.obs[batch_key].astype(str)
         # scanpy wraps harmonypy.run_harmony; theta = diversity penalty (higher = stronger mixing).
         sc.external.pp.harmony_integrate(
             adata, batch_key,

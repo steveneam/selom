@@ -59,6 +59,10 @@ pdf = [
   "pypdf>=5",
   "pypdfium2>=4",
   "pillow>=10",
+  # MPL-2.0 (wraps qpdf, Apache-2.0) — XMP/DocInfo metadata read + write-back for the
+  # paper_metadata.py enrichment layer (read embedded DOI/title; embed the resolved record
+  # back into the PDF). Optional: paper_metadata degrades cleanly when it is absent.
+  "pikepdf>=9",
 ]
 # Full heavy stack (superset of scrna): adds scvi-tools/PyTorch, proteomics, and Kaleido export
 # for later buckets (trajectory, proteomics volcano, journal-preset export). Multi-GB install.
@@ -98,7 +102,10 @@ omics = [
   # Harmony batch correction for the `integration` skill (multi-library co-embedding).
   # MIT (github.com/slowkow/harmonypy); driven via scanpy's external.pp.harmony_integrate,
   # lazy-imported behind the stub/real split like every other heavy engine.
-  "harmonypy>=0.0.10",
+  # PINNED <1: harmonypy 2.0.0 is an unrelated C++/CMake rewrite that does NOT build in this
+  # environment (`CMAKE_CXX_COMPILER not set`); the 0.0.x slowkow line is the pure-Python one
+  # the skill targets. A clean-room in-house replacement is scoped (docs/harmony-reimplementation-scope.md).
+  "harmonypy>=0.0.10,<1",
 ]
 # Async job path (B3): arq + Redis queue (DECISIONS #6) + boto3 for the R2 result
 # store. OPTIONAL — the default inline executor + local-filesystem result store need
