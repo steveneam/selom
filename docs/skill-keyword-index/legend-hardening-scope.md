@@ -99,6 +99,38 @@ single top:
 No behaviour is *forced* to a single answer it can't justify — the honest-signal posture that keeps
 the two-axis credibility (memory `selom-reproducibility-score`).
 
+## Architecture — a layered deterministic core (owner-resolved, 2026-06-20)
+
+Owner steer mid-session: the deterministic core should be **layered** — a precise first layer for the
+~90% of well-structured journals, then a recovery sweep for the messy ~10% (the JEV class) — rather
+than one aggressive pass that taxes the clean case. Adopted in full:
+
+**Two guarantees, four layers (owner framing).** The tool makes two different promises that deserve
+different layers: a **paper-level skill inventory** that must be near-100% ("which skills does this
+paper need?" — the core deliverable, robust because it does *not* depend on figure attribution), and
+**per-figure attribution** ("which figure does each skill belong to?" — the premium gravy, hard
+deterministically, perfected by AI). The core promise therefore rests on the *simplest* layer (L3).
+
+| Layer | Scope | What | Runs when | Provenance |
+|---|---|---|---|---|
+| **L1 — Structured** | per-figure | recognised headers; **numbered** inline / sectioned captions (`Figure 1 \|`); explicit `References`; **exact** curated/registry match (boundary-safe v1 matcher) | always | `tier=structured` → full conf |
+| **L2 — Recovery sweep** | per-figure | de-spaced / garbled / private-use-glyph markers + **ordinal** number recovery; **header-less** citation-dense refs detection; forward results-attribution | when L1 is insufficient for that paper/figure | `tier=recovered` → damped conf (AI-upsell flag) |
+| **L3 — Paper vocab sweep** | **whole paper, refs excluded** | **exact + relaxed** (token-canonical: space/hyphen-insensitive + conservative stemming, so `heat map`/`Heat maps`→heatmap, `differentially expressed`→`differential expression`) match over **all** non-reference text → the **authoritative skill inventory** | always | the core guarantee — **near-100% recall**, independent of attribution |
+| **L4 — AI (paid)** | per-figure | adjudicate residual low-confidence/ambiguous figures; OCR/vision for image-only PDFs; mine new synonyms back into the vocab | opt-in, gated | never required |
+
+**Why measured here:** the per-figure recall misses (`deg`/`heatmap` dropping on JEV Figs 1/4/5) are
+**surface-form** failures — exact match has `differential expression`/`heatmap` but the captions say
+`differentially expressed`/`heat map(s)`. L3's token-canonical relaxed matcher closes them generically
+(the canonical key of `differential expression` and `differentially expressed` is identical), with
+**one** curated add (a bare `heatmap` term) for the irregular split. Crucially, even when per-figure
+attribution coin-flips on a mixed figure (JEV Fig 1 = a DE heatmap **and** a qRT-PCR panel), **L3 still
+lists `deg`** — the core promise holds; only the gravy is uncertain, and it's flagged for L4.
+
+The L3 relaxed matcher is **boundary-safe by construction** (it tokenises whole words, so `PCA ∉ PVCA`,
+`GSEA ∉ ssGSEA`), runs as a **gap-filler** in the per-figure paths (skips spans an exact hit already
+claimed), and contributes at a **damped weight** so it never outranks a structured/exact hit. The
+paper-level inventory aggregates **all** non-reference hits, so no skill is lost to a segmentation error.
+
 ## Validation (validate-by-metric)
 
 1. **Real-JEV per-figure** (`skipif` the gitignored text is absent — same pattern as the live drives):
@@ -129,3 +161,40 @@ Library-only (D12); no new deps; no network in the unit suite; no dev servers.
 - **H4 — conservative refs-stripping** ✓. Only a clearly citation-dense tail is excluded; never a
   methods/results paragraph that merely cites a few works.
 - **Scope = all four fixes (A+B+C+D)** ✓ — B and C are required for A to fix per-figure on real PDFs.
+
+---
+
+## Built + validated (session 33, 2026-06-20)
+
+Shipped to the 4-layer design, library-only, no new deps. `extract/routing/`:
+
+- **segment.py** — caption detection now handles the garbled real-PDF form: de-spaced markers
+  (`F IG U R E `→`FIGURE`), trailing private-use-glyph numbers tolerated (`\W*$`), the L1/L2 gate
+  (clean numbered captions always kept; bare/garbled markers accepted only when the numbered set is
+  insufficient for the in-text figure pool), **ordinal** number recovery, cruft stripping, the
+  caption-shape gate, and per-figure `legend_tiers`. Header-less refs excluded via a **final-cluster**
+  detector (citation-shaped lines essentially only occur in the bibliography; find the trailing
+  cluster, absorb wrap-gaps) — on real JEV it lands exactly on the first reference, after a
+  letter-spaced `R E F E R E NC E S` the header regex can't see. Discussion/Introduction/Abstract
+  recognised as headers (→ body weight).
+- **index.py** — added the **relaxed token-canonical** matcher (L3 recall): canonical key = stemmed
+  tokens concatenated, so `heat map`/`Heat maps`→`heatmap` and `differentially expressed`→`differential
+  expression` match. Boundary-safe (whole-token), longest-span-first, negation-guarded.
+- **route.py** — exact (L1) + relaxed (L3) two-pass per section; relaxed is a **gap-filler** (skips
+  spans an exact hit claimed) at a **damped** weight; **canonical-term dedup** within (figure, section)
+  so a repeated sub-panel term can't dominate while distinct synonyms still reinforce; the **L3 paper
+  inventory** (`skills`/`out_of_scope`, robust to attribution error) + per-figure `tier`/`attribution`/
+  provenance-scaled `confidence` + `tier_summary`.
+- **synonyms.json** — one curated add (bare `heatmap`) for the irregular split the relaxed matcher
+  can't derive.
+
+**Validated by metric** (`tests/test_routing.py`, 23 pass + the real-JEV skipif):
+- **L3 inventory recall on the real JEV PDF (the core deliverable)** — all 8 of the ledger's in-scope
+  skills surfaced (`deg`/`heatmap` now recovered via the relaxed matcher; was missing pre-fix) +
+  `out_of_scope=['wet_lab']`. `annotate` (a Fig-8 demo substitution) is the only ledger skill not
+  surfaced — an honest, narrow gap.
+- **All 8 garbled JEV captions detected** and every figure flagged `tier=recovered` (`tier_summary
+  {structured:0, recovered:8}`) — the honest AI-upsell signal.
+- **Header-less refs** fully excluded (full bibliography from the first reference; a mid-list term does
+  not leak); **forward attribution**, **glyph tolerance**, **relaxed surface variants**, **dedup**,
+  **tier provenance**, and the 4-ledger backtest all guarded. No regression.
