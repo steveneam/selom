@@ -43,6 +43,18 @@ def run(data_path: str, params: dict) -> dict:
     nmads = float(params.get("nmads", 3.0))
     discard, filter_rows = (_adaptive_filter(obs, groupby, nmads) if do_filter else (None, None))
 
+    # Doublet detection (opt-in) — Scrublet, per capture (batch_key), on the raw counts.
+    do_doublets = to_bool(params.get("doublets", False))
+    doublet_rows = doublet_thr = None
+    if do_doublets:
+        doublet_thr = float(params.get("doublet_threshold", 0.25))
+        batch_key = groupby if (groupby and groupby in obs.columns) else None
+        # The automatic histogram threshold needs scikit-image; pass an explicit cut so the
+        # detector stays dependency-free. Scores are computed regardless of the threshold.
+        sc.pp.scrublet(adata, threshold=doublet_thr, batch_key=batch_key, random_state=0)
+        obs = adata.obs
+        doublet_rows = _doublet_rates(obs, groupby)
+
     idx = np.arange(adata.n_obs)
     max_cells = int(params.get("max_cells", 6000))
     if adata.n_obs > max_cells:
@@ -60,19 +72,38 @@ def run(data_path: str, params: dict) -> dict:
         panels.append({"label": label, "values_by_group": by_group})
 
     spec = qc_panel_spec(panels, "Per-cell QC")
+    n_total = int(adata.n_obs)
+    notes = []
     if do_filter:
+        notes.append(f"removed {int(discard.sum())}/{n_total} (MAD, nmads={nmads:g})")
+    if do_doublets:
+        n_dbl = int(obs["predicted_doublet"].fillna(False).to_numpy().astype(bool).sum())
+        notes.append(f"{n_dbl}/{n_total} doublets (Scrublet, thr={doublet_thr:g})")
+    if notes:
         from skills._table import table
 
-        n_total, n_removed = int(adata.n_obs), int(discard.sum())
-        spec["layout"]["title"]["text"] = (
-            f"Per-cell QC + adaptive filter — removed {n_removed}/{n_total} cells "
-            f"(MAD, nmads={nmads:g})"
-        )
-        spec["table"] = table(
-            ["group", "cells", "kept", "removed", "removed %"],
-            filter_rows,
-            "Adaptive QC filter (per-group MAD outliers)",
-        )
+        spec["layout"]["title"]["text"] = "Per-cell QC — " + " · ".join(notes)
+        if do_filter and do_doublets:
+            # One per-group summary combining both QC concerns (rows share group order).
+            dbl_by_group = {r[0]: r for r in doublet_rows}
+            rows = [[*fr, *(dbl_by_group.get(fr[0], [fr[0], fr[1], 0, 0.0])[2:])] for fr in filter_rows]
+            spec["table"] = table(
+                ["group", "cells", "kept", "QC outliers", "QC %", "doublets", "doublet %"],
+                rows,
+                "Adaptive QC filter + doublet detection (per group)",
+            )
+        elif do_filter:
+            spec["table"] = table(
+                ["group", "cells", "kept", "removed", "removed %"],
+                filter_rows,
+                "Adaptive QC filter (per-group MAD outliers)",
+            )
+        else:
+            spec["table"] = table(
+                ["group", "cells", "doublets", "doublet %"],
+                doublet_rows,
+                "Doublet detection (Scrublet, per group)",
+            )
     return jsonable(spec)
 
 
@@ -104,6 +135,28 @@ def _adaptive_filter(obs, groupby, nmads):
         n, rem = len(obs), int(discard.sum())
         rows.append(["all", n, n - rem, rem, round(100.0 * rem / max(n, 1), 1)])
     return discard, rows
+
+
+def _doublet_rates(obs, groupby):
+    """Per-group doublet counts from Scrublet's boolean ``predicted_doublet`` obs column.
+
+    Returns rows ``[group, cells, doublets, doublet %]`` (+ an overall ``all`` row when
+    there is more than one group), mirroring the adaptive-filter summary so the two can be
+    merged into one per-group QC table. Doublets are simulated and scored per capture
+    (``batch_key``) upstream; this only tallies the resulting flags."""
+    import numpy as np
+
+    pred = np.asarray(obs["predicted_doublet"].fillna(False).to_numpy(), dtype=bool)
+    groups = obs[groupby].astype(str).to_numpy() if groupby else np.array(["all"] * len(obs))
+    rows = []
+    for g in dict.fromkeys(groups.tolist()):
+        m = groups == g
+        n, d = int(m.sum()), int(pred[m].sum())
+        rows.append([str(g), n, d, round(100.0 * d / max(n, 1), 1)])
+    if len(rows) > 1:
+        n, d = len(obs), int(pred.sum())
+        rows.append(["all", n, d, round(100.0 * d / max(n, 1), 1)])
+    return rows
 
 
 def _mad_thresholds(values, mask, nmads):

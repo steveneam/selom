@@ -24,6 +24,7 @@ PYDESEQ2 = "Muzellec, B., Telenczuk, M., Cabeli, V. & Andreux, M. PyDESeq2: a py
 DESEQ2 = "Love, M.I., Huber, W. & Anders, S. Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. Genome Biology 15, 550 (2014)."
 SQUAIR = "Squair, J.W. et al. Confronting false discoveries in single-cell differential expression. Nature Communications 12, 5692 (2021)."
 SCATER = "McCarthy, D.J., Campbell, K.R., Lun, A.T.L. & Wills, Q.F. Scater: pre-processing, quality control, normalization and visualization of single-cell RNA-seq data in R. Bioinformatics 33, 1179-1186 (2017)."
+SCRUBLET = "Wolock, S.L., Lopez, R. & Klein, A.M. Scrublet: Computational Identification of Cell Doublets in Single-Cell Transcriptomic Data. Cell Systems 8, 281-291 (2019)."
 BH = "Benjamini, Y. & Hochberg, Y. Controlling the false discovery rate: a practical and powerful approach to multiple testing. Journal of the Royal Statistical Society B 57, 289-300 (1995)."
 GO = "Ashburner, M. et al. Gene Ontology: tool for the unification of biology. Nature Genetics 25, 25-29 (2000)."
 REACTOME = "Milacic, M. et al. The Reactome Pathway Knowledgebase 2024. Nucleic Acids Research 52, D672-D678 (2024)."
@@ -357,6 +358,15 @@ def _normalization_qc(p: dict):
             "manual cutoffs."
         )
         citations = [SCANPY, SCATER, SCIPY]
+    if str(p.get("doublets")).lower() in ("true", "1", "yes"):
+        thr = float(p.get("doublet_threshold", 0.25))
+        text += (
+            f" Doublets were identified per capture ({groupby}) with Scrublet, which simulates "
+            "artificial doublets from random pairs of observed transcriptomes and scores each cell "
+            f"by its similarity to the simulated doublets; cells with a doublet score above {thr:g} "
+            "were flagged."
+        )
+        citations = [*citations, SCRUBLET]
     return text, citations
 
 

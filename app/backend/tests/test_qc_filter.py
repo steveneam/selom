@@ -9,7 +9,7 @@ verified live on real data, matching the heavy-dep-free convention of test_deg_b
 import numpy as np
 import pandas as pd
 
-from skills.normalization_qc.run_real import _adaptive_filter
+from skills.normalization_qc.run_real import _adaptive_filter, _doublet_rates
 
 
 def _obs(groups, total, genes, mito):
@@ -88,3 +88,23 @@ def test_groupby_none_single_overall_group():
     discard, rows = _adaptive_filter(obs, None, 3.0)
     assert len(rows) == 1 and rows[0][0] == "all"  # no groupby -> one 'all' group
     assert len(discard) == 25
+
+
+def _dbl_obs(groups, flags):
+    return pd.DataFrame({"sample": list(groups), "predicted_doublet": np.asarray(flags, dtype=bool)})
+
+
+def test_doublet_rates_per_group_and_overall():
+    flags = [True, False, False, False] + [True, True, False, False]
+    obs = _dbl_obs(["A"] * 4 + ["B"] * 4, flags)
+    rows = _doublet_rates(obs, "sample")
+    assert rows[0] == ["A", 4, 1, 25.0]
+    assert rows[1] == ["B", 4, 2, 50.0]
+    assert rows[-1] == ["all", 8, 3, 37.5]  # overall row appended for >1 group
+
+
+def test_doublet_rates_handle_missing_and_no_groupby():
+    # A nullable/NaN predicted_doublet is treated as not-a-doublet, not an error.
+    obs = pd.DataFrame({"predicted_doublet": pd.array([True, None, False], dtype="boolean")})
+    rows = _doublet_rates(obs, None)
+    assert len(rows) == 1 and rows[0] == ["all", 3, 1, 33.3]

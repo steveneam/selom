@@ -10,7 +10,9 @@
     "groupby":   { "type": "str", "default": "sample" },
     "max_cells": { "type": "int", "default": 6000, "min": 500, "max": 50000 },
     "filter":    { "type": "bool", "default": false, "note": "apply adaptive MAD outlier filtering + report kept/removed" },
-    "nmads":     { "type": "number", "default": 3.0, "min": 1.0, "max": 10.0, "note": "MAD multiplier for the adaptive thresholds" }
+    "nmads":     { "type": "number", "default": 3.0, "min": 1.0, "max": 10.0, "note": "MAD multiplier for the adaptive thresholds" },
+    "doublets":  { "type": "bool", "default": false, "note": "detect doublets with Scrublet (per capture) + report the per-group rate" },
+    "doublet_threshold": { "type": "number", "default": 0.25, "min": 0.05, "max": 0.95, "note": "doublet-score cutoff (explicit; auto-thresholding needs scikit-image)" }
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" }
