@@ -1,6 +1,10 @@
 # Scope — Harmony2 fit-assessment for Selom Melody
 
-> Status: **SCOPE + RECOMMENDATION ONLY — PAUSED for the owner's build decision. Nothing built.**
+> Status: **BUILT + VALIDATED (session 30, 2026-06-19).** Owner approved the recommended subset
+> (deltas **A + B**); shipped behind a **default-off `harmony2` flag** in
+> `skills/integration/melody.py` (+ `run_real.py`, `skill.json`, `tests/test_melody.py`). Validated
+> by metric against the **R `harmony` 2.0.5** (Harmony2) oracle — results at the foot of this doc.
+> The original scope + recommendation is preserved below unchanged.
 > Author: Claude (acting FE+BE), session 30, 2026-06-19.
 > Question (owner-directed): Harmony2 (Patikas et al., bioRxiv 2026) is the 7-years-on successor
 > to the 2019 Harmony method that **Selom Melody** (`skills/integration/melody.py`, shipped +
@@ -256,3 +260,41 @@ ASK first; the C++ Python build is Docker-gated.)
 `harmony2=False` → validate (regression byte-identity first, then the constructed over-integration
 stress test, optionally vs the R Harmony2 oracle) → per-lane scoped commits (code/doc split) → ASK
 before push. Never regress the s29 numbers.
+
+---
+
+## Build + validation result (session 30 — A + B SHIPPED, PASSED)
+
+Owner approved **Build A+B now** + the R Harmony2 oracle + a constructed stress test. Built behind
+`melody(..., harmony2=False, alpha=0.2)` (and skill params `harmony2`/`alpha`, default off):
+**(A)** `_cluster` diversity denominator `(1+O)` → `(1+O+E)` when `harmony2`; **(B)** `_correct`
+ridge `diag([0,λ,…])` → per-cluster `diag([0, α·E_k1, …])` (floored `1e-8`). The spare s29 engine
+was copied to `graphify-out/scratch/melody_s29_backup.py` before editing.
+
+**Validation (all three claims passed):**
+
+1. **Default-off byte-identity (regression guard).** New `melody(harmony2=False)` is **`array_equal`
+   (max|diff| = 0.0e0)** to the s29 backup on the synthetic fixture — the validated 2019 path is
+   bit-for-bit untouched. (The full pre-existing `test_melody.py`/golden/live suite stays green.)
+2. **Constructed non-overlapping stress test** (two imbalanced groups, disjoint lineages; θ = 4 and
+   6). Harmony2 mode raises batch mixing **and** preserves cell-type purity better than Harmony1:
+
+   | θ=4 | batch mixing ↑ | cell-type purity ↑ |
+   |---|---|---|
+   | raw PCA | 0.000 | 1.000 |
+   | Melody off (Harmony1) | 0.455 | 0.995 |
+   | **Melody on (Harmony2)** | **0.569** | **1.000** |
+
+3. **R `harmony` 2.0.5 (Harmony2) oracle**, same stress test, convergence tolerances matched
+   (`alpha=0.2`, default `lambda=NULL` = dynamic-λ): **Melody-on matches the oracle on metric** —
+   batch mixing **0.569 vs 0.555** (|Δ|=0.014), purity **1.000 vs 1.000** (|Δ|=0.000), both well
+   above Harmony1 (0.455 / 0.995). The pre-Harmony2 package (`harmonypy 0.0.10`) corresponds to
+   Melody-off (the s29 result). Confirms the clean-room A+B is faithful to the real Harmony2.
+
+   *Oracle note:* R `harmony` 2.0.5's own defaults independently confirm the parameterization —
+   `harmony_options()` exposes `alpha = 0.2` (our Delta-B α exactly) and `batch.prop.cutoff = 1e-5`
+   (the Delta-C pruning threshold); `lambda = NULL` (dynamic) is its default. Run black-box only
+   (validation-only, ADR 0002) — never read for source.
+
+**pytest BE 485 (480 + 5 new Harmony2 tests) green; ruff clean.** Delta C (batch pruning) was
+**not** built (low value at our scale, as scoped). No FE change (output contract stable).
