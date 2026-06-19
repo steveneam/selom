@@ -337,39 +337,48 @@ def _bulk(data_path: str, params: dict) -> dict:
     return _bar(names, scores, f"Top DE genes — {treatment} vs {reference}", jsonable, subtitle)
 
 
-def _bulk_deseq(sub, cond, reference, treatment, top_n, normalization="deseq2"):
-    """pyDESeq2 Wald (treatment vs reference) on raw counts; CPM-log2FC fallback if absent.
+def deseq_results(sub, cond, reference, treatment, normalization="deseq2"):
+    """pyDESeq2 Wald (treatment vs reference) on a raw-count frame (rows = features,
+    columns = samples). Returns ``(results_df, engine label)`` — the FULL results frame
+    (log2FoldChange, padj, ...). Raises ``ImportError`` when pyDESeq2 is unavailable so
+    callers can choose their own light fallback.
 
-    ``normalization``: ``deseq2`` (median-of-ratios, the default) or ``tmm`` — edgeR-identical
-    TMM size factors (via rnanorm, Apache-2.0) injected into the otherwise-standard pyDESeq2
-    fit, to match the normalization of an edgeR/limma-voom reference pipeline. The *test* stays
-    DESeq2's Wald (only the normalization changes). Returns (gene names, signed log2FC scores,
-    engine label) for the top-N by |log2FC|.
+    ``normalization``: ``deseq2`` (median-of-ratios) or ``tmm`` — edgeR-identical TMM size
+    factors (via rnanorm, Apache-2.0) injected into the otherwise-standard pyDESeq2 fit, to
+    match an edgeR/limma-voom reference pipeline. The *test* stays DESeq2's Wald; only the
+    normalization changes. Shared by the bulk/pseudobulk DE path and differential abundance.
     """
-    import numpy as np
     import pandas as pd
+    from pydeseq2.dds import DeseqDataSet
+    from pydeseq2.ds import DeseqStats
+
+    metadata = pd.DataFrame({"condition": cond}, index=sub.columns)
+    dds = DeseqDataSet(
+        counts=sub.T, metadata=metadata, design="~condition", ref_level=["condition", reference], quiet=True
+    )
+    engine = "pyDESeq2 (Wald)"
+    if normalization == "tmm":
+        try:
+            _fit_deseq_with_tmm(dds, sub)
+            engine = "pyDESeq2 (Wald, TMM norm)"
+        except Exception:
+            dds.deseq2()  # rnanorm absent / API drift → fall back to median-of-ratios
+            engine = "pyDESeq2 (Wald, TMM unavailable)"
+    else:
+        dds.deseq2()
+    stat = DeseqStats(dds, contrast=["condition", treatment, reference], quiet=True)
+    stat.summary()
+    return stat.results_df, engine
+
+
+def _bulk_deseq(sub, cond, reference, treatment, top_n, normalization="deseq2"):
+    """Top-N DE genes by |log2FC| via :func:`deseq_results`; CPM-log2FC fallback if pyDESeq2
+    is absent. Returns (gene names, signed log2FC scores, engine label)."""
+    import numpy as np
 
     try:
-        from pydeseq2.dds import DeseqDataSet
-        from pydeseq2.ds import DeseqStats
-
-        metadata = pd.DataFrame({"condition": cond}, index=sub.columns)
-        dds = DeseqDataSet(
-            counts=sub.T, metadata=metadata, design="~condition", ref_level=["condition", reference], quiet=True
-        )
-        engine = "pyDESeq2 (Wald)"
-        if normalization == "tmm":
-            try:
-                _fit_deseq_with_tmm(dds, sub)
-                engine = "pyDESeq2 (Wald, TMM norm)"
-            except Exception:
-                dds.deseq2()  # rnanorm absent / API drift → fall back to median-of-ratios
-                engine = "pyDESeq2 (Wald, TMM unavailable)"
-        else:
-            dds.deseq2()
-        stat = DeseqStats(dds, contrast=["condition", treatment, reference], quiet=True)
-        stat.summary()
-        res = stat.results_df.dropna(subset=["log2FoldChange", "padj"])
+        res, engine = deseq_results(sub, cond, reference, treatment, normalization)
+        res = res.dropna(subset=["log2FoldChange", "padj"])
         res = res.reindex(res["log2FoldChange"].abs().sort_values(ascending=False).index).head(top_n)
         return [str(g) for g in res.index], [float(v) for v in res["log2FoldChange"]], engine
     except ImportError:

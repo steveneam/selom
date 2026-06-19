@@ -1,0 +1,137 @@
+{
+  "data": [
+    {
+      "type": "bar",
+      "orientation": "h",
+      "x": [
+        -1.9,
+        -0.4,
+        -0.1,
+        0.2,
+        1.6,
+        2.3
+      ],
+      "y": [
+        "Rods",
+        "Cones",
+        "Amacrine",
+        "Bipolar",
+        "M\u00fcller glia",
+        "Microglia"
+      ],
+      "marker": {
+        "color": [
+          "#f43f5e",
+          "#f43f5e",
+          "#f43f5e",
+          "#22d3ee",
+          "#22d3ee",
+          "#22d3ee"
+        ]
+      },
+      "name": "log2FC abundance",
+      "hovertemplate": "%{y}<br>log2FC %{x:.2f}<extra></extra>"
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Differential abundance \u2014 mutant vs WT (stub)<br><sub>pyDESeq2 (Wald, TMM norm) \u00b7 mutant (n=3) vs WT (n=3) \u00b7 6 clusters \u00b7 proportions are compositional</sub>",
+      "font": {
+        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "size": 16,
+        "color": "#1f2a37"
+      },
+      "x": 0.01,
+      "xanchor": "left"
+    },
+    "xaxis": {
+      "showline": true,
+      "linecolor": "#c4ccd4",
+      "linewidth": 1,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#c4ccd4",
+      "ticklen": 4,
+      "tickwidth": 1,
+      "tickfont": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "zeroline": false,
+      "showgrid": true,
+      "gridcolor": "#eef1f5",
+      "gridwidth": 1,
+      "title": {
+        "text": "log2 fold-change in abundance",
+        "font": {
+          "size": 13,
+          "color": "#1f2a37"
+        }
+      }
+    },
+    "yaxis": {
+      "showline": true,
+      "linecolor": "#c4ccd4",
+      "linewidth": 1,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#c4ccd4",
+      "ticklen": 4,
+      "tickwidth": 1,
+      "tickfont": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "zeroline": false,
+      "showgrid": true,
+      "gridcolor": "#eef1f5",
+      "gridwidth": 1,
+      "title": {
+        "text": "cluster",
+        "font": {
+          "size": 13,
+          "color": "#1f2a37"
+        }
+      }
+    },
+    "bargap": 0.3,
+    "plot_bgcolor": "#ffffff",
+    "font": {
+      "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      "size": 13,
+      "color": "#33404d"
+    },
+    "paper_bgcolor": "#ffffff",
+    "colorway": [
+      "#2f6db0",
+      "#e08a2b",
+      "#3f9b6b",
+      "#c0392b",
+      "#7d5ba6",
+      "#1f9aa6",
+      "#9aa017",
+      "#6b7280"
+    ],
+    "hoverlabel": {
+      "font": {
+        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "size": 12
+      },
+      "bgcolor": "#1f2a37"
+    },
+    "margin": {
+      "t": 46,
+      "r": 24,
+      "b": 52,
+      "l": 64
+    },
+    "legend": {
+      "font": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "bgcolor": "rgba(0,0,0,0)",
+      "bordercolor": "rgba(0,0,0,0)"
+    }
+  }
+}

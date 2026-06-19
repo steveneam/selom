@@ -1,0 +1,31 @@
+{
+  "id": "diff_abundance",
+  "version": "0.1.0",
+  "title": "Differential abundance",
+  "engine": "python",
+  "omics": "scrna-seq",
+  "entrypoint": "skills.diff_abundance.run:run",
+  "inputs": [{ "name": "matrix", "kind": "anndata|h5ad", "required": true }],
+  "param_spec": {
+    "sample_col":    { "type": "str", "default": "", "note": "obs column of the biological replicate (auto-detected if blank)" },
+    "condition_col": { "type": "str", "default": "", "note": "obs column of the condition contrasted" },
+    "label_col":     { "type": "str", "default": "", "note": "obs column of the cluster / cell-type tested" },
+    "reference":     { "type": "str", "default": "", "note": "reference condition (defaults when exactly two)" },
+    "treatment":     { "type": "str", "default": "", "note": "treatment condition (log2FC = treatment vs reference)" },
+    "normalization": { "type": "str", "default": "tmm", "note": "tmm (edgeR-DA convention) or deseq2" },
+    "min_cells":     { "type": "int", "default": 10, "min": 0, "max": 100000, "note": "drop clusters with fewer total cells across kept samples" }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "summary": "Differential abundance — tests which clusters expand or shrink between conditions on the cells-per-(cluster×sample) table with DESeq2 + TMM (sample-level replication; compositional caveat surfaced).",
+    "category": "single-cell",
+    "tier": "verified",
+    "status": "production",
+    "input_formats": [".h5ad"],
+    "chains_with": ["cluster", "annotate", "composition", "umap_scrna"],
+    "license": "MIT",
+    "popularity": 58
+  }
+}

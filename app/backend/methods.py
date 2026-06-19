@@ -298,6 +298,27 @@ def _composition(p: dict):
     return text, []
 
 
+def _diff_abundance(p: dict):
+    reference, treatment = str(p.get("reference") or "").strip(), str(p.get("treatment") or "").strip()
+    contrast = f" ({treatment} versus {reference})" if reference and treatment else ""
+    tmm = str(p.get("normalization") or "tmm").lower() == "tmm"
+    norm = (
+        "TMM-normalized (the edgeR differential-abundance convention, which limits the "
+        "compositional bias whereby one expanding cluster makes the others appear to shrink)"
+        if tmm else "median-of-ratios normalized"
+    )
+    text = (
+        f"Differential abundance of clusters between conditions{contrast} was tested by tallying "
+        "the number of cells of each cluster in each sample and modelling that cells-per-"
+        f"(cluster × sample) count table with PyDESeq2 (a Python reimplementation of DESeq2), "
+        f"{norm}, with the Wald test. Each sample — not each cell — is the unit of replication, "
+        "and p-values are corrected by the Benjamini-Hochberg procedure. The log2 fold change in "
+        "abundance per cluster is shown (positive = expanding in the treatment). Because cluster "
+        "proportions are compositional, the per-cluster changes should be read together."
+    )
+    return text, [SCANPY, PYDESEQ2, DESEQ2, BH]
+
+
 def _corr_heatmap(p: dict):
     axis = "samples" if str(p.get("axis", "samples")).startswith("sample") else "features"
     method = str(p.get("method", "pearson")).title()
@@ -547,6 +568,7 @@ _TEMPLATES = {
     "pseudotime_genes": _pseudotime_genes,
     "pca": _pca,
     "composition": _composition,
+    "diff_abundance": _diff_abundance,
     "corr_heatmap": _corr_heatmap,
     "upset": _upset,
     "scorecard": _scorecard,
