@@ -6,9 +6,10 @@
 > Selom's Python skills. **Reference-only — we reimplement license-clean in Python; R is
 > validation-only (ADR 0002), never shipped.**
 >
-> _Authored 2026-06-19 (session 25), Claude (acting FE+BE). This is a SCOPING doc — no code
-> changed. The backlog in §3 is for the owner to green-light, per the build charter
-> (scope-before-build)._
+> _Authored 2026-06-19 (session 25), Claude (acting FE+BE). Originally a SCOPING doc; now
+> also the running tracker. **SHIPPED so far: C, A, B, G (session 25) + D, I, H, F (session
+> 26).** Only **E** remains (scoped below, owner decision pending). Each shipped item is its
+> own scoped `feat(backend)` commit, verified live on real data, defaults OFF where applicable._
 
 ## 0. Sources
 
@@ -130,28 +131,50 @@ where a methods-faithful pipeline is the product). Each is scoped, not built.
   "verify integration by a before/after mixing number."
 - **Effort:** S.
 
-**D — Effect-size marker ranking**
+**D — Effect-size marker ranking** — ✅ SHIPPED (session 26, `baed4f0`)
 - **Gap:** `markers` ranks by Wilcoxon p; OSCA ranks by Cohen's d / AUC (cluster p-values are
   circular).
-- **Build:** add `rank_by="cohens_d"|"auc"|"wilcoxon"` to `markers` — compute Cohen's d & AUC
-  from the matrix we already read; keep Wilcoxon as an option.
-- **Effort:** S–M.
+- **Built:** `rank_by ∈ {wilcoxon (default), cohens_d, auc}` on `markers` — one-vs-rest
+  effect size per (cluster, gene) from the matrix; effect-size value on the Pillar-1 table.
+  Default `wilcoxon` keeps golden + outputs byte-identical.
+- **Verified:** real RPGRIP1 scRNA — effect-size ranking surfaces canonical markers
+  (NRL/RHO/GNAT1/RCVRN for rods; VIM/CLU/SOX2 for Müller) where Wilcoxon-by-p returns
+  obscure genes. The OSCA rationale, demonstrated.
 
-**F — Differential abundance test**
+**F — Differential abundance test** — ✅ SHIPPED (session 26, `f657048`)
 - **Gap:** `composition` only plots. OSCA tests cluster-count changes with edgeR + TMM.
-- **Build:** `composition` `test="da"` (or a `diff_abundance` skill) running the
-  cells-per-(cluster×sample) table through the DESeq2/TMM path, with the composition caveat
-  surfaced.
-- **Compounds:** reuses Gap-C's aggregation + the bulk engine.
-- **Effort:** M.
+- **Built:** new `diff_abundance` skill — cells-per-(cluster×sample) → DESeq2 (TMM default =
+  edgeR-DA convention), sample-level replication, compositional caveat surfaced; per-cluster
+  log2FC/padj table. Promote-not-rebuild: extracted shared `deg.deseq_results` (full frame
+  incl. padj) reused by `_bulk_deseq` (output unchanged) + the new skill.
+- **Verified:** real RPGRIP1 scRNA (MS-VUS n=3 vs LCA-1 n=2) — Cone photoreceptors
+  significantly shrinking (log2FC −1.32, adj p 5.9e-4).
 
-### Tier 3 — coverage (scope later)
+### Tier 3 — coverage
 
-- **H — genes-along-pseudotime** (`testPseudotime` equivalent): spline/correlation of genes
-  vs `dpt_pseudotime` → top trending genes. Reuse `deg._timecourse_rank`'s pattern. Effort M.
-- **I — doublet detection**: `sc.pp.scrublet` flag as a QC option. Effort S–M.
-- **E — reference-based annotation** (SingleR-style): `celltypist` or a correlation scorer
-  against a reference profile — bigger build, new dep. Effort L.
+- **H — genes-along-pseudotime** — ✅ SHIPPED (session 26, `20b77c5`): new
+  `pseudotime_genes` skill — per-gene Spearman vs `dpt_pseudotime`, BH-corrected, top-N
+  drawn as binned expression curves. Reusable `_scrna.compute_pseudotime` helper.
+  Verified: real RPGRIP1 — rod-rooted pseudotime's top trends are the rod identity program
+  (ROM1/NRL/RHO/GNAT1/PDE6G/…).
+- **I — doublet detection** — ✅ SHIPPED (session 26, `8bba291`): opt-in `doublets=true` on
+  `normalization_qc` via `sc.pp.scrublet` (per-capture `batch_key`; explicit threshold keeps
+  it dep-free as skimage is absent). Default OFF; per-group rate on the table (merges with
+  the MAD-filter summary). Verified: Hani subset 84/10000 doublets.
+- **E — reference-based annotation** (SingleR-style) — ⏳ SCOPED, owner decision pending.
+  Two routes:
+  - **(E1, recommended) clean-room correlation-to-reference** (SingleR-style): given a
+    reference (a labelled h5ad, or a precomputed cell-type × gene mean-expression table),
+    correlate each query cluster's mean profile (Spearman, over shared genes) to each
+    reference profile and assign the argmax + a confidence. **No new dependency, no remote
+    download** — pure scipy/numpy, fits the library-only/license-clean policy (D12). Reuses
+    the markers per-group means + the chunked-rank Spearman from `pseudotime_genes`. Likely
+    a Mode B on `annotate` (Mode A = marker-set scoring today). Effort **M**.
+  - **(E2) celltypist** — pretrained logistic-regression classifier. Adds a pip dep AND
+    downloads remote models; pretrained models are immune/gut-centric (may not match the
+    retinal dogfood); custom models need a labelled reference anyway. Heavier, and the
+    remote-download pattern is exactly what D12 / the ask-before-remote rule guard. Effort
+    **L**. Recommend deferring unless a pretrained model genuinely fits the domain.
 - **Cell cycle** (`sc.tl.score_genes_cell_cycle`) — only if a target dataset needs it. Effort S.
 
 ### Deliberate non-goals
@@ -167,10 +190,27 @@ where a methods-faithful pipeline is the product). Each is scoped, not built.
 
 ---
 
-## 4. Recommended next builds
+## 4. Build status
 
-If the owner green-lights, the highest-leverage order is **C → A → B/G**: pseudobulk DE fixes
-a real correctness gap and reuses the shipped DESeq2 engine; MAD QC filtering hardens every
-downstream skill on raw data; HVG + the integration mixing metric are cheap rigor wins that
-move Selom closer to how the target papers actually analyze their data. Each is its own
-scoped commit per the charter.
+The recommended order — **C → A → B/G** (session 25), then **D → I → H → F** (session 26) —
+is now **complete except E**. Eight of the nine gaps shipped, each its own scoped
+`feat(backend)` commit, verified live on real data, with new behavior opt-in/default-OFF
+where it would otherwise shift existing outputs (the verified Hani ledger stays byte-identical).
+
+Compounding wins banked along the way (per the "get more powerful each task" steer):
+- **promote-not-rebuild** — pseudobulk (C) and differential abundance (F) both reuse the
+  bulk DESeq2 engine; F's need for padj drove extracting a shared `deg.deseq_results` that
+  `_bulk_deseq` now also uses (its output unchanged).
+- **one shared helper per stage** — `_scrna.select_hvg` (B), `_scrna.compute_pseudotime`
+  (H, adoptable by `trajectory`); the chunked column-ranking pattern (markers AUC →
+  pseudotime Spearman) is now an established idiom.
+- **dependency-free diagnostics** — integration mixing entropy (G), Scrublet via explicit
+  threshold (I), vectorized BH everywhere.
+- **opt-in defaults protect verified reproductions** — every new knob defaults to the prior
+  behavior, so goldens and the driven ledgers are unaffected until deliberately flipped.
+
+**Remaining:** E (reference annotation) — owner to pick route E1 (clean-room correlation, no
+dep; recommended) vs E2 (celltypist, dep + download). Then the cross-cutting follow-ups from
+the session-25 plan: re-verify the Hani live-organoid ledger, and consider flipping
+`n_hvg`→2000 as the `umap_scrna`/`integration` default (the target papers use Seurat HVG, so
+it should improve fidelity — gate behind a ledger re-verify).
