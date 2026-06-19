@@ -4,6 +4,7 @@
   "title": "Regression scatter with fit",
   "engine": "python",
   "omics": "scrna-seq|bulk-rna-seq|proteomics|metabolomics",
+  "omics_type": ["general"],
   "entrypoint": "skills.regression.run:run",
   "inputs": [{ "name": "table", "kind": "csv", "required": true }],
   "param_spec": {

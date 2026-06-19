@@ -4,6 +4,7 @@
   "title": "ssGSEA single-sample pathway enrichment",
   "engine": "python",
   "omics": "bulk-rna-seq|proteomics|transcriptomics",
+  "omics_type": ["general"],
   "entrypoint": "skills.ssgsea.run:run",
   "inputs": [{ "name": "matrix", "kind": "csv", "required": true }],
   "param_spec": {

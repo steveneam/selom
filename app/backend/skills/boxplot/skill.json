@@ -4,6 +4,7 @@
   "title": "Grouped box-and-whisker",
   "engine": "python",
   "omics": "scrna-seq|bulk-rna-seq|proteomics|metabolomics",
+  "omics_type": ["general"],
   "entrypoint": "skills.boxplot.run:run",
   "inputs": [{ "name": "table", "kind": "csv", "required": true }],
   "param_spec": {

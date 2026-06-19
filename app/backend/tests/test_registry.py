@@ -60,3 +60,20 @@ def test_origin_flag_classifies_proprietary_vs_commodity():
     # Commodity wrappers — value is the editable output, not the algorithm.
     for sid in ("umap_scrna", "deg", "volcano", "heatmap"):
         assert by_id[f"selom.{sid}"]["proprietary"] is False, f"{sid} is a commodity wrapper"
+
+
+def test_omics_type_navigation_facet():
+    # External-tools study §1.3: every entry carries a non-empty omicsType list (domain
+    # navigation), distinct from `omics` (input modalities). Default is transcriptomics;
+    # cross-omics viz/stat/pathway skills use the `general` sentinel; proteomics is explicit.
+    by_id = {s["id"]: s for s in client.get("/skills").json()}
+    for s in by_id.values():
+        assert isinstance(s["omicsType"], list) and s["omicsType"], f"{s['id']} omicsType empty"
+    # Cross-omics tools — general (surface under every domain filter).
+    for sid in ("heatmap", "volcano", "pca", "enrichment", "gsea", "ssgsea"):
+        assert by_id[f"selom.{sid}"]["omicsType"] == ["general"], f"{sid} should be general"
+    # Domain-specific skills.
+    assert by_id["selom.proteomics_de"]["omicsType"] == ["proteomics"]
+    # Transcriptomics-first default (the expression workflow), set implicitly.
+    for sid in ("umap_scrna", "deg", "cluster", "markers"):
+        assert by_id[f"selom.{sid}"]["omicsType"] == ["transcriptomics"], f"{sid} default"

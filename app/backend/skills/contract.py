@@ -29,6 +29,14 @@ class SkillSpec(BaseModel):
     # over a public library where the value is the editable output + provenance, not the
     # algorithm. Default commodity (existing flat skills omit it). See docs/proprietary-skills.md.
     origin: str = "commodity"
+    # Omics-domain navigation facet (external-tools study §1.3): the high-level omics
+    # interest(s) a skill belongs to — for Store left-nav grouping and as ingest-routing
+    # metadata — distinct from `omics` (the input *modalities* a skill accepts). List-valued;
+    # the `general` sentinel marks cross-omics skills (heatmap/volcano/pca/enrichment/gsea/…)
+    # that should surface under EVERY domain filter. Default ["transcriptomics"] (Selom is
+    # transcriptomics-first), set explicitly only when it differs — the same default-and-
+    # override convention as `origin`. Surfaced via GET /skills as `omicsType`; zero runner change.
+    omics_type: list[str] = ["transcriptomics"]
     # Optional Skill-Store display metadata (name/summary/category/tier/status/license/…).
     # Presentation only — the execution contract above is what the runner needs. `catalog.name`
     # carries the branded display name. The registry (skills/registry.py) reads this to serve GET /skills.

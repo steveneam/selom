@@ -4,6 +4,7 @@
   "title": "Pathway enrichment",
   "engine": "python",
   "omics": "bulk-rna-seq|scrna-seq|proteomics",
+  "omics_type": ["general"],
   "entrypoint": "skills.enrichment.run:run",
   "inputs": [{ "name": "matrix", "kind": "csv", "required": true }],
   "param_spec": {

@@ -4,6 +4,7 @@
   "title": "GO enrichment graph",
   "engine": "python",
   "omics": "scrna-seq|bulk-rna-seq|proteomics",
+  "omics_type": ["general"],
   "entrypoint": "skills.go_graph.run:run",
   "inputs": [{ "name": "matrix", "kind": "csv", "required": true }],
   "param_spec": {

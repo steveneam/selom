@@ -4,6 +4,7 @@
   "title": "Expression heatmap",
   "engine": "python",
   "omics": "scrna-seq|bulk-rna-seq",
+  "omics_type": ["general"],
   "entrypoint": "skills.heatmap.run:run",
   "inputs": [{ "name": "matrix", "kind": "anndata|h5ad|csv", "required": true }],
   "param_spec": {

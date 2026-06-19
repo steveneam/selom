@@ -4,6 +4,7 @@
   "title": "Proteomics differential abundance",
   "engine": "python",
   "omics": "proteomics",
+  "omics_type": ["proteomics"],
   "entrypoint": "skills.proteomics_de.run:run",
   "inputs": [{ "name": "matrix", "kind": "csv", "required": true }],
   "param_spec": {

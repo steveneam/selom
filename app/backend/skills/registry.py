@@ -51,6 +51,10 @@ def to_catalog_entry(spec: SkillSpec) -> dict:
         "proprietary": spec.origin == "proprietary",
         "category": cat.get("category", "analysis"),
         "omics": _omics_facets(spec.omics),
+        # Omics-domain navigation facet (external-tools study §1.3) — for Store grouping by
+        # interest; `general` = cross-omics, surfaces under every domain filter. Distinct from
+        # `omics` above (input modalities). Surfaced like `origin`; no FE-type change required.
+        "omicsType": spec.omics_type,
         "tier": cat.get("tier", "verified"),
         "status": cat.get("status", "production"),
         "engine": spec.engine,

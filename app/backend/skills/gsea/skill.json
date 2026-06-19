@@ -4,6 +4,7 @@
   "title": "GSEA running enrichment",
   "engine": "python",
   "omics": "bulk-rna-seq|proteomics",
+  "omics_type": ["general"],
   "entrypoint": "skills.gsea.run:run",
   "inputs": [{ "name": "ranked", "kind": "csv", "required": true }],
   "param_spec": {
