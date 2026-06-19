@@ -1,0 +1,62 @@
+[
+  { "target": "skill:integration", "terms": ["Harmony", "Melody", "batch correction", "batch-correct", "batch effect removal", "batch integration", "data integration", "integrate datasets", "scVI", "LIGER", "RPCA", "reciprocal PCA", "canonical correlation analysis", "Seurat integration", "anchor integration", "BBKNN", "MNN correction", "Scanorama"], "note": "Selom Melody (clean-room Harmony) is the integration path" },
+
+  { "target": "skill:trajectory", "terms": ["Monocle", "Monocle2", "Monocle3", "Slingshot", "diffusion pseudotime", "DPT", "PAGA", "pseudotime", "pseudotemporal", "lineage trajectory", "cell trajectory", "trajectory inference", "developmental trajectory", "branch point"] },
+
+  { "target": "skill:pseudotime_genes", "terms": ["genes along pseudotime", "pseudotime-dependent genes", "expression trends along the trajectory", "gene expression along pseudotime"] },
+
+  { "target": "skill:markers", "terms": ["FindMarkers", "FindAllMarkers", "marker genes", "cluster markers", "rank_genes_groups", "Wilcoxon rank-sum", "marker gene identification", "cluster-specific genes"] },
+
+  { "target": "skill:cepo", "terms": ["Cepo", "cell identity genes", "stable cell-type markers"] },
+
+  { "target": "skill:annotate", "terms": ["cell type annotation", "cell-type assignment", "label transfer", "reference-based annotation", "SingleR", "Azimuth", "celltypist", "automated annotation"] },
+
+  { "target": "skill:deg", "terms": ["DESeq2", "pyDESeq2", "edgeR", "limma", "voom", "limma-voom", "differential expression", "differentially expressed genes", "DEG analysis", "DGE analysis", "glmLRT", "Wald test", "pseudobulk differential", "differential gene expression"] },
+
+  { "target": "skill:proteomics_de", "terms": ["mass spectrometry", "proteomic differential", "limma proteomics", "TMT labeling", "label-free quantification", "LFQ", "differentially abundant proteins"] },
+
+  { "target": "skill:gsea", "terms": ["GSEA", "fgsea", "gene set enrichment analysis", "preranked", "prerank", "gseapy", "blitzgsea", "enrichment score (NES)"] },
+
+  { "target": "skill:ssgsea", "terms": ["ssGSEA", "single-sample GSEA", "single-sample gene set enrichment"] },
+
+  { "target": "skill:enrichment", "terms": ["enrichR", "over-representation analysis", "over-representation test", "ORA", "GO enrichment", "pathway enrichment", "functional enrichment", "DAVID", "Metascape", "clusterProfiler", "g:Profiler"] },
+
+  { "target": "skill:go_graph", "terms": ["gene ontology graph", "GO term graph", "GO DAG", "GO hierarchy"] },
+
+  { "target": "skill:pathway", "terms": ["KEGG pathway", "Reactome", "WikiPathways", "pathway map", "pathway diagram"] },
+
+  { "target": "skill:string_network", "terms": ["STRING database", "STRING network", "protein-protein interaction network", "PPI network", "interaction network analysis"] },
+
+  { "target": "skill:pca", "terms": ["PCA", "principal component analysis", "principal components"] },
+
+  { "target": "skill:pvca", "terms": ["PVCA", "principal variance component analysis", "variance partition", "variance component analysis"] },
+
+  { "target": "skill:umap_scrna", "terms": ["UMAP", "t-SNE", "tSNE", "Leiden", "Louvain", "graph-based clustering", "unsupervised clustering", "single-cell clustering", "uniform manifold approximation"] },
+
+  { "target": "skill:cluster", "terms": ["k-means clustering", "hierarchical clustering", "consensus clustering"] },
+
+  { "target": "skill:normalization_qc", "terms": ["DoubletFinder", "Scrublet", "emptyDrops", "ambient RNA", "SoupX", "quality control filtering", "percent.mt", "mitochondrial fraction", "doublet removal", "SCTransform", "LogNormalize", "NormalizeData", "low-quality cell filtering"] },
+
+  { "target": "skill:diff_abundance", "terms": ["differential abundance", "Milo", "miloR", "DA testing", "neighbourhood abundance", "neighborhood abundance"] },
+
+  { "target": "skill:composition", "terms": ["cell type composition", "cell-type proportion", "cell-type proportions", "relative abundance of cell types", "proportion of cell types", "compositional analysis", "CIBERSORT", "deconvolution"] },
+
+  { "target": "skill:regression", "terms": ["linear regression", "regression analysis", "association with age", "age association", "correlation with developmental stage"] },
+
+  { "target": "skill:corr_heatmap", "terms": ["correlation heatmap", "correlation matrix", "pairwise correlation", "Spearman correlation matrix"] },
+
+  { "target": "skill:volcano", "terms": ["volcano plot"] },
+  { "target": "skill:heatmap", "terms": ["expression heatmap", "heatmap of", "clustered heatmap"] },
+  { "target": "skill:violin", "terms": ["violin plot"] },
+  { "target": "skill:boxplot", "terms": ["box plot", "boxplot", "box-and-whisker"] },
+  { "target": "skill:upset", "terms": ["UpSet plot", "UpSet", "intersection plot"] },
+  { "target": "skill:sankey", "terms": ["Sankey diagram", "alluvial plot", "alluvial diagram"] },
+
+  { "target": "oos:atac", "terms": ["scATAC", "scATAC-seq", "ATAC-seq", "ATACseq", "Signac", "chromVAR", "CellRanger-ATAC", "peak calling", "differentially accessible", "differential accessibility", "chromatin accessibility", "motif footprinting", "motif enrichment", "TOBIAS", "MACS2", "ArchR", "transcription factor footprint", "coverage track"], "note": "Selom has no ATAC modality" },
+
+  { "target": "oos:spatial", "terms": ["spatial transcriptomics", "Visium", "10x Visium", "MERFISH", "Slide-seq", "Xenium", "CosMx", "GeoMx", "spatially resolved", "spatial gene expression", "tissue section imaging", "spot deconvolution", "H&E staining section", "histological section"], "note": "Selom has no spatial coords / H&E support" },
+
+  { "target": "oos:grn", "terms": ["IPA", "Ingenuity Pathway Analysis", "SCENIC", "pySCENIC", "SCENIC+", "gene regulatory network", "GRN inference", "regulon", "eGRN", "transcription factor network", "GENIE3", "ARACNe"], "note": "GRN inference / IPA out of scope" },
+
+  { "target": "oos:wet_lab", "terms": ["immunohistochemistry", "immunostaining", "immunofluorescence", "immunolabeling", "RT-qPCR", "qRT-PCR", "western blot", "immunoblot", "TUNEL assay", "confocal microscopy", "in situ hybridization", "flow cytometry", "FACS", "luciferase assay", "EdU labeling"], "note": "wet-lab readouts are not derivable from sequencing" }
+]

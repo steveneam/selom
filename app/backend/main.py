@@ -16,6 +16,7 @@ import paper_metadata
 import papers_api
 import provenance
 from extract import chart_intake
+from extract import routing
 from gene_sets import library as gene_sets
 from litsynth import SkillRunRef, compose_methods
 from litsynth import from_ledger as ledger_methods
@@ -126,6 +127,19 @@ def get_paper_methods(slug: str, modality: str = ""):
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return section.model_dump()
+
+
+class RouteRequest(BaseModel):
+    text: str
+    paper_id: str = ""
+
+
+@app.post("/papers/route")
+def route_paper(req: RouteRequest):
+    # Skill Keyword Index (docs/skill-keyword-index/spec.md): route a dropped paper's text to a
+    # per-figure feasibility map — each figure → a Selom skill or an out-of-scope modality (+reason)
+    # — deterministically, no LLM on the path. Internal dogfood surface (engine D12 posture).
+    return routing.route_text(req.text, paper_id=req.paper_id).model_dump()
 
 
 def _save_upload(matrix: UploadFile) -> str:
