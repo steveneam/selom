@@ -1,0 +1,33 @@
+{
+  "id": "ssgsea",
+  "version": "0.1.0",
+  "title": "ssGSEA single-sample pathway enrichment",
+  "engine": "python",
+  "omics": "bulk-rna-seq|proteomics|transcriptomics",
+  "entrypoint": "skills.ssgsea.run:run",
+  "inputs": [{ "name": "matrix", "kind": "csv", "required": true }],
+  "param_spec": {
+    "gene_set":  { "type": "str",   "default": "" },
+    "gene_sets": { "type": "str",   "default": "go", "options": ["go", "wikipathways", "curated", "reference", "all"] },
+    "top_n":     { "type": "int",   "default": 25, "min": 1, "max": 100 },
+    "min_size":  { "type": "int",   "default": 10, "min": 1, "max": 5000 },
+    "max_size":  { "type": "int",   "default": 500, "min": 2, "max": 100000 },
+    "weight":    { "type": "float", "default": 0.25, "min": 0.0, "max": 2.0 },
+    "zscore":    { "type": "bool",  "default": true }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table",  "kind": "csv" }
+  ],
+  "catalog": {
+    "name": "Selom ssGSEA",
+    "summary": "Single-sample GSEA — scores every sample independently against a gene-set library, giving one enrichment score per pathway per sample, drawn as a sample x pathway heatmap. Needs no differential test, only an expression matrix; runs against the license-clean GO library (or a pasted set) via gseapy.ssgsea, with the top variable pathways shown.",
+    "category": "pathway-analysis",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".csv"],
+    "chains_with": ["heatmap", "gsea", "enrichment"],
+    "license": "MIT",
+    "popularity": 50
+  }
+}

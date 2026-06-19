@@ -38,6 +38,7 @@ STRING = "Szklarczyk, D. et al. The STRING database in 2023: protein-protein ass
 SMYTH = "Smyth, G.K. Linear models and empirical Bayes methods for assessing differential expression in microarray experiments. Statistical Applications in Genetics and Molecular Biology 3, Article 3 (2004)."
 GSEA = "Subramanian, A. et al. Gene set enrichment analysis: a knowledge-based approach for interpreting genome-wide expression profiles. PNAS 102, 15545-15550 (2005)."
 GSEAPY = "Fang, Z., Liu, X. & Peltz, G. GSEApy: a comprehensive package for performing gene set enrichment analysis in Python. Bioinformatics 39, btac757 (2023)."
+SSGSEA = "Barbie, D.A. et al. Systematic RNA interference reveals that oncogenic KRAS-driven cancers require TBK1. Nature 462, 108-112 (2009)."
 CEPO = "Kim, H.J., Wang, K., Chen, C. et al. Uncovering cell identity through differential stability with Cepo. Nature Computational Science 1, 784-790 (2021)."
 PVCA = "Boedigheimer, M.J. et al. Sources of variation in baseline gene expression levels from toxicogenomics study control animals across multiple laboratories. BMC Genomics 9, 285 (2008)."
 HARMONY = "Korsunsky, I. et al. Fast, sensitive and accurate integration of single-cell data with Harmony. Nature Methods 16, 1289-1296 (2019)."
@@ -513,6 +514,38 @@ def _gsea(p: dict):
     return text, [GSEA, GSEAPY, *lib_cite, BH]
 
 
+def _ssgsea(p: dict):
+    pasted = str(p.get("gene_set") or "").strip()
+    if pasted:
+        target = "a user-supplied gene set"
+        lib_cite: list[str] = []
+    else:
+        source = {"go": "the Gene Ontology", "wikipathways": "WikiPathways",
+                  "curated": "a curated pathway collection", "reference": "a reference gene-set collection",
+                  "all": "the combined gene-set library"}.get(str(p.get("gene_sets") or "go").lower(),
+                                                              "the Gene Ontology")
+        target = f"every gene set in {source}"
+        lib_cite = [GO]
+    weight = p.get("weight", 0.25)
+    min_size, max_size = p.get("min_size", 10), p.get("max_size", 500)
+    top_n = p.get("top_n", 25)
+    norm = (
+        " Per-pathway scores were z-scored across samples for display."
+        if p.get("zscore", True) else ""
+    )
+    text = (
+        "Per-sample pathway activity was quantified by single-sample Gene Set Enrichment "
+        "Analysis (ssGSEA; gseapy.ssgsea). Within each sample, genes were rank-normalized and a "
+        f"normalized enrichment score was computed for {target} as a Kolmogorov-Smirnov-like "
+        f"statistic over the ranked list, weighted by the rank (exponent {float(weight):g}); no "
+        "differential-expression test or permutation was required. Gene sets with fewer than "
+        f"{int(min_size)} or more than {int(max_size)} detected members were excluded. The top "
+        f"{int(top_n)} gene sets by across-sample variance are shown as a sample x pathway "
+        f"heatmap.{norm}"
+    )
+    return text, [SSGSEA, GSEAPY, *lib_cite]
+
+
 def _go_graph(p: dict):
     ns = str(p.get("namespace") or "").strip()
     ns_txt = (
@@ -552,6 +585,7 @@ _TEMPLATES = {
     "pvca": _pvca,
     "regression": _regression,
     "gsea": _gsea,
+    "ssgsea": _ssgsea,
     "go_graph": _go_graph,
     "cepo": _cepo,
     "proteomics_de": _proteomics_de,
