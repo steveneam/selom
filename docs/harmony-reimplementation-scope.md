@@ -1,10 +1,19 @@
 # Scope — clean-room in-house Harmony ("Selom Integrate")
 
+> **SUPERSEDED & BUILT (session 29, 2026-06-19).** This scope is realized — see
+> `docs/selom-integrate/spec.md` (the reviewed/approved spec + the validation result) and
+> `skills/integration/melody.py`. **Two corrections to the text below:** (1) the engine is named
+> **"Selom Melody"** (owner renamed Harmony→Melody so our clean-room code isn't confused with
+> the GPL packages); (2) the "License posture" section's claim that "harmonypy is MIT" is
+> **WRONG** — the whole Harmony lineage (harmonypy 0.0.10 + 2.0.0, R harmony) is **GPL-3.0**
+> (verified at the installed `.dist-info`/LICENSE). So we built clean-room **from the published
+> paper, not the GPL source**, and the swap removes GPL from the shipped path. The rest of the
+> scope (algorithm, "better" wins, validate-by-metric) held.
+>
 > Owner-requested scope (session 28, 2026-06-19): reverse-engineer + build our own, better
-> version of `harmonypy` — the same clean-room move as Cepo and the in-house GSEA/ORA. **Scope
-> only; not built this session.** Recommendation: **YES, worth it** — the strategic case (a
-> proprietary moat skill) and the practical case (the dependency is fragile — we hit it live
-> this session) both hold.
+> version of `harmonypy` — the same clean-room move as Cepo and the in-house GSEA/ORA.
+> Recommendation: **YES, worth it** — the strategic case (a proprietary moat skill) and the
+> practical case (the dependency is fragile — we hit it live this session) both hold.
 
 ## Why now — the dependency is genuinely fragile
 
