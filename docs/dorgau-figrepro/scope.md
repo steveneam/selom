@@ -121,3 +121,45 @@ Follows the established ledger API (`reproduction.py`: `Paper`, `Panel`, `Golden
 - **Subset size** for `drive_live_fig1` — how many samples / cells (cost vs fidelity). Default: a
   representative ~4–6 stage subset, ≤10k cells/sample, enough to recover the RPC→T1→T2/T3 lineage.
 - Whether to **widen scope** to the scRNA-derived Fig 2/3 violins later (needs a `module_score` skill).
+
+---
+
+## Reproduction record (session 31, 2026-06-20) — BUILT + VALIDATED
+
+`reproduction_dorgau.py` shipped: `build_ledger()` (13 panels) + `drive_captured()` + three live
+drives. Engine extension: new scope **`MODALITY_UNSUPPORTED`** (scATAC/spatial/IPA — data deposited,
+no Selom skill; added to `OUT_OF_SCOPE_SCOPES`).
+
+**Scorecard (the engine's output): Reproducibility 94/100 (Reproduced) · Selom-confidence 100/100 ·
+7 scored / 7 in-scope · 6 out-of-scope · 0 Selom defects.** The 6 spatial/scATAC/IPA/wet-lab reps
+grey out (excluded from the denominator); engine-substituted panels (Harmony→Melody, Monocle3→DPT,
+Seurat→scanpy markers) correctly cap at *Reproduced (92)*; the two un-substituted exact panels
+(1C, 3H) hit *Verified (100)*.
+
+**Three live validations (all PASS):**
+1. **Deposit re-derivation — Supp Data 2** (`drive_live_markers`): re-derived **43 clusters · 17
+   cell-fate labels · CCND1 (proliferating-RPC top marker) · 4 pseudotime branches** straight from
+   the deposited marker tables → `captured_matches_live: True`.
+2. **Cohort QC — Supp Data 1** (`drive_live_qc`): **24 samples**, spot-check 15046 **8073 → 4713**,
+   66.4% cells retained.
+3. **Raw-data Melody dogfood — GSE234963** (`drive_live_fig1`, staged 5-sample stage-spanning subset,
+   7,500 cells, 7.5→21 PCW Eye+Retina): **Melody batch-mixing 0.146 → 0.490** (kNN entropy, 1=fully
+   mixed; the paper used Harmony → direct method match) · **9 canonical retinal lineages recovered**
+   (Proliferating RPC, Rod, Cone, RGC, Amacrine, Horizontal, Bipolar, Müller glia, Microglia) · 25
+   live Leiden clusters (correctly *not* forced to the res-2.2 deposit count of 43) · the `integration`
+   skill rendered the editable Melody UMAP (23 traces).
+
+**The score spectrum across the four real ledgers:** RPGRIP1 63 / JEV 86 / Hani 96 / **Dorgau 94**
+(narrow-but-deep: the in-scope scRNA core reproduces cleanly; 6/7 figures grey out honestly).
+
+**Compounding wins realised:** (1) Melody dogfooded on a *new* real dataset (mixing number proves it);
+(2) first ledger to exercise `trajectory`/`pseudotime_genes` against a real published trajectory
+figure; (3) the `MODALITY_UNSUPPORTED` scope is reusable for any future multi-omic paper; (4)
+GSE234963 ingested (24-sample CSV cohort + the authors' per-cell DoubletFinder calls in the metadata).
+
+**Staging recipe:** `scripts/stage_dorgau_subset.py` (DEV-only) extracts a stage-spanning subset from
+`GSE234963_RAW.tar` → `D:/selom-data/dorgau/processed/dorgau_subset.h5ad` (gitignored data).
+
+**Deferred (next, owner-sequenced):** the **Skill Keyword Index** — a deterministic keyword→skill
+routing layer (AI verifies, not the backbone) that would have auto-produced this feasibility map;
+spec-before-code next session.
