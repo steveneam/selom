@@ -143,3 +143,26 @@ def test_live_cohort_qc_matches_the_deposit():
     assert qc["n_samples"] == 24 and qc["n_samples_matches"] is True
     assert qc["spot_matches"] is True                  # sample 15046: 8073 -> 4713
     assert 0.5 < qc["fraction_retained"] < 0.8         # QC retains a sensible majority of cells
+
+
+# --- live Fig-1 drive on the raw GSE234963 subset (the Melody dogfood; skipped if absent) -------
+
+FIG1_H5AD = Path("D:/selom-data/dorgau/processed/dorgau_subset.h5ad")
+
+
+@pytest.mark.skipif(not FIG1_H5AD.exists(),
+                    reason="Dorgau scRNA subset not staged (run scripts.stage_dorgau_subset)")
+def test_live_fig1_melody_integrates_and_recovers_cell_types():
+    ledger, summary = DG.drive_live_fig1(h5ad_path=FIG1_H5AD)
+    # The Melody dogfood: batch mixing must increase after integration (the paper used Harmony).
+    mix = summary["melody_mixing"]
+    assert mix["improved"] is True and mix["after"] > mix["before"]
+    # A multi-sample subset with the canonical retinal lineages recovered.
+    assert summary["scrna_subset"]["n_samples"] >= 3
+    assert summary["n_cell_types_recovered"] >= 4
+    # Selom's own integration skill rendered the editable UMAP (one trace per Leiden cluster).
+    assert summary["scrna_subset"]["integration_figure_traces"] >= 2
+    # The measured live mixing is recorded on the Harmony->Melody substitution.
+    assert "batch-mixing" in ledger.panel("1A").method_subs[0].delta_measured
+    # Still zero Selom-engine defects, driven live.
+    assert ledger.scorecard.findings["selom_engine_bugs"] == 0

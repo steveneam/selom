@@ -80,6 +80,21 @@ RETINAL_CELL_TYPES = [
 # A representative per-sample QC golden (Supp Data 1) — robust, deposit-exact spot check.
 GOLD_QC_SPOT = {"sample": "15046", "before": 8073, "after": 4713}  # 7.5 PCW whole eye
 
+# Canonical retinal-lineage marker panels for the live cell-type-recovery check (Fig 1A/B).
+# Drawn from the paper's own cluster markers + standard retinal markers; a lineage is "recovered"
+# when its markers are present AND a Leiden cluster is clearly enriched for them (drive_live_fig1).
+RETINAL_MARKER_PANELS = {
+    "Proliferating RPC": ["MKI67", "CCND1", "SOX2", "HMGA1"],
+    "Rod photoreceptors": ["RHO", "NRL", "NR2E3", "GNAT1"],
+    "Cone photoreceptors": ["ARR3", "OPN1SW", "GNAT2", "PDE6H"],
+    "Retinal ganglion cells": ["SNCG", "POU4F2", "NEFL", "GAP43"],
+    "Amacrine cells": ["TFAP2A", "TFAP2B", "GAD1"],
+    "Horizontal cells": ["ONECUT1", "ONECUT2", "LHX1"],
+    "Bipolar cells": ["VSX2", "OTX2", "GRM6"],
+    "Muller glia": ["RLBP1", "SLC1A3", "CRABP1"],
+    "Microglia": ["AIF1", "C1QA", "CX3CR1"],
+}
+
 
 # --- ledger construction (the structured target spec) -----------------------------------------
 
@@ -439,6 +454,108 @@ def drive_live_qc(xlsx_path: str | pathlib.Path) -> dict:
     }
 
 
+# --- live Fig-1 drive on the raw GSE234963 matrices (the Melody dogfood) -----------------------
+
+
+def _marker_enrichment(norm_adata, leiden) -> list[str]:
+    """Retinal lineages with a clearly-enriched Leiden cluster (panel mean >= 2x global mean).
+
+    ``norm_adata`` is normalized+log1p over ALL genes (so panel markers aren't lost to HVG
+    selection); ``leiden`` is the per-cell cluster label aligned to ``norm_adata.obs_names``."""
+    import numpy as np
+    import pandas as pd
+
+    labels = pd.Series(np.asarray(leiden), index=norm_adata.obs_names)
+    detected = []
+    for lineage, genes in RETINAL_MARKER_PANELS.items():
+        present = [g for g in genes if g in norm_adata.var_names]
+        if not present:
+            continue
+        X = norm_adata[:, present].X
+        X = X.toarray() if hasattr(X, "toarray") else np.asarray(X)
+        cell_mean = np.asarray(X).mean(axis=1).ravel()
+        glob = float(cell_mean.mean())
+        if glob <= 0:
+            continue
+        max_cluster_mean = float(pd.Series(cell_mean, index=norm_adata.obs_names)
+                                 .groupby(labels.values).mean().max())
+        if max_cluster_mean >= 2 * glob:
+            detected.append(lineage)
+    return detected
+
+
+def drive_live_fig1(ledger: Ledger | None = None, *, h5ad_path: str | pathlib.Path) -> tuple[Ledger, dict]:
+    """Drive Fig 1 live on the raw GSE234963 matrices — the Selom Melody dogfood (★1 compounding win).
+
+    Runs the full Selom scRNA stack on a stage-spanning subset (normalize -> 2000 HVG -> PCA ->
+    **Selom Melody** batch integration on ``sample`` -> Leiden) and measures (a) the Melody
+    batch-mixing improvement (the number that proves integration worked, the paper used Harmony) and
+    (b) how many canonical retinal lineages are recovered, then renders the integrated UMAP through
+    Selom's own ``integration`` skill (proving the editable figure path). The deposit-exact cluster
+    count (43 @ res 2.2) stays scored from Supp Data 2 (``drive_live_markers``) — a raw-data Leiden
+    pass at default resolution won't and shouldn't reproduce that res-2.2 artifact; the live drive's
+    evidence is the Melody mixing + the cell-type recovery. Needs scanpy + the external h5ad."""
+    import os
+
+    import scanpy as sc
+
+    from skills._genes import read_anndata
+    from skills._scrna import select_hvg
+    from skills.integration.melody import melody
+    from skills.integration.run_real import _batch_mixing
+
+    h5ad_path = str(h5ad_path)
+    ledger = ledger or build_ledger()
+    adata = read_anndata(h5ad_path)
+    n_cells, n_samples = int(adata.n_obs), int(adata.obs["sample"].nunique())
+
+    # Normalized full-gene copy (for marker enrichment) + the Melody integration pipeline.
+    norm_full = adata.copy()
+    sc.pp.normalize_total(norm_full, target_sum=1e4)
+    sc.pp.log1p(norm_full)
+
+    a = norm_full.copy()
+    sc.pp.filter_genes(a, min_cells=3)
+    a = select_hvg(a, GOLD_HVG)
+    n_pcs = max(2, min(50, a.n_obs - 1, a.n_vars - 1))
+    sc.pp.pca(a, n_comps=n_pcs)
+    batch = a.obs["sample"].to_numpy()
+    before = _batch_mixing(a.obsm["X_pca"], batch)
+    a.obsm["X_pca_melody"] = melody(a.obsm["X_pca"], batch, theta=2.0, max_iter_harmony=10)
+    after = _batch_mixing(a.obsm["X_pca_melody"], batch)
+    sc.pp.neighbors(a, n_neighbors=15, use_rep="X_pca_melody")
+    sc.tl.leiden(a, flavor="igraph", n_iterations=2, directed=False)
+    n_clusters = int(a.obs["leiden"].nunique())
+    cell_types = _marker_enrichment(norm_full, a.obs["leiden"].to_numpy())
+
+    # Render the integrated UMAP through Selom's own integration skill (the editable-figure path).
+    os.environ["SELOM_UMAP_ENGINE"] = "scanpy"
+    from skills.contract import run_skill
+
+    fig = run_skill("integration", h5ad_path,
+                    {"n_pcs": 50, "n_neighbors": 15, "batch_key": "sample",
+                     "n_hvg": GOLD_HVG, "color_by": "leiden"})
+    n_fig_traces = len(fig.get("data", []))
+
+    # Record the measured Melody mixing on the Harmony->Melody substitution, then re-drive.
+    mix = f"{before:.2f} -> {after:.2f}" if before is not None and after is not None else "n/a"
+    ledger.panel("1A").method_subs[0].delta_measured = (
+        f"Melody integrated {n_samples} samples ({n_cells} cells): kNN batch-mixing {mix} "
+        f"(entropy, 1=fully mixed); {len(cell_types)} retinal lineages recovered")
+    _drive(ledger, _captured(), run_prefix="live-fig1")
+
+    summary = {
+        "scrna_subset": {"n_cells": n_cells, "n_samples": n_samples, "n_clusters": n_clusters,
+                         "integration_figure_traces": n_fig_traces},
+        "melody_mixing": {"before": round(before, 4) if before is not None else None,
+                          "after": round(after, 4) if after is not None else None,
+                          "improved": bool(before is not None and after is not None and after > before)},
+        "cell_types_recovered": cell_types,
+        "n_cell_types_recovered": len(cell_types),
+    }
+    return ledger, summary
+
+
 # --- CLI (dev/validation only) -----------------------------------------------------------------
 
 
@@ -463,5 +580,9 @@ if __name__ == "__main__":
         _print_scorecard(led)
     elif args and args[0] == "--qc":
         print("cohort QC re-derivation (Supp Data 1):", drive_live_qc(args[1]))
+    elif args and args[0] == "--fig1":
+        led, summ = drive_live_fig1(h5ad_path=args[1])
+        print("live Fig-1 drive (GSE234963 subset):", summ)
+        _print_scorecard(led)
     else:
         _print_scorecard(drive_captured())
