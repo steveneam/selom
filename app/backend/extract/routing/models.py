@@ -65,13 +65,15 @@ class VocabEntry(BaseModel):
 
 class RoutingHit(BaseModel):
     """One matched term in the paper → its target, tagged with the section it was found in
-    (drives the section weighting) and, for legend/results hits, the figure it belongs to."""
+    (drives the section weighting) and, for legend/results hits, the figure it belongs to.
+    ``relaxed`` marks a token-canonical (L3) match rather than an exact (L1) one."""
 
     term: str
     target: str
     section: str           # methods | legend | results | body  (refs are excluded, never emitted)
     weight: float
     figure: str = ""
+    relaxed: bool = False
 
 
 class RoutingCandidate(BaseModel):
@@ -89,7 +91,14 @@ class RoutingCandidate(BaseModel):
 
 class FigureRoute(BaseModel):
     """The routing verdict for one figure: ranked candidates + the top target + whether it is
-    in Selom's scope + a confidence (the margin between the top two candidates)."""
+    in Selom's scope + a confidence + the evidence provenance.
+
+    ``attribution`` records WHERE the routing evidence came from — ``legend`` (anchored to the
+    figure's own caption, the strongest signal), ``results`` (best-effort proximity to an in-text
+    ``Fig N`` reference, inherently weaker), or ``none``. ``confidence`` is the top-two margin scaled
+    by that provenance, so a results-only route never reads as falsely certain. A low-confidence /
+    results-attributed figure is exactly where the optional, gated AI-verify tier (paid) adds
+    accuracy on tricky journal layouts — it is never required for the deterministic map to render."""
 
     figure: str
     candidates: list[RoutingCandidate] = Field(default_factory=list)
@@ -97,14 +106,24 @@ class FigureRoute(BaseModel):
     in_scope: bool = True
     reason: str = ""        # the oos reason when out-of-scope (atac/spatial/grn/wet_lab)
     confidence: float = 0.0
+    attribution: str = "none"   # legend | results | none  — WHERE the evidence came from
+    tier: str = "structured"    # structured (L1) | recovered (L2/relaxed) — HOW reliably
 
 
 class FeasibilityMap(BaseModel):
-    """The Skill Keyword Index's output for a paper — the auto-generated Dorgau-style table:
-    a per-figure route + a paper-level target rollup + the method-nouns that routed to NO skill
-    (``unmatched_terms`` = the Skill Foundry gap signal, surfaced not auto-filed in v1)."""
+    """The Skill Keyword Index's output for a paper — the auto-generated Dorgau-style table.
+
+    ``skills`` + ``out_of_scope`` are the **L3 paper-level inventory** (the core deliverable: every
+    skill the paper needs + the out-of-scope modalities it touches), derived from ``paper_targets``
+    and robust to per-figure attribution error. ``figures`` is the per-figure attribution (L1/L2 —
+    the premium gravy, each carrying a ``tier``/``confidence``). ``tier_summary`` rolls up how many
+    figures routed cleanly vs needed recovery — the signal a surface uses to offer the L4 AI upsell.
+    ``unmatched_terms`` are method-nouns that routed to NO skill (the Skill Foundry gap signal)."""
 
     paper_id: str = ""
+    skills: list[str] = Field(default_factory=list)         # in-scope skill ids (L3 inventory)
+    out_of_scope: list[str] = Field(default_factory=list)   # oos reasons present (atac/spatial/…)
     figures: list[FigureRoute] = Field(default_factory=list)
     paper_targets: list[RoutingCandidate] = Field(default_factory=list)
+    tier_summary: dict[str, int] = Field(default_factory=dict)
     unmatched_terms: list[str] = Field(default_factory=list)

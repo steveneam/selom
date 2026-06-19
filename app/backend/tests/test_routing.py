@@ -8,6 +8,8 @@ the router must reproduce each figure's in-scope skills and out-of-scope modalit
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from extract.routing import build_vocab, route_text
@@ -211,6 +213,120 @@ def test_backtest_rpgrip1():
     assert "skill:annotate" in _targets(_fig(fmap, "6"))
     # the wet-lab readouts are detected as out-of-scope somewhere in the paper.
     assert "oos:wet_lab" in _paper_targets(fmap)
+
+
+# --- legend-segmentation hardening (4-layer) --------------------------------
+
+# A garbled real-PDF caption: the marker reflows to a letter-spaced "F IG U R E " with the figure
+# number stripped, inline between Results paragraphs, header-less. The figure number is recovered
+# ordinally from the in-text references (the L2 recovery sweep).
+GARBLED = (
+    "Results\n"
+    "Cells were profiled and visualised (Figure 1a) then clustered (Figure 1b).\n"
+    "F IG U R E \n"
+    "Integrated retinal atlas. (a) UMAP of the integrated dataset. (b) marker genes from FindMarkers.\n"
+    "Pseudotime was then computed across the lineage (Figure 2a).\n"
+    "F IG U R E \n"
+    "Developmental lineage. (a) pseudotime trajectory inferred with Monocle 3.\n"
+)
+
+
+def test_garbled_letterspaced_caption_recovered_by_ordinal():
+    fmap = route_text(GARBLED, paper_id="garbled")
+    # both garbled captions detected; numbers recovered ordinally from the in-text Fig 1 / Fig 2 refs.
+    assert {"1", "2"} <= {f.figure for f in fmap.figures}
+    assert "skill:umap_scrna" in _targets(_fig(fmap, "1"))
+    assert "skill:trajectory" in _targets(_fig(fmap, "2"))
+    # a recovered caption is flagged recovered-tier (the AI-upsell signal), never falsely structured.
+    assert _fig(fmap, "1").tier == "recovered"
+
+
+def test_glyph_number_marker_tolerated():
+    # some journals render the figure number in a custom font whose digit extracts as a private-use
+    # glyph; the bare marker must still be recognised (number then recovered ordinally).
+    from extract.routing.segment import _marker
+
+    is_m, num, _ = _marker("F IG U R E ")
+    assert is_m and num is None
+
+
+def _fake_refs(n: int) -> str:
+    return "\n".join(
+        f"Author{i}, A. B., & Body, C. D. ({2000 + i}). A study of things number {i}. "
+        f"Journal of Things, {i}, {i * 10}. https://doi.org/10.1000/x{i}"
+        for i in range(n)
+    )
+
+
+def test_headerless_reference_tail_excluded():
+    # No "References" header — but a citation-dense tail must still be detected and excluded, so a
+    # tool named ONLY in the bibliography (Harmony) does not route to integration (the headline guard).
+    front = "\n".join(
+        ["Methods", "We clustered cells with Leiden and made a UMAP."]
+        + [f"Analysis step {i} was performed and the outcome recorded carefully." for i in range(12)]
+        + ["Discussion", "Our findings align with prior literature on the subject."]
+    )
+    text = (front + "\n" + _fake_refs(12) + "\n"
+            "Korsunsky, I., et al. (2019). Fast integration with Harmony. Nat Methods, 16, 1289. "
+            "https://doi.org/10.1038/y\n")
+    seg = segment(text)
+    assert "Harmony" in seg.refs and "Harmony" not in seg.methods
+    fmap = route_text(text)
+    assert "skill:integration" not in _paper_targets(fmap)
+    assert "skill:umap_scrna" in _paper_targets(fmap)
+
+
+def test_relaxed_match_recovers_surface_variants():
+    # exact vocab has "heatmap" / "differential expression"; the paper writes "heat map" /
+    # "differentially expressed" — the L3 token-canonical pass closes the surface-form gap.
+    fmap = route_text("Methods\nWe drew a heat map and tested differentially expressed transcripts.\n")
+    assert "heatmap" in fmap.skills
+    assert "deg" in fmap.skills
+
+
+def test_forward_figure_attribution_prefers_following_ref():
+    # figures are cited AFTER the claim ("…volcano plot (Figure 4e)"); the term must attach to the
+    # following figure, not the previous sentence's figure.
+    text = "Results\nWe computed a PCA (Figure 3a). The data are a volcano plot (Figure 4e).\n"
+    fmap = route_text(text)
+    assert "skill:volcano" in _targets(_fig(fmap, "4"))
+    f3 = next((r for r in fmap.figures if r.figure == "3"), None)
+    assert f3 is None or "skill:volcano" not in _targets(f3)
+
+
+def test_tier_structured_for_clean_caption():
+    clean = route_text("Figure legends\nFigure 1. UMAP of the integrated retinal atlas.\n")
+    assert _fig(clean, "1").tier == "structured"
+
+
+def test_repeated_term_does_not_inflate_score():
+    once = route_text("Figure legends\nFigure 1. Volcano plot of the data.\n")
+    thrice = route_text("Figure legends\nFigure 1. Volcano plot, volcano plot and a volcano plot.\n")
+    s_once = next(c.score for c in _fig(once, "1").candidates if c.target == "skill:volcano")
+    s_many = next(c.score for c in _fig(thrice, "1").candidates if c.target == "skill:volcano")
+    assert s_once == s_many
+
+
+def test_paper_inventory_lists_deduped_skills_and_oos():
+    fmap = route_text(DORGAU, paper_id="dorgau")
+    assert {"integration", "trajectory", "markers", "umap_scrna"} <= set(fmap.skills)
+    assert {"spatial", "atac", "grn", "wet_lab"} <= set(fmap.out_of_scope)
+    assert len(fmap.skills) == len(set(fmap.skills))  # the inventory is deduped
+
+
+_JEV_TEXT = r"D:/selom-data/_jev_text.txt"
+
+
+@pytest.mark.skipif(not os.path.exists(_JEV_TEXT), reason="real JEV PDF text not staged")
+def test_real_jev_inventory_recall_and_tiers():
+    fmap = route_text(open(_JEV_TEXT, encoding="utf-8").read(), paper_id="jev")
+    # L3 core deliverable — the ledger's in-scope skills are all surfaced in the paper inventory.
+    ledger = {"deg", "volcano", "pca", "heatmap", "composition", "umap_scrna", "markers", "trajectory"}
+    assert ledger <= set(fmap.skills)
+    assert "wet_lab" in fmap.out_of_scope
+    # all eight garbled captions recovered, every figure flagged recovered-tier (the AI-upsell signal).
+    assert len(fmap.figures) == 8
+    assert fmap.tier_summary["recovered"] == 8 and fmap.tier_summary["structured"] == 0
 
 
 # --- endpoint ---------------------------------------------------------------

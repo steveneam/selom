@@ -46,7 +46,7 @@
   { "target": "skill:corr_heatmap", "terms": ["correlation heatmap", "correlation matrix", "pairwise correlation", "Spearman correlation matrix"] },
 
   { "target": "skill:volcano", "terms": ["volcano plot"] },
-  { "target": "skill:heatmap", "terms": ["expression heatmap", "heatmap of", "clustered heatmap"] },
+  { "target": "skill:heatmap", "terms": ["heatmap", "heat map", "expression heatmap", "heatmap of", "clustered heatmap"] },
   { "target": "skill:violin", "terms": ["violin plot"] },
   { "target": "skill:boxplot", "terms": ["box plot", "boxplot", "box-and-whisker"] },
   { "target": "skill:upset", "terms": ["UpSet plot", "UpSet", "intersection plot"] },
