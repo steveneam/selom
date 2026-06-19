@@ -1,10 +1,11 @@
 {
   "id": "integration",
-  "version": "0.1.0",
-  "title": "scRNA integration (Harmony)",
+  "version": "0.2.0",
+  "title": "scRNA integration (Melody)",
   "engine": "python",
   "omics": "scrna-seq",
   "entrypoint": "skills.integration.run:run",
+  "origin": "proprietary",
   "inputs": [{ "name": "matrix", "kind": "anndata|10x_mtx|h5ad", "required": true }],
   "param_spec": {
     "batch_key":         { "type": "str",   "default": "sample" },
@@ -18,14 +19,14 @@
   },
   "outputs": [{ "name": "figure", "kind": "plotly_spec" }],
   "catalog": {
-    "name": "Selom Integration (Harmony)",
-    "summary": "Batch-correct and co-embed multiple single-cell libraries with Harmony: QC → normalize → PCA → Harmony on the chosen batch key → neighbours/Leiden/UMAP on the corrected embedding. Mixes batches while preserving cell-type structure — the prerequisite for building or benchmarking against a reference atlas.",
+    "name": "Selom Melody",
+    "summary": "Batch-correct and co-embed multiple single-cell libraries with Selom Melody — our clean-room, pure-numpy implementation of the Harmony integration method (Korsunsky et al. 2019), with no GPL dependency. QC → normalize → PCA → Melody on the chosen batch key → neighbours/Leiden/UMAP on the corrected embedding. Mixes batches while preserving cell-type structure — the prerequisite for building or benchmarking against a reference atlas. Emits the before→after batch-mixing score as provenance.",
     "category": "single-cell",
     "tier": "verified",
     "status": "beta",
     "input_formats": [".h5ad", ".csv"],
     "chains_with": ["umap_scrna", "composition", "deg"],
-    "license": "MIT",
+    "license": "Proprietary",
     "popularity": 70
   }
 }

@@ -2,13 +2,16 @@
 
 Multi-library batch correction: several single-cell samples are co-embedded so the
 same cell type from different batches lands together (rather than splitting by batch).
-The real engine in ``run_real.py`` runs Scanpy + Harmony; the stub here is a
-dependency-free deterministic UMAP-shaped scatter that shows the *post-integration*
-state — both batches interspersed across shared clusters — so the contract / golden
-tests and the light skeleton run end-to-end with ZERO heavy deps.
+The real engine in ``run_real.py`` runs Scanpy + Selom Melody (our clean-room, pure-numpy
+Harmony-method batch correction — no ``harmonypy``); the stub here is a dependency-free
+deterministic UMAP-shaped scatter that shows the *post-integration* state — both batches
+interspersed across shared clusters — so the contract / golden tests and the light skeleton
+run end-to-end with ZERO heavy deps.
 
-Engine selection via ``SELOM_SKILLS_ENGINE`` (shared ``_engine.use_real_engine``):
-real iff scanpy AND harmonypy are importable (``uv sync --extra omics``), else stub.
+Engine selection via ``SELOM_SKILLS_ENGINE`` (shared ``_engine.use_real_engine``): real iff
+scanpy is importable (``uv sync --extra omics``), else stub. Melody only needs numpy/sklearn
+(always present in the real env), so harmonypy is no longer a gate — it stays installed only
+as a validation oracle.
 """
 
 import math
@@ -17,7 +20,7 @@ from skills._engine import use_real_engine
 
 
 def run(data_path: str, params: dict) -> dict:
-    if use_real_engine("scanpy", "harmonypy"):
+    if use_real_engine("scanpy"):
         from skills.integration.run_real import run as run_real
 
         return run_real(data_path=data_path, params=params)
@@ -56,5 +59,5 @@ def _stub_figure() -> dict:
 
     return {
         "data": traces,
-        "layout": {"title": {"text": "scRNA integration — Harmony (stub)"}},
+        "layout": {"title": {"text": "scRNA integration — Melody (stub)"}},
     }

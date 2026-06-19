@@ -1,13 +1,14 @@
-"""Real Scanpy + Harmony -> editable Plotly figure-spec engine for the integration skill.
+"""Real Scanpy + Melody -> editable Plotly figure-spec engine for the integration skill.
 
-Requires the heavy stack: ``uv sync --extra omics`` (scanpy + harmonypy). Imports are
+Requires the heavy stack: ``uv sync --extra omics`` (scanpy). Batch correction itself uses
+Selom Melody (``skills.integration.melody`` — pure numpy, no ``harmonypy``). Imports are
 lazy (inside ``run``) so importing this module stays cheap and the light skeleton never
 pays for the heavy deps unless this engine is actually invoked.
 
-Pipeline: read -> drop all-zero genes -> (normalize -> log1p) -> PCA -> Harmony batch
-correction on the chosen ``batch_key`` (scanpy's ``external.pp.harmony_integrate``, which
-wraps harmonypy and writes ``X_pca_harmony``) -> kNN graph + Leiden + UMAP on the
-*corrected* embedding. The return value is the EDITABLE Plotly spec ({data, layout}) the
+Pipeline: read -> drop all-zero genes -> (normalize -> log1p) -> PCA -> Melody batch
+correction on the chosen ``batch_key`` (Selom's clean-room Harmony-method engine
+``skills.integration.melody``, writing ``X_pca_melody``) -> kNN graph + Leiden + UMAP on
+the *corrected* embedding. The return value is the EDITABLE Plotly spec ({data, layout}) the
 frontend renders — the SAME shape ``umap_scrna`` produces, so an integrated UMAP drops
 straight into the editor. Colour defaults to the batch key (to show the mixing); pass
 ``color_by`` to colour by Leiden cluster or any obs column instead.
@@ -59,20 +60,19 @@ def run(data_path: str, params: dict) -> dict:
     batch_key = _resolve_batch_key(adata, str(params.get("batch_key") or "").strip())
     integrated = batch_key is not None
     if integrated:
-        # harmonypy builds its batch design with pd.get_dummies; a pandas *categorical* batch
-        # column (anndata stores obs categoricals as `category` by default) yields pandas 3.0's
-        # nullable `boolean` dtype, whose .to_numpy() is an OBJECT array — which then breaks
-        # harmonypy's np.log (TypeError: ufunc 'log' on object). Cast to plain str so get_dummies
-        # returns a native bool matrix. Behaviour-preserving (the labels are unchanged).
-        adata.obs[batch_key] = adata.obs[batch_key].astype(str)
-        # scanpy wraps harmonypy.run_harmony; theta = diversity penalty (higher = stronger mixing).
-        sc.external.pp.harmony_integrate(
-            adata, batch_key,
+        # Selom Melody — clean-room Harmony-method batch correction (pure numpy, no harmonypy).
+        # theta = diversity penalty (higher = stronger mixing). Writes the corrected PCA to
+        # obsm["X_pca_melody"], the analogue of scanpy/harmonypy's X_pca_harmony.
+        from skills.integration.melody import melody
+
+        adata.obsm["X_pca_melody"] = melody(
+            adata.obsm["X_pca"],
+            adata.obs[batch_key].to_numpy(),
             theta=float(params.get("theta", 2.0)),
             max_iter_harmony=int(params.get("max_iter_harmony", 10)),
         )
-        use_rep = "X_pca_harmony"
-        title = f"Integrated scRNA UMAP — Harmony (batch: {batch_key})"
+        use_rep = "X_pca_melody"
+        title = f"Integrated scRNA UMAP — Melody (batch: {batch_key})"
     else:
         use_rep = "X_pca"
         title = "scRNA UMAP — no batch correction (single batch)"
@@ -83,7 +83,7 @@ def run(data_path: str, params: dict) -> dict:
     # mixed batches; no rise means correction didn't take (or there was nothing to mix).
     if integrated:
         before = _batch_mixing(adata.obsm["X_pca"], adata.obs[batch_key].to_numpy())
-        after = _batch_mixing(adata.obsm["X_pca_harmony"], adata.obs[batch_key].to_numpy())
+        after = _batch_mixing(adata.obsm["X_pca_melody"], adata.obs[batch_key].to_numpy())
         if before is not None and after is not None:
             title = f"{title}<br><sub>batch mixing {before:.2f} → {after:.2f} (kNN entropy, 1=fully mixed)</sub>"
 

@@ -99,13 +99,11 @@ omics = [
   # "match the paper's normalization" when the reference used edgeR/limma-voom. Apache-2.0;
   # the complete edgeR port edgePython is GPL-3.0 and is deliberately NOT used (DECISIONS #9).
   "rnanorm>=2.1",
-  # Harmony batch correction for the `integration` skill (multi-library co-embedding).
-  # MIT (github.com/slowkow/harmonypy); driven via scanpy's external.pp.harmony_integrate,
-  # lazy-imported behind the stub/real split like every other heavy engine.
-  # PINNED <1: harmonypy 2.0.0 is an unrelated C++/CMake rewrite that does NOT build in this
-  # environment (`CMAKE_CXX_COMPILER not set`); the 0.0.x slowkow line is the pure-Python one
-  # the skill targets. A clean-room in-house replacement is scoped (docs/harmony-reimplementation-scope.md).
-  "harmonypy>=0.0.10,<1",
+  # NOTE: the `integration` skill no longer depends on harmonypy — it runs on **Selom Melody**,
+  # our clean-room pure-numpy Harmony implementation (skills/integration/melody.py, s29).
+  # harmonypy moved to the `oracle` extra below (validation-only). Keeping it OFF the runtime
+  # closure means `uv sync --extra omics` can never re-resolve to the unbuildable harmonypy
+  # 2.0.0 C++/CMake rewrite — the s28 footgun is closed for the shipped path.
 ]
 # Async job path (B3): arq + Redis queue (DECISIONS #6) + boto3 for the R2 result
 # store. OPTIONAL — the default inline executor + local-filesystem result store need
@@ -120,6 +118,15 @@ dev = [
   "pytest",
   "httpx",
   "ruff",
+]
+
+# Validation oracles — installed only to cross-check Selom's clean-room engines against the
+# original tools (NEVER on the shipped path; the edgeR/fgsea/mmc2 pattern). GPL/heavy deps are
+# quarantined here so the runtime extras stay clean. harmonypy is **GPL-3.0** (the whole Harmony
+# lineage is — NOT MIT, corrected s29); pinned <1 because 2.0.0 is an unbuildable C++/CMake
+# rewrite. Used by the manual Selom Melody vs. harmonypy metric comparison, not by CI tests.
+oracle = [
+  "harmonypy>=0.0.10,<1",
 ]
 
 [tool.pytest.ini_options]
