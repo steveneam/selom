@@ -57,8 +57,14 @@ SOURCE_EXTRACTED = "extracted"
 TRANSCRIPTOMIC = "transcriptomic"
 WET_LAB = "wet_lab"
 DATA_NOT_DEPOSITED = "data_not_deposited"
+# A valid analysis in a modality/tool Selom has no skill for (scATAC-seq, spatial transcriptomics,
+# proprietary GRN tools like IPA). The data may be openly deposited — Selom simply cannot reproduce
+# the panel because the modality is outside its skill set. Distinct from WET_LAB (not sequencing at
+# all) and DATA_NOT_DEPOSITED (sequencing, but the data can't be obtained). First used by the Dorgau
+# ledger, where 6 of 7 figures are spatial / scATAC / IPA / wet-lab.
+MODALITY_UNSUPPORTED = "modality_unsupported"
 # Scopes a numeric reproduction can't apply to: excluded from the denominator, blame OUT_OF_SCOPE.
-OUT_OF_SCOPE_SCOPES = frozenset({WET_LAB, DATA_NOT_DEPOSITED})
+OUT_OF_SCOPE_SCOPES = frozenset({WET_LAB, DATA_NOT_DEPOSITED, MODALITY_UNSUPPORTED})
 
 # Where the oracle ran — the hinge of the blame procedure.
 DEPOSITED_RAW = "deposited_raw"          # authors' full method on the deposited data
