@@ -8,6 +8,7 @@ inverted keyword index over a registry-derived + curated-synonym vocabulary, sec
 never replaces the deterministic layer. See docs/skill-keyword-index/spec.md.
 """
 
+from .engine import build_auto_ledger, route_to_panels
 from .models import FeasibilityMap, FigureRoute, RoutingCandidate, RoutingHit, VocabEntry
 from .route import route_text
 from .vocab import build_vocab
@@ -18,6 +19,8 @@ __all__ = [
     "RoutingCandidate",
     "RoutingHit",
     "VocabEntry",
+    "build_auto_ledger",
     "build_vocab",
+    "route_to_panels",
     "route_text",
 ]

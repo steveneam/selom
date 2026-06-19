@@ -12,9 +12,11 @@ import os
 
 import pytest
 
-from extract.routing import build_vocab, route_text
+import reproduction as R
+
+from extract.routing import build_auto_ledger, build_vocab, route_text, route_to_panels
 from extract.routing.index import KeywordIndex
-from extract.routing.models import VocabEntry
+from extract.routing.models import VocabEntry, is_skill, skill_id
 from extract.routing.route import default_index
 from extract.routing.segment import segment
 from extract.routing.vocab import _validate, load_synonyms, registry_entries
@@ -327,6 +329,100 @@ def test_real_jev_inventory_recall_and_tiers():
     # all eight garbled captions recovered, every figure flagged recovered-tier (the AI-upsell signal).
     assert len(fmap.figures) == 8
     assert fmap.tier_summary["recovered"] == 8 and fmap.tier_summary["structured"] == 0
+
+
+# --- engine wiring (fast-follow #1): figure->skill map into the reproduction engine ----------
+
+# The auto-map is a SUGGESTION skeleton at figure granularity (no fabricated sub-panel letters),
+# so the golden is per-figure OVERLAP with the hand ledger's skills — not an exact panel match: the
+# router legitimately surfaces a chart-form alternative (a "heatmap of DE genes" -> heatmap) where
+# the hand author chose the more specific analysis skill (deg / pseudotime_genes). What must hold:
+# every in-scope figure's suggestions overlap the hand skills, no real skill is dropped, and a
+# purely out-of-scope figure maps to the right engine scope.
+
+
+def _hand_map(build_ledger):
+    """Per-figure hand-encoded in-scope skill sets + out-of-scope scopes from a real ledger."""
+    skills: dict[str, set[str]] = {}
+    oos: dict[str, set[str]] = {}
+    for p in build_ledger().panels:
+        if p.scope in R.OUT_OF_SCOPE_SCOPES:
+            oos.setdefault(p.figure, set()).add(p.scope)
+        elif p.skill_id:
+            skills.setdefault(p.figure, set()).add(p.skill_id)
+    return skills, oos
+
+
+@pytest.mark.parametrize("text,module_name", [
+    (DORGAU, "reproduction_dorgau"), (HANI, "reproduction_hani"),
+    (JEV, "reproduction_jev"), (RPGRIP1, "reproduction_rpgrip1"),
+])
+def test_auto_map_matches_hand_ledger_per_figure(text, module_name):
+    import importlib
+
+    hand_skills, hand_oos = _hand_map(importlib.import_module(module_name).build_ledger)
+    led = build_auto_ledger(text, paper_id=module_name)
+    fmap = route_text(text, paper_id=module_name)
+    for panel in led.panels:
+        fig = panel.figure
+        if panel.skill_id:  # in-scope figure: its suggestion set must overlap the hand skills
+            fr = next(f for f in fmap.figures if f.figure == fig)
+            auto_skills = {skill_id(c.target) for c in fr.candidates if is_skill(c.target)}
+            if fig in hand_skills:
+                assert auto_skills & hand_skills[fig], (fig, auto_skills, hand_skills[fig])
+        else:               # purely out-of-scope figure: the mapped scope must match the ledger
+            assert fig in hand_oos and panel.scope in hand_oos[fig], (fig, panel.scope)
+
+
+def test_mixed_figure_keeps_in_scope_skill_not_dropped():
+    # RPGRIP1 Fig 5 = GSEA/PCA/DE analysis + IHC/qPCR validation in ONE figure. The two wet-lab
+    # terms out-score each single skill, but the figure must stay IN-SCOPE (the reproducible skills
+    # are not dropped) with the co-present out-of-scope readout merely noted (the bug this guards).
+    f5 = next(p for p in build_auto_ledger(RPGRIP1, paper_id="rpgrip1").panels if p.figure == "5")
+    assert f5.skill_id in {"deg", "gsea", "pca", "heatmap"}
+    assert f5.scope == R.TRANSCRIPTOMIC
+    assert "wet_lab" in f5.note
+
+
+def test_route_to_panels_one_panel_per_figure_unique_keys():
+    panels = route_to_panels(route_text(DORGAU, paper_id="dorgau"))
+    keys = [p.key for p in panels]
+    assert len(keys) == len(set(keys))  # unique keys: one panel per figure, no engine shadowing
+    assert {p.figure for p in panels} == {f.figure for f in route_text(DORGAU).figures}
+
+
+def test_build_auto_ledger_drives_through_scorecard():
+    led = build_auto_ledger(DORGAU, paper_id="dorgau")
+    # the L3 paper-level inventory rides on the auto Paper.
+    assert set(led.paper.methods_digest["skills"]) >= {"trajectory", "markers", "umap_scrna"}
+    assert set(led.paper.methods_digest["out_of_scope"]) >= {"spatial", "atac", "grn", "wet_lab"}
+    sc = R.build_scorecard(led)
+    assert sc.n_panels == len(led.panels)
+    assert sc.n_in_scope == 1  # only Fig 1 in-scope; spatial/atac/grn/wet-lab greyed/excluded
+
+
+_DE_TEXT = ("Results\nWe identified 180 differentially expressed genes, with 61 upregulated and "
+            "119 downregulated at p < 0.05 (Figure 4e), summarised as a volcano plot.\n")
+
+
+def test_to_engine_panels_stamps_skill_id_only_with_feasibility():
+    from extract.golden import build_extracted_spec, to_engine_panels
+
+    spec = build_extracted_spec(None, "demo", text=_DE_TEXT)
+    plain = to_engine_panels(spec)  # no feasibility -> unchanged (skill_id stays None)
+    assert [p.key for p in plain] == ["4e"] and plain[0].skill_id is None
+    stamped = to_engine_panels(spec, feasibility=route_text(_DE_TEXT, paper_id="demo"))
+    assert stamped[0].skill_id == "deg" and stamped[0].scope == R.TRANSCRIPTOMIC
+
+
+@pytest.mark.skipif(not os.path.exists(_JEV_TEXT), reason="real JEV PDF text not staged")
+def test_real_jev_auto_ledger_skeleton():
+    led = build_auto_ledger(open(_JEV_TEXT, encoding="utf-8").read(), paper_id="jev")
+    inventory = set(led.paper.methods_digest["skills"])
+    in_scope_panels = [p for p in led.panels if p.skill_id]
+    assert in_scope_panels                                       # runnable figure panels exist
+    assert all(p.skill_id in inventory for p in in_scope_panels)  # no skill invented off-inventory
+    assert "wet_lab" in led.paper.methods_digest["out_of_scope"]
 
 
 # --- endpoint ---------------------------------------------------------------

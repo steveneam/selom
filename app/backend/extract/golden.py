@@ -229,9 +229,19 @@ def to_golden(t: GoldenTarget) -> R.Golden:
                     confidence=t.confidence, note=t.note, inconsistency_ref=t.inconsistency_ref)
 
 
-def to_engine_panels(spec: ExtractedSpec) -> list[R.Panel]:
+def to_engine_panels(spec: ExtractedSpec, *, feasibility=None) -> list[R.Panel]:
     """Group the spec's goldens by panel into engine ``Panel`` objects — the auto-generated
-    form of what ``build_ledger()`` hand-encodes (coarse in slice-1; segmentation refines it)."""
+    form of what ``build_ledger()`` hand-encodes (coarse in slice-1; segmentation refines it).
+
+    When a Skill Keyword Index ``feasibility`` map is passed (fast-follow #1), each panel's
+    ``skill_id`` is stamped from its figure's route (the figure's top in-scope skill), and an
+    out-of-scope figure overrides ``scope`` with the mapped engine scope. ``feasibility=None``
+    leaves the output byte-identical to before (``skill_id`` stays ``None``). The route resolves to
+    figure granularity, so every panel of a figure inherits that figure's primary skill — see
+    ``extract.routing.engine.route_to_panels`` for the rationale."""
+    from .routing.models import is_skill, scope_of, skill_id  # lazy: routing depends on engine bits
+
+    routes = {fr.figure: fr for fr in (feasibility.figures if feasibility else [])}
     drafts = {d.key: d for d in spec.panels}
     by_panel: dict[str, list[GoldenTarget]] = {}
     for t in spec.goldens:
@@ -239,10 +249,18 @@ def to_engine_panels(spec: ExtractedSpec) -> list[R.Panel]:
     panels: list[R.Panel] = []
     for key, targets in by_panel.items():
         d = drafts.get(key)
+        scope = d.scope if d else R.TRANSCRIPTOMIC
+        sid = None
+        fr = routes.get(targets[0].figure)
+        if fr and fr.top:
+            in_scope = [skill_id(c.target) for c in fr.candidates if is_skill(c.target)]
+            if in_scope:  # any in-scope skill -> stamp the top-ranked one (mixed figures stay in-scope)
+                sid = in_scope[0]
+            else:         # purely out-of-scope figure -> the routed scope wins over the draft's
+                scope = scope_of(fr.top)
         panels.append(R.Panel(
             paper_id=spec.paper_id, figure=targets[0].figure, panel=targets[0].panel,
-            chart_form=(d.chart_form if d else ""),
-            scope=(d.scope if d else R.TRANSCRIPTOMIC),
+            chart_form=(d.chart_form if d else ""), scope=scope, skill_id=sid,
             golden=[to_golden(t) for t in targets],
         ))
     return panels
