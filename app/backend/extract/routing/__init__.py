@@ -9,18 +9,42 @@ never replaces the deterministic layer. See docs/skill-keyword-index/spec.md.
 """
 
 from .engine import build_auto_ledger, route_to_panels
-from .models import FeasibilityMap, FigureRoute, RoutingCandidate, RoutingHit, VocabEntry
+from .models import (
+    FeasibilityMap,
+    FigureRoute,
+    RouteVerdict,
+    RoutingCandidate,
+    RoutingHit,
+    SynonymCandidate,
+    VocabEntry,
+)
 from .route import route_text
+from .verify import (
+    NullVerifier,
+    OperatorRouteVerifier,
+    RouteVerifier,
+    figures_needing_review,
+    mine_synonym_candidates,
+    verify_map,
+)
 from .vocab import build_vocab
 
 __all__ = [
     "FeasibilityMap",
     "FigureRoute",
+    "NullVerifier",
+    "OperatorRouteVerifier",
+    "RouteVerdict",
+    "RouteVerifier",
     "RoutingCandidate",
     "RoutingHit",
+    "SynonymCandidate",
     "VocabEntry",
     "build_auto_ledger",
     "build_vocab",
+    "figures_needing_review",
+    "mine_synonym_candidates",
     "route_to_panels",
     "route_text",
+    "verify_map",
 ]

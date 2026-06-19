@@ -89,6 +89,30 @@ class RoutingCandidate(BaseModel):
         return is_skill(self.target)
 
 
+class RouteVerdict(BaseModel):
+    """The optional L4 AI adjudication of one figure (fast-follow #2). The AI VERIFIES — it never
+    runs on the critical path: a verdict only ever annotates/refines a figure the deterministic
+    layer already routed. ``verdict`` is ``confirm`` (keep the deterministic top), ``override``
+    (the AI picked ``target`` instead), or ``uncertain`` (flagged, left as-is)."""
+
+    figure: str
+    verdict: str = "confirm"   # confirm | override | uncertain
+    target: str = ""           # the confirmed/overridden skill:/oos: target
+    confidence: float = 0.0
+    note: str = ""
+
+
+class SynonymCandidate(BaseModel):
+    """A mined synonym proposal (fast-follow #2): a method-noun that routed to NO target but
+    co-occurs (same section) with routed skills — a candidate ``term -> target`` for ``synonyms.json``.
+    SURFACED FOR REVIEW only; the curated moat is never auto-written (spec resolved-decision #3)."""
+
+    term: str
+    section: str = ""
+    co_targets: list[str] = Field(default_factory=list)  # routed targets co-present in the section
+    note: str = ""
+
+
 class FigureRoute(BaseModel):
     """The routing verdict for one figure: ranked candidates + the top target + whether it is
     in Selom's scope + a confidence + the evidence provenance.
@@ -108,6 +132,7 @@ class FigureRoute(BaseModel):
     confidence: float = 0.0
     attribution: str = "none"   # legend | results | none  — WHERE the evidence came from
     tier: str = "structured"    # structured (L1) | recovered (L2/relaxed) — HOW reliably
+    ai: RouteVerdict | None = None  # optional L4 AI adjudication (fast-follow #2); None = deterministic only
 
 
 class FeasibilityMap(BaseModel):
@@ -127,3 +152,5 @@ class FeasibilityMap(BaseModel):
     paper_targets: list[RoutingCandidate] = Field(default_factory=list)
     tier_summary: dict[str, int] = Field(default_factory=dict)
     unmatched_terms: list[str] = Field(default_factory=list)
+    # mined synonym proposals (fast-follow #2) — surfaced for review, never auto-written to the moat.
+    synonym_candidates: list[SynonymCandidate] = Field(default_factory=list)

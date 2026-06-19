@@ -14,9 +14,19 @@ import pytest
 
 import reproduction as R
 
-from extract.routing import build_auto_ledger, build_vocab, route_text, route_to_panels
+from extract.routing import (
+    NullVerifier,
+    OperatorRouteVerifier,
+    build_auto_ledger,
+    build_vocab,
+    figures_needing_review,
+    mine_synonym_candidates,
+    route_text,
+    route_to_panels,
+    verify_map,
+)
 from extract.routing.index import KeywordIndex
-from extract.routing.models import VocabEntry, is_skill, skill_id
+from extract.routing.models import RouteVerdict, VocabEntry, is_skill, skill_id
 from extract.routing.route import default_index
 from extract.routing.segment import segment
 from extract.routing.vocab import _validate, load_synonyms, registry_entries
@@ -423,6 +433,84 @@ def test_real_jev_auto_ledger_skeleton():
     assert in_scope_panels                                       # runnable figure panels exist
     assert all(p.skill_id in inventory for p in in_scope_panels)  # no skill invented off-inventory
     assert "wet_lab" in led.paper.methods_digest["out_of_scope"]
+
+
+# --- L4 AI-verify + synonym-mining seam (fast-follow #2) --------------------
+
+# The AI tier is gated + off the critical path: route_text() never calls it; verify_map() is an
+# opt-in post-pass that only ever REFINES the deterministic figures (recovered/low-confidence ones),
+# and the curated synonyms.json is never auto-written. Tested with a stand-in verifier, no live LLM.
+
+
+class _OverrideVerifier:
+    """A fake L4 verifier that overrides every flagged figure to a fixed target (stand-in for the
+    gated Claude-as-gateway adjudicator)."""
+
+    def __init__(self, target: str):
+        self.target = target
+
+    def verify_figure(self, figure):
+        return RouteVerdict(figure=figure.figure, verdict="override", target=self.target,
+                            confidence=0.95, note="fake adjudication")
+
+
+def test_verify_null_is_a_noop():
+    fmap = route_text(JEV, paper_id="jev")
+    assert verify_map(fmap, NullVerifier()) == fmap  # deterministic core returned unchanged
+
+
+def test_verify_override_applies_only_to_flagged_and_is_attributed():
+    fmap = route_text(JEV, paper_id="jev")
+    flagged = {fr.figure for fr in figures_needing_review(fmap)}
+    assert flagged, "expected at least one low-confidence/recovered figure to adjudicate"
+    out = verify_map(fmap, _OverrideVerifier("skill:volcano"))
+    for fr in out.figures:
+        before = _fig(fmap, fr.figure)
+        if fr.figure in flagged:
+            assert fr.ai is not None and fr.ai.verdict == "override"
+            assert fr.top == "skill:volcano" and fr.confidence == 0.95
+        else:  # an unflagged (structured, confident) figure is never touched
+            assert fr.ai is None and fr.top == before.top
+
+
+def test_figures_needing_review_skips_clean_structured_figure():
+    clean = route_text("Figure legends\nFigure 1. Volcano plot of the data.\n")
+    assert figures_needing_review(clean) == []  # structured + single confident candidate
+
+
+def test_operator_route_verifier_replays_recorded_and_skips_unrecorded():
+    fmap = route_text(JEV, paper_id="jev")
+    fig = figures_needing_review(fmap)[0].figure
+    op = OperatorRouteVerifier([RouteVerdict(figure=fig, verdict="confirm", target="skill:deg",
+                                             confidence=0.9)])
+    out = verify_map(fmap, op)
+    assert _fig(out, fig).ai is not None and _fig(out, fig).ai.verdict == "confirm"
+    # a flagged figure with no recorded verdict keeps the deterministic route (no fabrication).
+    others = [f.figure for f in figures_needing_review(fmap) if f.figure != fig]
+    for o in others:
+        assert _fig(out, o).ai is None
+
+
+def test_mine_synonym_candidates_surfaces_gap_without_writing_moat():
+    from extract.routing.vocab import load_synonyms
+
+    before = load_synonyms()
+    gapped = KeywordIndex([VocabEntry(terms=["UMAP"], target="skill:umap_scrna"),
+                           VocabEntry(terms=["edgeR", "differential expression"], target="skill:deg")])
+    text = "Methods\nWe ran fgsea after edgeR differential expression and a UMAP.\n"
+    fmap = route_text(text, index=gapped)
+    assert "fgsea" in fmap.unmatched_terms and not fmap.synonym_candidates
+    mined = mine_synonym_candidates(text, fmap, index=gapped)
+    cand = next(c for c in mined.synonym_candidates if c.term == "fgsea")
+    assert "skill:deg" in cand.co_targets  # co-mentioned routed skill surfaced for review
+    assert load_synonyms() == before        # the curated moat was NOT auto-written
+
+
+@pytest.mark.skipif(not os.path.exists(_JEV_TEXT), reason="real JEV PDF text not staged")
+def test_real_jev_all_recovered_figures_flagged_for_review():
+    fmap = route_text(open(_JEV_TEXT, encoding="utf-8").read(), paper_id="jev")
+    # every recovered-tier figure (the real JEV had 8) is offered to the paid L4 tier.
+    assert len(figures_needing_review(fmap)) == fmap.tier_summary["recovered"] == 8
 
 
 # --- endpoint ---------------------------------------------------------------
