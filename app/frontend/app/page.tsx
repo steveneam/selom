@@ -108,7 +108,6 @@ export default function HomePage() {
             <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {projects.slice(0, 6).map((p) => {
                 const dCount = select.datasets(state, p.id).length;
-                const iCount = select.installs(state, p.id).length;
                 const fCount = select.figures(state, p.id).length;
                 return (
                   <StaggerItem key={p.id}>
@@ -125,8 +124,7 @@ export default function HomePage() {
                             <ArrowRight className="ml-auto size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                           </div>
                           <p className="tabular mt-4 text-sm text-muted-foreground">
-                            {dCount} dataset{dCount === 1 ? "" : "s"} · {iCount} skill{iCount === 1 ? "" : "s"} ·{" "}
-                            {fCount} figure{fCount === 1 ? "" : "s"}
+                            {dCount} dataset{dCount === 1 ? "" : "s"} · {fCount} figure{fCount === 1 ? "" : "s"}
                           </p>
                         </Card>
                       </Link>

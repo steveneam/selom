@@ -13,7 +13,6 @@ import { defaultParams, skillParamSchema, type ParamField } from "@/lib/catalog/
 import { getSkill } from "@/lib/catalog/seed";
 import type { SkillParams } from "@/lib/skills-api";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
-import type { SkillInstall } from "@/lib/projects/types";
 
 const DND_TYPE = "application/x-selom-skill";
 
@@ -34,7 +33,8 @@ export function WorkbenchPanel({
   onRun,
   preselect,
 }: {
-  installs: SkillInstall[];
+  /** The installed-skill rows (workspace-level now) — only the id + skillId are read. */
+  installs: { id: string; skillId: string }[];
   proposal: IntakeProposal | null;
   running: string | null;
   onRun: (step: ProposedStep) => void;

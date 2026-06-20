@@ -8,7 +8,8 @@ import { cn } from "@/lib/cn";
 import { useCatalog } from "@/lib/catalog/registry";
 import { getSkill } from "@/lib/catalog/seed";
 import { skillColor, skillIcon } from "@/lib/catalog/modality";
-import { projectStore, select, useProjects } from "@/lib/projects/store";
+import { projectStore, useProjects } from "@/lib/projects/store";
+import { useWorkspace, workspaceStore, wselect } from "@/lib/workspace/store";
 import { dispatchIntent } from "@/lib/workspace/intent";
 
 /**
@@ -34,10 +35,6 @@ interface Command {
   icon: React.ReactNode;
   /** Accent hue for the icon tile. */
   color?: string;
-  /** Project-colour swatches shown after the hint (e.g. where a skill lives). */
-  dots?: string[];
-  /** Hover title for the swatch cluster (full list of names). */
-  dotsTitle?: string;
   onRun: () => void;
 }
 
@@ -90,6 +87,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const pathname = usePathname();
   const state = useProjects();
+  const ws = useWorkspace();
   const { catalog } = useCatalog();
 
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -184,71 +182,43 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         };
       });
 
-    const installedHere = currentProjectId
-      ? new Set(select.installedIds(state, currentProjectId))
-      : new Set<string>();
-    const installedAnywhere = new Set(state.installs.map((i) => i.skillId));
-    // Projects that have a given skill installed, most-recent first (for the
-    // "where is this?" swatches + the "go use it" jump target).
-    const ownersOf = (skillId: string) =>
-      [...state.installs]
-        .filter((i) => i.skillId === skillId)
-        .sort((a, b) => b.installedAt - a.installedAt)
-        .map((i) => state.projects.find((p) => p.id === i.projectId))
-        .filter((p): p is NonNullable<typeof p> => Boolean(p));
+    // Installs are workspace-level now (account-wide, spec D1) — a skill is installed or not,
+    // independent of any project. Applying still happens inside a project (the run target).
+    const installed = wselect.installedSkillIds(ws);
+    const fallbackProjectId = state.projects[0]?.id;
 
     const skills: Command[] = catalog.map((s) => {
       const verified = s.tier === "verified";
-      const owners = currentProjectId ? [] : ownersOf(s.id);
-      let hint: string;
-      let dots: string[] | undefined;
-      let dotsTitle: string | undefined;
-      if (currentProjectId) {
-        // The footer shows the active project, so the row verb stays terse.
-        hint = installedHere.has(s.id)
+      const isInstalled = installed.has(s.id);
+      const hint = currentProjectId
+        ? isInstalled
           ? verified
             ? "Apply"
             : "Queued"
           : verified
             ? "Add & apply"
-            : "Add";
-      } else if (owners.length > 0) {
-        // Compact: one word + project-colour swatches (where it lives).
-        hint = "Installed";
-        dots = owners.map((p) => p.color);
-        dotsTitle = `Installed in ${owners.map((p) => p.name).join(", ")}`;
-      } else {
-        hint = "In Store";
-      }
+            : "Add"
+        : isInstalled
+          ? "Installed"
+          : "In Store";
       return {
         id: `skill-${s.id}`,
         label: s.name,
         hint,
-        dots,
-        dotsTitle,
-        keywords: `${s.summary} ${s.category} ${s.omics.join(" ")} ${verified ? "apply run verified" : "community queue"} ${installedAnywhere.has(s.id) ? "installed" : "store"}`,
+        keywords: `${s.summary} ${s.category} ${s.omics.join(" ")} ${verified ? "apply run verified" : "community queue"} ${isInstalled ? "installed" : "store"}`,
         icon: <SkillGlyph skillId={s.id} />,
         color: skillColor(s),
         onRun: () => {
-          // In a project: install here, pre-select (verified), open the Workbench.
-          if (currentProjectId) {
-            projectStore.installSkill(currentProjectId, s.id);
-            dispatchIntent({
-              projectId: currentProjectId,
-              tab: "workbench",
-              skillId: verified ? s.id : undefined,
-            });
-            router.push(`/p/${currentProjectId}`);
+          // Apply needs a project (current, else most-recent); installing is global. With no
+          // project at all, an uninstalled skill just opens the Store.
+          const target = currentProjectId ?? fallbackProjectId;
+          if ((currentProjectId || isInstalled) && target) {
+            workspaceStore.installSkill(s.id);
+            dispatchIntent({ projectId: target, tab: "workbench", skillId: verified ? s.id : undefined });
+            router.push(`/p/${target}`);
             return;
           }
-          // No active project: jump to where it's installed (most recent), else the Store.
-          const owner = owners[0]?.id;
-          if (owner) {
-            dispatchIntent({ projectId: owner, tab: "workbench", skillId: verified ? s.id : undefined });
-            router.push(`/p/${owner}`);
-          } else {
-            router.push("/store");
-          }
+          router.push("/store");
         },
       };
     });
@@ -259,7 +229,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       { id: "figures", label: "Figures", items: figures },
       { id: "skills", label: currentProjectId ? "Apply a skill" : "Skills", items: skills },
     ];
-  }, [catalog, state, router, currentProjectId]);
+  }, [catalog, state, ws, router, currentProjectId]);
 
   // ── Filter + score ────────────────────────────────────────────────────────
   const filtered = React.useMemo<Section[]>(() => {
@@ -420,21 +390,6 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
                       <span className="min-w-0 flex-1 truncate text-sm text-foreground">{cmd.label}</span>
                       <span className="flex shrink-0 items-center gap-2">
                         {cmd.hint && <span className="text-xs text-muted-foreground">{cmd.hint}</span>}
-                        {cmd.dots && cmd.dots.length > 0 && (
-                          <span className="flex items-center gap-1" title={cmd.dotsTitle}>
-                            {cmd.dots.slice(0, 4).map((c, i) => (
-                              <span
-                                key={i}
-                                aria-hidden
-                                className="size-2.5 rounded-[3px] ring-1 ring-inset ring-black/20"
-                                style={{ backgroundColor: c }}
-                              />
-                            ))}
-                            {cmd.dots.length > 4 && (
-                              <span className="text-[10px] text-muted-foreground">+{cmd.dots.length - 4}</span>
-                            )}
-                          </span>
-                        )}
                       </span>
                     </div>
                   );

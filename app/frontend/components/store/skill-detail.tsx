@@ -123,7 +123,7 @@ export function SkillDetail({
           {!verified && (
             <p className="rounded-md border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
               This skill is browsable now. It runs in a future sandbox (or once ported to a native
-              runner via the Skill Foundry) — installing queues it for your project.
+              runner via the Skill Foundry) — installing queues it for your account.
             </p>
           )}
 

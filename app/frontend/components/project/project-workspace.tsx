@@ -22,6 +22,7 @@ import { useFigureStore } from "@/hooks/use-figure-store";
 import { getSkill } from "@/lib/catalog/seed";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 import { projectStore, select, useProjects } from "@/lib/projects/store";
+import { useWorkspace, workspaceStore, wselect } from "@/lib/workspace/store";
 import type { Dataset, Figure } from "@/lib/projects/types";
 import { figureStaleness } from "@/lib/lineage/staleness";
 import { figureTable } from "@/lib/lineage/figure-table";
@@ -56,9 +57,12 @@ function stampDataVersion(
 export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const router = useRouter();
   const state = useProjects();
+  const ws = useWorkspace();
   const project = select.project(state, projectId);
   const datasets = select.datasets(state, projectId);
-  const installs = select.installs(state, projectId);
+  // Installs are workspace-level now (account-wide, spec D1) — every project sees every
+  // installed skill. WorkspaceSkill has the {id, skillId} the workbench reads.
+  const installs = wselect.skills(ws);
   const figures = select.figures(state, projectId);
 
   const figure = useFigureStore();
@@ -161,7 +165,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       const intent = takeIntent(projectId);
       if (!intent) return;
       if (intent.skillId) {
-        projectStore.installSkill(projectId, intent.skillId);
+        workspaceStore.installSkill(intent.skillId);
         setPreselect((p) => ({ id: intent.skillId!, n: (p?.n ?? 0) + 1, params: intent.params }));
       }
       if (intent.tab) setView(viewFromTab(intent.tab));

@@ -15,7 +15,7 @@ import { cn } from "@/lib/cn";
 import { CATEGORY_GROUPS, humanizeCategory } from "@/lib/catalog/modality";
 import { useCatalog } from "@/lib/catalog/registry";
 import type { SkillCatalogEntry, SkillSource, SkillTier } from "@/lib/catalog/types";
-import { projectStore, select, useProjects } from "@/lib/projects/store";
+import { useWorkspace, workspaceStore, wselect } from "@/lib/workspace/store";
 
 type TierFilter = "all" | SkillTier;
 type SourceFilter = "all" | SkillSource;
@@ -25,8 +25,9 @@ type SourceFilter = "all" | SkillSource;
 const GROUPS = CATEGORY_GROUPS;
 
 export function CatalogBrowser() {
-  const state = useProjects();
-  const { projects } = state;
+  // Skill installs are workspace-level (account-wide, spec D1/D2) — the Store no longer asks
+  // "which project"; installing makes a skill available in every project.
+  const ws = useWorkspace();
   const { catalog } = useCatalog();
 
   // Filter facets follow the live catalog, not a fixed seed list.
@@ -45,14 +46,8 @@ export function CatalogBrowser() {
   const [omics, setOmics] = React.useState<string>("all");
   const [category, setCategory] = React.useState<string>("all");
   const [open, setOpen] = React.useState<SkillCatalogEntry | null>(null);
-  const [targetId, setTargetId] = React.useState<string | undefined>(undefined);
 
-  const target = targetId ?? projects[0]?.id;
-  const targetProject = projects.find((p) => p.id === target);
-  const installedIds = React.useMemo(
-    () => new Set(target ? select.installedIds(state, target) : []),
-    [state, target],
-  );
+  const installedIds = React.useMemo(() => wselect.installedSkillIds(ws), [ws]);
 
   const results = React.useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -92,19 +87,13 @@ export function CatalogBrowser() {
   }, [results]);
 
   function toggleInstall(skill: SkillCatalogEntry) {
-    let projectId = target;
-    if (!projectId) {
-      const p = projectStore.createProject("Untitled project");
-      projectId = p.id;
-      setTargetId(p.id);
-    }
-    if (installedIds.has(skill.id)) projectStore.uninstallSkill(projectId, skill.id);
-    else projectStore.installSkill(projectId, skill.id);
+    if (installedIds.has(skill.id)) workspaceStore.uninstallSkill(skill.id);
+    else workspaceStore.installSkill(skill.id);
   }
 
   return (
     <div className="space-y-5">
-      {/* target project + search */}
+      {/* search */}
       <div className="flex flex-wrap items-center gap-3">
         <label className="relative w-full max-w-xs">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -116,24 +105,7 @@ export function CatalogBrowser() {
             className="h-9 w-full rounded-md border border-input bg-background/60 pl-8 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring/60 focus-visible:ring-2 focus-visible:ring-ring/30"
           />
         </label>
-
-        <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-          <span>Installing into</span>
-          <div className="w-44">
-            <Select value={target ?? ""} onValueChange={setTargetId}>
-              <SelectTrigger aria-label="Target project">
-                <SelectValue placeholder="No project — create one" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        <span className="ml-auto text-xs text-muted-foreground">Installs are account-wide — available in every project.</span>
       </div>
 
       {/* facet rows */}
@@ -245,7 +217,6 @@ export function CatalogBrowser() {
       <SkillDetail
         skill={open}
         installed={open ? installedIds.has(open.id) : false}
-        targetProjectName={targetProject?.name}
         onClose={() => setOpen(null)}
         onToggleInstall={() => open && toggleInstall(open)}
       />
