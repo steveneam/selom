@@ -251,7 +251,7 @@ function PaperRow({
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <Button asChild variant="outline" size="sm">
-            <Link href={`/reproduction/paper/${paper.id}`} title="Open in Reproduction to add supplementary data and reproduce its figures">
+            <Link href={`/paper/${paper.id}?stage=reproduce`} title="Open in Reproduction to add supplementary data and reproduce its figures">
               <FlaskConical className="size-4" />
               Reproduce
             </Link>

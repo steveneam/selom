@@ -53,7 +53,7 @@ function YourPaperCard({ paper }: { paper: SavedPaper }) {
 
   return (
     <Link
-      href={`/reproduction/paper/${paper.id}`}
+      href={`/paper/${paper.id}?stage=reproduce`}
       className="group flex flex-col rounded-xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-ring/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
     >
       <div className="flex items-start justify-between gap-2">

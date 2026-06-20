@@ -1,12 +1,12 @@
-import { SavedSkillMatch } from "@/components/skill-match/saved-skill-match";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Skill Match — Selom" };
-
-export default async function SavedSkillMatchPage({
+// The per-paper Skill-Match surface folded into the unified Paper shell (umbrella-shell.md §4).
+// Kept as a redirect so any saved pill/bookmark still resolves; the Skill Match stage is the default.
+export default async function SavedSkillMatchRedirect({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <SavedSkillMatch id={id} />;
+  redirect(`/paper/${id}`);
 }

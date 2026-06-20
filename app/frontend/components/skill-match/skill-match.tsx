@@ -64,7 +64,7 @@ export function SkillMatch() {
     const saved = workspaceStore.savePaper(
       toSavedPaper(map, result?.metadata ?? null, result?.filename ?? "paper"),
     );
-    router.push(`/reproduction/paper/${saved.id}`);
+    router.push(`/paper/${saved.id}?stage=reproduce`);
   }
 
   // Revoke the object URL when it changes or on unmount (no leaked blobs).

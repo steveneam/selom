@@ -1,15 +1,11 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import {
-  ArrowLeft,
-  ArrowUpRight,
   FileSpreadsheet,
   FileText,
   FlaskConical,
   Hourglass,
-  Trash2,
   UploadCloud,
   X,
 } from "lucide-react";
@@ -18,7 +14,7 @@ import { useCatalog } from "@/lib/catalog/registry";
 import { skillColor } from "@/lib/catalog/modality";
 import type { SkillCatalogEntry } from "@/lib/catalog/types";
 import { oosLabel } from "@/lib/skill-match/api";
-import { useWorkspace, workspaceStore, wselect } from "@/lib/workspace/store";
+import { workspaceStore } from "@/lib/workspace/store";
 import {
   KIND_LABEL,
   SUPPLEMENT_ACCEPT,
@@ -29,115 +25,19 @@ import type { SavedPaper, SavedSupplement, SupplementKind } from "@/lib/workspac
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dropzone } from "@/components/project/dropzone";
-import { PaperPipeline } from "@/components/paper/pipeline";
-import { PaperMetaHeader } from "@/components/paper/paper-meta-header";
 
 /**
- * The per-paper Reproduction WORKSPACE — the pre-reproduction state of the same page family as
- * the read-only showcase detail (components/reproduction/paper-detail.tsx). A paper carried over
- * from Skill Match (no re-drop) lands here; the user adds its supplementary materials, then runs
- * reproduction. It deliberately mirrors PaperDetail's layout — header → two-axis score → heatmap —
- * but with the score + heatmap GHOSTED ("awaiting reproduction") and the supplementary dropzone as
- * the action, so once the live drive lands (a later backend contract) the very same page fills with
- * real metrics. The showcase index + dogfood detail are left untouched (additive integration).
+ * The Reproduce stage body in the Paper shell — the *inputs* half of reproduction: a recap of the
+ * skills Skill Match routed (continuity from stage 1), the supplementary-materials intake (umbrella
+ * §10 stage 2), and the staged Reproduce CTA. The graded *output* (two-axis score + heatmap) lives on
+ * the Score stage. Lifted from the former `PaperWorkspace` (its chrome now lives in `PaperShell`).
  */
-export function PaperWorkspace({ id }: { id: string }) {
-  const ws = useWorkspace();
-  const paper = wselect.paper(ws, id);
-
-  if (!paper) {
-    return (
-      <div className="mx-auto max-w-3xl px-6 py-20 text-center">
-        <p className="text-sm text-muted-foreground">
-          This paper isn&apos;t in your Library.
-        </p>
-        <p className="mt-1.5 text-xs text-muted-foreground">
-          Match a paper in{" "}
-          <Link href="/skill-match" className="text-primary hover:underline">
-            Skill Match
-          </Link>{" "}
-          and open it in Reproduction, or pick one from your{" "}
-          <Link href="/library" className="text-primary hover:underline">
-            Library
-          </Link>
-          .
-        </p>
-      </div>
-    );
-  }
-
+export function ReproduceStage({ paper }: { paper: SavedPaper }) {
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10 lg:px-10">
-      <Link
-        href="/library"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" />
-        Library
-      </Link>
-
-      {/* The shared workflow pipeline — you're at the Reproduce stage (carried from Skill Match).
-          Click the "Skill Match" pill to jump back to the match this paper was derived from. */}
-      <PaperPipeline
-        current="reproduce"
-        className="mt-4"
-        links={{ "skill-match": `/skill-match/${paper.id}` }}
-      />
-
-      <PaperMetaHeader
-        meta={paper}
-        filename={paper.filename}
-        className="mt-6"
-        eyebrow={
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/80">
-            Reproduction · carried from Skill Match
-          </p>
-        }
-      />
-
-      <AwaitingScore />
-
+    <div className="space-y-10">
       <MatchedSkills paper={paper} />
-
       <SupplementsSection paper={paper} />
-
       <ReproduceStep paper={paper} />
-
-      <AwaitingHeatmap />
-    </div>
-  );
-}
-
-/** The two-axis ScoreHeader shape, ghosted — the slots the real scores fill once reproduced. */
-function AwaitingScore() {
-  return (
-    <div className="mt-6 grid gap-4 sm:grid-cols-[auto_auto_1fr] sm:items-stretch">
-      <GhostAxis label="Reproducibility" />
-      <GhostAxis label="Selom confidence" />
-      <div className="flex flex-col justify-center rounded-xl border border-dashed border-border bg-card/30 p-5">
-        <p className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground/80">
-          <Hourglass className="size-4 text-muted-foreground" />
-          Awaiting reproduction
-        </p>
-        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-          Add the paper&apos;s supplementary data below, then run reproduction — Selom grades every
-          figure on two axes: how reproducible it is, and how confident Selom is in its own work.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function GhostAxis({ label }: { label: string }) {
-  return (
-    <div className="flex flex-col rounded-xl border border-dashed border-border bg-card/30 p-5">
-      <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-        {label}
-      </span>
-      <span className="tabular mt-1 text-5xl font-bold leading-none text-muted-foreground/30">
-        —<span className="ml-0.5 text-lg font-normal text-muted-foreground/40">/100</span>
-      </span>
-      <span className="mt-1.5 text-xs text-muted-foreground/70">not yet scored</span>
     </div>
   );
 }
@@ -158,7 +58,7 @@ function MatchedSkills({ paper }: { paper: SavedPaper }) {
   if (paper.skills.length === 0 && paper.outOfScope.length === 0) return null;
 
   return (
-    <section className="mt-8">
+    <section>
       <SectionHeading
         title="Matched skills"
         sub="What Skill Match routed this paper to — the skills reproduction will drive once the data is in."
@@ -228,7 +128,7 @@ function SupplementsSection({ paper }: { paper: SavedPaper }) {
   }
 
   return (
-    <section className="mt-10">
+    <section>
       <SectionHeading
         title="Add the supplementary data"
         sub="Drop the paper's supplementary files — Excel / CSV tables (the printed targets like ST2, ST6) and extended-methods PDFs. Reproduction matches Selom's computed numbers against these."
@@ -306,58 +206,27 @@ function SupplementRow({ paperId, supp }: { paperId: string; supp: SavedSuppleme
   );
 }
 
-/** Step 2 — the staged Reproduce CTA (live drive is a later backend contract; be honest). */
+/** Step 2 — a status note for the run. The trigger itself ("Run reproduction") is the prominent
+ *  top-right action in the pipeline (paper-shell.tsx); this explains what it does + supplement state.
+ *  The live drive is a later backend contract, so the run stays staged ("Live run coming"). */
 function ReproduceStep({ paper }: { paper: SavedPaper }) {
   const n = (paper.supplements ?? []).length;
   return (
-    <section className="mt-10">
+    <section>
       <Card className="flex flex-col gap-3 border-dashed bg-card/40 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-foreground">Reproduce the figures</p>
           <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">
             {n > 0
-              ? `${n} supplement${n > 1 ? "s" : ""} attached. Selom will run the matched skills, sweep the parameters to hit the printed numbers, and grade every figure.`
-              : "Attach the supplementary data above first — Selom searches its parameters for what reproduces the paper's printed numbers."}
+              ? `${n} supplement${n > 1 ? "s" : ""} attached. Hit Run reproduction up top — Selom runs the matched skills, sweeps the parameters to hit the printed numbers, and grades every figure on the Score tab.`
+              : "Attach the supplementary data above, then hit Run reproduction up top — Selom searches its parameters for what reproduces the paper's printed numbers."}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            <Hourglass className="size-3" />
-            Live run coming
-          </span>
-          <Button disabled title="The live reproduction drive is a backend step in progress">
-            <FlaskConical />
-            Reproduce
-          </Button>
-        </div>
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          <Hourglass className="size-3" />
+          Live run coming
+        </span>
       </Card>
-    </section>
-  );
-}
-
-/** The detail page's heatmap section, ghosted — with a pointer to a real graded example. */
-function AwaitingHeatmap() {
-  return (
-    <section className="mt-10">
-      <SectionHeading
-        title="Reproducibility heatmap"
-        sub="Once reproduced, every figure is graded here — the same per-panel heatmap the example papers show."
-      />
-      <div className="mt-4 flex flex-wrap gap-1.5" aria-hidden>
-        {Array.from({ length: 12 }).map((_, i) => (
-          <span
-            key={i}
-            className="size-6 rounded-[5px] border border-dashed border-border bg-muted/40"
-          />
-        ))}
-      </div>
-      <Link
-        href="/reproduction/jev"
-        className="mt-3 inline-flex items-center gap-1 text-xs text-primary/90 hover:text-primary hover:underline"
-      >
-        See a graded example
-        <ArrowUpRight className="size-3" />
-      </Link>
     </section>
   );
 }
