@@ -244,3 +244,46 @@ the substrate the umbrella needs regardless of how the shell UX lands.
   flow first; collapse into one shell once the handoffs are proven.)
 - Where do supplementary uploads live on the Paper anchor (stage 2)?
 - Is a "Paper" the same primitive as a `Project`, or a lighter object a Project can reference?
+
+## 11. Cross-cutting layer — Methods summary + Figure legend (owner vision, 2026-06-20)
+
+The owner's further idea: **after any run, emit a paste-ready Methods summary and a Figure legend** —
+human-edited before use. It serves *both* frameworks from one architecture:
+- **Paper / Reproduction case:** "how was this technique performed" per skill (the recipe we
+  reproduced, paste-ready) + the legend (redundant here — the paper has one). The value: people want to
+  know *how the omics was done* without reading 40 pages.
+- **Own-data case (future, when users drop their own data + run omics skills):** *generate* the Methods
+  + the **Figure legend** from scratch for the user's run — "drop data → run → publication-ready methods
+  + legend". This is the headline ("legendary") use.
+
+Both reduce to the same primitive: a run = `{skill, params, result, figure}` → Methods text + Legend
+text. One engine, two instantiations.
+
+### What already exists (do NOT rebuild — surface + extend)
+- `methods.build_body(spec, params)` — the reusable per-skill prose + citations unit.
+- `POST /methods/compose` — an ordered list of skill runs → one consolidated Methods section.
+- `GET /papers/{slug}/methods` (`litsynth/from_ledger.compose_ledger_methods`) — a reproduction Ledger
+  → paper-level Methods. Per-skill prose already shipped for gsea/go_graph/cepo (s22).
+- `Figure.methods?: SkillMethods` already exists on the own-data figure record.
+  → The whole **lit-synthesizer** is the backbone ([[selom-lit-synthesizer]]).
+
+### New pieces
+- **Figure-legend generator** — a sibling of `build_body`: `{skill, params, result}` → a legend
+  template ("Figure N. <skill> of <data>; n=<…>; thresholds <…>"). Deterministic, reuses the methods
+  seam. New but small.
+- **FE surface** — a "Methods & legend" panel after a run (Reproduction view now; own-data run later),
+  paste-ready with Copy. Extends this session's export (Copy/CSV → also export the methods/legend text).
+- **Pro/AI polish tier** — the deterministic baseline (free, always: we have params + results, so the
+  template fills honestly) is *polished* by AI into fluid, journal-styled manuscript prose / synthesised
+  cohesively across many skills. Same AI-proposes / human-edits model; ties into journal style packs
+  ([[selom-journal-styles-feature]]). Human edit is mandatory — never auto-submit manuscript text.
+
+### Gating (consistent with §10)
+- **Free:** deterministic per-skill Methods paragraph + a filled Figure-legend template (honest, paste-
+  able, what the engine already produces).
+- **Pro/AI:** publication-grade polish + journal-style adaptation + multi-skill synthesis fluency.
+
+### Standalone quick win
+For the *paper* case, even without a reproduction run: a **"Methods digest"** — skim-the-paper-for-just-
+the-methods. Partially exists (`extract/golden` methods-digest lexicon pulls tools + thresholds). Strong
+solo value prop ("I just want to know how the omics was done"), and a natural Skill-Match add-on.
