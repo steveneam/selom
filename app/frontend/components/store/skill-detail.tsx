@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Check, Download, ExternalLink, Plus, X } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight, Check, Download, ExternalLink, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getSkill } from "@/lib/catalog/seed";
@@ -18,7 +19,9 @@ export function SkillDetail({
   installed: boolean;
   targetProjectName?: string;
   onClose: () => void;
-  onToggleInstall: () => void;
+  // Optional: when omitted (e.g. opened from Skill Match, which has no target project) the dialog is
+  // read-only — the install action is replaced by an install-status line + a link into the Store.
+  onToggleInstall?: () => void;
 }) {
   const dialogRef = React.useRef<HTMLDivElement>(null);
 
@@ -125,25 +128,42 @@ export function SkillDetail({
           )}
 
           <div className="flex items-center gap-2 border-t border-border pt-4">
-            <Button
-              variant={installed ? "secondary" : verified ? "default" : "outline"}
-              size="sm"
-              onClick={onToggleInstall}
-            >
-              {installed ? (
-                <>
-                  <Check /> Installed{targetProjectName ? ` · ${targetProjectName}` : ""}
-                </>
-              ) : verified ? (
-                <>
-                  <Download /> Install{targetProjectName ? ` to ${targetProjectName}` : ""}
-                </>
-              ) : (
-                <>
-                  <Plus /> Queue{targetProjectName ? ` for ${targetProjectName}` : ""}
-                </>
-              )}
-            </Button>
+            {onToggleInstall ? (
+              <Button
+                variant={installed ? "secondary" : verified ? "default" : "outline"}
+                size="sm"
+                onClick={onToggleInstall}
+              >
+                {installed ? (
+                  <>
+                    <Check /> Installed{targetProjectName ? ` · ${targetProjectName}` : ""}
+                  </>
+                ) : verified ? (
+                  <>
+                    <Download /> Install{targetProjectName ? ` to ${targetProjectName}` : ""}
+                  </>
+                ) : (
+                  <>
+                    <Plus /> Queue{targetProjectName ? ` for ${targetProjectName}` : ""}
+                  </>
+                )}
+              </Button>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                {installed ? (
+                  <>
+                    <Check className="size-3.5 text-emerald-500" /> Installed — runs in your account now
+                  </>
+                ) : (
+                  <>
+                    <Download className="size-3.5 text-primary" /> Available in the Skill Store
+                  </>
+                )}
+                <Link href="/store" className="inline-flex items-center gap-0.5 text-primary hover:underline">
+                  Open <ArrowUpRight className="size-3" />
+                </Link>
+              </span>
+            )}
             <a
               href={`https://github.com/${skill.provenance.repo}`}
               target="_blank"

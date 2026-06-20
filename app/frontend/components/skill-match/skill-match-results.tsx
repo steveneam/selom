@@ -9,6 +9,7 @@ import { useCatalog } from "@/lib/catalog/registry";
 import { skillColor, skillIcon } from "@/lib/catalog/modality";
 import type { SkillCatalogEntry } from "@/lib/catalog/types";
 import { Card } from "@/components/ui/card";
+import { SkillDetail } from "@/components/store/skill-detail";
 import {
   ATTRIBUTION_LABEL,
   confidenceColor,
@@ -43,26 +44,37 @@ type SkillLookup = Map<string | undefined, SkillCatalogEntry>;
 
 /**
  * A rich, Store-style skill pill (matches the Project's Quick-apply chips): the skill's modality
- * icon in its domain colour + its catalog display name + an installed/available marker. STATIC — not
- * a link, so a stray click never navigates away; a deliberate "Open the Skill Store" link sits under
- * the inventory for browsing/installing. INSTALLED = a verified catalog runner exists (runs now);
- * otherwise the skill is available in the Store (never colour alone — an icon + tooltip carry it too).
+ * icon in its domain colour + its catalog display name + an installed/available marker. When `onOpen`
+ * is supplied AND the skill resolves to a catalog entry, the chip is a button that opens the same
+ * Store-style detail popout — a deliberate click, never a stray navigation. INSTALLED = a verified
+ * catalog runner exists (runs now); otherwise the skill is available in the Store (never colour alone —
+ * an icon + tooltip carry it too).
  */
-function SkillChip({ slug, entry, installed }: { slug: string; entry?: SkillCatalogEntry; installed: boolean }) {
+function SkillChip({
+  slug,
+  entry,
+  installed,
+  onOpen,
+}: {
+  slug: string;
+  entry?: SkillCatalogEntry;
+  installed: boolean;
+  onOpen?: (entry: SkillCatalogEntry) => void;
+}) {
   const color = entry ? skillColor(entry) : "var(--primary)";
   const icon = entry ? skillIcon(entry) : Boxes;
-  return (
-    <span
-      title={
-        installed
-          ? `${entry?.name ?? slug} — installed (runs now)`
-          : `${entry?.name ?? slug} — not installed (available in the Skill Store)`
-      }
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs font-medium text-foreground",
-        installed ? "border-border" : "border-primary/40",
-      )}
-    >
+  const clickable = !!(onOpen && entry);
+  const status = installed
+    ? `${entry?.name ?? slug} — installed (runs now)`
+    : `${entry?.name ?? slug} — not installed (available in the Skill Store)`;
+  const cls = cn(
+    "inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs font-medium text-foreground",
+    installed ? "border-border" : "border-primary/40",
+    clickable &&
+      "cursor-pointer transition-colors hover:bg-accent hover:border-ring/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+  );
+  const inner = (
+    <>
       <span aria-hidden style={{ color }}>
         {React.createElement(icon, { className: "size-3.5" })}
       </span>
@@ -72,6 +84,15 @@ function SkillChip({ slug, entry, installed }: { slug: string; entry?: SkillCata
       ) : (
         <Download className="size-3 text-primary" aria-label="available to install" />
       )}
+    </>
+  );
+  return clickable ? (
+    <button type="button" title={`${status} · click for details`} onClick={() => onOpen!(entry!)} className={cls}>
+      {inner}
+    </button>
+  ) : (
+    <span title={status} className={cls}>
+      {inner}
     </span>
   );
 }
@@ -100,94 +121,147 @@ export function SkillMatchResults({ map }: { map: FeasibilityMap }) {
     : { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0, transition: { duration: 0.22, ease: "easeOut" } } };
 
   const installedN = map.skills.filter((s) => installed.has(s)).length;
+  const hasFigs = map.figures.length > 0;
+  // Two views in the right column so the per-figure breakdown reads beside the paper instead of below
+  // the fold: "Overview" (summary + the paper-level skill inventory) and "Per-figure" (scrollable).
+  const [tab, setTab] = React.useState<"overview" | "figures">("overview");
+  // Click any skill chip -> the same Store-style detail popout (read-only here; no project context).
+  const [openSkill, setOpenSkill] = React.useState<SkillCatalogEntry | null>(null);
 
   return (
-    <motion.div className="space-y-6" variants={container} initial="hidden" animate="show">
-      <motion.div variants={rise}>
-        <SummaryUpsell map={map} installedN={installedN} />
-      </motion.div>
+    <div className="space-y-4">
+      {hasFigs && (
+        <div role="tablist" aria-label="Skill-match results" className="inline-flex rounded-lg border border-border bg-card p-0.5 text-xs">
+          <TabButton active={tab === "overview"} onClick={() => setTab("overview")}>
+            Overview
+          </TabButton>
+          <TabButton active={tab === "figures"} onClick={() => setTab("figures")}>
+            Per-figure
+            <span className="ml-1.5 tabular opacity-70">{map.figures.length}</span>
+          </TabButton>
+        </div>
+      )}
 
-      <motion.section variants={rise}>
-        <SectionHeading title="Skills this paper needs">
-          The paper-level inventory — every Selom skill the paper&apos;s methods and figures call for.
-        </SectionHeading>
-        <motion.div className="mt-3 flex flex-wrap gap-1.5" variants={container}>
-          {map.skills.length === 0 && (
-            <span className="text-xs text-muted-foreground">No in-scope skills detected.</span>
-          )}
-          {map.skills.map((s) => (
-            <motion.span key={s} variants={rise}>
-              <SkillChip slug={s} entry={bySlug.get(s)} installed={installed.has(s)} />
-            </motion.span>
-          ))}
-        </motion.div>
-        {map.skills.length > 0 && (
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            <span className="tabular text-foreground/80">
-              {installedN}/{map.skills.length}
-            </span>{" "}
-            installed{" "}
-            {installedN < map.skills.length
-              ? "· the rest are available in the Skill Store"
-              : "— every skill this paper needs runs in your account now"}
-          </p>
-        )}
-        {map.skills.length > 0 && (
-          <Link
-            href="/store"
-            className="mt-2 inline-flex items-center gap-1 text-xs text-primary/90 hover:text-primary hover:underline"
-          >
-            Open the Skill Store
-            <ArrowUpRight className="size-3" />
-          </Link>
-        )}
-        {map.out_of_scope.length > 0 && (
-          <>
-            <p className="mt-4 text-xs font-medium text-muted-foreground">Out of scope (no Selom skill)</p>
-            <motion.div className="mt-2 flex flex-wrap gap-1.5" variants={container}>
-              {map.out_of_scope.map((r) => (
-                <motion.span
-                  key={r}
-                  variants={rise}
-                  className={cn(chip, "border-border bg-muted text-muted-foreground")}
-                >
-                  <FlaskConical className="size-3" />
-                  {oosLabel(r)}
+      {!hasFigs || tab === "overview" ? (
+        <motion.div key="overview" className="space-y-6" variants={container} initial="hidden" animate="show">
+          <motion.div variants={rise}>
+            <SummaryUpsell map={map} installedN={installedN} />
+          </motion.div>
+
+          <motion.section variants={rise}>
+            <SectionHeading title="Skills this paper needs">
+              The paper-level inventory — every Selom skill the paper&apos;s methods and figures call for.
+            </SectionHeading>
+            <motion.div className="mt-3 flex flex-wrap gap-1.5" variants={container}>
+              {map.skills.length === 0 && (
+                <span className="text-xs text-muted-foreground">No in-scope skills detected.</span>
+              )}
+              {map.skills.map((s) => (
+                <motion.span key={s} variants={rise}>
+                  <SkillChip slug={s} entry={bySlug.get(s)} installed={installed.has(s)} onOpen={setOpenSkill} />
                 </motion.span>
               ))}
             </motion.div>
-          </>
-        )}
-      </motion.section>
+            {map.skills.length > 0 && (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                <span className="tabular text-foreground/80">
+                  {installedN}/{map.skills.length}
+                </span>{" "}
+                installed{" "}
+                {installedN < map.skills.length
+                  ? "· the rest are available in the Skill Store"
+                  : "— every skill this paper needs runs in your account now"}
+              </p>
+            )}
+            {map.skills.length > 0 && (
+              <Link
+                href="/store"
+                className="mt-2 inline-flex items-center gap-1 text-xs text-primary/90 hover:text-primary hover:underline"
+              >
+                Open the Skill Store
+                <ArrowUpRight className="size-3" />
+              </Link>
+            )}
+            {map.out_of_scope.length > 0 && (
+              <>
+                <p className="mt-4 text-xs font-medium text-muted-foreground">Out of scope (no Selom skill)</p>
+                <motion.div className="mt-2 flex flex-wrap gap-1.5" variants={container}>
+                  {map.out_of_scope.map((r) => (
+                    <motion.span
+                      key={r}
+                      variants={rise}
+                      className={cn(chip, "border-border bg-muted text-muted-foreground")}
+                    >
+                      <FlaskConical className="size-3" />
+                      {oosLabel(r)}
+                    </motion.span>
+                  ))}
+                </motion.div>
+              </>
+            )}
+          </motion.section>
 
-      {map.figures.length > 0 && (
-        <motion.section variants={rise}>
+          {map.unmatched_terms.length > 0 && (
+            <motion.div variants={rise}>
+              <SkillGaps terms={map.unmatched_terms} />
+            </motion.div>
+          )}
+        </motion.div>
+      ) : (
+        <motion.div key="figures" variants={container} initial="hidden" animate="show">
           <SectionHeading title="Per-figure routing">
-            Each figure&apos;s matched skill, its routing tier, and a confidence score (the top-two
-            evidence margin, scaled by where the evidence came from).
+            Every skill each figure routed to, plus that figure&apos;s routing tier and confidence —
+            both figure-level (confidence = the top-two evidence margin for the figure, scaled by
+            where the evidence came from).
           </SectionHeading>
           <div className={cn(FIG_GRID, "mt-3 px-3 text-[10px] font-medium uppercase tracking-wider text-muted-foreground")}>
             <span>Fig</span>
-            <span>Matched skill</span>
+            <span>Matched skills</span>
             <span>Tier</span>
             <span className="text-right">Confidence</span>
           </div>
-          <motion.ul className="mt-1.5 space-y-1.5" variants={container}>
+          {/* Scrolls within itself so the list stays beside the paper rather than pushing the page. */}
+          <motion.ul className="mt-1.5 max-h-[68vh] space-y-1.5 overflow-y-auto pr-1" variants={container}>
             {map.figures.map((fr) => (
               <motion.li key={fr.figure} variants={rise}>
-                <FigureRow fr={fr} installed={installed} bySlug={bySlug} />
+                <FigureRow fr={fr} installed={installed} bySlug={bySlug} onOpen={setOpenSkill} />
               </motion.li>
             ))}
           </motion.ul>
-        </motion.section>
-      )}
-
-      {map.unmatched_terms.length > 0 && (
-        <motion.div variants={rise}>
-          <SkillGaps terms={map.unmatched_terms} />
         </motion.div>
       )}
-    </motion.div>
+
+      <SkillDetail
+        skill={openSkill}
+        installed={!!openSkill && installed.has(openSkill.id.split(".").pop())}
+        onClose={() => setOpenSkill(null)}
+      />
+    </div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center rounded-md px-3 py-1.5 font-medium transition-colors",
+        active ? "bg-muted text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -341,42 +415,59 @@ function FigureRow({
   fr,
   installed,
   bySlug,
+  onOpen,
 }: {
   fr: FigureRoute;
   installed: Set<string | undefined>;
   bySlug: SkillLookup;
+  onOpen: (entry: SkillCatalogEntry) => void;
 }) {
   const v = figureView(fr);
   const tm = tierMeta(fr.tier);
   const flagged = needsReview(fr);
   const pct = Math.round(fr.confidence * 100);
   const heat = confidenceColor(fr.confidence);
-  // The sub-line: other suggested skills, a co-present out-of-scope readout, and the evidence source.
+  // Every in-scope skill the figure routed to, top-ranked first — all shown as chips (below), so the
+  // engine's full match for a figure reads at a glance rather than hiding in a sentence.
+  const skills = v.inScope ? [v.primary, ...v.also] : [];
+  // The sub-line carries only the non-skill context: a co-present out-of-scope readout + the evidence
+  // source (the skills themselves are now chips, not prose).
   const sub = [
-    v.also.length ? `also ${v.also.join(", ")}` : "",
     v.inScope && v.oos.length ? `+ ${v.oos.map(oosLabel).join(", ")} readout` : "",
     ATTRIBUTION_LABEL[fr.attribution] ?? fr.attribution,
   ].filter(Boolean).join(" · ");
   return (
     <div
-      className={cn(FIG_GRID, "rounded-lg border border-border bg-card px-3 py-2.5")}
+      className={cn(FIG_GRID, "items-start rounded-lg border border-border bg-card px-3 py-2.5")}
       style={flagged ? { borderLeft: `2px solid ${tierMeta("recovered").color}` } : undefined}
     >
-      <span className="grid size-6 place-items-center rounded-md bg-muted text-xs font-semibold text-foreground tabular">
+      <span className="mt-0.5 grid size-6 place-items-center rounded-md bg-muted text-xs font-semibold text-foreground tabular">
         {fr.figure}
       </span>
       <div className="min-w-0">
         {v.inScope ? (
-          <SkillChip slug={v.primary} entry={bySlug.get(v.primary)} installed={installed.has(v.primary)} />
+          <div className="flex flex-wrap gap-1.5">
+            {skills.map((slug) => (
+              <SkillChip
+                key={slug}
+                slug={slug}
+                entry={bySlug.get(slug)}
+                installed={installed.has(slug)}
+                onOpen={onOpen}
+              />
+            ))}
+          </div>
         ) : (
           <span className={cn(chip, "border-border bg-muted text-muted-foreground")}>
             <FlaskConical className="size-3" />
             {v.primary}
           </span>
         )}
-        <p className="mt-1 truncate text-[11px] text-muted-foreground" title={sub}>
-          {sub}
-        </p>
+        {sub && (
+          <p className="mt-1.5 truncate text-[11px] text-muted-foreground" title={sub}>
+            {sub}
+          </p>
+        )}
       </div>
       <span className={cn(chip, "justify-self-start")} style={tint(tm.color)} title={tm.hint}>
         {tm.label}
