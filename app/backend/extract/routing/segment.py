@@ -53,6 +53,16 @@ _MARKER_INLINE = re.compile(rf"^fig(?:ure)?\.?\s*(\d+)\s*{_SEP}\s*(.*)$", re.I)
 # render the number in a custom font whose digits extract as private-use-area codepoints (e.g.
 # "F IG U R E <U+F6DC>") — non-word junk we can't decode, so the number is recovered ordinally (H1).
 _MARKER_BARE = re.compile(rf"^fig(?:ure|\.)?(\d+)?{_SEP}?\W*$", re.I)
+# Inline caption whose figure number renders as a Private-Use-Area font glyph, with the caption text
+# on the SAME (long) line: "FIGURE <U+F6DC> Müller glia… (a)…". This is the Wiley/JEV production form
+# that ``_MARKER_INLINE`` misses (no real ``\d`` after the marker) and the long-line guard rejects —
+# the number is undecodable from the glyph, so it is recovered ordinally like the bare form.
+_PUA = f"[{chr(0xE000)}-{chr(0xF8FF)}]"  # Unicode Private Use Area (custom-font figure digits)
+_MARKER_GLYPH = re.compile(rf"^fig(?:ure)?\.?\s+{_PUA}+\s+(.*)$", re.I)
+# A leading manuscript / preprint line-number ("305 Fig. 1. …" in bioRxiv submissions) breaks the
+# ^figure anchor; stripped LOCALLY (marker-matching only, not a whole-document rewrite) so a
+# line-numbered preprint's otherwise-clean captions are still detected.
+_LINENO = re.compile(r"^\d{1,4}\s+")
 
 # sub-panel marker "(a)" / "(A)" — the strongest "this is a caption" signal.
 _SUBPANEL = re.compile(r"\([a-z]\)", re.I)
@@ -109,16 +119,25 @@ def _despace(s: str) -> str:
 
 def _marker(line: str) -> tuple[bool, str | None, str]:
     """Classify a line as a figure-caption marker. Returns ``(is_marker, number|None, inline_text)``.
-    Handles both the clean inline form ("Figure 1. <caption…>", which may be a long line — its
-    ``Fig N <sep>`` structure is the guard) and the garbled bare form (a letter-spaced "F IG U R E "
-    with the number reflowed away, which must be a SHORT line so a sentence containing 'figure' can't
-    masquerade as one)."""
+    Handles four real-PDF caption forms: the clean inline ("Figure 1. <caption…>", which may be a
+    long line — its ``Fig N <sep>`` structure is the guard); the inline custom-font-glyph form
+    ("FIGURE <U+F6DC> <caption…>", number recovered ordinally); a line-numbered manuscript prefix
+    ("305 Fig. 1. …", stripped locally before matching); and the garbled bare form (a letter-spaced
+    "F IG U R E " with the number reflowed away, which must be a SHORT line so a sentence containing
+    'figure' can't masquerade as one)."""
     s = line.strip()
     if not s:
         return (False, None, "")
-    m = _MARKER_INLINE.match(s)
-    if m:
-        return (True, m.group(1), m.group(2).strip())
+    # L2 recovery: a manuscript / preprint line-number prefix ("305 Fig. 1. …") breaks the ^figure
+    # anchor — try the de-numbered candidate first, then the raw line.
+    s2 = _LINENO.sub("", s, count=1)
+    for cand in ((s2, s) if s2 != s else (s,)):
+        m = _MARKER_INLINE.match(cand)
+        if m:
+            return (True, m.group(1), m.group(2).strip())
+        g = _MARKER_GLYPH.match(cand)  # "FIGURE <glyph> <caption inline>" — number recovered ordinally
+        if g and _looks_like_caption(g.group(1)):
+            return (True, None, g.group(1).strip())
     if len(s) > 40:
         return (False, None, "")
     m2 = _MARKER_BARE.match(_despace(s))  # "F IG U R E" -> "FIGURE"

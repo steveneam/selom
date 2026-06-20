@@ -262,6 +262,49 @@ def test_glyph_number_marker_tolerated():
     assert is_m and num is None
 
 
+# Two PRODUCTION caption forms the pypdfium2 extractor emits that the hand `_jev_text.txt` fixture did
+# NOT reproduce — the s34 extraction↔recovery gap, now closed (`legend-extraction-gap-scope.md`).
+
+# (1) Wiley/JEV: the marker word is intact but the figure NUMBER is a private-use-area font glyph and
+# the caption text is INLINE on the same long line. Number recovered ordinally from the in-text refs.
+GLYPH_INLINE = (
+    "Results\n"
+    "Cells were clustered and a UMAP drawn (Figure 1a), then pseudotime computed (Figure 2a).\n"
+    f"FIGURE {chr(0xF6DC)} Integrated retinal atlas. (a) UMAP of the integrated dataset. "
+    "(b) marker genes from FindMarkers.\n"
+    f"FIGURE {chr(0xF63A)} Developmental lineage. (a) pseudotime trajectory inferred with Monocle 3.\n"
+)
+
+
+def test_inline_glyph_caption_recovered():
+    fmap = route_text(GLYPH_INLINE, paper_id="glyph")
+    assert {"1", "2"} <= {f.figure for f in fmap.figures}
+    assert "skill:umap_scrna" in _targets(_fig(fmap, "1"))
+    assert "skill:trajectory" in _targets(_fig(fmap, "2"))
+    # an unmappable-glyph number is recovered ordinally -> recovered-tier (the AI-upsell signal).
+    assert _fig(fmap, "1").tier == "recovered"
+
+
+# (2) bioRxiv/preprint: a line-numbered manuscript — every line carries a manuscript line-number that
+# breaks the ^figure anchor. The clean "Fig. N." caption is recovered by stripping the prefix.
+LINENO_MANUSCRIPT = (
+    "304 Figure legends\n"
+    "305 Fig. 1. Pseudotime trajectory of rod photoreceptors during dark adaptation.\n"
+    "306 (A) UMAP visualization of re-clustered rod subpopulations. (B) Slingshot pseudotime.\n"
+    "314 Fig. 2. Lineage 1 exhibits enriched MYC programs.\n"
+    "315 (A) enrichment analysis of transcription factors. (B-E) violin plots of Hallmark scores.\n"
+)
+
+
+def test_line_numbered_manuscript_caption_recovered():
+    fmap = route_text(LINENO_MANUSCRIPT, paper_id="manuscript")
+    assert {"1", "2"} <= {f.figure for f in fmap.figures}
+    assert "skill:trajectory" in _targets(_fig(fmap, "1"))
+    assert "skill:violin" in _targets(_fig(fmap, "2"))
+    # a clean numbered caption (after de-numbering) is structured-tier, not recovery.
+    assert _fig(fmap, "1").tier == "structured"
+
+
 def _fake_refs(n: int) -> str:
     return "\n".join(
         f"Author{i}, A. B., & Body, C. D. ({2000 + i}). A study of things number {i}. "
