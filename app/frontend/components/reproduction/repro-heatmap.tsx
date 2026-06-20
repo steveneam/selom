@@ -56,11 +56,11 @@ function HeatCell({ cell }: { cell: PanelScore }) {
     (cell.note ? `. ${cell.note}` : "");
 
   return (
-    <div
-      role="img"
-      aria-label={label}
+    <a
+      href={`#panel-${cell.panel_key}`}
+      aria-label={`${label}. Jump to its evidence below`}
       title={label}
-      className="flex flex-col gap-1 rounded-lg border p-2.5"
+      className="flex flex-col gap-1 rounded-lg border p-2.5 transition-shadow hover:ring-1 hover:ring-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
       style={tint(cell.color)}
     >
       <div className="flex items-center justify-between gap-1">
@@ -75,7 +75,7 @@ function HeatCell({ cell }: { cell: PanelScore }) {
       <span className="truncate text-[10px] uppercase tracking-wider opacity-80">
         {tierLabel(cell.tier)}
       </span>
-    </div>
+    </a>
   );
 }
 

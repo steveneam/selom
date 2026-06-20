@@ -39,7 +39,8 @@ export function PanelTable({ ledger }: { ledger: Ledger }) {
             {oos.map((s) => (
               <span
                 key={s.panel_key}
-                className="flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs text-muted-foreground"
+                id={`panel-${s.panel_key}`}
+                className="flex scroll-mt-6 items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs text-muted-foreground"
                 title={s.note}
               >
                 <span className="tabular font-medium text-foreground/80">{s.panel_key}</span>
@@ -66,7 +67,10 @@ function PanelRow({
 }) {
   const lift = panel?.lift ?? null;
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-card">
+    <div
+      id={`panel-${v.panel_key}`}
+      className="scroll-mt-6 overflow-hidden rounded-lg border border-border bg-card"
+    >
       <div className="flex flex-wrap items-center gap-2 border-b border-border bg-card/60 px-4 py-2.5">
         {lift?.thumbnail_url && <PanelThumb lift={lift} slug={slug} panelKey={v.panel_key} />}
         <span className="tabular text-sm font-semibold text-foreground">{v.panel_key}</span>
@@ -87,7 +91,17 @@ function PanelRow({
           </span>
         </div>
       </div>
-      <table className="w-full text-sm">
+      {/* table-fixed + a shared colgroup so Metric/Golden/Computed/Verdict/Blame land at the SAME
+          x-position on every panel card — the columns line up when scanning down the page (without
+          this, each card's table auto-sizes independently and the columns jump left/right). */}
+      <table className="w-full table-fixed text-sm">
+        <colgroup>
+          <col />
+          <col className="w-24" />
+          <col className="w-24" />
+          <col className="w-28" />
+          <col className="w-48" />
+        </colgroup>
         <thead>
           <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
             <th className="px-4 py-1.5 font-medium">Metric</th>

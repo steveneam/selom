@@ -121,7 +121,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* `scrollbar-gutter: stable` reserves the scrollbar gutter even when content fits, so the
             centered page doesn't shift horizontally when navigating between a short and a tall route
             (e.g. the Paper shell's Skill Match ↔ Reproduce stages). */}
-        <main className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto scroll-smooth [scrollbar-gutter:stable]">{children}</main>
       </div>
       {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
       <UndoToast />
