@@ -7,6 +7,7 @@ import { Sidebar } from "./sidebar";
 import { CommandPalette } from "./command-palette";
 import { UndoToast } from "./undo-toast";
 import { projectStore } from "@/lib/projects/store";
+import { workspaceStore } from "@/lib/workspace/store";
 
 /**
  * The persistent command-center frame: project rail + header + main stage.
@@ -29,6 +30,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Load persisted projects + the rail-collapse preference on the client, once.
   React.useEffect(() => {
     projectStore.hydrate();
+    // After projects (so the one-time workspace migration reads a persisted snapshot).
+    workspaceStore.hydrate();
     try {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time hydrate of a persisted UI pref on mount (SSR-safe)
       if (localStorage.getItem(RAIL_COLLAPSED_KEY) === "1") setRailCollapsed(true);

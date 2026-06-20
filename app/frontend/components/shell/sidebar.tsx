@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Crosshair, Dna, Home, ListChecks, PanelLeftClose, PanelLeftOpen, Plus, ScanSearch, Settings, Store } from "lucide-react";
+import { BookMarked, Crosshair, Dna, Home, ListChecks, PanelLeftClose, PanelLeftOpen, Plus, ScanSearch, Settings, Store } from "lucide-react";
 import { SelomMark, SelomWordmark } from "@/components/brand/selom-mark";
 import { cn } from "@/lib/cn";
 import { projectStore, useProjects } from "@/lib/projects/store";
@@ -63,6 +63,7 @@ export function Sidebar({
         <RailLink href="/reproduction" icon={<ScanSearch />} label="Reproduction" active={pathname.startsWith("/reproduction")} collapsed={collapsed} onNavigate={onNavigate} />
         <RailLink href="/skill-match" icon={<ListChecks />} label="Skill Match" active={pathname.startsWith("/skill-match")} collapsed={collapsed} onNavigate={onNavigate} />
         <RailLink href="/extract" icon={<Crosshair />} label="Recover data" active={pathname.startsWith("/extract")} collapsed={collapsed} onNavigate={onNavigate} />
+        <RailLink href="/library" icon={<BookMarked />} label="Library" active={pathname.startsWith("/library")} collapsed={collapsed} onNavigate={onNavigate} />
       </nav>
 
       <div className={cn("mt-2 flex items-center pb-1", collapsed ? "justify-center px-2" : "justify-between px-4")}>

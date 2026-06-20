@@ -16,8 +16,9 @@ import {
   type GeneSetCard,
   type GeneSetSource,
 } from "@/lib/gene-sets/api";
-import { projectStore, select, useProjects } from "@/lib/projects/store";
+import { projectStore, useProjects } from "@/lib/projects/store";
 import type { GeneSet } from "@/lib/projects/types";
+import { useWorkspace, workspaceStore, wselect } from "@/lib/workspace/store";
 import { dispatchIntent } from "@/lib/workspace/intent";
 
 /**
@@ -26,12 +27,16 @@ import { dispatchIntent } from "@/lib/workspace/intent";
  * A list-first, license-clean catalog over the corpus Selom owns or that is open
  * (GO · WikiPathways · curated). Search/browse → apply to data: a single set
  * highlights its panel in the volcano; a whole source becomes the enrichment library.
- * Picked sets save to a project as a provenance-stamped GeneSet for reuse.
+ * Picked sets save to the project- and data-agnostic Workspace Library as a
+ * provenance-stamped GeneSet (spec D1) — applying then runs the panel in a chosen project.
  */
 export function GeneSetBrowser() {
   const router = useRouter();
   const state = useProjects();
   const { projects } = state;
+  // Saved gene sets now live in the project- and data-agnostic Workspace Library, not a project
+  // (spec D1): saving is account-level, while applying still runs the panel in a chosen project.
+  const ws = useWorkspace();
 
   const [query, setQuery] = React.useState("");
   const [sourceKey, setSourceKey] = React.useState("all");
@@ -51,7 +56,7 @@ export function GeneSetBrowser() {
   const selectedIds = Object.keys(selected);
 
   const target = targetId ?? projects[0]?.id;
-  const savedSets = target ? select.geneSets(state, target) : [];
+  const savedSets = wselect.geneSets(ws);
   const savedFrom = new Set(savedSets.map((g) => g.createdFrom).filter(Boolean) as string[]);
 
   // Debounced search; aborts the in-flight request when the query/source changes.
@@ -116,12 +121,12 @@ export function GeneSetBrowser() {
     router.push(`/p/${projectId}`);
   }
 
-  async function saveToProject(card: GeneSetCard) {
+  async function saveToLibrary(card: GeneSetCard) {
     setBusyId(card.id);
     try {
       const full = await getGeneSet(card.id);
-      const projectId = ensureTarget();
-      projectStore.saveGeneSet(projectId, {
+      // Account-level save (spec D1) — no project context required.
+      workspaceStore.saveGeneSet({
         name: full.name,
         genes: full.genes,
         source: full.source,
@@ -156,8 +161,7 @@ export function GeneSetBrowser() {
       const picked = Object.values(selected);
       const name = compileName.trim() || `${picked.map((s) => s.name).join(op === "union" ? " ∪ " : " ∩ ")}`;
       const result = await compileGeneSets(selectedIds, op, name);
-      const projectId = ensureTarget();
-      projectStore.saveGeneSet(projectId, {
+      workspaceStore.saveGeneSet({
         name: result.name ?? name,
         genes: result.genes,
         source: "compiled",
@@ -165,7 +169,7 @@ export function GeneSetBrowser() {
         license: result.provenance.licenses.join(" + ") || "compiled",
         createdFrom: `compiled:${selectedIds.sort().join(",")}:${op}`,
       });
-      setCompiledMsg(`Compiled “${result.name ?? name}” — ${result.genes.length} genes saved to ${targetProject?.name ?? "the project"}.`);
+      setCompiledMsg(`Compiled “${result.name ?? name}” — ${result.genes.length} genes saved to your Library.`);
       setSelected({});
       setCompileName("");
     } catch {
@@ -275,7 +279,7 @@ export function GeneSetBrowser() {
 
       {/* saved in this project */}
       {savedSets.length > 0 && (
-        <SavedStrip sets={savedSets} onApply={(g) => applySaved(g)} onRemove={(id) => projectStore.removeGeneSet(id)} />
+        <SavedStrip sets={savedSets} onApply={(g) => applySaved(g)} onRemove={(id) => workspaceStore.removeGeneSet(id)} />
       )}
 
       {/* results */}
@@ -299,7 +303,7 @@ export function GeneSetBrowser() {
               onToggleSelect={() => toggleSelect(set)}
               onOpen={() => setDetail(set)}
               onHighlight={() => highlightInVolcano(set)}
-              onSave={() => saveToProject(set)}
+              onSave={() => saveToLibrary(set)}
             />
           ))}
         </div>
@@ -312,7 +316,7 @@ export function GeneSetBrowser() {
         targetName={targetProject?.name}
         onClose={() => setDetail(null)}
         onHighlight={() => detail && highlightInVolcano(detail)}
-        onSave={() => detail && saveToProject(detail)}
+        onSave={() => detail && saveToLibrary(detail)}
       />
     </div>
   );
@@ -401,8 +405,8 @@ function SetCard({
           variant="ghost"
           className="size-8 shrink-0 text-muted-foreground"
           disabled={busy}
-          aria-label={saved ? "Saved to project" : "Save to project"}
-          title={saved ? "Saved to project" : "Save to project"}
+          aria-label={saved ? "Saved to Library" : "Save to Library"}
+          title={saved ? "Saved to Library" : "Save to Library"}
           onClick={onSave}
         >
           {saved ? <BookmarkCheck className="size-4 text-primary" /> : <Bookmark className="size-4" />}
@@ -486,7 +490,7 @@ function SavedStrip({
   return (
     <div>
       <p className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
-        <BookmarkCheck className="size-3 text-primary" /> Saved in this project
+        <BookmarkCheck className="size-3 text-primary" /> Saved in your Library
       </p>
       <div className="flex flex-wrap gap-2">
         {sets.map((g) => (

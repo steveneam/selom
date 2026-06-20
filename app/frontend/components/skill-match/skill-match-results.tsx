@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion, useReducedMotion, type Variants } from "motion/react";
-import { ArrowUpRight, Boxes, Check, Copy, Download, FlaskConical, Lock, Sparkles, TriangleAlert } from "lucide-react";
+import { ArrowUpRight, Bookmark, BookmarkCheck, Boxes, Check, Copy, Download, FlaskConical, Lock, Sparkles, TriangleAlert } from "lucide-react";
 
 import { useCatalog } from "@/lib/catalog/registry";
 import { skillColor, skillIcon } from "@/lib/catalog/modality";
@@ -20,7 +20,9 @@ import {
   oosReason,
   reviewCount,
   tierMeta,
+  toSavedPaper,
 } from "@/lib/skill-match/api";
+import { useWorkspace, workspaceStore } from "@/lib/workspace/store";
 import {
   exportFilename,
   toCSV,
@@ -193,7 +195,10 @@ export function SkillMatchResults({
             </TabButton>
           </div>
         )}
-        <ExportControls data={exportData} />
+        <div className="flex shrink-0 items-center gap-1.5">
+          <SaveToLibrary map={map} meta={meta} filename={filename ?? "paper"} />
+          <ExportControls data={exportData} />
+        </div>
       </div>
 
       {!hasFigs || tab === "overview" ? (
@@ -378,6 +383,43 @@ function ExportControls({ data }: { data: SkillMatchExport }) {
         CSV
       </Button>
     </div>
+  );
+}
+
+/**
+ * "Save to Library" — persists this Skill-Match result as a compact `SavedPaper` in the project- and
+ * data-agnostic Workspace Library so it's revisitable without re-dropping the PDF (spec §5). The
+ * summary (skill inventory + per-figure tier rollup) is built from the data already on the client;
+ * saving is idempotent on `doi || filename`, so the button reads "Saved" once the paper is in the
+ * Library (and a click then refreshes it).
+ */
+function SaveToLibrary({
+  map,
+  meta,
+  filename,
+}: {
+  map: FeasibilityMap;
+  meta?: PaperMetadata | null;
+  filename: string;
+}) {
+  const ws = useWorkspace();
+  const key = (meta?.doi && meta.doi.trim()) || filename;
+  const inLibrary = ws.papers.some((p) => ((p.doi && p.doi.trim()) || p.filename) === key);
+
+  function save() {
+    workspaceStore.savePaper(toSavedPaper(map, meta, filename));
+  }
+
+  return (
+    <Button
+      variant={inLibrary ? "outline" : "default"}
+      size="sm"
+      onClick={save}
+      title={inLibrary ? "Saved to your Library — click to refresh it" : "Save this match to your Workspace Library"}
+    >
+      {inLibrary ? <BookmarkCheck className="text-primary" /> : <Bookmark />}
+      {inLibrary ? "Saved" : "Save to Library"}
+    </Button>
   );
 }
 

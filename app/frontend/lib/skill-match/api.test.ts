@@ -12,8 +12,9 @@ import {
   reviewCount,
   skillId,
   tierMeta,
+  toSavedPaper,
 } from "./api";
-import type { FeasibilityMap, FigureRoute } from "./types";
+import type { FeasibilityMap, FigureRoute, PaperMetadata } from "./types";
 
 function fig(over: Partial<FigureRoute>): FigureRoute {
   return {
@@ -109,6 +110,50 @@ describe("confidenceColor (5-step temperature scale)", () => {
     expect(confidenceColor(0.5)).toBe("#f59e0b"); // medium — amber
     expect(confidenceColor(0.3)).toBe("#f97316"); // low — orange
     expect(confidenceColor(0.1)).toBe("#ef4444"); // very low — red
+  });
+});
+
+describe("toSavedPaper (the Library summary)", () => {
+  const map = {
+    paper_id: "JEV",
+    skills: ["deg", "volcano"],
+    out_of_scope: ["wet_lab"],
+    figures: [fig({ figure: "1" }), fig({ figure: "2" })],
+    paper_targets: [],
+    tier_summary: { structured: 2, recovered: 0 },
+    unmatched_terms: [],
+  } as FeasibilityMap;
+  const meta: PaperMetadata = {
+    title: "EV paper",
+    authors: ["A. Cioanca", "Y. Wooff"],
+    venue: "JEV",
+    year: 2023,
+    doi: "10.1/abc",
+    pmid: "999",
+    is_preprint: false,
+  };
+
+  it("maps metadata + the routing rollup into the compact summary (no PDF bytes)", () => {
+    const p = toSavedPaper(map, meta, "JEV.pdf");
+    expect(p).toMatchObject({
+      filename: "JEV.pdf",
+      doi: "10.1/abc",
+      pmid: "999",
+      title: "EV paper",
+      skills: ["deg", "volcano"],
+      outOfScope: ["wet_lab"],
+      figureCount: 2,
+      tierSummary: { structured: 2, recovered: 0 },
+      isPreprint: false,
+    });
+    expect("id" in p).toBe(false); // the store assigns id + savedAt
+  });
+
+  it("degrades to nulls + a zero tier summary when metadata is absent", () => {
+    const p = toSavedPaper({ ...map, tier_summary: undefined as unknown as FeasibilityMap["tier_summary"] }, null, "x.pdf");
+    expect(p.doi).toBeNull();
+    expect(p.title).toBeNull();
+    expect(p.tierSummary).toEqual({ structured: 0, recovered: 0 });
   });
 });
 

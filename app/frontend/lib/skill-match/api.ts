@@ -10,6 +10,7 @@
  * tier/attribution/oos display metadata. No LLM on this path — the map is deterministic and offline.
  */
 
+import type { SavedPaper } from "@/lib/workspace/types";
 import type { ExtractResult, FeasibilityMap, FigureRoute, PaperMetadata, RoutingTier } from "./types";
 
 const ROUTE_URL = "/api/papers/route";
@@ -137,6 +138,37 @@ export function citationLine(m: PaperMetadata | null | undefined): string {
  * scRNA figure plus spatial / scATAC / GRN / wet-lab figures — so the surface demonstrates the full
  * range (skill inventory, out-of-scope modalities, recovered-tier figures, and the upsell) offline.
  */
+/**
+ * Build the compact `SavedPaper` summary from the on-client routing result + metadata — what the
+ * Workspace Library keeps so a paper is revisitable without re-dropping the PDF. Stores the L3 skill
+ * inventory + per-figure tier rollup (NOT the full FeasibilityMap, spec D3) and NO PDF bytes/object
+ * URL (spec I5). The store dedups idempotently on `doi || filename` (spec I3).
+ */
+export function toSavedPaper(
+  map: FeasibilityMap,
+  meta: PaperMetadata | null | undefined,
+  filename: string,
+): Omit<SavedPaper, "id" | "savedAt"> {
+  return {
+    filename,
+    doi: meta?.doi ?? null,
+    pmid: meta?.pmid ?? null,
+    title: meta?.title ?? null,
+    authors: meta?.authors ?? null,
+    venue: meta?.venue ?? null,
+    year: meta?.year ?? null,
+    volume: meta?.volume ?? null,
+    issue: meta?.issue ?? null,
+    pages: meta?.pages ?? null,
+    isPreprint: meta?.is_preprint ?? false,
+    url: meta?.url ?? null,
+    skills: map.skills,
+    outOfScope: map.out_of_scope,
+    figureCount: map.figures.length,
+    tierSummary: map.tier_summary ?? { structured: 0, recovered: 0 },
+  };
+}
+
 export const SAMPLE_TEXT = `Methods
 Single-cell RNA-seq libraries were processed with CellRanger and analysed in Seurat. After
 FindVariableFeatures (2000 HVG) we performed Harmony batch correction, computed a UMAP, applied
