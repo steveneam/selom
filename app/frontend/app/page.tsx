@@ -108,7 +108,11 @@ export default function HomePage() {
             <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {projects.slice(0, 6).map((p) => {
                 const dCount = select.datasets(state, p.id).length;
-                const fCount = select.figures(state, p.id).length;
+                const figs = select.figures(state, p.id);
+                const fCount = figs.length;
+                // Skills USED to generate this project's figures (distinct) — a per-project metric
+                // that stays meaningful now that *installs* are account-wide (spec D1).
+                const sCount = new Set(figs.map((f) => f.skillId).filter(Boolean)).size;
                 return (
                   <StaggerItem key={p.id}>
                     <HoverLift>
@@ -124,7 +128,8 @@ export default function HomePage() {
                             <ArrowRight className="ml-auto size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                           </div>
                           <p className="tabular mt-4 text-sm text-muted-foreground">
-                            {dCount} dataset{dCount === 1 ? "" : "s"} · {fCount} figure{fCount === 1 ? "" : "s"}
+                            {dCount} dataset{dCount === 1 ? "" : "s"} · {sCount} skill{sCount === 1 ? "" : "s"} ·{" "}
+                            {fCount} figure{fCount === 1 ? "" : "s"}
                           </p>
                         </Card>
                       </Link>

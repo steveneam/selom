@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Boxes, GripVertical, MousePointerClick, Play, Sparkles, X } from "lucide-react";
+import { Boxes, GripVertical, MousePointerClick, Play, Search, Sparkles, X } from "lucide-react";
 import { ProposalPlan } from "@/components/intake/proposal-plan";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,9 @@ export function WorkbenchPanel({
   const [selected, setSelected] = React.useState<string | null>(null);
   const [dragOver, setDragOver] = React.useState(false);
   const [params, setParams] = React.useState<SkillParams>({});
+  // Filter the installed-skills list — installs are account-wide now (spec D1), so a library can
+  // hold 100+ skills; a search keeps the column scannable (a dropdown would lose drag-to-apply).
+  const [filter, setFilter] = React.useState("");
   // The last preselect nonce whose param prefills we consumed (one-shot per dispatch).
   const appliedPrefill = React.useRef<number>(-1);
 
@@ -86,6 +89,15 @@ export function WorkbenchPanel({
     .filter((s): s is NonNullable<typeof s> => !!s && s.tier === "verified")
     .sort((a, b) => b.popularity - a.popularity)
     .slice(0, 4);
+
+  // The installed-skills list, filtered by the search box (name or category).
+  const q = filter.trim().toLowerCase();
+  const filteredInstalls = q
+    ? installs.filter((i) => {
+        const s = getSkill(i.skillId);
+        return (s?.name ?? i.skillId).toLowerCase().includes(q) || (s?.category ?? "").toLowerCase().includes(q);
+      })
+    : installs;
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
@@ -227,6 +239,9 @@ export function WorkbenchPanel({
         <div className="flex items-center justify-between">
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
             Installed skills
+            {installs.length > 0 && (
+              <span className="tabular ml-1.5 text-muted-foreground/60">{installs.length}</span>
+            )}
           </p>
           <Link href="/store" className="text-[11px] font-medium text-primary hover:underline">
             + Store
@@ -241,7 +256,28 @@ export function WorkbenchPanel({
             </Button>
           </Card>
         ) : (
-          installs.map((inst) => {
+          <>
+            {/* Account-wide libraries can be large — a filter keeps the list scannable. */}
+            {installs.length > 6 && (
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  aria-label="Filter installed skills"
+                  placeholder="Filter skills…"
+                  className="h-8 w-full rounded-md border border-input bg-background/60 pl-8 pr-3 text-xs text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring/60 focus-visible:ring-2 focus-visible:ring-ring/30"
+                />
+              </label>
+            )}
+            {/* Height-capped + scrollable so the column never runs off the page. */}
+            <div className="max-h-[34rem] space-y-2.5 overflow-y-auto pr-0.5">
+              {filteredInstalls.length === 0 ? (
+                <p className="px-1 py-4 text-center text-xs text-muted-foreground">
+                  No installed skills match “{filter}”.
+                </p>
+              ) : (
+                filteredInstalls.map((inst) => {
             const skill = getSkill(inst.skillId);
             const busy = running === inst.skillId;
             const verified = skill?.tier === "verified";
@@ -288,7 +324,10 @@ export function WorkbenchPanel({
                 </Button>
               </Card>
             );
-          })
+                })
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>
