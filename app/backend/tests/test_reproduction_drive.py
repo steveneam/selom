@@ -182,7 +182,9 @@ def test_build_merged_ledger_dedups_golden_figures():
     assert golden_panels, "expected the DE figure to carry extracted DE-count goldens"
     gp = golden_panels[0]
     assert {g.metric for g in gp.golden} >= {"de_total", "de_up", "de_down"}
-    assert gp.skill_id  # stamped from the route
+    # a DE-count golden is forced to volcano (the only clean DE-count source) even if the
+    # per-figure route picked another skill — the inventory-backed override.
+    assert gp.skill_id == "volcano"
     # no figure is double-counted (skeleton panel for a golden figure was dropped).
     figs = [p.figure for p in led.panels]
     assert len(figs) == len(set(figs))

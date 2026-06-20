@@ -100,15 +100,23 @@ _METRIC_SKILL = {
 
 
 def _backfill_skill(panel: R.Panel) -> None:
-    """If a golden panel has no routed skill, infer it from the golden metric kind (in place)."""
-    if panel.skill_id or not panel.golden:
+    """Set a golden panel's skill from its metric when the metric has an *authoritative* source.
+
+    This OVERRIDES the per-figure route, not just fills a blank one: DE counts read cleanly only
+    from ``volcano``'s de_table (never ``deg``/``cluster`` — no direction column), and PC variance
+    only from ``pca``. Real-PDF routing mis-attributes figures (the live JEV smoke routed the DE
+    figures to ``cluster``), so for these specific metrics the golden's data need is a more reliable
+    skill signal than the noisy route. Skills for non-mapped metrics are left to the route."""
+    if not panel.golden:
         return
     for gold in panel.golden:
         sid = _METRIC_SKILL.get(gold.metric)
-        if sid:
+        if sid and panel.skill_id != sid:
+            prev = panel.skill_id
             panel.skill_id = sid
+            was = f" (route said {prev})" if prev else ""
             panel.note = (panel.note + "; " if panel.note else "") + \
-                f"skill inferred from golden '{gold.metric}' → {sid}"
+                f"skill set to {sid} — authoritative source for golden '{gold.metric}'{was}"
             return
 
 
