@@ -197,6 +197,14 @@ single first-class **Paper** object. You drop a PDF once and it flows through st
    free. This is the *entry point*.
 2. **Reproduction** (have, separate surface) — add the **supplementary** data → reproduce the figures
    + numbers with real skills, scored. The paper carries over from stage 1 (no re-drop).
+   - **Firm requirement (owner, 2026-06-20):** the Reproduction surface **needs a dropzone for
+     supplementary materials** — Excel (`.xlsx`/`.xls`), CSV, and PDF supplements (extended methods +
+     supplementary tables like ST2/ST6). This is the input that distinguishes the Reproduction stage
+     from Skill Match: you keep the main paper from stage 1 and *add* its supplements here. The backend
+     contract already exists (`extract/ingest.py` `ingest_paper` → `PaperBundle`: PDF supplements expose
+     `text`, xlsx/csv expose `sheets`); v1 FE accepts + lists the files by kind behind the engine seam
+     (the real ingest+drive endpoint is a later BE contract). Supplements attach to the **Paper anchor**
+     (`SavedPaper.supplements?`).
 3. **Recover data** (have, separate `/extract`) — a **side action in the PDF viewer**: a "grab figure"
    button → region-select a figure in the viewer → save it; repeat for every figure → "Recover data"
    opens `/extract` pre-loaded with the saved figures for the normal calibrate-and-run.
@@ -249,7 +257,9 @@ the substrate the umbrella needs regardless of how the shell UX lands.
 - Does the umbrella replace the three separate nav entries with one "Paper" workspace, or keep them as
   deep-links into stages? (Lean: keep the surfaces, add a unifying "open in Reproduction / Recover"
   flow first; collapse into one shell once the handoffs are proven.)
-- Where do supplementary uploads live on the Paper anchor (stage 2)?
+- ~~Where do supplementary uploads live on the Paper anchor (stage 2)?~~ **RESOLVED (owner, 2026-06-20):**
+  a supplementary-materials dropzone on the Reproduction surface; supplements attach to the Paper anchor
+  (`SavedPaper.supplements?`). See the firm requirement under stage 2 above.
 - Is a "Paper" the same primitive as a `Project`, or a lighter object a Project can reference?
 
 ## 11. Cross-cutting layer — Methods summary + Figure legend (owner vision, 2026-06-20)
