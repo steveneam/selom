@@ -3,6 +3,7 @@ import json
 import pathlib
 import shutil
 import tempfile
+import uuid
 
 from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
@@ -15,6 +16,7 @@ import methods
 import paper_metadata
 import papers_api
 import provenance
+from config import settings
 from extract import chart_intake
 from extract import routing
 from gene_sets import library as gene_sets
@@ -127,6 +129,82 @@ def get_paper_methods(slug: str, modality: str = ""):
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return section.model_dump()
+
+
+async def _save_capped(run_dir: str, upload: UploadFile, max_bytes: int) -> str:
+    # Save one multipart upload into the per-run temp dir, rejecting oversized files (413 upstream).
+    # Keeps a sanitized original name (prefixed for uniqueness) so the suffix-based kind inference
+    # in extract.ingest still works.
+    data = await upload.read()
+    if len(data) > max_bytes:
+        raise ValueError(
+            f"'{upload.filename}' exceeds the {max_bytes // (1024 * 1024)} MB upload limit")
+    name = pathlib.Path(upload.filename or "file").name or "file"
+    path = pathlib.Path(run_dir) / f"{uuid.uuid4().hex[:8]}-{name}"
+    path.write_bytes(data)
+    return str(path)
+
+
+@app.post("/papers/{paper_id}/reproduce")
+async def reproduce_paper(
+    paper_id: str,
+    main: UploadFile,
+    supplements: list[UploadFile] = File(default=[]),
+    design: UploadFile | None = File(None),
+):
+    # Live-reproduction drive (docs/reproduction-engine/live-reproduction-spec.md §5): the user's
+    # paper PDF + its supplements -> a graded two-axis ledger. Bytes are saved to a per-run temp dir
+    # (cleaned after the inline drive), submitted as a reproduce run (reproduction_runs.start_run),
+    # which orchestrates the matched skills over the supplements. Inline -> already terminal on
+    # return; the FE then GETs /reproduction-runs/{run_id} to fill the Score stage.
+    import reproduction_runs
+
+    max_bytes = settings.max_upload_mb * 1024 * 1024
+    run_dir = tempfile.mkdtemp(prefix="selom-repro-")
+    try:
+        main_path = await _save_capped(run_dir, main, max_bytes)
+        supp_paths = [await _save_capped(run_dir, s, max_bytes) for s in supplements]
+        params = None
+        if design is not None:  # a design sheet (sample->condition) threads to the DE skills
+            params = {"_design_path": await _save_capped(run_dir, design, max_bytes)}
+        rec = reproduction_runs.start_run(main_path, supp_paths, paper_id=paper_id, params=params)
+        return reproduction_runs.public(rec, light=True)
+    except ValueError as exc:  # the size cap
+        raise HTTPException(status_code=413, detail=str(exc)) from exc
+    finally:
+        shutil.rmtree(run_dir, ignore_errors=True)
+
+
+@app.get("/reproduction-runs/{run_id}")
+def get_reproduction_run(run_id: str):
+    # The run's state; on `succeeded` the driven Ledger + scorecard (same shape as GET /papers/{slug})
+    # so the Score stage reuses the showcase heatmap / dual-axis score / golden-vs-computed.
+    import reproduction_runs
+
+    rec = reproduction_runs.get_run(run_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail="unknown reproduction run")
+    return reproduction_runs.public(rec)
+
+
+@app.get("/reproduction-runs/{run_id}/events")
+async def reproduction_run_events(run_id: str):
+    # SSE progress for the drive. Inline runs are already terminal, so this resolves in one event;
+    # the arq path (deferred) would stream the per-panel transitions.
+    import reproduction_runs
+
+    async def stream():
+        for _ in range(600):  # ~5 min ceiling at 0.5s/tick
+            rec = reproduction_runs.get_run(run_id)
+            if rec is None:
+                yield f"event: error\ndata: {json.dumps({'detail': 'unknown run'})}\n\n"
+                return
+            yield f"data: {json.dumps(reproduction_runs.public(rec, light=True))}\n\n"
+            if rec.status in TERMINAL:
+                return
+            await asyncio.sleep(0.5)
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
 
 
 class RouteRequest(BaseModel):

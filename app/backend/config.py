@@ -26,6 +26,10 @@ class Settings(BaseSettings):
         default=pathlib.Path(__file__).parent / "data", validation_alias="SELOM_DATA_DIR"
     )
 
+    # Per-file upload cap (MB) for the live-reproduction intake (POST /papers/{id}/reproduce).
+    # Oversized uploads are rejected with 413. Large-file/BAM async ingest is out of scope here.
+    max_upload_mb: int = Field(default=50, validation_alias="SELOM_MAX_UPLOAD_MB")
+
     # Reproduction-engine R oracle (validation-only, ADR 0002 — NEVER on the shipped path).
     # OFF by default: the blame instrument runs the authors' actual R tool (edgeR/fgsea) to
     # split engine-delta / upstream-delta / paper-irreproducible. Disabled -> blame degrades
