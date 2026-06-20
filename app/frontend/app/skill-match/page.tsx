@@ -8,7 +8,7 @@ export const metadata = { title: "Skill Match — Selom" };
  */
 export default function SkillMatchPage() {
   return (
-    <div className="mx-auto max-w-6xl px-6 py-12 lg:px-10 lg:py-14">
+    <div className="mx-auto max-w-[100rem] px-6 py-12 lg:px-10 lg:py-14">
       <div className="max-w-2xl">
         <p className="text-xs font-medium uppercase tracking-[0.2em] text-primary/80">
           Skill Keyword Index

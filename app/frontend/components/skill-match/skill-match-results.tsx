@@ -220,8 +220,8 @@ export function SkillMatchResults({ map }: { map: FeasibilityMap }) {
             <span>Tier</span>
             <span className="text-right">Confidence</span>
           </div>
-          {/* Scrolls within itself so the list stays beside the paper rather than pushing the page. */}
-          <motion.ul className="mt-1.5 max-h-[68vh] space-y-1.5 overflow-y-auto pr-1" variants={container}>
+          {/* The whole right column scrolls (its parent owns the height), so the list just flows. */}
+          <motion.ul className="mt-1.5 space-y-1.5" variants={container}>
             {map.figures.map((fr) => (
               <motion.li key={fr.figure} variants={rise}>
                 <FigureRow fr={fr} installed={installed} bySlug={bySlug} onOpen={setOpenSkill} />

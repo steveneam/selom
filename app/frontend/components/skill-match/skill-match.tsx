@@ -92,13 +92,20 @@ export function SkillMatch() {
     <div className="space-y-6">
       {result && <MetadataCard result={result} />}
 
-      {/* Once a PDF is loaded the panes balance so the viewer and the skills both get room. */}
-      <div className={cn("grid gap-6", hasPaper ? "lg:grid-cols-2" : "lg:grid-cols-[minmax(0,22rem)_1fr]")}>
+      {/* Once a PDF is loaded the route becomes a fixed-height two-pane row: the viewer is favoured
+          (1.6fr) and gets the page's full width, and the skills column scrolls within itself so both
+          panes stay exactly the same height and the paper reads beside the routing. */}
+      <div
+        className={cn(
+          "grid gap-6",
+          hasPaper ? "lg:h-[78vh] lg:grid-cols-[1.6fr_1fr]" : "lg:grid-cols-[minmax(0,22rem)_1fr]",
+        )}
+      >
         {/* Left — input / PDF viewer */}
-        <div className="space-y-3">
+        <div className={cn("flex min-h-0 flex-col gap-3", hasPaper && "lg:h-full")}>
           {hasPaper ? (
-            <Card className="overflow-hidden">
-              <div className="flex items-center gap-2 border-b border-border p-2.5">
+            <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <div className="flex shrink-0 items-center gap-2 border-b border-border p-2.5">
                 <Button onClick={run} disabled={busy || !text.trim()} size="sm">
                   {phase === "routing" ? <Loader2 className="animate-spin" /> : <Play />}
                   Run
@@ -113,7 +120,7 @@ export function SkillMatch() {
               <iframe
                 src={fileUrl}
                 title="Paper PDF"
-                className="h-[70vh] w-full bg-muted"
+                className="min-h-0 w-full flex-1 bg-muted"
               />
             </Card>
           ) : mode === "drop" ? (
@@ -184,8 +191,9 @@ export function SkillMatch() {
           <p className="text-center text-[11px] text-muted-foreground">Deterministic · no LLM · offline</p>
         </div>
 
-        {/* Right — matched skills (stream in on Run) */}
-        <div>
+        {/* Right — matched skills (stream in on Run). When a paper is loaded this column scrolls as a
+            whole so it matches the viewer's height instead of running past the fold. */}
+        <div className={cn(hasPaper && "lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1")}>
           {map ? (
             <SkillMatchResults map={map} />
           ) : (
