@@ -205,13 +205,27 @@ the substrate the umbrella needs regardless of how the shell UX lands.
   optional `recoveredFigures?` / `reproductionId?` later without a rewrite. The foundation (store +
   Save + the three collections) is not in dispute and unblocks everything else. Don't build the
   umbrella *shell* yet — sequence it after the substrate exists.
-- **Reproduction should stay deterministic and free at its core — do NOT gate reproduction behind AI.**
-  Reproducing figures with real skills + filtering, validated against oracles, *is* Selom's moat
-  ([[selom-figure-repro-mission]]). What the **Pro/AI tier** earns money on is the **assist** when the
-  deterministic path is uncertain: verifying low-confidence routing, extracting skills/params from a
-  messy paper, mapping a figure the router couldn't. This is the same open-core, layered model Skill
-  Match already ships (free deterministic core + paid AI upsell — [[layered-deterministic-extraction]]).
-  So: gate the **AI assist**, never the reproduction itself.
+- **Reproduction splits into a deterministic engine and a recipe-inference step — gate the latter, not
+  the former (owner pushed on this 2026-06-20; the refined answer).** Skill Match answers *which* skills;
+  Reproduction answers *how they were used* (params, thresholds, contrasts, design formula, ordering,
+  filtering). That splits cleanly:
+  - **The engine — run the skills, the parameter *sweep*, the R oracle, the score — is fully
+    deterministic.** It's stronger than it sounds because **the printed numbers are the oracle**: you
+    don't infer the recipe blind, you *search a parameter space for what hits a known target*. The sweep
+    already recovered RPGRIP1's "numbers only reconcile at *unadjusted* p" with zero semantics. This is
+    the moat + the honesty layer (it flags *paper-irreproducible* when nothing matches). **Never gate it.**
+  - **Recipe inference from the methods prose has a deterministic floor and a real ceiling.** Floor
+    (keyword/regex/sweep) reproduces well-specified single-number figures; ceiling = vague or complex
+    multi-step pipelines (design formula / order / subsetting) that need reading comprehension. Honest
+    tell: across all 4 ledgers the hard recipe-reading was done by an agent reading the STAR methods,
+    not a deterministic extractor — so the hard cases already depend on a semantic reader, just not a
+    productized one.
+  - **Resolution — AI proposes, deterministic disposes.** For messy papers an LLM/RAG pass *proposes*
+    the recipe / narrows the search; the deterministic engine *executes* + *validates against the
+    printed numbers*. The AI hypothesises, it never "reproduces" — so validation stays deterministic and
+    honest. This is the legitimate **Pro/AI gate**: free reproduces cleanly-specified figures (extraction
+    + sweep); Pro cracks the vague/complex ones (AI proposes → engine validates). Same open-core, layered
+    model as Skill Match ([[layered-deterministic-extraction]]).
 - **Recover-data-in-viewer needs a renderer swap (the key enabler).** Today the PDF is a native
   browser viewer in an `<iframe>` — the parent page **cannot** draw a selection rectangle over it or
   map coordinates to PDF pages (it's an embedded chrome viewer). Region-select capture requires
