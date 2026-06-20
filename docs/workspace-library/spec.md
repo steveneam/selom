@@ -1,7 +1,10 @@
 # Workspace Library — spec
 
-> Status: **DRAFT — awaiting owner sign-off on the model** (§Decisions). Spec-first per the owner
-> direction (2026-06-20, s35). Build only after the open decisions are resolved.
+> Status: **FOUNDATION SHIPPED (s37, 2026-06-20)** — §9 steps 1–4 built + browser-verified, and
+> step "flatten installs" done per the owner's full-flatten decision (D1/D2). Model signed off
+> (D1/D2/D3). What remains is later/out-of-scope (§2 Out): the real backend persistence (the seam
+> is in place), and the umbrella/Methods-legend layers (§10/§11). Spec-first per the owner direction
+> (2026-06-20, s35); the model was resolved before code.
 > Lane: the **client store + FE is Claude's lane**; the real account/DB persistence is a later
 > **backend** contract (§Persistence seam). No backend work is in scope for v1.
 
@@ -172,14 +175,18 @@ On first `workspaceStore.hydrate()` with no `selom.workspace.v1` key:
 - **I4** Migration is **non-destructive** (projectStore data is read, never deleted by v1).
 - **I5** `SavedPaper` holds **no PDF bytes / object URLs** (session-only; the Library is text + ids).
 
-## 9. Build plan (after sign-off)
+## 9. Build plan (SHIPPED s37, 2026-06-20)
 
-1. `lib/workspace/types.ts` + `lib/workspace/store.ts` + `useWorkspace` + selectors + vitest (seed,
-   hydrate, idempotent save, migration).
-2. Skill Match **Save to Library** button (builds the summary from `meta`+`map`).
-3. `/library` page + rail entry + the three tabs (Papers re-open/Export/Remove first).
-4. Re-point Gene Sets (and Store, if installs promoted) at the workspace; wire the migration.
-5. (Later, BE contract) the real `WorkspaceStore` persistence + auth.
+1. ✅ `lib/workspace/types.ts` + `lib/workspace/store.ts` + `useWorkspace` + selectors + vitest (seed,
+   hydrate, idempotent save, migration). 11 tests.
+2. ✅ Skill Match **Save to Library** button (`toSavedPaper` builds the summary from `meta`+`map`).
+3. ✅ `/library` page + rail entry + the three tabs (Papers: summary/Export/Remove+Undo · Gene sets:
+   Apply/Remove · Skills: open the Store detail).
+4. ✅ Re-pointed Gene Sets (save → workspace; the "Apply into [project]" run target stays) AND the
+   Store installs (full flatten per D1/D2 — account-wide; the project picker is gone, every project
+   sees every installed skill, the command-palette per-project swatches + the home skill count went
+   away). Migration wired (lifts gene sets + installs on first hydrate).
+5. (Later, BE contract) the real `WorkspaceStore` persistence + auth — the seam is in place.
 
 ## 10. North star — the unified Paper workflow (owner vision, 2026-06-20)
 
