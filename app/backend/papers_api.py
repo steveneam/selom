@@ -68,6 +68,15 @@ def list_papers() -> list[dict]:
                 "slug": slug,
                 "title": ledger.paper.title,
                 "doi": ledger.paper.doi,
+                "pmid": ledger.paper.pmid,
+                # Structured bibliographic metadata — the shared Paper-anchor shape the FE renders
+                # via the same authorSummary/citationLine as Skill Match (spec §10).
+                "authors": ledger.paper.authors,
+                "venue": ledger.paper.venue,
+                "year": ledger.paper.year,
+                "volume": ledger.paper.volume,
+                "issue": ledger.paper.issue,
+                "pages": ledger.paper.pages,
                 "geo": ledger.paper.geo,
                 "score": sc.score.model_dump() if sc and sc.score else None,
                 "n_panels": sc.n_panels if sc else 0,

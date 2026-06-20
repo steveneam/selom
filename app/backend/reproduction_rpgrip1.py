@@ -213,8 +213,15 @@ def build_ledger() -> Ledger:
     from the PDF. ``drive_captured`` / ``drive_live_fig5`` add the runs + verdicts."""
     paper = Paper(
         id=PAPER_ID, slug=PAPER_ID,
-        title="RPGRIP1 retinal organoid (Loi et al. 2025, Stem Cell Reports)",
+        title="Connecting cilium, stress response, and proteostasis abnormalities inform variant "
+              "and therapy assessment in RPGRIP1 retinal organoids",
         doi="10.1016/j.stemcr.2025.102717",
+        pmid="41270749",
+        # Structured metadata (our extractor's chain → CrossRef; the main PDF isn't staged here).
+        authors=["To Ha Loi", "Anson Cheng", "Hani Jieun Kim", "Milan Fernando",
+                 "Benjamin M. Nash", "Nader Aryamanesh", "John R. Grigg", "Pengyi Yang",
+                 "Anai Gonzalez-Cordero", "Robyn V. Jamieson"],
+        venue="Stem Cell Reports", year=2025, volume="20", issue="12", pages="102717",
         geo=["GSE293982", "GSE293984"],
         methods_digest={
             "bulk_de": "featureCounts -> edgeR TMM -> CPM<2 filter -> 3-group NB-GLM -> "

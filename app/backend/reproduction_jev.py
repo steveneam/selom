@@ -284,9 +284,15 @@ def build_ledger() -> Ledger:
     record that R4's extraction subsystem will eventually produce from the PDF + supplement."""
     paper = Paper(
         id=PAPER_ID, slug=PAPER_ID,
-        title="Retinal EV-miRNA driving gliotic responses in degeneration "
-              "(Cioanca, Natoli et al. 2023, J Extracell Vesicles)",
+        title="Multiomic integration reveals neuronal-extracellular vesicle coordination of "
+              "gliotic responses in degeneration",
         doi="10.1002/jev2.12393",
+        pmid="38082562",
+        # Structured metadata dogfooded through POST /papers/extract (OpenAlex, not degraded).
+        authors=["Adrian V. Cioanca", "Yvette Wooff", "Riemke Aggio-Bruce", "Rakshanya Sekar",
+                 "Catherine Dietrich", "Riccardo Natoli"],
+        venue="Journal of Extracellular Vesicles", year=2023, volume="12", issue="12",
+        pages="e12393",
         geo=["GSE153674 (Fadl 2020 reference — the study's own scRNA PRJNA990691 not deposited)"],
         methods_digest={
             "mirna_de": "OpenArray miRNA Ct → limma moderated-t → topTable (Table S2), p<0.05",

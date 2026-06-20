@@ -262,9 +262,13 @@ def build_ledger() -> Ledger:
     paper = Paper(
         id=PAPER_ID, slug=PAPER_ID,
         title="Comprehensive characterization of fetal and mature retinal cell identity to assess "
-              "the fidelity of retinal organoids (Kim, Gonzalez-Cordero, Yang et al. 2023, "
-              "Stem Cell Reports)",
+              "the fidelity of retinal organoids",
         doi="10.1016/j.stemcr.2022.12.002",
+        pmid="36630901",
+        # Structured metadata dogfooded through POST /papers/extract (OpenAlex, not degraded).
+        authors=["Hani Jieun Kim", "Michelle O'Hara-Wright", "Daniel Kim", "To Ha Loi",
+                 "Benjamin Y. Lim", "Robyn V. Jamieson", "Anai Gonzalez-Cordero", "Pengyi Yang"],
+        venue="Stem Cell Reports", year=2023, volume="18", issue="1", pages="175-189",
         modality="scrna",  # rod-dominant organoid scRNA-seq (GSE201356) — single modality
         geo=["GSE201356"],
         methods_digest={

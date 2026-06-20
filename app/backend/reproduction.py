@@ -365,6 +365,17 @@ class Paper(BaseModel):
     slug: str
     title: str = ""
     doi: str = ""
+    pmid: str = ""
+    # Structured bibliographic metadata — the SAME shape our PDF extractor produces
+    # (paper_metadata: OpenAlex/CrossRef/PubMed) and that Skill Match carries, so every surface
+    # shares one representation (the umbrella Paper anchor, workspace-library spec §10). Keeping the
+    # citation structured (not baked into `title`) lets the FE render author/venue rows consistently.
+    authors: list[str] = Field(default_factory=list)
+    venue: str = ""
+    year: int | None = None
+    volume: str = ""
+    issue: str = ""
+    pages: str = ""
     pdf_path: str = ""
     # The paper's primary data modality (scrna | bulk | proteomics | …), used to frame the
     # auto-generated Methods intro (lit-synth Phase D). Empty = mixed/unknown -> a neutral lead;
