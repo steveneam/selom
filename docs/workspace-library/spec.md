@@ -151,18 +151,16 @@ On first `workspaceStore.hydrate()` with no `selom.workspace.v1` key:
 - Write the workspace key. The projectStore copies are left in place (non-destructive); selectors stop
   reading them once callers point at the workspace (a follow-up, tracked, not a big-bang rewrite).
 
-## 7. Decisions to confirm (owner sign-off needed)
+## 7. Decisions (RESOLVED by owner 2026-06-20)
 
-- **D1 — Promotion scope.** Which collections move to the workspace? The memory says papers + gene
-  sets + skills. Confirm; in particular whether **skill installs** become purely workspace-level (a
-  skill installed once is available in every project) vs staying project-scoped.
-- **D2 — Dual vs single home.** For anything promoted, do project-level copies still exist (dual:
-  workspace default + per-project override) or is the workspace the single source of truth (simpler;
-  the Store/Gene Sets surfaces stop asking "which project")? Recommendation: **single home** — it's the
-  whole point ("project-agnostic") and avoids two-writer ambiguity.
-- **D3 — SavedPaper depth.** Store the compact **summary** (recommended — small, all the Library needs)
-  vs the full re-openable `FeasibilityMap` (re-open shows the exact per-figure rows without re-routing,
-  but bloats localStorage). Recommendation: **summary**, with a "re-drop to re-route per-figure" path.
+- **D1 — Promotion scope → papers + gene sets + skill installs ALL move to the workspace** (single
+  home). Plus the owner expanded the vision: saved **recovered figures** (Recover data) and
+  **reproduction** artifacts also belong in the Library — see §10 (the unified Paper workflow). v1
+  ships papers + gene sets + skills; the Paper anchor is designed to extend to figures/reproduction.
+- **D2 — Single workspace home.** The workspace is the one source of truth; Gene Sets / Store stop
+  asking "which project". No project-level override layer.
+- **D3 — Compact summary.** `SavedPaper` stores the routed summary (metadata + inventory + per-figure
+  counts/tiers), not the full `FeasibilityMap`. Re-drop the PDF to see exact per-figure rows again.
 
 ## 8. Invariants
 
@@ -182,3 +180,53 @@ On first `workspaceStore.hydrate()` with no `selom.workspace.v1` key:
 3. `/library` page + rail entry + the three tabs (Papers re-open/Export/Remove first).
 4. Re-point Gene Sets (and Store, if installs promoted) at the workspace; wire the migration.
 5. (Later, BE contract) the real `WorkspaceStore` persistence + auth.
+
+## 10. North star — the unified Paper workflow (owner vision, 2026-06-20)
+
+The owner's bigger idea: **fold Skill Match + Reproduction + Recover data into one umbrella** over a
+single first-class **Paper** object. You drop a PDF once and it flows through stages:
+
+1. **Skill Match** (have) — drop PDF → metadata + the routed skills the paper needs. Deterministic,
+   free. This is the *entry point*.
+2. **Reproduction** (have, separate surface) — add the **supplementary** data → reproduce the figures
+   + numbers with real skills, scored. The paper carries over from stage 1 (no re-drop).
+3. **Recover data** (have, separate `/extract`) — a **side action in the PDF viewer**: a "grab figure"
+   button → region-select a figure in the viewer → save it; repeat for every figure → "Recover data"
+   opens `/extract` pre-loaded with the saved figures for the normal calibrate-and-run.
+
+The **Workspace Library is the connective tissue**: the `SavedPaper` becomes the *Paper anchor* that
+all three stages read/write — routed skills (stage 1), a reproduction ledger ref (stage 2), recovered
+figures (stage 3) — plus the cross-cutting gene sets + skills. So building the Library now is building
+the substrate the umbrella needs regardless of how the shell UX lands.
+
+### Recommendations (Claude)
+
+- **Build the Library foundation now; design `SavedPaper` to extend into the Paper anchor.** Add
+  optional `recoveredFigures?` / `reproductionId?` later without a rewrite. The foundation (store +
+  Save + the three collections) is not in dispute and unblocks everything else. Don't build the
+  umbrella *shell* yet — sequence it after the substrate exists.
+- **Reproduction should stay deterministic and free at its core — do NOT gate reproduction behind AI.**
+  Reproducing figures with real skills + filtering, validated against oracles, *is* Selom's moat
+  ([[selom-figure-repro-mission]]). What the **Pro/AI tier** earns money on is the **assist** when the
+  deterministic path is uncertain: verifying low-confidence routing, extracting skills/params from a
+  messy paper, mapping a figure the router couldn't. This is the same open-core, layered model Skill
+  Match already ships (free deterministic core + paid AI upsell — [[layered-deterministic-extraction]]).
+  So: gate the **AI assist**, never the reproduction itself.
+- **Recover-data-in-viewer needs a renderer swap (the key enabler).** Today the PDF is a native
+  browser viewer in an `<iframe>` — the parent page **cannot** draw a selection rectangle over it or
+  map coordinates to PDF pages (it's an embedded chrome viewer). Region-select capture requires
+  rendering the PDF ourselves on a `<canvas>` via **pdfjs-dist** (Apache-2.0, license-clean). That swap
+  is self-contained and unlocks a lot (overlay capture, per-figure thumbnails, annotations). It also
+  dovetails with the already-decided extract↔reproduction bridge (the "Digitize this panel" entry —
+  [[selom-extract-reproduction-bridge]]): the viewer capture is the more general "grab any region"
+  version of it. Scope it as its own piece after the Library foundation.
+- **Sequencing.** Foundation (Library store + Save + collections) → paper-anchor handoff (Skill Match →
+  Reproduction carrying the Paper) → pdf.js viewer + region capture (Recover data) → the umbrella shell
+  (one nav, stages as tabs over a Paper). Each is its own scoped, owner-gated step.
+
+### Open questions for the umbrella (defer until the foundation exists)
+- Does the umbrella replace the three separate nav entries with one "Paper" workspace, or keep them as
+  deep-links into stages? (Lean: keep the surfaces, add a unifying "open in Reproduction / Recover"
+  flow first; collapse into one shell once the handoffs are proven.)
+- Where do supplementary uploads live on the Paper anchor (stage 2)?
+- Is a "Paper" the same primitive as a `Project`, or a lighter object a Project can reference?
