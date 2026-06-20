@@ -2,26 +2,77 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowUpRight, GitCompareArrows, Hourglass } from "lucide-react";
+import { ArrowUpRight, GitCompareArrows, Hourglass, Loader2, TriangleAlert } from "lucide-react";
 
 import { tierLabel } from "@/lib/reproduction/api";
+import { useReproductionRun } from "@/lib/reproduction/run";
+import { ScoreReport } from "@/components/reproduction/score-report";
 import type { SavedPaper } from "@/lib/workspace/types";
 
 /**
- * The Score stage body in the Paper shell — the graded *output* of reproduction, GHOSTED until the
- * live drive lands (a later backend contract). It is a faithful skeleton of the real per-paper score
- * region (components/reproduction/paper-detail.tsx): the same two-axis ScoreHeader, the "what the
- * engine found" findings row, and a heatmap grid using the real `ReproHeatmap` cell dimensions — so
- * when the live run fills it, the layout doesn't reflow. (D-c / U6: the ghost mirrors the real layout,
- * not loose placeholder boxes.)
+ * The Score stage body in the Paper shell — the graded *output* of reproduction.
+ *
+ * Three live states + the pre-run ghost:
+ *  - no run yet            → the faithful skeleton (mirrors the real layout so it doesn't reflow, U6)
+ *  - run loading           → a calm "scoring" placeholder
+ *  - run succeeded         → the REAL `ScoreReport` (the same component the showcase detail renders)
+ *  - run expired / failed  → an honest banner (runs are session-scoped; re-run from the Reproduce tab)
  */
 export function ScoreStage({ paper }: { paper: SavedPaper }) {
+  const runId = paper.reproductionRunId;
+  const { ledger, status, error, loading } = useReproductionRun(runId);
+
+  if (runId && loading) return <ScoreLoading />;
+  if (runId && status === "succeeded" && ledger) return <ScoreReport ledger={ledger} />;
+  if (runId && (error || status === "failed" || status === "succeeded")) {
+    // status==="succeeded" with no ledger shouldn't happen, but treat it as unavailable, not blank.
+    return <ScoreUnavailable paperId={paper.id} failed={status === "failed"} />;
+  }
+
+  // No run yet → the faithful ghost skeleton.
   return (
     <div className="space-y-8">
       <GhostScoreHeader />
       <GhostFindings />
       <GhostHeatmap figureCount={paper.figureCount} />
       <GoldenVsComputedHint />
+    </div>
+  );
+}
+
+/** Shown while the driven ledger loads (a quick GET — the inline run is already terminal). */
+function ScoreLoading() {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card/30 px-6 py-20 text-center">
+      <Loader2 className="size-6 animate-spin text-primary" />
+      <p className="mt-3 text-sm font-medium text-foreground">Scoring this paper…</p>
+      <p className="mt-1 text-xs text-muted-foreground">Reading back the driven figures.</p>
+    </div>
+  );
+}
+
+/** The run is gone (session-scoped store) or it failed — honest, calm, and points back to re-run. */
+function ScoreUnavailable({ paperId, failed }: { paperId: string; failed: boolean }) {
+  return (
+    <div className="rounded-xl border border-dashed border-border bg-card/30 px-6 py-12 text-center">
+      <span className="mx-auto grid size-10 place-items-center rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400">
+        <TriangleAlert className="size-5" />
+      </span>
+      <p className="mt-3 text-sm font-medium text-foreground">
+        {failed ? "That reproduction run didn't finish" : "This reproduction run is no longer available"}
+      </p>
+      <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-muted-foreground">
+        {failed
+          ? "The drive failed — check the supplementary data matches the paper, then run it again."
+          : "Runs are kept for the session only (the file contents aren't stored). Re-attach the data and run reproduction again."}
+      </p>
+      <Link
+        href={`/paper/${paperId}?stage=reproduce`}
+        className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+      >
+        Back to Reproduce
+        <ArrowUpRight className="size-3" />
+      </Link>
     </div>
   );
 }

@@ -186,6 +186,14 @@ export const workspaceStore = {
     setState({ ...state, papers: state.papers.map((p) => (p.id === paperId ? updated : p)) });
     return updated;
   },
+  /** Stamp the live-reproduction run id once a paper's drive succeeds (live-reproduction-spec §7).
+   *  The Score stage reads it to fetch + render the driven ledger. No-op if the paper is gone. */
+  setPaperReproductionRun(paperId: string, runId: string) {
+    const paper = state.papers.find((p) => p.id === paperId);
+    if (!paper || paper.reproductionRunId === runId) return;
+    const updated: SavedPaper = { ...paper, reproductionRunId: runId };
+    setState({ ...state, papers: state.papers.map((p) => (p.id === paperId ? updated : p)) });
+  },
   /** Detach one supplement from a paper by its id. */
   removePaperSupplement(paperId: string, supplementId: string) {
     const paper = state.papers.find((p) => p.id === paperId);

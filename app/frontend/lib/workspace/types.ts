@@ -70,10 +70,10 @@ export interface SavedPaper {
   tierSummary: { structured: number; recovered: number };
   savedAt: number;
 
-  // ── Reserved for the unified Paper workflow (spec §10); unused in v1, here so the
-  //    anchor extends without a type migration. Stage 2/3 will populate these. ──
-  /** A reproduction ledger ref once the paper flows into Reproduction (stage 2). */
-  reproductionId?: string;
+  // ── The unified Paper workflow (spec §10); the anchor extends without a type migration. ──
+  /** The live-reproduction run id once the paper's drive succeeds (live-reproduction-spec §7).
+   *  The Score stage reads this to GET /reproduction-runs/{id} and render the driven ledger. */
+  reproductionRunId?: string;
   /** Supplementary files attached in the Reproduction stage (stage 2) — Excel / CSV tables +
    *  extended-methods PDFs. Metadata only (no bytes; spec I5). */
   supplements?: SavedSupplement[];

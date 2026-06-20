@@ -16,7 +16,15 @@ import { AttributionChip, BlameChip, ProvenanceBadge, TierChip, VerdictChip } fr
 export function PanelTable({ ledger }: { ledger: Ledger }) {
   const panelByKey = new Map(ledger.panels.map((p) => [`${p.figure}${p.panel}`, p]));
   const scoreByKey = new Map((ledger.scorecard?.panel_scores ?? []).map((s) => [s.panel_key, s]));
-  const oos = (ledger.scorecard?.panel_scores ?? []).filter((s) => !s.in_scope);
+  const allScores = ledger.scorecard?.panel_scores ?? [];
+  const oos = allScores.filter((s) => !s.in_scope);
+  // In-scope panels the live drive couldn't auto-score (no printed target, no matched data, or the
+  // metric wasn't readable) — shown honestly so they aren't silently absent (L4) and so each grey
+  // heatmap cell has a scroll target. Empty for the staged showcase ledgers (all validated).
+  const validatedKeys = new Set(ledger.validations.map((v) => v.panel_key));
+  const ungraded = allScores.filter(
+    (s) => s.in_scope && s.reproducibility == null && !validatedKeys.has(s.panel_key),
+  );
 
   return (
     <div className="space-y-3">
@@ -29,6 +37,39 @@ export function PanelTable({ ledger }: { ledger: Ledger }) {
           slug={ledger.paper.slug}
         />
       ))}
+
+      {ungraded.length > 0 && (
+        <div className="rounded-lg border border-dashed border-border bg-card/40 px-4 py-3">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            Computed — not auto-validated
+          </p>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
+            In scope, but Selom couldn&apos;t auto-score these — no printed target, no matched data, or
+            the metric wasn&apos;t readable from the run. Shown honestly; excluded from the score, never
+            counted as a defect.
+          </p>
+          <ul className="mt-2.5 space-y-1.5">
+            {ungraded.map((s) => {
+              const panel = panelByKey.get(s.panel_key);
+              return (
+                <li
+                  key={s.panel_key}
+                  id={`panel-${s.panel_key}`}
+                  className="flex scroll-mt-6 flex-wrap items-center gap-x-2 gap-y-1 text-xs"
+                >
+                  <span className="tabular font-medium text-foreground/80">{s.panel_key}</span>
+                  {panel?.skill_id && (
+                    <span className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                      {panel.skill_id}
+                    </span>
+                  )}
+                  {s.note && <span className="text-muted-foreground">{s.note}</span>}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
 
       {oos.length > 0 && (
         <div className="rounded-lg border border-dashed border-border bg-card/40 px-4 py-3">

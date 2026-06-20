@@ -196,6 +196,14 @@ describe("workspaceStore — paper supplements (Reproduction stage 2)", () => {
     expect(wselect.paper(workspaceStore.getSnapshot(), p.id)?.id).toBe(p.id);
     expect(wselect.paper(workspaceStore.getSnapshot(), "missing")).toBeUndefined();
   });
+
+  it("setPaperReproductionRun stamps the run id (and is a no-op for an unknown paper)", async () => {
+    const { workspaceStore, wselect } = await freshStore();
+    const p = workspaceStore.savePaper(base);
+    workspaceStore.setPaperReproductionRun(p.id, "run_abc");
+    expect(wselect.paper(workspaceStore.getSnapshot(), p.id)?.reproductionRunId).toBe("run_abc");
+    expect(() => workspaceStore.setPaperReproductionRun("nope", "run_x")).not.toThrow();
+  });
 });
 
 describe("workspaceStore — gene sets + skills", () => {

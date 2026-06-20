@@ -12,6 +12,7 @@ import { PaperPipeline } from "@/components/paper/pipeline";
 import { PaperMetaHeader } from "@/components/paper/paper-meta-header";
 import { extractPaper, routePaper, SAMPLE_TEXT, toSavedPaper } from "@/lib/skill-match/api";
 import { workspaceStore } from "@/lib/workspace/store";
+import { paperFiles } from "@/lib/paper/run-files";
 import type { ExtractResult, FeasibilityMap } from "@/lib/skill-match/types";
 import { RoutingProgress } from "./routing-progress";
 import { SkillMatchResults } from "./skill-match-results";
@@ -48,6 +49,7 @@ export function SkillMatch() {
   const [mode, setMode] = React.useState<"drop" | "paste">("drop");
   const [result, setResult] = React.useState<ExtractResult | null>(null);
   const [text, setText] = React.useState("");
+  const [file, setFile] = React.useState<File | null>(null); // the dropped PDF, stashed for the run
   const [fileUrl, setFileUrl] = React.useState<string | null>(null); // object URL for the inline viewer
   const [map, setMap] = React.useState<FeasibilityMap | null>(null);
   const [phase, setPhase] = React.useState<Phase>("idle");
@@ -64,6 +66,9 @@ export function SkillMatch() {
     const saved = workspaceStore.savePaper(
       toSavedPaper(map, result?.metadata ?? null, result?.filename ?? "paper"),
     );
+    // Carry the dropped PDF bytes into the session cache so the Reproduce stage can run without a
+    // re-drop (the SavedPaper itself keeps no bytes — I5). A reload clears this; the stage re-prompts.
+    if (file) paperFiles.setMain(saved.id, file);
     router.push(`/paper/${saved.id}?stage=reproduce`);
   }
 
@@ -78,6 +83,7 @@ export function SkillMatch() {
     setPhase("extracting");
     setError(null);
     setMap(null);
+    setFile(file);
     setFileUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return URL.createObjectURL(file);
@@ -100,6 +106,7 @@ export function SkillMatch() {
       if (prev) URL.revokeObjectURL(prev);
       return null;
     });
+    setFile(null);
     setResult(null);
     setText("");
     setMap(null);

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, FlaskConical } from "lucide-react";
 
 import { useWorkspace, wselect } from "@/lib/workspace/store";
+import { usePaperRun } from "@/lib/reproduction/run";
 import {
   PaperPipeline,
   type PipelineForward,
@@ -40,6 +41,10 @@ export function PaperShell({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- flip once after hydration (SSR-safe gate)
     setMounted(true);
   }, []);
+
+  // The live-reproduction run controller (one instance for the shell → shared by the forward button
+  // and the Reproduce stage). Keyed by the route id, so it's valid before the paper resolves.
+  const run = usePaperRun(id);
 
   const raw = params.get("stage");
   const stage: PipelineStage = STAGE_KEYS.includes(raw as PipelineStage)
@@ -92,11 +97,16 @@ export function PaperShell({ id }: { id: string }) {
         }
       : stage === "reproduce"
         ? {
-            label: "Run reproduction",
+            label: run.phase === "running" ? "Running…" : "Run reproduction",
             icon: FlaskConical,
-            disabled: true,
+            disabled: !run.canRun,
+            onClick: run.start,
             title:
-              "The live reproduction drive is a backend step in progress — attach supplements and it runs here",
+              run.phase === "running"
+                ? "Reproduction is running…"
+                : run.canRun
+                  ? "Run the matched skills on your data and grade every figure"
+                  : "Attach the paper PDF and at least one Excel/CSV supplement to run reproduction",
           }
         : undefined;
 
@@ -127,7 +137,7 @@ export function PaperShell({ id }: { id: string }) {
 
       <div className="mt-8">
         {stage === "skill-match" && <SkillMatchStage paper={paper} />}
-        {stage === "reproduce" && <ReproduceStage paper={paper} />}
+        {stage === "reproduce" && <ReproduceStage paper={paper} run={run} />}
         {stage === "score" && <ScoreStage paper={paper} />}
       </div>
     </div>
