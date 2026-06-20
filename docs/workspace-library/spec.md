@@ -253,6 +253,19 @@ the substrate the umbrella needs regardless of how the shell UX lands.
   Reproduction carrying the Paper) → pdf.js viewer + region capture (Recover data) → the umbrella shell
   (one nav, stages as tabs over a Paper). Each is its own scoped, owner-gated step.
 
+> **Shipped through s39 (2026-06-21):** Foundation (s37) · Paper-anchor handoff + per-paper Reproduction
+> workspace + supplementary intake (s38) · **the cross-cutting consistency pass (s39):** one shared
+> paper-metadata representation + formatters (`lib/paper/metadata.ts`; Skill Match's structured shape is
+> the canonical engine, every surface conforms — see [[unify-on-superior-framework]]); ONE shared
+> `PaperMetaHeader` (canonical 4-line layout) across live Skill Match / saved Skill Match / Reproduction
+> workspace / showcase detail; a `PaperPipeline` stage strip (Skill Match → Reproduce → Score) above the
+> metadata on both surfaces with **navigable pills** (per-paper Skill Match ⇄ Reproduce; Score gated); a
+> saved Skill Match per-paper view (`/skill-match/[id]`) so the pill has a target without re-dropping;
+> structured bibliographic metadata on the backend reproduction `Paper`; the spectrum cards redesigned to
+> a fixed, aligned skeleton. **Remaining:** pdf.js viewer + region-capture (Recover data) · the full
+> umbrella shell (stages as tabs over one Paper) · the live reproduction ingest+drive backend contract
+> (the staged Reproduce CTA + supplements await it) · the Methods/legend layer (§11).
+
 ### Open questions for the umbrella (defer until the foundation exists)
 - Does the umbrella replace the three separate nav entries with one "Paper" workspace, or keep them as
   deep-links into stages? (Lean: keep the surfaces, add a unifying "open in Reproduction / Recover"
