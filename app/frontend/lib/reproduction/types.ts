@@ -36,11 +36,20 @@ export interface PaperCell {
   in_scope: boolean;
 }
 
-/** One paper in the index "reproducibility spectrum". */
+/** One paper in the index "reproducibility spectrum". Carries the shared Paper-anchor metadata
+ *  (the same shape Skill Match uses) so cards render the author/citation row via the shared
+ *  `authorSummary`/`citationLine` formatters (spec §10). */
 export interface PaperSummary {
   slug: string;
   title: string;
   doi: string;
+  pmid: string;
+  authors: string[];
+  venue: string;
+  year: number | null;
+  volume: string;
+  issue: string;
+  pages: string;
   geo: string[];
   score: PaperScore | null;
   n_panels: number;
@@ -140,6 +149,13 @@ export interface Paper {
   slug: string;
   title: string;
   doi: string;
+  pmid: string;
+  authors: string[];
+  venue: string;
+  year: number | null;
+  volume: string;
+  issue: string;
+  pages: string;
   geo: string[];
 }
 

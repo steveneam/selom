@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, GitCompareArrows } from "lucide-react";
 
 import { shortName, tierLabel, useLedger } from "@/lib/reproduction/api";
+import { PaperMetaHeader } from "@/components/paper/paper-meta-header";
 import type { PaperScore } from "@/lib/reproduction/types";
 import { ReproHeatmap } from "./repro-heatmap";
 import { PanelTable } from "./panel-table";
@@ -31,31 +32,20 @@ export function PaperDetail({ slug }: { slug: string }) {
     <div className="mx-auto max-w-6xl px-6 py-10 lg:px-10">
       <BackLink />
 
-      <header className="mt-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/80">
-          {shortName(slug)}
-        </p>
-        <h1 className="mt-2 max-w-3xl text-balance text-2xl font-semibold leading-tight text-foreground">
-          {ledger.paper.title}
-        </h1>
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          {ledger.paper.doi && (
-            <a
-              href={`https://doi.org/${ledger.paper.doi}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="tabular underline-offset-2 hover:text-foreground hover:underline"
-            >
-              {ledger.paper.doi}
-            </a>
-          )}
-          {ledger.paper.geo.map((g) => (
-            <span key={g} className="rounded border border-border bg-muted px-1.5 py-0.5 tabular">
-              {g}
-            </span>
-          ))}
-        </div>
-      </header>
+      <PaperMetaHeader
+        meta={ledger.paper}
+        className="mt-4"
+        eyebrow={
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/80">
+            {shortName(slug)}
+          </p>
+        }
+        trailing={ledger.paper.geo.map((g) => (
+          <span key={g} className="rounded border border-border bg-muted px-1.5 py-0.5 tabular">
+            {g}
+          </span>
+        ))}
+      />
 
       {score && <ScoreHeader score={score} findings={sc?.findings ?? {}} />}
 

@@ -11,8 +11,15 @@ import type { Ledger, PaperSummary } from "./types";
 export const REPRO_PAPERS: PaperSummary[] = [
   {
     "slug": "rpgrip1",
-    "title": "RPGRIP1 retinal organoid (Loi et al. 2025, Stem Cell Reports)",
+    "title": "Connecting cilium, stress response, and proteostasis abnormalities inform variant and therapy assessment in RPGRIP1 retinal organoids",
     "doi": "10.1016/j.stemcr.2025.102717",
+    "pmid": "41270749",
+    "authors": ["To Ha Loi", "Anson Cheng", "Hani Jieun Kim", "Milan Fernando", "Benjamin M. Nash", "Nader Aryamanesh", "John R. Grigg", "Pengyi Yang", "Anai Gonzalez-Cordero", "Robyn V. Jamieson"],
+    "venue": "Stem Cell Reports",
+    "year": 2025,
+    "volume": "20",
+    "issue": "12",
+    "pages": "102717",
     "geo": [
       "GSE293982",
       "GSE293984"
@@ -125,8 +132,15 @@ export const REPRO_PAPERS: PaperSummary[] = [
   },
   {
     "slug": "jev",
-    "title": "Retinal EV-miRNA driving gliotic responses in degeneration (Cioanca, Natoli et al. 2023, J Extracell Vesicles)",
+    "title": "Multiomic integration reveals neuronal-extracellular vesicle coordination of gliotic responses in degeneration",
     "doi": "10.1002/jev2.12393",
+    "pmid": "38082562",
+    "authors": ["Adrian V. Cioanca", "Yvette Wooff", "Riemke Aggio-Bruce", "Rakshanya Sekar", "Catherine Dietrich", "Riccardo Natoli"],
+    "venue": "Journal of Extracellular Vesicles",
+    "year": 2023,
+    "volume": "12",
+    "issue": "12",
+    "pages": "e12393",
     "geo": [
       "GSE153674 (Fadl 2020 reference — the study's own scRNA PRJNA990691 not deposited)"
     ],
@@ -248,8 +262,15 @@ export const REPRO_PAPERS: PaperSummary[] = [
   },
   {
     "slug": "hani",
-    "title": "Comprehensive characterization of fetal and mature retinal cell identity to assess the fidelity of retinal organoids (Kim, Gonzalez-Cordero, Yang et al. 2023, Stem Cell Reports)",
+    "title": "Comprehensive characterization of fetal and mature retinal cell identity to assess the fidelity of retinal organoids",
     "doi": "10.1016/j.stemcr.2022.12.002",
+    "pmid": "36630901",
+    "authors": ["Hani Jieun Kim", "Michelle O'Hara-Wright", "Daniel Kim", "To Ha Loi", "Benjamin Y. Lim", "Robyn V. Jamieson", "Anai Gonzalez-Cordero", "Pengyi Yang"],
+    "venue": "Stem Cell Reports",
+    "year": 2023,
+    "volume": "18",
+    "issue": "1",
+    "pages": "175-189",
     "geo": [
       "GSE201356"
     ],
@@ -334,8 +355,15 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
     "paper": {
       "id": "rpgrip1",
       "slug": "rpgrip1",
-      "title": "RPGRIP1 retinal organoid (Loi et al. 2025, Stem Cell Reports)",
+      "title": "Connecting cilium, stress response, and proteostasis abnormalities inform variant and therapy assessment in RPGRIP1 retinal organoids",
       "doi": "10.1016/j.stemcr.2025.102717",
+      "pmid": "41270749",
+      "authors": ["To Ha Loi", "Anson Cheng", "Hani Jieun Kim", "Milan Fernando", "Benjamin M. Nash", "Nader Aryamanesh", "John R. Grigg", "Pengyi Yang", "Anai Gonzalez-Cordero", "Robyn V. Jamieson"],
+      "venue": "Stem Cell Reports",
+      "year": 2025,
+      "volume": "20",
+      "issue": "12",
+      "pages": "102717",
       "geo": [
         "GSE293982",
         "GSE293984"
@@ -1103,8 +1131,15 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
     "paper": {
       "id": "jev",
       "slug": "jev",
-      "title": "Retinal EV-miRNA driving gliotic responses in degeneration (Cioanca, Natoli et al. 2023, J Extracell Vesicles)",
+      "title": "Multiomic integration reveals neuronal-extracellular vesicle coordination of gliotic responses in degeneration",
       "doi": "10.1002/jev2.12393",
+      "pmid": "38082562",
+      "authors": ["Adrian V. Cioanca", "Yvette Wooff", "Riemke Aggio-Bruce", "Rakshanya Sekar", "Catherine Dietrich", "Riccardo Natoli"],
+      "venue": "Journal of Extracellular Vesicles",
+      "year": 2023,
+      "volume": "12",
+      "issue": "12",
+      "pages": "e12393",
       "geo": [
         "GSE153674 (Fadl 2020 reference — the study's own scRNA PRJNA990691 not deposited)"
       ]
@@ -1863,8 +1898,15 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
     "paper": {
       "id": "hani",
       "slug": "hani",
-      "title": "Comprehensive characterization of fetal and mature retinal cell identity to assess the fidelity of retinal organoids (Kim, Gonzalez-Cordero, Yang et al. 2023, Stem Cell Reports)",
+      "title": "Comprehensive characterization of fetal and mature retinal cell identity to assess the fidelity of retinal organoids",
       "doi": "10.1016/j.stemcr.2022.12.002",
+      "pmid": "36630901",
+      "authors": ["Hani Jieun Kim", "Michelle O'Hara-Wright", "Daniel Kim", "To Ha Loi", "Benjamin Y. Lim", "Robyn V. Jamieson", "Anai Gonzalez-Cordero", "Pengyi Yang"],
+      "venue": "Stem Cell Reports",
+      "year": 2023,
+      "volume": "18",
+      "issue": "1",
+      "pages": "175-189",
       "geo": [
         "GSE201356"
       ]

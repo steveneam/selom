@@ -117,21 +117,10 @@ export async function extractPaper(file: File): Promise<ExtractResult> {
   return (await res.json()) as ExtractResult;
 }
 
-/** A compact author display: "Cioanca, Wooff, … +4" (first two surnames, then the remainder count). */
-export function authorSummary(authors: string[] | null | undefined): string {
-  if (!authors || authors.length === 0) return "";
-  const surname = (a: string) => a.trim().split(/\s+/).pop() ?? a;
-  if (authors.length <= 2) return authors.map(surname).join(", ");
-  return `${surname(authors[0])}, ${surname(authors[1])} +${authors.length - 2}`;
-}
-
-/** A compact citation line: "J. Extracellular Vesicles · 12(12):e12393 · 2023" (skips missing parts). */
-export function citationLine(m: PaperMetadata | null | undefined): string {
-  if (!m) return "";
-  const vi = [m.volume, m.issue ? `(${m.issue})` : ""].filter(Boolean).join("");
-  const volPart = [vi, m.pages].filter(Boolean).join(":");
-  return [m.venue, volPart, m.year].filter(Boolean).join(" · ");
-}
+// Bibliographic formatters live in the shared paper-metadata module (the one representation used by
+// Skill Match, Reproduction, and Recover data — spec §10). Re-exported here so existing imports keep
+// working while the canonical home is `@/lib/paper/metadata`.
+export { authorSummary, citationLine } from "@/lib/paper/metadata";
 
 /**
  * A compact, realistic sample (a developing-retina multi-omic paper, Dorgau-shaped): an in-scope

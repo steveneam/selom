@@ -17,7 +17,7 @@ import {
 import { useCatalog } from "@/lib/catalog/registry";
 import { skillColor } from "@/lib/catalog/modality";
 import type { SkillCatalogEntry } from "@/lib/catalog/types";
-import { authorSummary, citationLine, oosLabel } from "@/lib/skill-match/api";
+import { oosLabel } from "@/lib/skill-match/api";
 import { useWorkspace, workspaceStore, wselect } from "@/lib/workspace/store";
 import {
   KIND_LABEL,
@@ -29,6 +29,8 @@ import type { SavedPaper, SavedSupplement, SupplementKind } from "@/lib/workspac
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dropzone } from "@/components/project/dropzone";
+import { PaperPipeline } from "@/components/paper/pipeline";
+import { PaperMetaHeader } from "@/components/paper/paper-meta-header";
 
 /**
  * The per-paper Reproduction WORKSPACE — the pre-reproduction state of the same page family as
@@ -74,7 +76,24 @@ export function PaperWorkspace({ id }: { id: string }) {
         Library
       </Link>
 
-      <Header paper={paper} />
+      {/* The shared workflow pipeline — you're at the Reproduce stage (carried from Skill Match).
+          Click the "Skill Match" pill to jump back to the match this paper was derived from. */}
+      <PaperPipeline
+        current="reproduce"
+        className="mt-4"
+        links={{ "skill-match": `/skill-match/${paper.id}` }}
+      />
+
+      <PaperMetaHeader
+        meta={paper}
+        filename={paper.filename}
+        className="mt-6"
+        eyebrow={
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/80">
+            Reproduction · carried from Skill Match
+          </p>
+        }
+      />
 
       <AwaitingScore />
 
@@ -86,57 +105,6 @@ export function PaperWorkspace({ id }: { id: string }) {
 
       <AwaitingHeatmap />
     </div>
-  );
-}
-
-/** Mirrors PaperDetail's header — label, balanced title, identifier chips — plus the "carried over" cue. */
-function Header({ paper }: { paper: SavedPaper }) {
-  const authors = authorSummary(paper.authors);
-  const cite = citationLine(paper);
-  return (
-    <header className="mt-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/80">
-        Reproduction · carried from Skill Match
-      </p>
-      <h1 className="mt-2 max-w-3xl text-balance text-2xl font-semibold leading-tight text-foreground">
-        {paper.title || paper.filename}
-      </h1>
-      {(authors || cite) && (
-        <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">
-          {[authors, cite].filter(Boolean).join(" · ")}
-        </p>
-      )}
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        {paper.doi && (
-          <a
-            href={`https://doi.org/${paper.doi}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="tabular inline-flex items-center gap-0.5 underline-offset-2 hover:text-foreground hover:underline"
-          >
-            DOI <ArrowUpRight className="size-3" />
-          </a>
-        )}
-        {paper.pmid && (
-          <a
-            href={`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="tabular inline-flex items-center gap-0.5 underline-offset-2 hover:text-foreground hover:underline"
-          >
-            PMID {paper.pmid} <ArrowUpRight className="size-3" />
-          </a>
-        )}
-        {paper.isPreprint && (
-          <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 font-medium text-amber-600 dark:text-amber-400">
-            preprint
-          </span>
-        )}
-        <span className="tabular truncate" title={paper.filename}>
-          {paper.filename}
-        </span>
-      </div>
-    </header>
   );
 }
 

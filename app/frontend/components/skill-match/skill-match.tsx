@@ -1,15 +1,18 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { useReducedMotion } from "motion/react";
-import { FileText, Loader2, Play, ScrollText } from "lucide-react";
+import { FileText, FlaskConical, Loader2, Play, ScrollText } from "lucide-react";
 
 import { Dropzone } from "@/components/project/dropzone";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { extractPaper, routePaper, SAMPLE_TEXT } from "@/lib/skill-match/api";
+import { PaperPipeline } from "@/components/paper/pipeline";
+import { PaperMetaHeader } from "@/components/paper/paper-meta-header";
+import { extractPaper, routePaper, SAMPLE_TEXT, toSavedPaper } from "@/lib/skill-match/api";
+import { workspaceStore } from "@/lib/workspace/store";
 import type { ExtractResult, FeasibilityMap } from "@/lib/skill-match/types";
-import { MetadataCard } from "./metadata-card";
 import { RoutingProgress } from "./routing-progress";
 import { SkillMatchResults } from "./skill-match-results";
 
@@ -52,6 +55,17 @@ export function SkillMatch() {
 
   const busy = phase !== "idle";
   const reduce = useReducedMotion();
+  const router = useRouter();
+
+  // The pipeline's forward step (umbrella stage 1 → stage 2): save this match as the Paper anchor
+  // (idempotent on doi||filename) and carry it into the Reproduction workspace — no re-drop.
+  function handleReproduce() {
+    if (!map) return;
+    const saved = workspaceStore.savePaper(
+      toSavedPaper(map, result?.metadata ?? null, result?.filename ?? "paper"),
+    );
+    router.push(`/reproduction/paper/${saved.id}`);
+  }
 
   // Revoke the object URL when it changes or on unmount (no leaked blobs).
   React.useEffect(() => {
@@ -120,8 +134,37 @@ export function SkillMatch() {
   return (
     <div className="space-y-6">
       {/* Header swaps from the lead-in to the paper's metadata once a PDF is loaded — the layout
-          shifts up, the explainer retires, and the record of what you dropped takes its place. */}
-      {hasPaper ? result && <MetadataCard result={result} /> : <Intro />}
+          shifts up, the explainer retires, and the record of what you dropped takes its place. The
+          pipeline sits ABOVE the metadata so the Skill Match → Reproduce → Score workflow reads as
+          one pipeline, with "Reproduce" as the forward step (enabled once the match has run). */}
+      {hasPaper ? (
+        result && (
+          <>
+            <PaperPipeline
+              current="skill-match"
+              forward={{
+                label: "Reproduce",
+                icon: FlaskConical,
+                onClick: handleReproduce,
+                disabled: !map,
+                title: map
+                  ? "Save this paper and open it in Reproduction to add supplementary data"
+                  : "Run the match first, then carry the paper into Reproduction",
+              }}
+            />
+            <PaperMetaHeader
+              meta={
+                result.metadata
+                  ? { ...result.metadata, isPreprint: result.metadata.is_preprint }
+                  : null
+              }
+              filename={result.filename}
+            />
+          </>
+        )
+      ) : (
+        <Intro />
+      )}
 
       {hasPaper ? (
         /* Paper loaded → a fixed-height two-pane row: the viewer is favoured (1.6fr) and gets the
