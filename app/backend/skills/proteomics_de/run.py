@@ -1,11 +1,12 @@
 """Proteomics differential abundance — intensity matrix to volcano.
 
 Real path (``run_real.py``): log2 + median-normalize an intensity matrix, filter
-sparse proteins, mean-impute residual missing values, run a per-protein Welch t-test
-between two sample groups, and Benjamini-Hochberg adjust. Proteomics-native stats on
-log-intensities — distinct from the count-based ``deg`` skill. The stub is a
-deterministic volcano. Both reuse the ``volcano`` skill's ``_assemble``, so the figure
-is identical in shape and picks up the same publication theme.
+sparse proteins, fill residual dropouts (``missing``: mean | mindet | minprob), run a
+per-protein Welch or empirical-Bayes moderated t-test between two sample groups, and
+Benjamini-Hochberg adjust. Proteomics-native stats on log-intensities — distinct from
+the count-based ``deg`` skill. The stub is a deterministic volcano. Both reuse the
+``volcano`` skill's ``_assemble``, so the figure is identical in shape and picks up the
+same publication theme.
 """
 
 import math

@@ -126,3 +126,65 @@ def test_moderated_mode_runs_via_skill():
         if tr.get("mode") == "text":
             labels |= {str(t) for t in tr["text"]}
     assert set(UP) | set(DOWN) <= labels, "moderated mode should still recover the planted DE"
+
+
+def test_impute_mean_default_matches_prior_row_mean():
+    """The default ``mean`` mode must reproduce the prior per-protein-row mean impute exactly,
+    so verified outputs stay byte-identical."""
+    from skills.proteomics_de.run_real import _impute
+
+    M = np.array([[1.0, np.nan, 3.0], [np.nan, 2.0, 4.0]])
+    got = _impute(M, "mean", np)
+    exp = M.copy()
+    rowmean = np.nanmean(M, axis=1)
+    exp[0, 1] = rowmean[0]
+    exp[1, 0] = rowmean[1]
+    assert np.allclose(got, exp)
+    assert np.isfinite(got).all()
+
+
+def test_impute_mindet_fills_from_low_detection_tail():
+    """``mindet`` is left-censored per sample: a high protein dropping out in one sample is
+    filled from that sample's low tail — NOT the protein's high row mean (the MNAR fix)."""
+    from skills.proteomics_de.run_real import _impute
+
+    # protein 0 is high (8) but missing in sample col 2, whose other proteins are low (2,3)
+    M = np.array([[8.0, 8.0, np.nan], [1.0, 2.0, 3.0], [0.5, 1.0, 2.0]])
+    mindet = _impute(M, "mindet", np)
+    mean = _impute(M, "mean", np)
+    assert mean[0, 2] == 8.0, "mean impute fills the dropout with the protein's high row mean"
+    assert mindet[0, 2] < 3.0, "mindet fills from the sample's low detection tail, not the high mean"
+    assert mindet[0, 2] < mean[0, 2], "left-censored fill must be below the mean fill (preserves MNAR FC)"
+
+
+def test_impute_minprob_is_deterministic_and_downshifted():
+    """``minprob`` draws from a downshifted normal but is seeded -> reproducible across runs,
+    and lands below the sample's observed mean."""
+    from skills.proteomics_de.run_real import _impute
+
+    M = np.array([[5.0, 6.0, np.nan], [1.0, 2.0, 3.0], [2.0, 3.0, 4.0]])
+    a = _impute(M, "minprob", np)
+    b = _impute(M, "minprob", np)
+    assert np.allclose(a, b), "seeded minprob must be reproducible"
+    assert np.isfinite(a).all()
+    col2_obs_mean = np.nanmean(np.array([3.0, 4.0]))  # observed entries of sample col 2
+    assert a[0, 2] < col2_obs_mean, "downshifted draw should sit below the observed mean"
+
+
+def test_mindet_mode_runs_via_skill():
+    fd, path = tempfile.mkstemp(suffix=".csv")
+    os.close(fd)
+    try:
+        _synthetic_csv(path)
+        fig = run_skill(
+            "proteomics_de", path,
+            {"group_a": "A", "group_b": "B", "log_input": True, "missing": "mindet", "top_n": 40},
+        )
+    finally:
+        os.unlink(path)
+
+    labels = set()
+    for tr in fig["data"]:
+        if tr.get("mode") == "text":
+            labels |= {str(t) for t in tr["text"]}
+    assert set(UP) | set(DOWN) <= labels, "mindet mode should still recover the planted DE"

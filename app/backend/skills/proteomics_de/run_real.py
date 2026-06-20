@@ -2,11 +2,17 @@
 
 Reads an intensity matrix (proteins x samples; first column = protein/gene id),
 log2-transforms and median-normalizes the samples, filters proteins that are too
-sparse, mean-imputes residual missing values within each group, then runs a
-per-protein Welch t-test (unequal variance) between two sample groups with
-Benjamini-Hochberg FDR. Emits the same volcano spec as the ``volcano`` skill via
-its ``_assemble``. Stats are proteomics-native (log-intensity), so this is distinct
-from the count-based ``deg`` skill while sharing the figure.
+sparse, fills residual missing values per the chosen ``missing`` strategy, then runs a
+per-protein Welch or empirical-Bayes moderated t-test (unequal variance) between two
+sample groups with Benjamini-Hochberg FDR. Emits the same volcano spec as the
+``volcano`` skill via its ``_assemble``. Stats are proteomics-native (log-intensity),
+so this is distinct from the count-based ``deg`` skill while sharing the figure.
+
+Missing-value handling (``missing``): proteomics dropouts are mostly MNAR (below the
+run's detection limit), so the default per-protein **mean** impute biases real
+fold-changes toward zero. ``mindet`` / ``minprob`` instead fill from each sample's low
+(detection-limit) tail — the Perseus/limma-recommended left-censored treatment — which
+preserves true MNAR effects. Defaults to ``mean`` so verified outputs stay unchanged.
 """
 
 import re
@@ -46,8 +52,9 @@ def run(data_path: str, params: dict) -> dict:
     min_valid = float(params.get("min_valid", 0.5))
     keep = (np.isfinite(A).mean(axis=1) >= min_valid) & (np.isfinite(B).mean(axis=1) >= min_valid)
 
-    # mean-impute residual dropouts within each group so a few missing values don't bias the FC
-    A, B = _impute_rows(A, np), _impute_rows(B, np)
+    # fill residual dropouts per the chosen strategy (mean = default; mindet/minprob = MNAR-aware)
+    miss_mode = str(params.get("missing") or "mean").lower()
+    A, B = _impute(A, miss_mode, np), _impute(B, miss_mode, np)
 
     mode = str(params.get("stats") or "welch").lower()
     if mode == "moderated":
@@ -80,19 +87,50 @@ def run(data_path: str, params: dict) -> dict:
         labels = [(round(float(lfc[i]), 4), round(float(nlp[i]), 4), str(genes.iloc[i])) for i in order]
 
     stat_label = "moderated t" if mode == "moderated" else "Welch t"
+    imp_label = "" if miss_mode == "mean" else f", {miss_mode} impute"
     title = (
         f"Proteomics differential abundance — {len(cols_a)}v{len(cols_b)} samples, "
-        f"{int(keep.sum())} proteins ({stat_label})"
+        f"{int(keep.sum())} proteins ({stat_label}{imp_label})"
     )
     return _assemble(up, down, ns, labels, fc_t, y_cut, title)
 
 
-def _impute_rows(M, np):
-    """Replace NaNs with the finite row mean (per group)."""
+def _impute(M, mode, np):
+    """Fill missing (NaN) intensities per the chosen strategy.
+
+    - ``mean`` (default): per-protein (row) group mean. Simple, but biases MNAR dropouts
+      toward the observed mean, shrinking real fold-changes (the limma/Perseus caution).
+    - ``mindet``: per-sample (column) deterministic left-censored — fill with the low (1%)
+      quantile of that sample's observed intensities, a detection-limit proxy.
+    - ``minprob``: per-sample downshifted-normal draw (Perseus: mean-1.8*sd, width 0.3*sd),
+      seeded so the run is reproducible.
+
+    Left-censored modes operate per sample (column) because MNAR is a per-run detection
+    limit, independent of group. ``mean`` reproduces the prior behaviour exactly.
+    """
+    mode = (mode or "mean").lower()
     M = M.copy()
-    means = np.nanmean(M, axis=1)
-    bad = np.where(~np.isfinite(M))
-    M[bad] = np.take(means, bad[0])
+    if mode == "mean":
+        means = np.nanmean(M, axis=1)
+        bad = np.where(~np.isfinite(M))
+        M[bad] = np.take(means, bad[0])
+        return M
+
+    rng = np.random.default_rng(0) if mode == "minprob" else None
+    for j in range(M.shape[1]):
+        col = M[:, j]
+        miss = ~np.isfinite(col)
+        if not miss.any():
+            continue
+        obs = col[~miss]
+        if obs.size == 0:
+            continue  # whole sample missing -> leave as NaN (filtered downstream)
+        if mode == "mindet":
+            col[miss] = float(np.quantile(obs, 0.01))
+        else:  # minprob
+            sd = float(obs.std())
+            sd = sd if sd > 0 else 1e-6
+            col[miss] = rng.normal(float(obs.mean()) - 1.8 * sd, 0.3 * sd, size=int(miss.sum()))
     return M
 
 
