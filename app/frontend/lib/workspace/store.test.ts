@@ -149,6 +149,55 @@ describe("workspaceStore — savePaper (idempotent)", () => {
   });
 });
 
+describe("workspaceStore — paper supplements (Reproduction stage 2)", () => {
+  const base = {
+    filename: "JEV.pdf",
+    title: "EV paper",
+    skills: ["deg", "volcano"],
+    outOfScope: ["wet_lab"],
+    figureCount: 8,
+    tierSummary: { structured: 6, recovered: 2 },
+  };
+
+  it("adds supplements to a paper, deduped on filename (case-insensitive)", async () => {
+    const { workspaceStore, wselect } = await freshStore();
+    const p = workspaceStore.savePaper(base);
+    workspaceStore.addPaperSupplements(p.id, [
+      { filename: "mmc2.xlsx", kind: "xlsx", size: 1000 },
+      { filename: "methods.pdf", kind: "pdf" },
+    ]);
+    workspaceStore.addPaperSupplements(p.id, [{ filename: "MMC2.XLSX", kind: "xlsx" }]); // dup
+    const supp = wselect.paper(workspaceStore.getSnapshot(), p.id)?.supplements ?? [];
+    expect(supp.map((s) => s.filename)).toEqual(["mmc2.xlsx", "methods.pdf"]);
+    expect(supp[0].id).toMatch(/^supp_/);
+  });
+
+  it("returns undefined when the paper isn't in the Library", async () => {
+    const { workspaceStore } = await freshStore();
+    expect(workspaceStore.addPaperSupplements("nope", [{ filename: "x.csv", kind: "csv" }])).toBeUndefined();
+  });
+
+  it("removePaperSupplement detaches one file by id", async () => {
+    const { workspaceStore, wselect } = await freshStore();
+    const p = workspaceStore.savePaper(base);
+    workspaceStore.addPaperSupplements(p.id, [
+      { filename: "a.csv", kind: "csv" },
+      { filename: "b.xlsx", kind: "xlsx" },
+    ]);
+    const first = wselect.paper(workspaceStore.getSnapshot(), p.id)!.supplements![0];
+    workspaceStore.removePaperSupplement(p.id, first.id);
+    const left = wselect.paper(workspaceStore.getSnapshot(), p.id)?.supplements ?? [];
+    expect(left.map((s) => s.filename)).toEqual(["b.xlsx"]);
+  });
+
+  it("wselect.paper finds a saved paper by id", async () => {
+    const { workspaceStore, wselect } = await freshStore();
+    const p = workspaceStore.savePaper(base);
+    expect(wselect.paper(workspaceStore.getSnapshot(), p.id)?.id).toBe(p.id);
+    expect(wselect.paper(workspaceStore.getSnapshot(), "missing")).toBeUndefined();
+  });
+});
+
 describe("workspaceStore — gene sets + skills", () => {
   it("saveGeneSet is idempotent on createdFrom", async () => {
     const { workspaceStore } = await freshStore();

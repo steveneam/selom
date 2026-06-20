@@ -15,6 +15,30 @@
 import type { GeneSet } from "@/lib/projects/types";
 
 /**
+ * The kind of a supplementary file, mirroring the backend ingest contract
+ * (app/backend/extract/ingest.py): a PDF supplement carries *extended methods*; an Excel or
+ * CSV supplement carries *supplementary tables* (the golden numbers like ST2 / ST6 the
+ * Reproduction engine matches against).
+ */
+export type SupplementKind = "pdf" | "xlsx" | "csv";
+
+/**
+ * One supplementary file attached to a saved paper during the Reproduction stage (the umbrella
+ * §10 stage-2 input the owner asked for). Compact metadata only — NO bytes / object URL
+ * (spec I5); the dropped `File` lives in session state for the later live drive, while this
+ * record (filename + kind + size) persists on the Paper anchor so the Library remembers what
+ * the user attached.
+ */
+export interface SavedSupplement {
+  id: string;
+  filename: string;
+  kind: SupplementKind;
+  /** Bytes — for display only. */
+  size?: number;
+  addedAt: number;
+}
+
+/**
  * A saved Skill-Match result — the paper's metadata + its routed skill summary, kept so
  * the user can revisit "what skills does this paper need" without re-dropping the PDF.
  * Compact by design (no PDF bytes, no object URL — those are session-only; spec I5).
@@ -50,6 +74,9 @@ export interface SavedPaper {
   //    anchor extends without a type migration. Stage 2/3 will populate these. ──
   /** A reproduction ledger ref once the paper flows into Reproduction (stage 2). */
   reproductionId?: string;
+  /** Supplementary files attached in the Reproduction stage (stage 2) — Excel / CSV tables +
+   *  extended-methods PDFs. Metadata only (no bytes; spec I5). */
+  supplements?: SavedSupplement[];
   /** Recovered-figure ids saved from the in-viewer region grab (stage 3). */
   recoveredFigures?: string[];
 }

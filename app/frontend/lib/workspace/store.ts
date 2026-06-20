@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import type { GeneSet, ProjectState, SkillInstall } from "@/lib/projects/types";
-import type { SavedPaper, WorkspaceSkill, WorkspaceState } from "./types";
+import type { SavedPaper, SavedSupplement, WorkspaceSkill, WorkspaceState } from "./types";
 
 /**
  * Mock `WorkspaceStore` — the localStorage-backed implementation of the project- and
@@ -163,6 +163,40 @@ export const workspaceStore = {
     setState({ ...state, papers: [paper, ...state.papers] });
   },
 
+  // ── paper supplements (Reproduction stage 2; docs/workspace-library/spec.md §10) ──────────
+  /** Attach supplementary files to a saved paper (metadata only — no bytes, spec I5). Deduped on
+   *  filename within the paper so re-dropping the same file is a no-op. Returns the updated paper
+   *  (or undefined if the paper isn't in the Library). */
+  addPaperSupplements(
+    paperId: string,
+    items: Omit<SavedSupplement, "id" | "addedAt">[],
+  ): SavedPaper | undefined {
+    const paper = state.papers.find((p) => p.id === paperId);
+    if (!paper) return undefined;
+    const have = new Set((paper.supplements ?? []).map((s) => s.filename.toLowerCase()));
+    const added: SavedSupplement[] = [];
+    for (const it of items) {
+      const fn = it.filename.toLowerCase();
+      if (have.has(fn)) continue;
+      have.add(fn);
+      added.push({ ...it, id: uid("supp"), addedAt: Date.now() });
+    }
+    if (added.length === 0) return paper;
+    const updated: SavedPaper = { ...paper, supplements: [...(paper.supplements ?? []), ...added] };
+    setState({ ...state, papers: state.papers.map((p) => (p.id === paperId ? updated : p)) });
+    return updated;
+  },
+  /** Detach one supplement from a paper by its id. */
+  removePaperSupplement(paperId: string, supplementId: string) {
+    const paper = state.papers.find((p) => p.id === paperId);
+    if (!paper || !paper.supplements) return;
+    const updated: SavedPaper = {
+      ...paper,
+      supplements: paper.supplements.filter((s) => s.id !== supplementId),
+    };
+    setState({ ...state, papers: state.papers.map((p) => (p.id === paperId ? updated : p)) });
+  },
+
   // ── gene sets ──────────────────────────────────────────────────────────────
   /** Save a gene set into the workspace (idempotent on the source catalog id). */
   saveGeneSet(set: Omit<GeneSet, "id" | "projectId" | "createdAt">): GeneSet {
@@ -194,6 +228,7 @@ export const workspaceStore = {
 // ── selectors (pure) ───────────────────────────────────────────────────────────
 export const wselect = {
   papers: (s: WorkspaceState) => s.papers,
+  paper: (s: WorkspaceState, id: string) => s.papers.find((p) => p.id === id),
   geneSets: (s: WorkspaceState) => s.geneSets,
   skills: (s: WorkspaceState) => s.skills,
   installedSkillIds: (s: WorkspaceState) => new Set(s.skills.map((x) => x.skillId)),

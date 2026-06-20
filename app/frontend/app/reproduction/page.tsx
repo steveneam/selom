@@ -1,4 +1,5 @@
 import { Spectrum } from "@/components/reproduction/spectrum";
+import { YourReproductions } from "@/components/reproduction/your-reproductions";
 
 export const metadata = { title: "Reproduction — Selom" };
 
@@ -24,6 +25,8 @@ export default function ReproductionPage() {
       <div className="mt-10">
         <Spectrum />
       </div>
+
+      <YourReproductions />
     </div>
   );
 }

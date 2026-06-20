@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, useReducedMotion, type Variants } from "motion/react";
 import { ArrowUpRight, Bookmark, BookmarkCheck, Boxes, Check, Copy, Download, FlaskConical, Lock, Sparkles, TriangleAlert } from "lucide-react";
 
@@ -197,6 +198,7 @@ export function SkillMatchResults({
         )}
         <div className="flex shrink-0 items-center gap-1.5">
           <SaveToLibrary map={map} meta={meta} filename={filename ?? "paper"} />
+          <OpenInReproduction map={map} meta={meta} filename={filename ?? "paper"} />
           <ExportControls data={exportData} />
         </div>
       </div>
@@ -419,6 +421,39 @@ function SaveToLibrary({
     >
       {inLibrary ? <BookmarkCheck className="text-primary" /> : <Bookmark />}
       {inLibrary ? "Saved" : "Save to Library"}
+    </Button>
+  );
+}
+
+/**
+ * "Open in Reproduction" — the umbrella stage-1 → stage-2 handoff. Saves this match as a
+ * `SavedPaper` (idempotent on `doi || filename`, the same anchor as Save to Library) and routes to
+ * its per-paper Reproduction workspace, so the paper carries over without re-dropping the PDF and the
+ * user adds the supplementary data there.
+ */
+function OpenInReproduction({
+  map,
+  meta,
+  filename,
+}: {
+  map: FeasibilityMap;
+  meta?: PaperMetadata | null;
+  filename: string;
+}) {
+  const router = useRouter();
+  function open() {
+    const saved = workspaceStore.savePaper(toSavedPaper(map, meta, filename));
+    router.push(`/reproduction/paper/${saved.id}`);
+  }
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={open}
+      title="Save this paper and open it in Reproduction to add supplementary data"
+    >
+      <FlaskConical />
+      Reproduce
     </Button>
   );
 }

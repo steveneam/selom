@@ -19,6 +19,8 @@ import { cn } from "@/lib/cn";
  */
 export function Dropzone({
   onFile,
+  onFiles,
+  multiple = false,
   accept,
   title,
   hint,
@@ -27,7 +29,11 @@ export function Dropzone({
   variant = "primary",
   className,
 }: {
-  onFile: (file: File) => void;
+  /** Single-file callback (the default). Ignored when `multiple` + `onFiles` are supplied. */
+  onFile?: (file: File) => void;
+  /** Multi-file callback — receives every dropped/selected file at once. Requires `multiple`. */
+  onFiles?: (files: File[]) => void;
+  multiple?: boolean;
   accept: string;
   title: string;
   hint: string;
@@ -46,6 +52,14 @@ export function Dropzone({
     setDragging(false);
   }
 
+  /** Route a FileList to the right callback — every file when multi, otherwise just the first. */
+  function emit(list: FileList | null | undefined) {
+    const files = list ? Array.from(list) : [];
+    if (files.length === 0) return;
+    if (multiple && onFiles) onFiles(files);
+    else onFile?.(files[0]);
+  }
+
   return (
     <label
       onDragEnter={(e) => {
@@ -62,8 +76,7 @@ export function Dropzone({
       onDrop={(e) => {
         e.preventDefault();
         reset();
-        const f = e.dataTransfer.files?.[0];
-        if (f) onFile(f);
+        emit(e.dataTransfer.files);
       }}
       className={cn(
         "group relative block cursor-pointer overflow-hidden rounded-2xl border border-dashed transition-colors duration-200",
@@ -78,11 +91,11 @@ export function Dropzone({
       <input
         type="file"
         accept={accept}
+        multiple={multiple}
         aria-label={title}
         className="sr-only"
         onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onFile(f);
+          emit(e.target.files);
           e.target.value = "";
         }}
       />

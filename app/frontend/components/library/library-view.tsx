@@ -215,6 +215,7 @@ function PaperRow({
   const cite = citationLine(paper);
   const authors = authorSummary(paper.authors);
   const installedN = paper.skills.filter((s) => installed.has(s)).length;
+  const nSupp = (paper.supplements ?? []).length;
 
   function remove() {
     const removed = workspaceStore.removePaper(paper.id);
@@ -249,6 +250,12 @@ function PaperRow({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/reproduction/paper/${paper.id}`} title="Open in Reproduction to add supplementary data and reproduce its figures">
+              <FlaskConical className="size-4" />
+              Reproduce
+            </Link>
+          </Button>
           <PaperExport paper={paper} nameOf={name} installed={installed} />
           <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-destructive" onClick={remove} aria-label="Remove from Library" title="Remove from Library">
             <Trash2 className="size-4" />
@@ -264,6 +271,12 @@ function PaperRow({
           <span className="font-medium text-foreground/80">{installedN}/{paper.skills.length}</span> installed
           {" · "}
           <span className="font-medium text-foreground/80">{paper.figureCount}</span> figure{paper.figureCount === 1 ? "" : "s"}
+          {nSupp > 0 && (
+            <>
+              {" · "}
+              <span className="font-medium text-foreground/80">{nSupp}</span> supplement{nSupp === 1 ? "" : "s"}
+            </>
+          )}
           {(paper.tierSummary.structured + paper.tierSummary.recovered) > 0 && (
             <>
               {" · "}
