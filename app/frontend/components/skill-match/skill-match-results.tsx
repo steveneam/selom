@@ -3,11 +3,12 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion, useReducedMotion, type Variants } from "motion/react";
-import { ArrowUpRight, Boxes, Check, Download, FlaskConical, Lock, Sparkles, TriangleAlert } from "lucide-react";
+import { ArrowUpRight, Boxes, Check, Copy, Download, FlaskConical, Lock, Sparkles, TriangleAlert } from "lucide-react";
 
 import { useCatalog } from "@/lib/catalog/registry";
 import { skillColor, skillIcon } from "@/lib/catalog/modality";
 import type { SkillCatalogEntry } from "@/lib/catalog/types";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { SkillDetail } from "@/components/store/skill-detail";
 import {
@@ -20,7 +21,14 @@ import {
   reviewCount,
   tierMeta,
 } from "@/lib/skill-match/api";
-import type { FeasibilityMap, FigureRoute } from "@/lib/skill-match/types";
+import {
+  exportFilename,
+  toCSV,
+  toTSV,
+  type ExportFigureRow,
+  type SkillMatchExport,
+} from "@/lib/skill-match/export";
+import type { FeasibilityMap, FigureRoute, PaperMetadata } from "@/lib/skill-match/types";
 import { cn } from "@/lib/cn";
 
 /** A translucent fill + readable border/text from one accent hex (the repo's Badge house style). */
@@ -97,7 +105,15 @@ function SkillChip({
   );
 }
 
-export function SkillMatchResults({ map }: { map: FeasibilityMap }) {
+export function SkillMatchResults({
+  map,
+  meta,
+  filename,
+}: {
+  map: FeasibilityMap;
+  meta?: PaperMetadata | null;
+  filename?: string;
+}) {
   const reduce = useReducedMotion();
   const { catalog } = useCatalog();
   // Installed = a verified catalog runner; match on the bare slug (catalog ids are `source.slug`).
@@ -110,6 +126,41 @@ export function SkillMatchResults({ map }: { map: FeasibilityMap }) {
     for (const e of catalog) m.set(e.id.split(".").pop(), e);
     return m;
   }, [catalog]);
+
+  // The export payload — catalog display names resolved the same way the chips show them, so a Copy /
+  // CSV reads identically to the screen. Pure + offline (lib/skill-match/export).
+  const exportData: SkillMatchExport = React.useMemo(() => {
+    const name = (slug: string) => bySlug.get(slug)?.name ?? slug;
+    const figures: ExportFigureRow[] = map.figures.map((fr) => {
+      const v = figureView(fr);
+      return {
+        figure: fr.figure,
+        skills: v.inScope ? [v.primary, ...v.also].map(name) : [],
+        tier: tierMeta(fr.tier).label,
+        confidencePct: Math.round(fr.confidence * 100),
+        attribution: ATTRIBUTION_LABEL[fr.attribution] ?? fr.attribution,
+        outOfScope: v.oos.map(oosLabel),
+      };
+    });
+    return {
+      paper: {
+        title: meta?.title ?? null,
+        authors: meta?.authors ?? null,
+        venue: meta?.venue ?? null,
+        year: meta?.year ?? null,
+        volume: meta?.volume ?? null,
+        issue: meta?.issue ?? null,
+        pages: meta?.pages ?? null,
+        doi: meta?.doi ?? null,
+        pmid: meta?.pmid ?? null,
+        filename: filename ?? "paper",
+      },
+      skills: map.skills.map((s) => ({ name: name(s), slug: s, installed: installed.has(s) })),
+      outOfScope: map.out_of_scope.map(oosLabel),
+      figures,
+      unmatchedTerms: map.unmatched_terms,
+    };
+  }, [map, meta, filename, bySlug, installed]);
 
   // Staggered reveal — the skills "appear as it runs". Reduced-motion → empty states = instant.
   const container: Variants = {
@@ -130,17 +181,20 @@ export function SkillMatchResults({ map }: { map: FeasibilityMap }) {
 
   return (
     <div className="space-y-4">
-      {hasFigs && (
-        <div role="tablist" aria-label="Skill-match results" className="inline-flex rounded-lg border border-border bg-card p-0.5 text-xs">
-          <TabButton active={tab === "overview"} onClick={() => setTab("overview")}>
-            Overview
-          </TabButton>
-          <TabButton active={tab === "figures"} onClick={() => setTab("figures")}>
-            Per-figure
-            <span className="ml-1.5 tabular opacity-70">{map.figures.length}</span>
-          </TabButton>
-        </div>
-      )}
+      <div className={cn("flex items-center gap-3", hasFigs ? "justify-between" : "justify-end")}>
+        {hasFigs && (
+          <div role="tablist" aria-label="Skill-match results" className="inline-flex rounded-lg border border-border bg-card p-0.5 text-xs">
+            <TabButton active={tab === "overview"} onClick={() => setTab("overview")}>
+              Overview
+            </TabButton>
+            <TabButton active={tab === "figures"} onClick={() => setTab("figures")}>
+              Per-figure
+              <span className="ml-1.5 tabular opacity-70">{map.figures.length}</span>
+            </TabButton>
+          </div>
+        )}
+        <ExportControls data={exportData} />
+      </div>
 
       {!hasFigs || tab === "overview" ? (
         <motion.div key="overview" className="space-y-6" variants={container} initial="hidden" animate="show">
@@ -262,6 +316,68 @@ function TabButton({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * Copy (TSV → clipboard, pastes into Excel/Sheets) + Download CSV of the whole routing result —
+ * paper metadata + skill inventory + per-figure routing. Pure, client-side, offline (the data is
+ * already here); a true multi-sheet .xlsx can come later from a small backend openpyxl endpoint.
+ */
+function ExportControls({ data }: { data: SkillMatchExport }) {
+  const [copied, setCopied] = React.useState(false);
+
+  async function copy() {
+    const tsv = toTSV(data);
+    try {
+      await navigator.clipboard.writeText(tsv);
+    } catch {
+      // Non-secure-context fallback.
+      const ta = document.createElement("textarea");
+      ta.value = tsv;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+      } catch {
+        /* clipboard unavailable — nothing we can do */
+      }
+      ta.remove();
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  }
+
+  function download() {
+    const blob = new Blob([toCSV(data)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = exportFilename(data);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="flex shrink-0 items-center gap-1.5">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={copy}
+        title="Copy as TSV — paste straight into Excel or Google Sheets"
+      >
+        {copied ? <Check className="text-emerald-500" /> : <Copy />}
+        {copied ? "Copied" : "Copy"}
+      </Button>
+      <Button variant="outline" size="sm" onClick={download} title="Download the result as a CSV file">
+        <Download />
+        CSV
+      </Button>
+    </div>
   );
 }
 
