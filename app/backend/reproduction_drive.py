@@ -1,0 +1,270 @@
+"""Live-reproduction drive — orchestrate the existing pieces into one ``reproduce()`` (umbrella step c).
+
+Drop a paper + its supplements, get a graded two-axis scorecard. This module is **orchestration, not
+new engine** (``docs/reproduction-engine/live-reproduction-spec.md`` §3-4): it composes already-built
+parts —
+
+  ingest (``extract.ingest.ingest_paper``)
+    → route + extract goldens, MERGED into one drivable ledger (gap #1)
+    → match a data file per panel (gap #2)
+    → run the matched skill + READ its golden metric back (``extract.readers``, gap #3)
+    → grade what reproduced, and **honestly classify the rest**.
+
+The honest classification is the load-bearing part (invariants L2/L4): a panel we could not drive
+because of the paper or its data (``out_of_scope`` / ``no_golden`` / ``data_unmatched`` /
+``needs_recipe`` / ``run_failed``) is **greyed, excluded from the reproducibility rollup, and
+contributes ZERO Selom-confidence defects** — a hard paper never reads as a Selom failure, and no
+panel is silently dropped (every one gets a heatmap cell with its reason).
+
+v1 = the deterministic **floor**: default params + single run + read-back. The parameter *sweep*
+toward a golden and the AI *recipe proposal* are later increments (the floor never blocks on them).
+
+The skill run is injected (``runner=``) so the orchestration + classification are unit-testable
+without the scientific stack; the default runner executes the real skill. Library-only; no HTTP
+(that is ``main.py``'s job, build-plan phase 2).
+"""
+
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+import reproduction as R
+from extract.golden import build_extracted_spec, to_engine_panels
+from extract.ingest import SUPP_CSV, SUPP_XLSX, PaperBundle, ingest_paper
+from extract.readers import panel_extractor, panel_readings
+from extract.routing.engine import route_to_panels
+from extract.routing.route import route_text
+
+# --- per-panel drive outcomes (honest classification) -------------------------
+DRIVEN = "driven"                # ran + read ≥1 golden metric + validated → a real score
+NO_GOLDEN = "no_golden"          # in scope, skill matched, but the paper printed no number to score
+DATA_UNMATCHED = "data_unmatched"  # in scope, golden present, but no supplement feeds this skill
+NEEDS_RECIPE = "needs_recipe"    # ran, but no layer could read the golden metric from the output
+NO_SKILL = "no_skill"            # in-scope figure with no routed skill (purely-oos handled below)
+RUN_FAILED = "run_failed"        # the skill raised on the matched data (data/recipe issue, not a bug)
+OUT_OF_SCOPE = "out_of_scope"    # wet-lab / unsupported modality / data-not-deposited (greyed)
+
+# Outcomes that are *honest gaps*, never a Selom defect — they get a grey, excluded heatmap cell.
+_GREY = {NO_GOLDEN, DATA_UNMATCHED, NEEDS_RECIPE, NO_SKILL, RUN_FAILED, OUT_OF_SCOPE}
+
+
+class PanelDrive(BaseModel):
+    """The honest per-panel record of what the drive did (and didn't) — feeds the heatmap + report."""
+
+    panel_key: str
+    status: str
+    skill_id: str | None = None
+    data_ref: str = ""
+    metrics_read: list[str] = Field(default_factory=list)
+    note: str = ""
+
+
+class DriveResult(BaseModel):
+    """The driven ledger (same shape as ``GET /papers/{slug}``) + the per-panel drive report."""
+
+    ledger: R.Ledger
+    panel_drives: list[PanelDrive] = Field(default_factory=list)
+
+    @property
+    def summary(self) -> dict[str, int]:
+        out: dict[str, int] = {}
+        for d in self.panel_drives:
+            out[d.status] = out.get(d.status, 0) + 1
+        return out
+
+
+def _default_runner(skill_id: str, data_path: str, params: dict):
+    """Run the real skill → (figure, table). Lazy import keeps the orchestration import-light."""
+    from skills.contract import run_skill_with_table
+
+    return run_skill_with_table(skill_id, data_path, params)
+
+
+# --- gap #1: merge routing skill_ids + extracted goldens into one ledger ------
+
+
+def _fig_sort_key(panel: R.Panel):
+    """Figure order: numeric figures first (1,2,…), then any non-numeric, then panel letter."""
+    fig = panel.figure
+    num = int(fig) if str(fig).isdigit() else 10**6
+    return (num, str(fig), panel.panel)
+
+
+# A golden metric implies its skill class — and the schema inventory says DE counts read cleanly
+# only from `volcano`'s de_table (not `deg`), and PC variance only from `pca`. So a golden figure
+# whose per-figure route didn't assign a skill is backfilled from the metric it printed.
+_METRIC_SKILL = {
+    "de_total": "volcano", "de_up": "volcano", "de_down": "volcano",
+    "pc1_var": "pca", "pc2_var": "pca",
+}
+
+
+def _backfill_skill(panel: R.Panel) -> None:
+    """If a golden panel has no routed skill, infer it from the golden metric kind (in place)."""
+    if panel.skill_id or not panel.golden:
+        return
+    for gold in panel.golden:
+        sid = _METRIC_SKILL.get(gold.metric)
+        if sid:
+            panel.skill_id = sid
+            panel.note = (panel.note + "; " if panel.note else "") + \
+                f"skill inferred from golden '{gold.metric}' → {sid}"
+            return
+
+
+def build_merged_ledger(bundle: PaperBundle, paper_id: str, *, paper: R.Paper | None = None,
+                        index=None) -> R.Ledger:
+    """Compose the auto-routed figure→skill skeleton with the extracted printed-number goldens.
+
+    Both producers exist; this is the missing composition. Figures the paper printed an extractable
+    number for become **drivable golden panels** (skill_id from the route + the ``Golden``); figures
+    with a matched skill but no number stay as **no-golden** skill panels; purely out-of-scope
+    figures stay out-of-scope. A figure with goldens drops its bare skeleton panel so it is not
+    double-counted."""
+    fmap = route_text(bundle.text, paper_id=paper_id, index=index)
+    spec = build_extracted_spec(bundle, paper_id)
+    golden_panels = to_engine_panels(spec, feasibility=fmap)
+    for p in golden_panels:
+        _backfill_skill(p)
+    golden_figs = {p.figure for p in golden_panels}
+    skeleton = [p for p in route_to_panels(fmap) if p.figure not in golden_figs]
+    panels = sorted(golden_panels + skeleton, key=_fig_sort_key)
+    pid = paper_id or "auto"
+    paper = paper or R.Paper(
+        id=pid, slug=pid, title="(live reproduction drive)",
+        methods_digest={"skills": fmap.skills, "out_of_scope": fmap.out_of_scope},
+    )
+    return R.Ledger(paper=paper, panels=panels)
+
+
+# --- gap #2: match a data file to a panel -------------------------------------
+
+
+def _tabular_paths(bundle: PaperBundle) -> list[str]:
+    """Supplement paths that could BE the analysis data (xlsx/csv); PDFs are methods, not data."""
+    return [s.path for s in bundle.supplements if s.kind in (SUPP_XLSX, SUPP_CSV)]
+
+
+def match_data(panel: R.Panel, tabular: list[str], data_map: dict[str, str] | None) -> tuple[str | None, str]:
+    """Resolve the data file feeding this panel's skill → ``(path | None, note)``.
+
+    v1: an explicit per-panel ``data_map`` override (the data-picker fast-follow) wins; else the
+    single most-likely tabular supplement, honestly noting ambiguity when there is more than one;
+    else ``None`` (the caller marks ``data_unmatched``). Deliberately conservative — better an honest
+    "data not matched" than a wrong run."""
+    if data_map and panel.key in data_map:
+        return data_map[panel.key], "explicit data-map override"
+    if not tabular:
+        return None, "no tabular supplement attached"
+    if len(tabular) == 1:
+        return tabular[0], "single tabular supplement"
+    return tabular[0], f"first of {len(tabular)} tabular supplements (ambiguous — pick per panel)"
+
+
+# --- the per-panel drive ------------------------------------------------------
+
+
+def drive_panel(ledger: R.Ledger, panel: R.Panel, *, tabular: list[str],
+                data_map: dict[str, str] | None, runner, params: dict | None) -> PanelDrive:
+    """Drive one panel: classify → (maybe run) → read → (maybe validate). Honest, never a false fail.
+
+    Appends a ``ReproRun`` whenever the skill ran (so the FE can show the computed output even when
+    there is nothing to score), and a ``Validation`` only when a golden metric was actually read."""
+    key = panel.skill_id
+    if panel.scope in R.OUT_OF_SCOPE_SCOPES:
+        return PanelDrive(panel_key=panel.key, status=OUT_OF_SCOPE, skill_id=key,
+                          note=f"out-of-scope ({panel.scope})")
+    if not key:
+        return PanelDrive(panel_key=panel.key, status=NO_SKILL,
+                          note="in-scope figure with no routed skill")
+    data_path, data_note = match_data(panel, tabular, data_map)
+    if data_path is None:
+        status = DATA_UNMATCHED if panel.golden else NO_GOLDEN
+        return PanelDrive(panel_key=panel.key, status=status, skill_id=key, note=data_note)
+
+    try:
+        figure, table = runner(key, data_path, {**(params or {}), **panel.params})
+    except Exception as exc:  # noqa: BLE001 — a data/recipe mismatch is honest, not a Selom bug
+        return PanelDrive(panel_key=panel.key, status=RUN_FAILED, skill_id=key,
+                          data_ref=data_path, note=f"skill raised: {exc}")
+
+    computed = panel_extractor(panel, figure, table)
+    run = R.ReproRun(id=f"{panel.key}-{len(ledger.runs) + 1}", panel_key=panel.key, skill_id=key,
+                     params=panel.params, dataset_ref=data_path, figure_spec=figure, table=table,
+                     computed=[R.MetricValue(metric=k, value=v) for k, v in computed.items()])
+    ledger.runs.append(run)
+    panel.status = "run"
+
+    if not panel.golden:
+        return PanelDrive(panel_key=panel.key, status=NO_GOLDEN, skill_id=key, data_ref=data_path,
+                          note="computed (no printed number to score against)")
+    if not computed:
+        readings = panel_readings(panel, figure, table)
+        unread = ", ".join(r.metric for r in readings if r.value is None)
+        return PanelDrive(panel_key=panel.key, status=NEEDS_RECIPE, skill_id=key, data_ref=data_path,
+                          note=f"ran, but no layer could read: {unread}")
+    validation = R.validate_panel(panel, computed, run_id=run.id)
+    ledger.validations.append(validation)
+    panel.status = "validated"
+    return PanelDrive(panel_key=panel.key, status=DRIVEN, skill_id=key, data_ref=data_path,
+                      metrics_read=list(computed), note=data_note)
+
+
+# --- honest heatmap completion (L4: no silent caps) ---------------------------
+
+
+def _append_grey_cells(ledger: R.Ledger, drives: list[PanelDrive]) -> None:
+    """Give every panel that was NOT validated a grey, excluded heatmap cell carrying its reason —
+    so an unmatched / no-golden / out-of-scope panel is *shown* as that, never silently missing.
+
+    Grey cells have ``reproducibility=None`` → excluded from the rollup and contributing zero to
+    both axes (so the scorecard's score/coverage, already built, are unchanged)."""
+    sc = ledger.scorecard
+    if sc is None:
+        return
+    scored_keys = {ps.panel_key for ps in sc.panel_scores}
+    note_by_key = {d.panel_key: d for d in drives}
+    tier, color = R.score_to_tier(None)
+    for panel in ledger.panels:
+        if panel.key in scored_keys:
+            continue
+        d = note_by_key.get(panel.key)
+        in_scope = panel.scope not in R.OUT_OF_SCOPE_SCOPES
+        sc.panel_scores.append(R.PanelScore(
+            panel_key=panel.key, reproducibility=None, selom_confidence=None, tier=tier, color=color,
+            attribution=R.ATTR_DATA, in_scope=in_scope, weight=panel.weight,
+            note=(d.note if d else "not driven"),
+        ))
+
+
+# --- the orchestration entrypoint ---------------------------------------------
+
+
+def drive_bundle(bundle: PaperBundle, *, paper_id: str = "", paper: R.Paper | None = None,
+                 data_map: dict[str, str] | None = None, params: dict | None = None,
+                 runner=_default_runner, index=None) -> DriveResult:
+    """Drive an already-ingested ``PaperBundle`` → a graded two-axis ``DriveResult``.
+
+    The bundle-level entrypoint (``reproduce`` = ingest + this), split out so the orchestration +
+    honest classification are testable with a constructed bundle + an injected ``runner``, no PDF."""
+    ledger = build_merged_ledger(bundle, paper_id, paper=paper, index=index)
+    tabular = _tabular_paths(bundle)
+    drives = [drive_panel(ledger, p, tabular=tabular, data_map=data_map, runner=runner,
+                          params=params) for p in ledger.panels]
+    ledger.scorecard = R.build_scorecard(ledger)
+    _append_grey_cells(ledger, drives)
+    return DriveResult(ledger=ledger, panel_drives=drives)
+
+
+def reproduce(main_path: str, supplement_paths: list | None = None, *, paper_id: str = "",
+              paper: R.Paper | None = None, data_map: dict[str, str] | None = None,
+              params: dict | None = None, runner=_default_runner, index=None) -> DriveResult:
+    """Drop a paper + supplements → a graded two-axis ``DriveResult`` (the live-reproduction floor).
+
+    ``supplement_paths`` items are a path or a ``(path, role)`` pair (``extract.ingest`` contract).
+    ``data_map`` (``{panel_key: path}``) is the per-panel data-picker override; ``runner`` is the
+    injectable skill executor (defaults to the real one). Pure orchestration over the existing
+    engine — see the module docstring for the pipeline."""
+    bundle = ingest_paper(main_path, supplement_paths or [], paper_id=paper_id)
+    return drive_bundle(bundle, paper_id=paper_id, paper=paper, data_map=data_map, params=params,
+                        runner=runner, index=index)
