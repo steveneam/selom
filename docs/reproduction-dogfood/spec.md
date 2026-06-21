@@ -138,19 +138,45 @@ measure before we build**.
 - **DoD:** baseline→after numbers recorded in the findings note; tests green; ruff clean.
 - **Depends on:** Slice 0. **Size:** ~1 session per gap cluster (may be 1–2 commits).
 
-### Slice 2 — Per-panel data matcher (P2 2d)
+### Slice 2 — Data-fit scoring + matcher honesty + per-panel picker (P2 2d)
 
-- **Goal:** when a panel is `data_unmatched`, let the user point it at the right supplement file.
-  The engine already accepts a `data_map` ({panel_key: path}) override and `match_data` returns an
-  honest `data_note`; this surfaces the override (BE: accept it on the run contract; FE: a
-  per-panel "which file feeds this?" picker on the Reproduce/Score stage). Auto-heuristic first,
-  ask only on the gap (D3).
-- **Acceptance:** a Harmony panel that was `data_unmatched` becomes `driven` after the user picks
-  its file; the choice persists for the run; an un-picked panel stays honestly grey (no silent
-  guess).
-- **DoD:** BE test for the `data_map` round-trip; FE picker browser-verified vs the live BE.
-- **Depends on:** Slice 0 (to know which panels need it). **Size:** ~1 session (BE small, FE the
-  bulk).
+> **Scope enriched by the owner (s52).** Two owner asks fold into this slice because they are the
+> same lever: (a) *"rank/score the data dropped into the supplementary box so we know if it's
+> compatible / good data or not — we have a filter for this, our own engine should recognize if the
+> dropped data is good or not"*; (b) *"the score must be visible **before** a user clicks Run (so
+> they can drop different data) **and** after."* Matcher honesty IS that score, made the gate.
+
+**The bridge being built.** The engine already has the two halves of the owner's "filter":
+`engine.classify` (what modality is this file) + `engine.qc.run_qc` (is it clean). What's missing
+is the bridge that scores a dropped file against *what a panel's skill actually needs*. New
+`engine/compat.py` is that bridge — one rankable **data-fit score (0–100)** per (file, skill),
+composed of modality compatibility × data cleanliness. It is surfaced before a run (a pre-run
+`assess` endpoint so the user can swap a bad file) and after (in the gap report + run contract),
+and it drives the matcher.
+
+- **Matcher honesty (the load-bearing gate).** `match_data` stops force-feeding the lone tabular
+  onto a skill whose modality it can't be. The honest, *certain* gate: a flat table (xlsx/csv, the
+  only thing `tabular_paths` yields) loads as a DataFrame and can **never** be `sc_counts` (that
+  needs AnnData/10x) — so a single-cell panel fed a QC table is a determined payload-class mismatch
+  → `data_unmatched`, **not** a forced `run_failed`. This is what flips Yoshimura's QC-table panels
+  from a misleading crash to an honest "this file isn't the single-cell matrix this analysis needs."
+  Honesty rule: gate **only** on a *positively-determined* incompatibility (file loads AND its
+  payload class conflicts) — an unloadable/unclassifiable file stays optimistic (never gate on a
+  guess; this is also why every existing fake-path drive test is unaffected).
+- **The data-map override** ({panel_key: path}) already exists in the drive and still wins; this
+  surfaces it on the run contract (BE) and as a per-panel "which file feeds this?" picker (FE).
+  Auto-heuristic first, ask only on the gap (D3).
+- **Acceptance:** (1) a Yoshimura/Harmony single-cell panel whose only supplement is a QC table
+  classifies `data_unmatched` with an honest modality reason, not `run_failed`; (2) a pre-run
+  `assess` returns each dropped file's kind + QC verdict + a 0–100 fit score per relevant analysis,
+  ranked, so a wrong file is visibly poor *before* Run; (3) the data-map override makes a panel
+  `driven` when pointed at a compatible file and the choice persists; an un-picked panel stays
+  honestly grey (no silent guess); (4) the 4 hand ledgers grade **byte-identically** (no regression).
+- **DoD:** `engine/compat.py` + tests (fit scoring + the certain/optimistic gate); `match_data`
+  honesty test; pre-run `assess` endpoint + run-contract surfacing tests; FE data-fit panel
+  (before + after) + per-panel picker browser-verified vs the live BE.
+- **Depends on:** Slice 0 (to know which panels need it). **Size:** ~1–2 sessions (BE the engine +
+  endpoint this session; FE the panel/picker next).
 
 ### Slice 3 — Skill-gap signal (P3 3c)
 

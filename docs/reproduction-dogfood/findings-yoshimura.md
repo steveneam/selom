@@ -77,6 +77,37 @@ correctly does **not** mistake supplementary-table refs ("Table ST6/ST2") for Me
 studies (those are `ST` + ≥6 digits). Surfaced in the gap report header + a **Cited datasets** table.
 **Phase B (fetch + ingest) is GATED** (network / size-cap / cache / async — ASK first, D6).
 
+## Slice 2 — matcher honesty + dropped-data fit — SHIPPED (s52)
+
+The binding constraint the two baselines surfaced (the lone supplement is a QC *table*, not the
+single-cell *matrix* the panels need) is now handled honestly, end-to-end, and **verified on the real
+Yoshimura PDF + `sd01.xlsx`** (live `POST /papers/yoshimura/assess-data` + the cold diagnostic):
+
+| | Before Slice 2 (s51) | After Slice 2 (s52) |
+|---|---|---|
+| status rollup | `run_failed×3`, `out_of_scope×1` | **`data_unmatched×1`, `no_golden×3`, `out_of_scope×1` — zero `run_failed`** |
+| why the single-cell panels failed | force-fed the QC xlsx → h5py *"file signature not found"* crash | honest: *"this is a table (modality unclear), but umap_scrna needs single-cell matrix"* |
+| dropped-data verdict | *(none)* | `sd01.xlsx` → **confidence `not_a_fit`** (quality 55/100, best fit `trajectory` 12/100) |
+| Selom-confidence defects | 0 | **0** (the two-axis guard held) |
+
+**The engine.** New `engine/compat.py` is the bridge the owner asked for — it composes the two
+filters the engine already had (`engine.classify` = modality + `engine.qc` = is-it-clean) against
+*what a panel's skill needs*, into one rankable **fit score (0-100)** + a **confidence band**
+(Confident / Usable / Uncertain / Not a fit / Unreadable). Layered like the extractor
+([[layered-deterministic-extraction]]): **L2** payload-class gate (a flat table can never be a
+single-cell matrix — the *certain* gate Yoshimura hits) → **L1** per-skill column schema (volcano
+needs a fold-change + a p-value column; gsea a ranked gene list — precise + actionable) → **L3**
+coarse modality fallback. **Honesty rule:** gate only on a *positively-determined* mismatch (the file
+loads AND conflicts); an unloadable/unclear file stays optimistic, never gated on a guess (so every
+fake-path drive test is unaffected and the 4 hand ledgers grade byte-identical).
+
+**Visible before *and* after, and product-agnostic.** Surfaced pre-run via `POST
+/papers/{id}/assess-data` (no skills execute — the user sees a wrong/dirty file as poor *before* Run
+and can swap it) and post-run on the run contract + gap report. Because `compat` lives in the
+product-agnostic `engine/` spine, the **own-data product** gets the same band for free — surfaced on
+`POST /data/inspect` and `POST /skills/{id}/run` (`data_fit`), answering "is *my* data good for this
+analysis?" FE: a reusable `DataFitPanel` on the Reproduce stage (before) + the Score stage (after).
+
 ## What this validates about the plan
 
 - **Two baselines, one gap.** Harmony and Yoshimura independently show the *extractor* gap (now
@@ -89,10 +120,13 @@ studies (those are `ST` + ≥6 digits). Surfaced in the gap report header + a **
 
 ## Next
 
-1. **Slice 2 — matcher honesty + per-panel picker.** Stop force-feeding a QC table to a matrix skill
-   → `data_unmatched`; let the user (or Slice 5 Phase B) point the n_cells/UMAP panels at the GEO
-   matrix. This is what flips Yoshimura's `auto_grade_rate` off 0%.
+1. **Slice 2 matcher honesty + data-fit — DONE (s52, above).** Remaining within Slice 2: the explicit
+   **per-panel picker** (the `data_map` override exists + round-trips; the FE control to point a
+   `data_unmatched` panel at a chosen file is the last piece) + a **Product-A FE** that renders the
+   `data_fit` band on the own-data run/inspect screens (BE already surfaces it).
 2. **Slice 5 Phase B (GATED).** Fetch the open GEO-supplement processed files for `ingestable`
-   accessions → `engine.ingest` → close `data_unmatched`. ASK before any network/large-file/async.
+   accessions → `engine.ingest` → close `data_unmatched` (the picker/auto-match then points the
+   n_cells/UMAP panels at the real matrix → `auto_grade_rate` finally moves off 0%). ASK before any
+   network/large-file/async.
 3. Extractor: add the next golden family **when a dogfooded paper prints it** (cluster/cell-type
    count, correlation r) — not speculatively.
