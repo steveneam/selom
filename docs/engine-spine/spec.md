@@ -115,7 +115,7 @@ the own-data workbench become **consumers**, not owners:
 | INGEST | `engine/ingest.py` `ingest()` → `DataBundle` | **new (P1)** |
 | classify / QC | `engine/databundle.py` `classify()` + `engine/qc.py` `run_qc()` | **new (P1)** |
 | ROUTE | `engine/route.py` — wraps `extract/routing` (paper) **+** new raw-data router (P3a) | partial |
-| JOIN / MATCH | `engine/match.py` — `DataBundle`↔skill matching + ledger merge (lift from `reproduction_drive`) | partial |
+| JOIN / MATCH | `engine/match.py` — ledger merge + data↔panel matching (lifted from `reproduction_drive`) | **done (s47)** — `merge_ledger`/`match_data`/`tabular_paths`; `DataBundle`↔skill matching follows when the runner takes a `DataBundle` (E4) |
 | ANALYZE | `run_skill(skill_id, DataBundle, params)` → `{figure, table}` (adds a `DataBundle` entry to the existing runner) | mostly |
 | READ-BACK | `extract/readers.py` (L1/L2) + `extract/synthesize.py` (L3, P2) | partial |
 | GRADE | `reproduction.py` (consumer-only; **Product B**) | done (floor) |
@@ -170,6 +170,14 @@ grade` — i.e. it *calls the spine* and adds only the grade step. Product A cal
    `ingest` → show the `QCReport`; proves Product A has a front door.
 5. **Fold reproduction** — `reproduce()` ingests via the registry; `data_map`/merge move to
    `engine/match.py`; re-verify all 4 ledgers' scorecards unchanged (the regression guard, P5c).
+   **DONE (s47).** The JOIN/MATCH stage (`merge_ledger` + `match_data` + `tabular_paths`) was lifted
+   verbatim into `engine/match.py`; `reproduction_drive` now consumes it and keeps only the
+   orchestration (run + read-back + grade), re-exporting the three names for back-compat. Behaviour
+   is byte-identical — the 4 hand ledgers (RPGRIP1/JEV/Hani/Dorgau) + drive + drive_honest all pass
+   unchanged (59 tests). The matcher already speaks the engine-ingest tabular vocabulary (xlsx/csv);
+   the **remaining** increment is making the runner take a `DataBundle` so `reproduce()` and Product A
+   load analysis data through `engine.ingest` end-to-end (E4 additive — deliberately not forced now,
+   since skills are still path-based).
 
 **No new infra.** Pure library + the existing inline path; ASK before any Redis/arq/Docker
 ([[ask-before-docker-wsl]]).

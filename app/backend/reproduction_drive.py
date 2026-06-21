@@ -5,10 +5,14 @@ new engine** (``docs/reproduction-engine/live-reproduction-spec.md`` §3-4): it 
 parts —
 
   ingest (``extract.ingest.ingest_paper``)
-    → route + extract goldens, MERGED into one drivable ledger (gap #1)
-    → match a data file per panel (gap #2)
+    → route + extract goldens, MERGED into one drivable ledger (gap #1, ``engine.match.merge_ledger``)
+    → match a data file per panel (gap #2, ``engine.match.match_data``)
     → run the matched skill + READ its golden metric back (``extract.readers``, gap #3)
     → grade what reproduced, and **honestly classify the rest**.
+
+The JOIN/MATCH stage (gaps #1–#2) was lifted into the product-agnostic ``engine.match`` (P1 step 5,
+``docs/engine-spine/spec.md`` Sec 6) so both products share it; this module keeps the orchestration +
+honest classification. ``merge_ledger``/``match_data``/``tabular_paths`` remain importable from here.
 
 The honest classification is the load-bearing part (invariants L2/L4): a panel we could not drive
 because of the paper or its data (``out_of_scope`` / ``no_golden`` / ``data_unmatched`` /
@@ -29,11 +33,14 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 import reproduction as R
-from extract.golden import build_extracted_spec, to_engine_panels
-from extract.ingest import SUPP_CSV, SUPP_XLSX, PaperBundle, ingest_paper
+from engine.match import match_data, merge_ledger, tabular_paths
+from extract.ingest import PaperBundle, ingest_paper
 from extract.readers import panel_extractor, panel_readings
-from extract.routing.engine import route_to_panels
-from extract.routing.route import route_text
+
+# Back-compat: the JOIN/MATCH stage moved to ``engine.match`` (the spine boundary, P1 step 5).
+# These names stay importable from here so existing callers/tests are unaffected.
+build_merged_ledger = merge_ledger
+__all_match__ = ("match_data", "merge_ledger", "tabular_paths", "build_merged_ledger")
 
 # --- per-panel drive outcomes (honest classification) -------------------------
 DRIVEN = "driven"                # ran + read ≥1 golden metric + validated → a real score
@@ -80,93 +87,9 @@ def _default_runner(skill_id: str, data_path: str, params: dict):
     return run_skill_with_table(skill_id, data_path, params)
 
 
-# --- gap #1: merge routing skill_ids + extracted goldens into one ledger ------
-
-
-def _fig_sort_key(panel: R.Panel):
-    """Figure order: numeric figures first (1,2,…), then any non-numeric, then panel letter."""
-    fig = panel.figure
-    num = int(fig) if str(fig).isdigit() else 10**6
-    return (num, str(fig), panel.panel)
-
-
-# A golden metric implies its skill class — and the schema inventory says DE counts read cleanly
-# only from `volcano`'s de_table (not `deg`), and PC variance only from `pca`. So a golden figure
-# whose per-figure route didn't assign a skill is backfilled from the metric it printed.
-_METRIC_SKILL = {
-    "de_total": "volcano", "de_up": "volcano", "de_down": "volcano",
-    "pc1_var": "pca", "pc2_var": "pca",
-}
-
-
-def _backfill_skill(panel: R.Panel) -> None:
-    """Set a golden panel's skill from its metric when the metric has an *authoritative* source.
-
-    This OVERRIDES the per-figure route, not just fills a blank one: DE counts read cleanly only
-    from ``volcano``'s de_table (never ``deg``/``cluster`` — no direction column), and PC variance
-    only from ``pca``. Real-PDF routing mis-attributes figures (the live JEV smoke routed the DE
-    figures to ``cluster``), so for these specific metrics the golden's data need is a more reliable
-    skill signal than the noisy route. Skills for non-mapped metrics are left to the route."""
-    if not panel.golden:
-        return
-    for gold in panel.golden:
-        sid = _METRIC_SKILL.get(gold.metric)
-        if sid and panel.skill_id != sid:
-            prev = panel.skill_id
-            panel.skill_id = sid
-            was = f" (route said {prev})" if prev else ""
-            panel.note = (panel.note + "; " if panel.note else "") + \
-                f"skill set to {sid} — authoritative source for golden '{gold.metric}'{was}"
-            return
-
-
-def build_merged_ledger(bundle: PaperBundle, paper_id: str, *, paper: R.Paper | None = None,
-                        index=None) -> R.Ledger:
-    """Compose the auto-routed figure→skill skeleton with the extracted printed-number goldens.
-
-    Both producers exist; this is the missing composition. Figures the paper printed an extractable
-    number for become **drivable golden panels** (skill_id from the route + the ``Golden``); figures
-    with a matched skill but no number stay as **no-golden** skill panels; purely out-of-scope
-    figures stay out-of-scope. A figure with goldens drops its bare skeleton panel so it is not
-    double-counted."""
-    fmap = route_text(bundle.text, paper_id=paper_id, index=index)
-    spec = build_extracted_spec(bundle, paper_id)
-    golden_panels = to_engine_panels(spec, feasibility=fmap)
-    for p in golden_panels:
-        _backfill_skill(p)
-    golden_figs = {p.figure for p in golden_panels}
-    skeleton = [p for p in route_to_panels(fmap) if p.figure not in golden_figs]
-    panels = sorted(golden_panels + skeleton, key=_fig_sort_key)
-    pid = paper_id or "auto"
-    paper = paper or R.Paper(
-        id=pid, slug=pid, title="(live reproduction drive)",
-        methods_digest={"skills": fmap.skills, "out_of_scope": fmap.out_of_scope},
-    )
-    return R.Ledger(paper=paper, panels=panels)
-
-
-# --- gap #2: match a data file to a panel -------------------------------------
-
-
-def _tabular_paths(bundle: PaperBundle) -> list[str]:
-    """Supplement paths that could BE the analysis data (xlsx/csv); PDFs are methods, not data."""
-    return [s.path for s in bundle.supplements if s.kind in (SUPP_XLSX, SUPP_CSV)]
-
-
-def match_data(panel: R.Panel, tabular: list[str], data_map: dict[str, str] | None) -> tuple[str | None, str]:
-    """Resolve the data file feeding this panel's skill → ``(path | None, note)``.
-
-    v1: an explicit per-panel ``data_map`` override (the data-picker fast-follow) wins; else the
-    single most-likely tabular supplement, honestly noting ambiguity when there is more than one;
-    else ``None`` (the caller marks ``data_unmatched``). Deliberately conservative — better an honest
-    "data not matched" than a wrong run."""
-    if data_map and panel.key in data_map:
-        return data_map[panel.key], "explicit data-map override"
-    if not tabular:
-        return None, "no tabular supplement attached"
-    if len(tabular) == 1:
-        return tabular[0], "single tabular supplement"
-    return tabular[0], f"first of {len(tabular)} tabular supplements (ambiguous — pick per panel)"
+# Gap #1 (merge routed skeleton + extracted goldens) and gap #2 (match a data file to a panel) now
+# live in ``engine.match`` (``merge_ledger`` / ``match_data`` / ``tabular_paths``) — the spine's
+# JOIN/MATCH stage. Imported above; this module keeps only the orchestration below.
 
 
 # --- the per-panel drive ------------------------------------------------------
@@ -255,8 +178,8 @@ def drive_bundle(bundle: PaperBundle, *, paper_id: str = "", paper: R.Paper | No
 
     The bundle-level entrypoint (``reproduce`` = ingest + this), split out so the orchestration +
     honest classification are testable with a constructed bundle + an injected ``runner``, no PDF."""
-    ledger = build_merged_ledger(bundle, paper_id, paper=paper, index=index)
-    tabular = _tabular_paths(bundle)
+    ledger = merge_ledger(bundle, paper_id, paper=paper, index=index)
+    tabular = tabular_paths(bundle)
     drives = [drive_panel(ledger, p, tabular=tabular, data_map=data_map, runner=runner,
                           params=params) for p in ledger.panels]
     ledger.scorecard = R.build_scorecard(ledger)
