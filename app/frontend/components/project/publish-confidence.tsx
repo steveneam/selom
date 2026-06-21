@@ -1,29 +1,32 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, BadgeCheck, Check, ChevronDown, Copy, FileText, FlaskConical, Info, ShieldCheck } from "lucide-react";
+import { AlertTriangle, BadgeCheck, Captions, Check, ChevronDown, Copy, FileText, FlaskConical, Info, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { SkillGuardrail, SkillMethods, SkillProvenance } from "@/lib/skills-api";
+import type { FigureLegend, SkillGuardrail, SkillMethods, SkillProvenance } from "@/lib/skills-api";
 
 /**
  * Publish-confidence panel (charter B4) — the answer to "is THIS the right,
- * reproducible figure to put in my paper?". Shows the auto methods-text (copyable,
- * with citations) and the per-figure reproducibility bundle (skill+version, the exact
- * parameters, the input data hash, and the analysis environment). Collapsed by default
- * so it never steals space from the editor; both halves come from the backend `/run`
- * response, so it hides cleanly when a run predates B4 or the mock omits it.
+ * reproducible figure to put in my paper?". Shows the paste-ready methods text and figure
+ * legend (the "drop data → run → publication-ready methods + legend" pair, P4c / workspace-
+ * library §11) plus the per-figure reproducibility bundle (skill+version, the exact parameters,
+ * the input data hash, and the analysis environment). Collapsed by default so it never steals
+ * space from the editor; every part comes from the backend `/run` response, so it hides cleanly
+ * when a run predates a field or the mock omits it.
  */
 export function PublishConfidence({
   provenance,
   methods,
+  legend,
   guardrails = [],
 }: {
   provenance?: SkillProvenance;
   methods?: SkillMethods;
+  legend?: FigureLegend;
   guardrails?: SkillGuardrail[];
 }) {
   const [open, setOpen] = React.useState(false);
-  if (!provenance && !methods && guardrails.length === 0) return null;
+  if (!provenance && !methods && !legend && guardrails.length === 0) return null;
 
   const warnCount = guardrails.filter((g) => g.level === "warn").length;
 
@@ -38,7 +41,7 @@ export function PublishConfidence({
         <BadgeCheck className="size-4 text-primary" />
         <span className="text-sm font-medium text-foreground">Publish confidence</span>
         <span className="hidden text-xs text-muted-foreground sm:inline">
-          Quality checks, methods text &amp; reproducibility
+          Quality checks, methods, figure legend &amp; reproducibility
         </span>
         {warnCount > 0 && (
           <span className="ml-auto flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400">
@@ -54,10 +57,13 @@ export function PublishConfidence({
       {open && (
         <div className="space-y-4 border-t border-border px-4 py-4">
           {guardrails.length > 0 && <Guardrails items={guardrails} />}
-          <div className="grid gap-4 lg:grid-cols-2">
-            {methods && <Methods methods={methods} />}
-            {provenance && <Reproducibility provenance={provenance} />}
-          </div>
+          {(methods || legend) && (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {methods && <Methods methods={methods} />}
+              {legend && <Legend legend={legend} />}
+            </div>
+          )}
+          {provenance && <Reproducibility provenance={provenance} />}
         </div>
       )}
     </div>
@@ -133,6 +139,37 @@ function Methods({ methods }: { methods: SkillMethods }) {
           ))}
         </ol>
       )}
+    </section>
+  );
+}
+
+function Legend({ legend }: { legend: FigureLegend }) {
+  const [copied, setCopied] = React.useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(legend.text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard blocked (e.g. insecure context) — no-op */
+    }
+  }
+
+  return (
+    <section aria-labelledby="pc-legend" className="min-w-0">
+      <div className="flex items-center gap-2">
+        <Captions className="size-3.5 text-muted-foreground" />
+        <h3 id="pc-legend" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Figure legend
+        </h3>
+        <Button variant="ghost" size="sm" className="ml-auto h-7 gap-1.5 px-2 text-xs" onClick={copy}>
+          {copied ? <Check className="text-primary" /> : <Copy />}
+          {copied ? "Copied" : "Copy"}
+        </Button>
+      </div>
+      <p className="mt-2 select-text text-sm leading-relaxed text-foreground/90">{legend.text}</p>
+      <p className="mt-2 text-[11px] text-muted-foreground">Draft caption — number it and edit before use.</p>
     </section>
   );
 }

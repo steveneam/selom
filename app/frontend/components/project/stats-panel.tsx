@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowDown, ArrowUp, ChevronDown, Download, Table2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Download, Sparkles, Table2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import type { StatsTable } from "@/lib/skills-api";
@@ -51,6 +51,7 @@ export function StatsPanel({ table, className, defaultOpen = false }: { table: S
       >
         <Table2 className="size-4 text-primary" />
         <span className="text-sm font-medium text-foreground">{table.title ?? "Statistics"}</span>
+        {table.synthesized && <SynthesizedBadge />}
         <span className="hidden text-xs text-muted-foreground sm:inline">
           {table.rows.length} rows · {table.columns.length} columns
         </span>
@@ -59,6 +60,15 @@ export function StatsPanel({ table, className, defaultOpen = false }: { table: S
 
       {open && (
         <div className="border-t border-border">
+          {table.synthesized && (
+            <p className="flex items-start gap-1.5 border-b border-border/60 bg-primary/[0.04] px-4 py-2 text-[11px] leading-relaxed text-muted-foreground">
+              <Sparkles className="mt-px size-3 shrink-0 text-primary/80" />
+              <span>
+                Computed by Selom from the figure — this skill doesn&apos;t emit a table, so we re-shaped
+                the values it plotted (read, not re-computed) into an editable one.
+              </span>
+            </p>
+          )}
           <div className="flex items-center justify-between gap-2 px-4 py-2">
             <span className="text-[11px] text-muted-foreground">
               {shown.length < rows.length ? `Showing ${shown.length} of ${rows.length} rows` : `${rows.length} rows`}
@@ -108,6 +118,20 @@ export function StatsPanel({ table, className, defaultOpen = false }: { table: S
         </div>
       )}
     </div>
+  );
+}
+
+/** Marks a Statistics table that Selom synthesized from the figure (L3) rather than the skill
+ *  emitting natively — kept visually distinct from a native table (table-synthesis spec S3). */
+function SynthesizedBadge() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary"
+      title="Computed by Selom from the figure — this skill emits no native table"
+    >
+      <Sparkles className="size-2.5" />
+      Computed by Selom
+    </span>
   );
 }
 

@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Lock, Redo2, RefreshCw, Sparkles, Table2, Trash2, Undo2 } from "lucide-react";
 import { DataPanel, type AnalyzeArgs } from "./data-panel";
+import { DataCheckPanel } from "./data-check";
 import { Dropzone } from "./dropzone";
 import { WorkbenchPanel } from "./workbench-panel";
 import { PublishConfidence } from "./publish-confidence";
@@ -31,7 +32,7 @@ import type { ParamValue } from "@/lib/lineage/diff";
 import { datasetDisplayName, familyColorMap } from "@/lib/lineage/family";
 import { defaultParams } from "@/lib/catalog/params";
 import { readStyleStamp } from "@/lib/figure-spec";
-import { runSkill, runtimeSkillId, type SkillProvenance } from "@/lib/skills-api";
+import { DataCheckError, runSkill, runtimeSkillId, type DataCheck, type SkillProvenance } from "@/lib/skills-api";
 import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
 import { pushUndo } from "@/lib/workspace/undo";
 
@@ -90,6 +91,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [incomingFile, setIncomingFile] = React.useState<File | null>(null);
   const [running, setRunning] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  // The is-my-data-clean guardrail tripped (HTTP 422, P1c/D-e5): the run was halted by a
+  // block-severity QC problem. Holds the verdict + the step so "Review & run anyway" can re-run
+  // with override. Cleared at the start of every run.
+  const [blocked, setBlocked] = React.useState<{ check: DataCheck; step: ProposedStep } | null>(null);
   // Active journal style for the current figure (journal-styles v1) — DERIVED from the
   // spec's stamp (layout.meta.selomStyle), not held separately, so undo/redo and "New
   // figure" rewind the picker label for free. Runs come out in the Selom default.
@@ -102,7 +107,12 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // no longer transient React state.
   const activeFigure = activeFigureId ? figures.find((f) => f.id === activeFigureId) : undefined;
   const bundle = activeFigure
-    ? { provenance: activeFigure.provenance, methods: activeFigure.methods, guardrails: activeFigure.guardrails }
+    ? {
+        provenance: activeFigure.provenance,
+        methods: activeFigure.methods,
+        legend: activeFigure.legend,
+        guardrails: activeFigure.guardrails,
+      }
     : null;
 
   // Staleness (Pillar 1): diff the open figure's stored provenance against the live
@@ -201,20 +211,21 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   }, [figure.spec, activeFigureId, frozen]);
 
   const runFlow = React.useCallback(
-    async (step: ProposedStep) => {
+    async (step: ProposedStep, opts: { override?: boolean } = {}) => {
       setRunning(step.skillId);
       setError(null);
+      setBlocked(null);
       try {
         // Attach the project's dataset even on the demo deep-link (no explicit pick),
         // so produced figures have a dataset to compute staleness against.
         const dsId = datasetId ?? datasets[0]?.id;
         const dataset = dsId ? datasets.find((d) => d.id === dsId) : undefined;
         const file = lastFile ?? new File(["mock"], dataset?.filename ?? "data.csv");
-        const res = await runSkill(runtimeSkillId(step.skillId), file, step.params, designFile);
+        const res = await runSkill(runtimeSkillId(step.skillId), file, step.params, designFile, opts);
         const name = getSkill(step.skillId)?.name ?? step.skillId;
         // Persist the figure durably — full spec + the provenance bundle (the staleness
         // trigger-set, stamped with the dataset's current version). Both were transient
-        // before Pillar 1, lost on reload.
+        // before Pillar 1, lost on reload. The legend + data-check verdict ride along too.
         const saved = projectStore.addFigure(projectId, {
           title: `${name} — figure`,
           datasetId: dsId,
@@ -222,14 +233,19 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           spec: res.figure,
           provenance: stampDataVersion(res.provenance, dataset),
           methods: res.methods,
+          legend: res.legend,
           guardrails: res.guardrails,
           table: res.table ?? undefined,
+          dataCheck: res.dataCheck,
         });
         setActiveFigureId(saved.id);
         figure.init(res.figure); // fresh spec carries no style stamp → activeStyle derives the default
         setView("figure");
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Run failed. Please try again.");
+        // The is-my-data-clean guardrail (HTTP 422) → a reviewable block card + "run anyway",
+        // not a generic error (P1c/D-e5).
+        if (e instanceof DataCheckError) setBlocked({ check: e.dataCheck, step });
+        else setError(e instanceof Error ? e.message : "Run failed. Please try again.");
       } finally {
         setRunning(null);
       }
@@ -257,8 +273,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           spec: res.figure,
           provenance: stampDataVersion(res.provenance, dataset),
           methods: res.methods,
+          legend: res.legend,
           guardrails: res.guardrails,
           table: res.table ?? undefined,
+          dataCheck: res.dataCheck,
           parentFigureId: fig.id,
           variantLabel: "re-run",
         });
@@ -298,8 +316,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
               spec: res.figure,
               provenance: stampDataVersion(res.provenance, dataset),
               methods: res.methods,
+              legend: res.legend,
               guardrails: res.guardrails,
               table: res.table ?? undefined,
+              dataCheck: res.dataCheck,
               parentFigureId: origin.id,
               variantLabel: `${param} = ${value}`,
             }),
@@ -362,6 +382,16 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     setLastFile(file);
     setDesignFile(df ?? null);
     setProposal(p);
+    setView("skill");
+  }
+
+  // Pick a suggested-pipeline step from the data-check verdict (P3a guidance): install the
+  // skill and pre-select it in the Workbench, ready to run on this data. Routing steps are
+  // bare slugs of Selom-native skills; the catalog/install layer is keyed by `selom.<slug>`.
+  function pickSuggestedSkill(skillId: string) {
+    const catalogId = `selom.${skillId}`;
+    workspaceStore.installSkill(catalogId);
+    setPreselect((p) => ({ id: catalogId, n: (p?.n ?? 0) + 1 }));
     setView("skill");
   }
 
@@ -520,6 +550,19 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         </div>
       )}
 
+      {blocked && (
+        <div className="mt-3">
+          <DataCheckPanel
+            dataCheck={blocked.check}
+            variant="blocked"
+            skillName={getSkill(blocked.step.skillId)?.name ?? blocked.step.skillId}
+            overriding={running != null}
+            onOverride={() => runFlow(blocked.step, { override: true })}
+            onDismiss={() => setBlocked(null)}
+          />
+        </div>
+      )}
+
       {/* Workrail + main pane (Pillar 1, S2.3) — the lineage rail replaces the tabs. */}
       <div className="mt-5 flex min-h-0 flex-1 gap-6">
         <Workrail
@@ -627,7 +670,15 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     onToggleFreeze={toggleFreeze}
                   />
                 )}
-                <PublishConfidence provenance={bundle?.provenance} methods={bundle?.methods} guardrails={bundle?.guardrails} />
+                {activeFigure?.dataCheck && (
+                  <DataCheckPanel dataCheck={activeFigure.dataCheck} onPickSkill={pickSuggestedSkill} />
+                )}
+                <PublishConfidence
+                  provenance={bundle?.provenance}
+                  methods={bundle?.methods}
+                  legend={bundle?.legend}
+                  guardrails={bundle?.guardrails}
+                />
                 <div className="flex min-h-[520px] flex-1 overflow-hidden rounded-xl border border-border bg-background">
                   <EditorWorkspace store={figure} elevated={exportOpen} readOnly={frozen} onEditCopy={editCopy} />
                 </div>

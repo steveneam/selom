@@ -37,6 +37,64 @@ export interface StatsTable {
   columns: string[];
   rows: (string | number)[][];
   title?: string;
+  /**
+   * L3 table synthesis (docs/table-synthesis/spec.md, S3): true when Selom re-shaped
+   * this table from the figure's OWN output because the skill emits no native table —
+   * a real computed value, not a digitized guess, but labelled distinctly in the UI.
+   */
+  synthesized?: boolean;
+  /** Provenance note for a synthesized table (e.g. "figure"). */
+  source?: string;
+}
+
+/** One honest data-quality signal from the engine QC (backend engine/qc.py QCFlag). */
+export interface QcFlag {
+  severity: "info" | "warn" | "block";
+  code: string;
+  message: string;
+  /** A concrete next step — always present for a `block`/`warn` (E3: never a silent filter). */
+  fix: string;
+}
+
+/** "Is-my-data-clean?" verdict (backend engine/qc.py QCReport). */
+export interface DataQcReport {
+  ran: boolean;
+  ok: boolean;
+  /** Any `block`-severity flag present (D-e5: warn + require override, not hard-refuse). */
+  blocked: boolean;
+  flags: QcFlag[];
+  stats: Record<string, number | string>;
+}
+
+/** One suggested analysis step for a modality (backend engine/route.py SuggestedStep). */
+export interface SuggestedStep {
+  skill_id: string;
+  role: string;
+  reason: string;
+}
+
+/** Suggested skill pipeline for a classified DataBundle (backend engine/route.py DataRouting). */
+export interface DataRouting {
+  kind: string;
+  steps: SuggestedStep[];
+  confident: boolean;
+  note: string;
+}
+
+/**
+ * The is-my-data-clean verdict surfaced with a run (P1c/P3a) — the modality the engine
+ * detected, the QC report, and the suggested pipeline for that modality. `qc`/`routing` are
+ * null when the upload couldn't be inspected (fail-soft; `kind` is then "unknown").
+ */
+export interface DataCheck {
+  kind: string;
+  qc: DataQcReport | null;
+  routing: DataRouting | null;
+}
+
+/** Auto figure-legend text (backend legends.py — the caption half of the Methods+legend layer). */
+export interface FigureLegend {
+  text: string;
 }
 
 export interface SkillRunResponse {
@@ -45,9 +103,29 @@ export interface SkillRunResponse {
   // still renders the figure; the panel just hides when absent.
   provenance?: SkillProvenance;
   methods?: SkillMethods;
+  legend?: FigureLegend;
   guardrails?: SkillGuardrail[];
   // Statistics result (Pillar 1, Decision D7) — null for purely-visual skills.
   table?: StatsTable | null;
+  // The is-my-data-clean verdict + suggested next steps for this run (P1c/P3a). Absent when
+  // an older backend / mock omits it.
+  dataCheck?: DataCheck;
+}
+
+/**
+ * Thrown when the engine QC guardrail BLOCKS a run (HTTP 422, engine-spine spec §5 / E3 / D-e5):
+ * the uploaded data has a `block`-severity problem (e.g. negative counts where raw integers are
+ * required). The caller shows the flags + their fix hints and offers "review & run anyway" —
+ * re-running with `override: true`. It is a warn-and-override, never a hard refuse (the user owns
+ * their data).
+ */
+export class DataCheckError extends Error {
+  readonly dataCheck: DataCheck;
+  constructor(message: string, dataCheck: DataCheck) {
+    super(message);
+    this.name = "DataCheckError";
+    this.dataCheck = dataCheck;
+  }
 }
 
 export type SkillParams = Record<string, string | number | boolean>;
@@ -82,17 +160,29 @@ export async function runSkill(
    * provenance (reserved `_design_path`). Sent as the multipart field `design`.
    */
   design?: File | null,
+  /**
+   * Run options. `override: true` re-runs past a `block`-severity QC verdict (the
+   * "review & run anyway" affordance — engine-spine spec §5 / D-e5).
+   */
+  opts: { override?: boolean } = {},
 ): Promise<SkillRunResponse> {
   const fd = new FormData();
   fd.append("matrix", file);
   if (design) fd.append("design", design);
 
   const entries = Object.entries(params).map(([k, v]) => [k, String(v)] as [string, string]);
+  if (opts.override) entries.push(["override", "true"]);
   const qs = new URLSearchParams(entries).toString();
   const url = `/api/skills/${encodeURIComponent(skillId)}/run${qs ? `?${qs}` : ""}`;
 
   const res = await fetch(url, { method: "POST", body: fd });
   if (!res.ok) {
+    // The "is-my-data-clean?" guardrail (HTTP 422): a structured block verdict the caller
+    // turns into a reviewable card + a "run anyway" override (D-e5), not a generic failure.
+    if (res.status === 422) {
+      const blocked = await readDataCheckBlock(res);
+      if (blocked) throw blocked;
+    }
     // Prefer the backend's own explanation; otherwise speak plainly (the user is
     // a bench scientist, not an ops engineer) and always point at a next step.
     let detail =
@@ -101,14 +191,14 @@ export async function runSkill(
         : `the request was rejected (${res.status})`;
     try {
       const body = await res.json();
-      if (body?.detail) detail = body.detail;
+      if (typeof body?.detail === "string") detail = body.detail;
     } catch {
       /* non-JSON error body */
     }
     throw new Error(`Couldn't run this skill — ${detail}. Please try again.`);
   }
 
-  const json = (await res.json()) as Partial<SkillRunResponse>;
+  const json = (await res.json()) as Record<string, unknown> & Partial<SkillRunResponse>;
   if (!json.figure || !Array.isArray(json.figure.data)) {
     throw new Error("Server returned a malformed figure spec.");
   }
@@ -116,7 +206,32 @@ export async function runSkill(
     figure: json.figure,
     provenance: json.provenance,
     methods: json.methods,
+    // The run response names it `figure_legend`; the FE carries it as `legend`.
+    legend: (json.figure_legend as FigureLegend | undefined) ?? undefined,
     guardrails: json.guardrails,
     table: json.table ?? null,
+    dataCheck: (json.data_check as DataCheck | undefined) ?? undefined,
   };
+}
+
+/** Parse a 422 body into a {@link DataCheckError} when it carries the engine's block verdict. */
+async function readDataCheckBlock(res: Response): Promise<DataCheckError | null> {
+  try {
+    const body = await res.json();
+    const d = body?.detail;
+    if (d && typeof d === "object" && d.error === "data_check_failed") {
+      const message =
+        typeof d.message === "string"
+          ? d.message
+          : "This data has a blocking problem for analysis.";
+      return new DataCheckError(message, {
+        kind: String(d.kind ?? "unknown"),
+        qc: (d.qc as DataQcReport | null) ?? null,
+        routing: (d.routing as DataRouting | null) ?? null,
+      });
+    }
+  } catch {
+    /* non-JSON / unexpected shape — fall through to the generic error */
+  }
+  return null;
 }

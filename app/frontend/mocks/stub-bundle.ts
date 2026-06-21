@@ -1,4 +1,4 @@
-import type { SkillGuardrail, SkillMethods, SkillProvenance, StatsTable } from "@/lib/skills-api";
+import type { DataCheck, FigureLegend, SkillGuardrail, SkillMethods, SkillProvenance, StatsTable } from "@/lib/skills-api";
 
 /**
  * A representative publish-confidence bundle for the MSW mock (B4), so the panel
@@ -117,6 +117,41 @@ function titleize(slug: string): string {
   return slug.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/**
+ * A representative is-my-data-clean verdict for the mock (P1c/P3a) — a clean raw-count
+ * scRNA matrix with the standard scRNA pipeline — so the Data check panel renders offline
+ * (`npm run dev:mock`). The real verdict comes from the backend engine (engine/qc.py +
+ * engine/route.py). The block + override affordance is exercised against the live backend.
+ */
+export function mockDataCheck(): DataCheck {
+  return {
+    kind: "sc_counts",
+    qc: {
+      ran: true,
+      ok: true,
+      blocked: false,
+      flags: [],
+      stats: { n_cells: 2700, n_genes: 13_714, median_pct_mito: 2.1 },
+    },
+    routing: {
+      kind: "sc_counts",
+      confident: true,
+      note: "Single-cell matrix detected — the standard scRNA path.",
+      steps: [
+        { skill_id: "normalization_qc", role: "qc", reason: "QC + normalize before clustering" },
+        { skill_id: "umap_scrna", role: "analyze", reason: "cluster the cells + embed (UMAP)" },
+        { skill_id: "markers", role: "analyze", reason: "find each cluster's marker genes" },
+        { skill_id: "composition", role: "visualize", reason: "cell-type composition across conditions" },
+      ],
+    },
+  };
+}
+
+/** A representative figure legend for the mock (legends.py — the Methods+legend layer). */
+export function mockLegend(skillId: string): FigureLegend {
+  return { text: `${titleize(skillId)} of the demo single-cell dataset.` };
+}
+
 // Skills whose figure carries a tabular DE result (Pillar 1 Statistics node).
 const DE_SKILLS = new Set(["deg", "volcano", "proteomics_de"]);
 
@@ -155,6 +190,32 @@ export function mockTable(skillId: string, query: Record<string, string> = {}): 
       return [g, lfc, padj, direction];
     });
     return { columns: ["gene", "log2FC", "padj", "direction"], rows, title: "Differential expression" };
+  }
+  // L3 synthesized tables (table-synthesis spec): tableless skills whose figure Selom re-shapes
+  // into a Statistics table on the run path — mocked here so the "computed by Selom" label renders
+  // offline. Shapes mirror extract/synthesize.py (pca → [component, %]; composition → bar arrays).
+  if (skillId === "pca") {
+    return {
+      columns: ["component", "variance %"],
+      rows: [["PC1", 61.2], ["PC2", 12.7]],
+      title: "PCA variance explained",
+      synthesized: true,
+      source: "figure",
+    };
+  }
+  if (skillId === "composition") {
+    return {
+      columns: ["category", "DR %", "PD %"],
+      rows: [
+        ["Rods", 21.8, 4.5],
+        ["Müller glia", 2.6, 22.2],
+        ["Microglia", 9.5, 15.2],
+        ["Bipolar", 10.4, 14.3],
+      ],
+      title: "Composition",
+      synthesized: true,
+      source: "figure",
+    };
   }
   if (skillId === "enrichment") {
     return {

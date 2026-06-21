@@ -8,7 +8,7 @@
  */
 
 import type { FigureSpec } from "@/lib/figure-spec";
-import type { SkillGuardrail, SkillMethods, SkillProvenance, StatsTable } from "@/lib/skills-api";
+import type { DataCheck, FigureLegend, SkillGuardrail, SkillMethods, SkillProvenance, StatsTable } from "@/lib/skills-api";
 
 export type Modality = "scRNA-seq" | "bulk RNA-seq" | "proteomics" | "unknown";
 
@@ -114,8 +114,10 @@ export interface Figure {
   spec?: FigureSpec;           // the editable Plotly spec (was transient)
   provenance?: SkillProvenance;// the staleness trigger-set (was transient)
   methods?: SkillMethods;
+  legend?: FigureLegend;       // paste-ready figure caption (P4c — the Methods+legend layer)
   guardrails?: SkillGuardrail[];
   table?: StatsTable;          // the Statistics result (wired in S2)
+  dataCheck?: DataCheck;       // the is-my-data-clean verdict + routing for this run (P1c/P3a)
   // lineage / versioning
   parentFigureId?: string;     // set on a fork / variant / re-run
   variantLabel?: string;       // e.g. "resolution = 1.0"

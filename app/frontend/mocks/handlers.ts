@@ -2,7 +2,7 @@ import { http, HttpResponse } from "msw";
 import { CATALOG } from "@/lib/catalog/seed";
 import type { FigureSpec } from "@/lib/figure-spec";
 import { stubUmapFigure } from "./stub-figure";
-import { mockBundle, mockTable } from "./stub-bundle";
+import { mockBundle, mockDataCheck, mockLegend, mockTable } from "./stub-bundle";
 import { compileFixture, getFixtureSet, searchFixture } from "./gene-sets-fixture";
 import { EXPORT_PRESETS, mockExportFile } from "./export-fixture";
 import { FIGURE_STYLES, mockApplyStyle } from "./styles-fixture";
@@ -96,6 +96,8 @@ export const handlers = [
       figure: stubUmapFigure(),
       ...mockBundle(skillId, query),
       table: mockTable(skillId, query),
+      figure_legend: mockLegend(skillId),
+      data_check: mockDataCheck(),
     });
   }),
 ];
