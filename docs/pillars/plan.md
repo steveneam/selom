@@ -115,6 +115,11 @@ the gap is contract uniformity + the methods/legend wiring.
 Now harden **credibility**.
 **Today:** `reproduction_drive` + `reproduction_runs` + Phase-3 FE + 4 validated ledgers + the
 two-axis Score.
+**ACTIVE PHASE (s50, owner-picked):** *Reproduction — dogfood-ready* → focused execution plan
++ agile task slices in **`docs/reproduction-dogfood/spec.md`** (covers **5b/5c/5d + P2 2d + P3 3c**).
+Owner's why: dogfood many papers to *train the engine* (limited own omics data). Start = a cold-drive
+diagnostic on Harmony. That spec is the task-of-record for this phase; the slices below are the
+roadmap entries it fulfils.
 **Slices:**
 - **5a** Metric-type-aware tolerance grader — tie the band to known engine deltas ([[selom-gsea-engine-sensitivity]], Melody↔Harmony) so **engine-delta ≠ irreproducible** in `validate_panel`. **DONE (s46):** `metric_type` on `Golden` → family band (`METRIC_TYPE_TOLERANCES` + `infer_metric_type`/`resolve_tolerances`); explicit per-golden tolerance still wins; the drive auto-types its goldens; 4 ledgers byte-identical.
 - **5b** Generic-extractor coverage (more metrics readable without a hand ledger; rides P2/L3).
