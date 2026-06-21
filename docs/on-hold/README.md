@@ -27,6 +27,7 @@ of P1–P5, it belongs here — write the pointer and move on.
 | **OSCA Gap E — reference annotation** | Last OSCA gap; owner deferred E1 vs E2. | [[osca-source-sc-workflow]] | P4 (a skill) |
 | **pdf.js region-capture (Recover-data 4th stage)** | Umbrella remainder; only pull in if reproduction needs it. | `docs/workspace-library/umbrella-shell.md` | P5 (if needed) |
 | **metabolomics_de skill** | New pillar, pure whitespace — *but* only build when a product needs it; otherwise breadth. | [[selom-clawbio-bioskills-shortlist]] (audit #2) | P4 (on demand) |
+| **Accession AUTO-fetch + ingest (dogfood Slice 5 Phase B2)** | The network/large-file/async auto-download of deposited data (GEO-suppl heterogeneity: tar / mtx-triplet / per-sample → `engine.ingest`). **Owner decision s53:** put the infra on hold — instead ship the *manual* handoff (Slice 5B: a per-accession link + download instructions → user fetches → drops into the per-panel picker). Revisit auto-fetch only if the manual loop proves too slow. | `docs/reproduction-dogfood/spec.md` Slice 5 Phase B2, [[selom-accession-ingest]], [[ask-before-docker-wsl]] | P1/P5 (later, infra) |
 
 > Note: `[[name]]` links resolve to the auto-memory under
 > `C:\Users\seamegdool\.claude\projects\D--selom\memory\`. The `MEMORY.md` index there

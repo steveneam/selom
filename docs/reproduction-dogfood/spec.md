@@ -242,11 +242,21 @@ and it drives the matcher.
   NGDC/CNCB) · PRIDE (`PXD`) · MetaboLights/MW (`MTBLS/ST`) · Zenodo/Figshare/Dryad DOIs. URLs built
   deterministically (no dependency — avoid GEOparse on the shipped path unless its license is
   verified). Surface in the diagnostic gap report **and** Product A's `data_check`.
-- **Phase B — fetch + ingest (GATED, defer):** pull the open/*processed* cases (GEO-suppl / Zenodo /
-  Figshare) → `engine.ingest` → feed the matcher (closes `data_unmatched`). Needs network + a size
-  cap + a cache dir + likely async → **ASK before building** ([[ask-before-docker-wsl]]). The hard
-  part is GEO-supplement heterogeneity (tar / mtx-triplet / per-sample) + mapping a file to a panel.
-- **Phase C:** per-accession → per-panel (folds into Slice 2's picker).
+- **Phase B — deposit-data HANDOFF (link + download instructions; do now, NO infra) — owner
+  decision s53.** Instead of auto-fetching, surface for each recognized accession a **direct link +
+  concrete per-repo download instructions** (which file to grab, how) so the user fetches it
+  themselves and drops it into the **per-panel picker** (Slice 2, shipped s53). Deterministic, no
+  network on the shipped path → **NOT gated**. This closes `data_unmatched` via *the user + the
+  picker* with zero fetch infra. The recognizer (Phase A) already builds the `url`; Phase B adds the
+  per-repo "how to download the right file" copy + the FE surface (in the gap report / Reproduce
+  stage, next to the Cited-datasets table) that hands the user to the link and back to the picker.
+- **Phase B2 — auto-fetch + ingest (ON HOLD, P6).** The original network/large-file/async
+  auto-download (open/processed GEO-suppl / Zenodo / Figshare → `engine.ingest` → feed the matcher).
+  The hard part is GEO-supplement heterogeneity (tar / mtx-triplet / per-sample). **Parked** in
+  `docs/on-hold/README.md` — the manual handoff (B) makes it non-urgent; revisit only if the manual
+  loop proves too slow ([[ask-before-docker-wsl]]).
+- **Phase C:** per-accession → per-panel (folds into Slice 2's picker — the picker already takes a
+  per-panel file, so a downloaded accession file just becomes another pickable supplement).
 - **Honest rules (load-bearing):** raw-reads (`SRA/ENA/GSA-CRA`) → "needs quantification" (the parked
   BAM-ingest, [[selom-bam-ingest]]); controlled (`dbGaP/EGA/GSA-HRA`) → "requires application,
   cannot auto-fetch" — never a silent failure.
@@ -286,10 +296,14 @@ metric-type tolerance**; two tiers (cheap classification-shape in CI, slow real-
 opt-in). *Why:* catches silent regressions without making CI re-run heavy science every push, and
 reuses the tolerance grader so engine deltas don't flap. *Reversible:* yes.
 
-**D6 — Accession fetch is gated.** *Recommend:* ship **Phase A** (recognize + classify + link, no
-network) freely; **defer Phase B (fetch + ingest) behind an explicit owner ask** (network /
-large-file / async infra). *Why:* recognition is cheap, deterministic, and license-clean and is
-immediately useful; auto-fetch is where the infra + GEO-heterogeneity cost lives. *Reversible:* yes.
+**D6 — Accession fetch is gated.** *Original (s50):* ship Phase A (recognize + classify + link, no
+network) freely; defer the fetch behind an explicit owner ask. **UPDATED (owner, s53):** don't build
+the auto-fetch at all for now — ship a **manual handoff** instead (Phase B: per-accession link +
+download instructions → the user downloads → drops the file into the per-panel picker). That is
+deterministic, no-infra, and **un-gated**; the network/large-file/async **auto-fetch (Phase B2) goes
+on hold** (`docs/on-hold/README.md`). *Why:* the picker (Slice 2) already accepts a per-panel file,
+so the cheap manual loop closes `data_unmatched` end-to-end without paying the infra cost; revisit
+auto-fetch only if the manual loop proves too slow. *Reversible:* yes.
 
 *Assumption:* Harmony's supplement zips contain the tabular data the integration panels need; if
 the deposited data is a processed embedding rather than raw counts, Slice 0 will report
