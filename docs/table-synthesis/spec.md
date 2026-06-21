@@ -16,10 +16,12 @@
 > reduced confidence (S3) — a real computed value, so it MAY feed the score (S2); registering the new
 > synthesizers auto-extended reader coverage (no reader edit). **The lossy Tier-B set
 > (`boxplot`/`heatmap`/`scorecard`/`violin`) SHIPPED (s45)** — each behind a faithfulness gate; all
-> four had a faithful deterministic table so none was punted to L4 (§8 step 3b). **Remaining:** FE
-> Statistics-node wiring (cross-lane) · `proteomics_de` at source (Codex lane). The full synthesizer
-> set is now 16 skills; the only L4-only skills are the node-link trio (`go_graph`/`pathway`/
-> `string_network`).
+> four had a faithful deterministic table so none was punted to L4 (§8 step 3b). **`proteomics_de` at
+> source SHIPPED (s46)** — it now attaches the canonical `de_table` (real engine + stub), and the
+> shared `de_table` L1 reader (`_read_de_table`) is registered for it so `de_total` reads as up+down
+> (§8 step 5). **Remaining: only the FE Statistics-node wiring** (cross-lane, §8 step 4 — folded into
+> the deferred circle-back FE pass). The full synthesizer set is 16 skills; the only L4-only skills
+> are the node-link trio (`go_graph`/`pathway`/`string_network`).
 > Original directive (s41): make our own custom Statistics tables so skills that don't emit one *do*;
 > skills that genuinely can't → don't force it → L4 Pro AI. Sequenced after the L1/L2 reader (shipped).
 > Companions: `docs/reproduction-engine/skill-table-schemas.md` (the inventory this builds on),
@@ -175,4 +177,12 @@ build first; **Tier B** = synthesizable but lossy/needs care; **L4** = leave to 
    misaligned theta/r · no annotation).
 4. **FE Statistics-node wiring** (cross-lane) — attach synthesized tables in the run/job response so
    tableless skills show an editable table in the editor; labelled provenance.
-5. **proteomics_de at source** (Codex lane) — attach a native `de_table` (the one real source fix).
+5. **proteomics_de at source** — attach a native `de_table` (the one real source fix). **DONE
+   (s46, Claude acting BE).** `proteomics_de` computed real per-protein logFC+padj but attached no
+   table (the figure title's tested-protein count was easily mistaken for a DE total); it now
+   attaches the canonical `de_table` the volcano is drawn from, restricted to the tested/kept
+   proteins, in both the real engine and the stub — exactly as `volcano` does. Registered
+   `proteomics_de` to the shared `de_table` L1 reader (renamed `_read_volcano` → `_read_de_table`)
+   so `de_total` reads as up+down, not the tested-protein row count. With this the only L4-only
+   skills are the node-link trio (`go_graph`/`pathway`/`string_network`). **Build plan complete bar
+   step 4** (FE Statistics-node wiring, folded into the deferred circle-back FE pass).

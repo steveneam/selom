@@ -116,7 +116,7 @@ Now harden **credibility**.
 **Today:** `reproduction_drive` + `reproduction_runs` + Phase-3 FE + 4 validated ledgers + the
 two-axis Score.
 **Slices:**
-- **5a** Metric-type-aware tolerance grader — tie the band to known engine deltas ([[selom-gsea-engine-sensitivity]], Melody↔Harmony) so **engine-delta ≠ irreproducible** in `validate_panel`.
+- **5a** Metric-type-aware tolerance grader — tie the band to known engine deltas ([[selom-gsea-engine-sensitivity]], Melody↔Harmony) so **engine-delta ≠ irreproducible** in `validate_panel`. **DONE (s46):** `metric_type` on `Golden` → family band (`METRIC_TYPE_TOLERANCES` + `infer_metric_type`/`resolve_tolerances`); explicit per-golden tolerance still wins; the drive auto-types its goldens; 4 ledgers byte-identical.
 - **5b** Generic-extractor coverage (more metrics readable without a hand ledger; rides P2/L3).
 - **5c** The 4 validated ledgers (RPGRIP1/JEV/Hani/Dorgau) become **regression fixtures** over the auto-drive — catch engine drift.
 - **5d** Live-repro edge hardening (`data_unmatched` / `needs_recipe` honesty under more real papers).
@@ -135,7 +135,7 @@ pillar it would rejoin). Nothing deleted, nothing moved out of its existing home
 2. Then the **two structure-bearing tracks** can proceed largely in parallel:
    - **P2a/2b/2c** (L3 + table joining) — already specced; the clearest "table joining" wins.
    - **P1c/1d + P3a** (clean + route raw data) — the Product-A path that the spine has been missing.
-3. **P5a** (tolerance grader) and **P4a** (contract uniformity) ride on top once P2/L3 lands.
+3. **P5a** (tolerance grader) **DONE (s46)**; **P4a** (contract uniformity) rides on top once P2/L3 lands.
 4. **P6** stays parked throughout; an item only leaves the lot by an explicit owner decision that
    names the pillar it rejoins.
 
@@ -151,6 +151,6 @@ s25–s42 drift.
 |---|---|
 | **Done — engine-relevant** | ~30 analysis skills · clean-room Melody + Harmony2 · `ingest_paper`/`PaperBundle` · routing (skill-keyword-index 4-layer) · `extract/golden` · L1/L2 readers · `reproduction_drive` (merge+match+drive+grade) · `reproduction_runs` + Phase-3 FE · two-axis Score · figure editor + publication theme · lit-synth methods (~70%) · 4 validated ledgers |
 | **Done — surfaces** | Workspace Library · umbrella shell (`/paper/[id]`) · Skill Match FE · chart extractor (`/extract`) · paper metadata + auto-rename · gene-set builder Phase A |
-| **Not done — engine-core** | **L3 table-synthesis** (specced, 4 decisions) · **is-my-data-clean? + RAW-data routing** · **metric-type-aware tolerance grader** · canonical `DataBundle` / unified ingest · `proteomics_de` native `de_table` |
+| **Not done — engine-core** | **is-my-data-clean? + RAW-data routing** · canonical `DataBundle` / unified ingest · P4 methods/figure-legend layer wiring _(L3 table-synthesis, metric-type tolerance grader, `proteomics_de` native `de_table` all DONE s43–s46; only the L3 FE Statistics-node wiring remains, in the circle-back FE pass)_ |
 | **On-hold (P6)** | journal styles · BAM ingest · Ask-Selom chat · atlas reproductions · external-tool builds (ARCHS4/phylo/eggNOG) · ClawBio HOST slice · pipeline flow animation · digitize-this-panel bridge · gene-set messy lists · command-center C/B platform · Supabase/arq/Kaleido infra · OSCA Gap E · pdf.js region-capture |
-| **Good to do (serves P1–P5)** | the engine spec (P1a) · L3 (P2a) · RAW-data router (P3a) · is-my-data-clean (P1c) · tolerance grader (P5a) |
+| **Good to do (serves P1–P5)** | RAW-data router (P3a) · is-my-data-clean (P1c) · P4 methods/legend wiring (P4c) · P1 step-5 consolidation (fold reproduction onto engine/ingest + `engine/match.py`) |
