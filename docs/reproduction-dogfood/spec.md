@@ -167,6 +167,36 @@ measure before we build**.
   pattern is documented so each future blessed paper is a copy-paste.
 - **Depends on:** Slices 1–2. **Size:** ~1 session.
 
+### Slice 5 — Accession recognizer (data-side; P1 ingest)  ·  *NEXT BUILD (s51)*
+
+- **Goal:** recognize dataset **accessions** in the paper text (esp. the *Data/Code Availability*
+  statement) and classify each by repository + access type, so a paper whose data is *cited not
+  attached* (the Harmony meta-finding — papers deposit code/`.rda`/accessions, not tabular
+  supplements) gets honest, actionable data provenance instead of a mis-matched supplement.
+  **Owner-originated (s50).** The data-side sibling of Slice 1 (extractor-side) — orthogonal, both
+  needed.
+- **Build — Phase A (do now, no network, license-clean):** `extract/accessions.py` — deterministic
+  regex over `bundle.text` (weight the availability section) → typed
+  `Accession{repo, id, access: open|raw|controlled, ingestable, url}`. Repos: GEO (`GSE/GSM/GPL`) ·
+  SRA (`SRR/SRP/PRJNA`) · ENA (`PRJEB/ERR`) · ArrayExpress (`E-MTAB-`) · **GSA** (`CRA/PRJCA/HRA`,
+  NGDC/CNCB) · PRIDE (`PXD`) · MetaboLights/MW (`MTBLS/ST`) · Zenodo/Figshare/Dryad DOIs. URLs built
+  deterministically (no dependency — avoid GEOparse on the shipped path unless its license is
+  verified). Surface in the diagnostic gap report **and** Product A's `data_check`.
+- **Phase B — fetch + ingest (GATED, defer):** pull the open/*processed* cases (GEO-suppl / Zenodo /
+  Figshare) → `engine.ingest` → feed the matcher (closes `data_unmatched`). Needs network + a size
+  cap + a cache dir + likely async → **ASK before building** ([[ask-before-docker-wsl]]). The hard
+  part is GEO-supplement heterogeneity (tar / mtx-triplet / per-sample) + mapping a file to a panel.
+- **Phase C:** per-accession → per-panel (folds into Slice 2's picker).
+- **Honest rules (load-bearing):** raw-reads (`SRA/ENA/GSA-CRA`) → "needs quantification" (the parked
+  BAM-ingest, [[selom-bam-ingest]]); controlled (`dbGaP/EGA/GSA-HRA`) → "requires application,
+  cannot auto-fetch" — never a silent failure.
+- **Acceptance (Phase A):** on Harmony, the recognizer finds the paper's availability-statement
+  accessions and labels each (repo + access + ingestable); the diagnostic shows data provenance
+  instead of 8× mis-matched `run_failed`. Unit tests over real availability-statement strings (GEO /
+  SRA / GSA / a controlled one).
+- **DoD:** `extract/accessions.py` + tests green; wired into the diagnostic report.
+- **Depends on:** Slice 0 (done). Feeds Slice 2. **Size:** ~1 session (Phase A).
+
 ## Decisions (for owner review)
 
 **D1 — Gap-report schema.** *Recommend:* a thin `DiagnosticReport` projected from the existing
@@ -195,6 +225,11 @@ unbounded). *Why:* the backlog must outlive the session and rank across papers. 
 metric-type tolerance**; two tiers (cheap classification-shape in CI, slow real-data re-drive
 opt-in). *Why:* catches silent regressions without making CI re-run heavy science every push, and
 reuses the tolerance grader so engine deltas don't flap. *Reversible:* yes.
+
+**D6 — Accession fetch is gated.** *Recommend:* ship **Phase A** (recognize + classify + link, no
+network) freely; **defer Phase B (fetch + ingest) behind an explicit owner ask** (network /
+large-file / async infra). *Why:* recognition is cheap, deterministic, and license-clean and is
+immediately useful; auto-fetch is where the infra + GEO-heterogeneity cost lives. *Reversible:* yes.
 
 *Assumption:* Harmony's supplement zips contain the tabular data the integration panels need; if
 the deposited data is a processed embedding rather than raw counts, Slice 0 will report
