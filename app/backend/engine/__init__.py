@@ -11,6 +11,7 @@ Ingest registry (``engine.ingest``) and QC (``engine.qc``) follow.
 from __future__ import annotations
 
 from engine.databundle import DataBundle, classify
+from engine.ingest import ingest
 from engine.models import (
     ALL_KINDS,
     BULK_COUNTS,
@@ -28,6 +29,7 @@ from engine.models import (
 __all__ = [
     "DataBundle",
     "classify",
+    "ingest",
     "ALL_KINDS",
     "SC_COUNTS",
     "BULK_COUNTS",
