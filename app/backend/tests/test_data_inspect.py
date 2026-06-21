@@ -38,6 +38,10 @@ def test_inspect_clean_bulk_counts_ok():
     # P3 guidance rides along: a registry-validated pipeline for this modality.
     assert body["routing"]["confident"] is True
     assert "deg" in [s["skill_id"] for s in body["routing"]["steps"]]
+    # Slice 2 (product-agnostic): own data also gets the data-fit confidence band.
+    assert body["data_fit"]["confidence"] == "confident" and body["data_fit"]["quality"] == 100
+    assert any(f["skill_id"] == "deg" and f["confidence"] == "confident"
+               for f in body["data_fit"]["fits"])
 
 
 def test_inspect_hint_forces_kind_and_qc_blocks_non_integer_counts():

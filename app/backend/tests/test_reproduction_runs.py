@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 import config
 import reproduction as R
 import reproduction_runs
+from engine.compat import DataFit, FileFitReport
 from jobs.store import JobStatus
 from main import app
 from reproduction_drive import DriveResult, PanelDrive
@@ -29,7 +30,13 @@ def _canned_result():
     ledger.validations.append(val)
     ledger.scorecard = R.build_scorecard(ledger)
     drives = [PanelDrive(panel_key="4", status="driven", skill_id="volcano", metrics_read=["de_total"])]
-    return DriveResult(ledger=ledger, panel_drives=drives)
+    fits = [FileFitReport(path="d.csv", filename="d.csv", kind="de_results", quality=100,
+                          qc_ok=True, loadable=True, score=100, best_skill="volcano",
+                          best_verdict="fit",
+                          fits=[DataFit(path="d.csv", filename="d.csv", skill_id="volcano",
+                                        kind="de_results", score=100, compatible=True,
+                                        verdict="fit", qc_ok=True)])]
+    return DriveResult(ledger=ledger, panel_drives=drives, data_fits=fits)
 
 
 def _fake_drive(main_path, supplement_paths, **kw):
@@ -62,6 +69,14 @@ def test_public_light_omits_ledger():
     full = reproduction_runs.public(rec)
     assert "ledger" not in light and light["status"] == "succeeded"
     assert full["ledger"]["paper"]["title"] == "Test paper" and full["scorecard"] is not None
+
+
+def test_public_surfaces_data_fits_with_confidence_band():
+    # the run contract carries the dropped-data fit ranking + the confidence band the score means.
+    rec = reproduction_runs.start_run("m.pdf", ["d.csv"], drive_fn=_fake_drive)
+    full = reproduction_runs.public(rec)
+    assert full["data_fits"] and full["data_fits"][0]["filename"] == "d.csv"
+    assert full["data_fits"][0]["confidence"] == "confident"  # computed band, serialized for the FE
 
 
 # --- routes -------------------------------------------------------------------
@@ -109,3 +124,32 @@ def test_events_unknown_run_emits_error():
     with client.stream("GET", "/reproduction-runs/ghost/events") as resp:
         body = "".join(resp.iter_text())
     assert "unknown run" in body
+
+
+# --- pre-run data-fit assessment (Slice 2: the score BEFORE Run) --------------
+
+
+def _assess(supp, skills=""):
+    files = [("supplements", (name, io.BytesIO(data), "text/csv")) for name, data in supp]
+    return client.post("/papers/p/assess-data", files=files, data={"skills": skills})
+
+
+def test_assess_data_scores_a_good_file_confident():
+    # a DE table dropped for a volcano panel → Confident, before any run (no PDF needed: skills given).
+    r = _assess([("de.csv", b"gene,log2FoldChange,padj\nA,2.0,0.001\nB,-1.5,0.02")], skills="volcano")
+    assert r.status_code == 200
+    fits = r.json()["data_fits"]
+    assert fits and fits[0]["confidence"] == "confident" and fits[0]["best_skill"] == "volcano"
+
+
+def test_assess_data_flags_a_wrong_file_not_a_fit():
+    # a QC table dropped for a single-cell panel → Not a fit, so the user can swap it before Run.
+    r = _assess([("qc.csv", b"sample,estimated_cells,median_genes\ns1,5000,1500\ns2,6000,1480")],
+                skills="umap_scrna")
+    fits = r.json()["data_fits"]
+    assert fits and fits[0]["confidence"] == "not_a_fit"
+
+
+def test_assess_data_no_supplements_is_empty():
+    r = client.post("/papers/p/assess-data", data={"skills": "volcano"})
+    assert r.status_code == 200 and r.json() == {"paper_id": "p", "n_files": 0, "data_fits": []}

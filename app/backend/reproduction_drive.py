@@ -67,10 +67,12 @@ class PanelDrive(BaseModel):
 
 
 class DriveResult(BaseModel):
-    """The driven ledger (same shape as ``GET /papers/{slug}``) + the per-panel drive report."""
+    """The driven ledger (same shape as ``GET /papers/{slug}``) + the per-panel drive report +
+    the dropped-data fit ranking (Slice 2: how good/compatible each supplement is for the run)."""
 
     ledger: R.Ledger
     panel_drives: list[PanelDrive] = Field(default_factory=list)
+    data_fits: list = Field(default_factory=list)  # list[engine.compat.FileFitReport]
 
     @property
     def summary(self) -> dict[str, int]:
@@ -108,11 +110,13 @@ def _default_runner(skill_id: str, data_path: str, params: dict):
 
 
 def drive_panel(ledger: R.Ledger, panel: R.Panel, *, tabular: list[str],
-                data_map: dict[str, str] | None, runner, params: dict | None) -> PanelDrive:
+                data_map: dict[str, str] | None, runner, params: dict | None,
+                assessments=None) -> PanelDrive:
     """Drive one panel: classify → (maybe run) → read → (maybe validate). Honest, never a false fail.
 
     Appends a ``ReproRun`` whenever the skill ran (so the FE can show the computed output even when
-    there is nothing to score), and a ``Validation`` only when a golden metric was actually read."""
+    there is nothing to score), and a ``Validation`` only when a golden metric was actually read.
+    ``assessments`` is the per-run data-fit cache (``engine.compat.inventory``) the matcher reuses."""
     key = panel.skill_id
     if panel.scope in R.OUT_OF_SCOPE_SCOPES:
         return PanelDrive(panel_key=panel.key, status=OUT_OF_SCOPE, skill_id=key,
@@ -120,7 +124,7 @@ def drive_panel(ledger: R.Ledger, panel: R.Panel, *, tabular: list[str],
     if not key:
         return PanelDrive(panel_key=panel.key, status=NO_SKILL,
                           note="in-scope figure with no routed skill")
-    data_path, data_note = match_data(panel, tabular, data_map)
+    data_path, data_note = match_data(panel, tabular, data_map, assessments=assessments)
     if data_path is None:
         status = DATA_UNMATCHED if panel.golden else NO_GOLDEN
         return PanelDrive(panel_key=panel.key, status=status, skill_id=key, note=data_note)
@@ -190,13 +194,21 @@ def drive_bundle(bundle: PaperBundle, *, paper_id: str = "", paper: R.Paper | No
 
     The bundle-level entrypoint (``reproduce`` = ingest + this), split out so the orchestration +
     honest classification are testable with a constructed bundle + an injected ``runner``, no PDF."""
+    from engine import compat
+
     ledger = merge_ledger(bundle, paper_id, paper=paper, index=index)
     tabular = tabular_paths(bundle)
+    assessments = compat.inventory(tabular)  # classify each supplement once, reused below
     drives = [drive_panel(ledger, p, tabular=tabular, data_map=data_map, runner=runner,
-                          params=params) for p in ledger.panels]
+                          params=params, assessments=assessments) for p in ledger.panels]
     ledger.scorecard = R.build_scorecard(ledger)
     _append_grey_cells(ledger, drives)
-    return DriveResult(ledger=ledger, panel_drives=drives)
+    # Rank each dropped supplement against the run's in-scope analyses (reuses the same inventory) —
+    # the "is this good/compatible data?" verdict surfaced in the gap report + run contract (Slice 2).
+    skills = [p.skill_id for p in ledger.panels
+              if p.skill_id and p.scope not in R.OUT_OF_SCOPE_SCOPES]
+    data_fits = compat.report_files(tabular, skills, assessments=assessments)
+    return DriveResult(ledger=ledger, panel_drives=drives, data_fits=data_fits)
 
 
 def reproduce(main_path: str, supplement_paths: list | None = None, *, paper_id: str = "",

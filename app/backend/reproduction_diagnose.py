@@ -17,6 +17,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 import reproduction as R
+from engine.compat import FileFitReport
 from extract.accessions import Accession, AccessionReport, find_accessions
 from extract.ingest import ingest_paper
 from reproduction_drive import DRIVEN, DriveResult, drive_bundle
@@ -63,6 +64,7 @@ class DiagnosticReport(BaseModel):
     n_driven: int = 0
     auto_grade_rate: float | None = None
     accessions: list[Accession] = Field(default_factory=list)  # datasets the paper CITES (Slice 5)
+    data_fits: list[FileFitReport] = Field(default_factory=list)  # dropped-data quality/fit (Slice 2)
 
     @property
     def data_provenance(self) -> str:
@@ -78,13 +80,16 @@ class DiagnosticReport(BaseModel):
 
 
 def diagnose(result: DriveResult, *, paper_id: str = "",
-             accessions: list[Accession] | None = None) -> DiagnosticReport:
+             accessions: list[Accession] | None = None,
+             data_fits: list[FileFitReport] | None = None) -> DiagnosticReport:
     """Project a driven ``DriveResult`` → a :class:`DiagnosticReport` (pure, PDF-free, unit-testable).
 
     Iterates the authoritative per-panel drive records (1:1 with ledger panels, in the drive's sorted
     order) and joins each to its ledger panel for the printed goldens + scope. Every panel yields one
     row — no silent caps, mirroring the heatmap invariant. ``accessions`` (Slice 5) carries the
-    datasets the paper *cites* — surfaced so a ``data_unmatched`` paper shows honest provenance."""
+    datasets the paper *cites*; ``data_fits`` (Slice 2) carries how good/compatible each dropped
+    supplement is for the run's analyses — surfaced so a ``data_unmatched`` paper shows both honest
+    provenance and an honest verdict on the data the user actually attached."""
     panel_by_key = {p.key: p for p in result.ledger.panels}
     rows: list[DiagnosticPanel] = []
     for d in result.panel_drives:
@@ -116,6 +121,7 @@ def diagnose(result: DriveResult, *, paper_id: str = "",
         n_driven=n_driven,
         auto_grade_rate=(n_driven / n_gradable) if n_gradable else None,
         accessions=accessions or [],
+        data_fits=(result.data_fits if data_fits is None else data_fits),
     )
 
 
@@ -124,8 +130,10 @@ def diagnose_paper(main_path: str, supplement_paths: list | None = None, *, pape
     """Run a cold drive on a paper (no hand ledger) and return its gap report. Heavy path: it drives
     the real scientific stack. ``kw`` forwards ``data_map`` / ``runner`` / ``index`` to the drive.
 
-    Ingests once and reuses the bundle for both the drive and the accession scan (Slice 5), so the
-    gap report carries the paper's cited-dataset provenance alongside the per-panel statuses."""
+    Ingests once and reuses the bundle for the drive + the accession scan (Slice 5). The dropped-data
+    fit ranking (Slice 2) rides on the ``DriveResult`` (the drive already classified each supplement),
+    so the gap report carries cited-dataset provenance AND an honest score on the data the user
+    attached, alongside the per-panel statuses."""
     bundle = ingest_paper(main_path, supplement_paths or [], paper_id=paper_id)
     result = drive_bundle(bundle, paper_id=paper_id, **kw)
     return diagnose(result, paper_id=paper_id, accessions=find_accessions(bundle.text))
@@ -151,6 +159,18 @@ def to_markdown(report: DiagnosticReport) -> str:
             head += "| " + " | ".join([
                 a.label or a.repo, f"[{a.id}]({a.url})", a.access,
                 "yes" if a.ingestable else "no", a.section, a.note or "—",
+            ]) + " |\n"
+        head += "\n"
+    if report.data_fits:
+        head += "## Dropped data — fit (Slice 2)\n\n"
+        fcols = ["file", "kind", "quality", "best fit", "score", "confidence", "why"]
+        head += "| " + " | ".join(fcols) + " |\n|" + "|".join(["---"] * len(fcols)) + "|\n"
+        for ff in report.data_fits:
+            best = ff.fits[0] if ff.fits else None
+            head += "| " + " | ".join([
+                ff.filename or "—", ff.kind, f"{ff.quality}/100",
+                ff.best_skill or "—", f"{ff.score}/100", ff.confidence,
+                ((best.reason if best else ff.note) or "—").replace("|", "\\|"),
             ]) + " |\n"
         head += "\n"
     cols = ["panel", "fig", "status", "skill", "data", "goldens(exp)", "read", "reason"]

@@ -5,7 +5,7 @@ import shutil
 import tempfile
 import uuid
 
-from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -193,6 +193,49 @@ async def reproduce_paper(
         shutil.rmtree(run_dir, ignore_errors=True)
 
 
+@app.post("/papers/{paper_id}/assess-data")
+async def assess_paper_data(
+    paper_id: str,
+    main: UploadFile | None = File(None),
+    supplements: list[UploadFile] = File(default=[]),
+    skills: str = Form(""),
+):
+    # Pre-run data-fit check (Slice 2): classify + score each dropped supplement against the
+    # analyses this paper routes to — so the user sees a confidence band (Confident / Not a fit /
+    # …) BEFORE clicking Run and can swap a wrong/dirty file. NO skills execute (cheap: ingest +
+    # route + score). The same FileFitReport shape the Score stage shows after a run, so the FE
+    # renders one panel for both. ``skills`` (csv of skill ids) lets the FE skip re-routing.
+    from engine.compat import report_files
+    from engine.match import merge_ledger, tabular_paths
+    from extract.ingest import ingest_paper
+
+    max_bytes = settings.max_upload_mb * 1024 * 1024
+    run_dir = tempfile.mkdtemp(prefix="selom-assess-")
+    try:
+        supp_paths = [await _save_capped(run_dir, s, max_bytes) for s in supplements]
+        if not supp_paths:
+            return {"paper_id": paper_id, "n_files": 0, "data_fits": []}
+        skill_ids = [s for s in (skills.split(",") if skills else []) if s.strip()]
+        tabular = supp_paths
+        if main is not None:  # route the paper → the in-scope panel skills to score against
+            main_path = await _save_capped(run_dir, main, max_bytes)
+            bundle = ingest_paper(main_path, supp_paths, paper_id=paper_id)
+            tabular = tabular_paths(bundle)
+            if not skill_ids:
+                ledger = merge_ledger(bundle, paper_id)
+                import reproduction as R
+
+                skill_ids = [p.skill_id for p in ledger.panels
+                             if p.skill_id and p.scope not in R.OUT_OF_SCOPE_SCOPES]
+        fits = report_files(tabular, skill_ids)
+        return {"paper_id": paper_id, "n_files": len(fits),
+                "data_fits": [f.model_dump() for f in fits]}
+    except ValueError as exc:  # the size cap
+        raise HTTPException(status_code=413, detail=str(exc)) from exc
+    finally:
+        shutil.rmtree(run_dir, ignore_errors=True)
+
+
 @app.get("/reproduction-runs/{run_id}")
 def get_reproduction_run(run_id: str):
     # The run's state; on `succeeded` the driven Ledger + scorecard (same shape as GET /papers/{slug})
@@ -290,6 +333,7 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
     # the user reads and can override. The cheap routing inventory in extract.ingest is the
     # paper-side complement. `sheet` selects an xlsx sheet; `hint` forces the modality.
     from engine import ALL_KINDS, ingest, route_data, run_qc
+    from engine import compat
 
     if hint is not None and hint not in ALL_KINDS:
         raise HTTPException(status_code=400, detail=f"hint must be one of {ALL_KINDS}")
@@ -298,17 +342,28 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
         bundle = ingest(path, hint=hint, sheet=sheet)
         bundle.qc = run_qc(bundle)
         routing = route_data(bundle)               # which analyses fit this modality (P3 guidance)
+        bundle.source.filename = pathlib.Path(matrix.filename or "").name  # honest name
+        # Data-fit (Slice 2, product-agnostic): score THIS file against the analyses it routes to —
+        # the same confidence band ("Confident / Not a fit / …") Product B shows, now for own data.
+        fa = compat.assess_bundle(bundle)
+        fits = sorted((compat.fit(s.skill_id, fa) for s in routing.steps),
+                      key=lambda f: (f.compatible is False, -f.score))
+        data_fit = {
+            "quality": fa.quality,
+            "confidence": fits[0].confidence if fits else ("uncertain" if fa.loadable else "unreadable"),
+            "fits": [f.model_dump() for f in fits],
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     finally:
         pathlib.Path(path).unlink(missing_ok=True)
-    bundle.source.filename = pathlib.Path(matrix.filename or "").name  # honest name, not the temp file
     return {
         "filename": matrix.filename or "",
         "kind": bundle.kind,
         "source": bundle.source.model_dump(),
         "qc": bundle.qc.model_dump(),
         "routing": routing.model_dump(),           # suggested skill pipeline + honest note
+        "data_fit": data_fit,                      # is-this-good-data verdict for own data (Slice 2)
     }
 
 
@@ -356,6 +411,14 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
             from extract.synthesize import synthesize_table
 
             table = synthesize_table(skill_id, figure)
+        # Data-fit for THIS skill on the user's own data (Slice 2, product-agnostic): the same
+        # confidence band Product B shows — "is the data I'm running good/compatible for this
+        # analysis?" Reuses the already-ingested bundle (no second load); None when uninspectable.
+        data_fit = None
+        if bundle is not None:
+            from engine import compat
+
+            data_fit = compat.fit(skill_id, compat.assess_bundle(bundle)).model_dump()
         # B4 publish-confidence: every figure ships with its reproducibility bundle +
         # auto methods-text. Pillar 1 adds the Statistics `table` (None for purely-visual
         # skills). Additive — the FE still reads `.figure`.
@@ -371,6 +434,7 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
             "data_check": ({"kind": bundle.kind, "qc": qc.model_dump(),
                             "routing": routing.model_dump() if routing is not None else None}
                            if bundle is not None else {"kind": "unknown", "qc": None, "routing": None}),
+            "data_fit": data_fit,                        # is-my-data-good-for-this-skill (Slice 2)
         }
     finally:
         if design_path:

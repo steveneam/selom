@@ -53,11 +53,14 @@ def test_override_runs_the_analysis_anyway():
 def test_clean_data_passes_and_surfaces_the_verdict_plus_routing():
     r = client.post("/skills/deg/run", files={"matrix": ("counts.csv", _CLEAN_COUNTS, "text/csv")})
     assert r.status_code == 200
-    dc = r.json()["data_check"]
+    body = r.json()
+    dc = body["data_check"]
     assert dc["kind"] == "bulk_counts"
     assert dc["qc"]["ok"] is True and dc["qc"]["blocked"] is False
     # P3 guidance: the suggested pipeline for this modality rides along.
     assert "deg" in [s["skill_id"] for s in dc["routing"]["steps"]]
+    # Slice 2 (product-agnostic): the data-fit verdict for THIS skill on the user's own data.
+    assert body["data_fit"]["confidence"] == "confident" and body["data_fit"]["skill_id"] == "deg"
 
 
 def test_uninspectable_upload_is_fail_soft():
@@ -71,3 +74,4 @@ def test_uninspectable_upload_is_fail_soft():
     body = r.json()
     assert body["figure"]["data"]
     assert body["data_check"] == {"kind": "unknown", "qc": None, "routing": None}
+    assert body["data_fit"] is None            # no bundle to score → honest null (Slice 2)

@@ -32,6 +32,7 @@ class RunRecord(BaseModel):
     progress: str = ""
     ledger: R.Ledger | None = None
     drive_summary: dict = Field(default_factory=dict)
+    data_fits: list = Field(default_factory=list)  # list[engine.compat.FileFitReport] — Slice 2
     error: str | None = None
     created_at: float = 0.0
     updated_at: float = 0.0
@@ -75,7 +76,8 @@ def start_run(main_path: str, supplement_paths: list | None = None, *, paper_id:
         result = drive(main_path, supplement_paths or [], paper_id=(paper_id or rec.id),
                        paper=paper, data_map=data_map, params=params)
         run_store.update(rec.id, status=JobStatus.SUCCEEDED, ledger=result.ledger,
-                         drive_summary=result.summary, progress="scored")
+                         drive_summary=result.summary,
+                         data_fits=getattr(result, "data_fits", []), progress="scored")
     except Exception as exc:  # noqa: BLE001 — surface a clean failed run, never a 500 stack
         run_store.update(rec.id, status=JobStatus.FAILED, error=str(exc), progress="failed")
     return run_store.get(rec.id)
@@ -96,4 +98,7 @@ def public(rec: RunRecord, *, light: bool = False) -> dict:
         out["ledger"] = rec.ledger.model_dump()
         out["scorecard"] = rec.ledger.scorecard.model_dump() if rec.ledger.scorecard else None
         out["drive_summary"] = rec.drive_summary
+        # The dropped-data fit ranking (Slice 2) — surfaced AFTER the run so the Score stage shows
+        # how good/compatible each supplement was, with the confidence band the score means.
+        out["data_fits"] = [f.model_dump() if hasattr(f, "model_dump") else f for f in rec.data_fits]
     return out

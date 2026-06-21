@@ -103,18 +103,23 @@ def tabular_paths(bundle: PaperBundle) -> list[str]:
     return [s.path for s in bundle.supplements if s.kind in (SUPP_XLSX, SUPP_CSV)]
 
 
-def match_data(panel: R.Panel, tabular: list[str],
-               data_map: dict[str, str] | None) -> tuple[str | None, str]:
+def match_data(panel: R.Panel, tabular: list[str], data_map: dict[str, str] | None, *,
+               assessments=None) -> tuple[str | None, str]:
     """Resolve the data file feeding this panel's skill → ``(path | None, note)``.
 
-    v1: an explicit per-panel ``data_map`` override (the data-picker fast-follow) wins; else the
-    single most-likely tabular supplement, honestly noting ambiguity when there is more than one;
-    else ``None`` (the caller marks ``data_unmatched``). Deliberately conservative — better an honest
-    "data not matched" than a wrong run."""
+    An explicit per-panel ``data_map`` override (the data-picker) wins. Otherwise the file is chosen
+    by **data-fit** (``engine.compat.best_match``): the best-scoring tabular supplement that is *not a
+    certain modality mismatch* for this panel's skill. If every loadable candidate IS a certain
+    mismatch — a flat QC table fed to a single-cell skill (the dogfood meta-finding) — this returns
+    ``None`` with the honest modality reason so the caller marks ``data_unmatched`` instead of letting
+    the skill crash (``run_failed``). An unloadable/unclear file stays optimistic (never gated on a
+    guess) so the floor never blocks on the new check. ``assessments`` reuses a per-run
+    :func:`engine.compat.inventory` so a file is classified once, not once per panel."""
+    from engine import compat
+
     if data_map and panel.key in data_map:
         return data_map[panel.key], "explicit data-map override"
     if not tabular:
         return None, "no tabular supplement attached"
-    if len(tabular) == 1:
-        return tabular[0], "single tabular supplement"
-    return tabular[0], f"first of {len(tabular)} tabular supplements (ambiguous — pick per panel)"
+    path, _fit, note = compat.best_match(panel.skill_id or "", tabular, assessments=assessments)
+    return path, note
