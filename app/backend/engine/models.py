@@ -11,7 +11,7 @@ AnnData/DataFrame *payload* that must not be serialized — is a dataclass in
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 # Kind — the closed modality taxonomy (E2: never None; UNKNOWN is honest). ----------------
 # String constants (house style, mirroring reproduction's scope + ingest's SUPP_* literals).
@@ -69,7 +69,9 @@ class QCReport(BaseModel):
     flags: list[QCFlag] = Field(default_factory=list)
     stats: dict = Field(default_factory=dict)
 
+    @computed_field
     @property
     def blocked(self) -> bool:
-        """Any ``block``-severity flag present (D-e5: warn + require override, not hard-refuse)."""
+        """Any ``block``-severity flag present (D-e5: warn + require override, not hard-refuse).
+        Serialized (computed_field) so the FE can gate on it directly."""
         return any(f.severity == QC_BLOCK for f in self.flags)

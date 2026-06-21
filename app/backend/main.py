@@ -246,6 +246,34 @@ def _save_upload(matrix: UploadFile) -> str:
         return f.name
 
 
+@app.post("/data/inspect")
+async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str | None = None):
+    # Engine spine front door (P1, docs/engine-spine/spec.md): drop a data file -> its modality
+    # (Kind) + an "is-my-data-clean?" QC report. Product A's entry point; library-only, runs no
+    # analysis. ingest() classifies the loaded payload; run_qc() emits honest, modality-aware flags
+    # the user reads and can override. The cheap routing inventory in extract.ingest is the
+    # paper-side complement. `sheet` selects an xlsx sheet; `hint` forces the modality.
+    from engine import ALL_KINDS, ingest, run_qc
+
+    if hint is not None and hint not in ALL_KINDS:
+        raise HTTPException(status_code=400, detail=f"hint must be one of {ALL_KINDS}")
+    path = _save_upload(matrix)
+    try:
+        bundle = ingest(path, hint=hint, sheet=sheet)
+        bundle.qc = run_qc(bundle)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        pathlib.Path(path).unlink(missing_ok=True)
+    bundle.source.filename = pathlib.Path(matrix.filename or "").name  # honest name, not the temp file
+    return {
+        "filename": matrix.filename or "",
+        "kind": bundle.kind,
+        "source": bundle.source.model_dump(),
+        "qc": bundle.qc.model_dump(),
+    }
+
+
 @app.post("/skills/{skill_id}/run")
 async def run(skill_id: str, request: Request, matrix: UploadFile, design: UploadFile | None = File(None)):
     # Synchronous one-shot — the proven fast path for light skills (B1). Heavy skills
