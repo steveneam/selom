@@ -28,7 +28,8 @@ from litsynth import lookup as citations_lookup
 from jobs.queue import get_job, result_store, submit
 from jobs.store import TERMINAL
 from skills import styles, theme
-from skills.contract import load_skill, run_skill_with_table
+from skills._engine import to_bool
+from skills.contract import load_skill, run_bundle_with_table, run_skill_with_table
 from skills.registry import list_catalog, list_skill_ids
 
 app = FastAPI(title="Selom API")
@@ -263,6 +264,24 @@ def _save_upload(matrix: UploadFile) -> str:
         return f.name
 
 
+def _inspect_for_run(path: str, filename: str | None):
+    # The engine front door for an own-data run (P1c/P3a): ingest -> classify -> "is-my-data-clean?"
+    # QC -> routing. Returns the classified `DataBundle`, its `QCReport`, and the `DataRouting`.
+    # FAIL-SOFT by design (E4): any load/classify/QC error returns (None, None, None) so the proven
+    # run path is NEVER broken by the guardrail — a file we can't inspect (e.g. a placeholder upload)
+    # just runs as before, and a genuinely-bad payload still errors honestly inside the skill. We only
+    # ever BLOCK when ingest + QC succeed AND surface a real block-severity flag.
+    try:
+        from engine import ingest, route_data, run_qc
+
+        bundle = ingest(path)
+        bundle.qc = run_qc(bundle)
+        bundle.source.filename = pathlib.Path(filename or "").name or bundle.source.filename
+        return bundle, bundle.qc, route_data(bundle)
+    except Exception:  # noqa: BLE001 — the guardrail is best-effort; never let it break a valid run
+        return None, None, None
+
+
 @app.post("/data/inspect")
 async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str | None = None):
     # Engine spine front door (P1, docs/engine-spine/spec.md): drop a data file -> its modality
@@ -302,12 +321,31 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
     # it is threaded as a reserved param and kept out of the provenance record.
     path = _save_upload(matrix)
     params = dict(request.query_params)
+    # P1c "is-my-data-clean?" guardrail (engine-spine spec §5, E3/D-e5): a block-severity QC
+    # problem warns + REQUIRES an explicit override rather than silently producing a misleading
+    # figure — the native moat for non-bioinformaticians. `override=true` runs anyway. The flag is
+    # popped here so it never reaches the skill, methods text, or the recorded provenance config.
+    override = to_bool(params.pop("override", False))
     design_path = _save_upload(design) if design is not None else None
     if design_path:
         params["_design_path"] = design_path
     spec = load_skill(skill_id)
     try:
-        figure, table = run_skill_with_table(skill_id, path, params)
+        # Both products load through one ingest front door (engine-spine §6/§9): classify + QC, then
+        # run from the same DataBundle. Fail-soft — an uninspectable upload yields no bundle and runs
+        # the path-based way (byte-identical), so the guardrail never breaks a previously-valid run.
+        bundle, qc, routing = _inspect_for_run(path, matrix.filename)
+        if qc is not None and qc.blocked and not override:
+            raise HTTPException(status_code=422, detail={
+                "error": "data_check_failed",
+                "message": "This data has a blocking problem for analysis. Review the flags, then "
+                           "re-run with override=true to analyze it anyway.",
+                "kind": bundle.kind,
+                "qc": qc.model_dump(),
+                "routing": routing.model_dump() if routing is not None else None,
+            })
+        figure, table = (run_bundle_with_table(skill_id, bundle, params) if bundle is not None
+                         else run_skill_with_table(skill_id, path, params))
         # B4 publish-confidence: every figure ships with its reproducibility bundle +
         # auto methods-text. Pillar 1 adds the Statistics `table` (None for purely-visual
         # skills). Additive — the FE still reads `.figure`.
@@ -318,6 +356,11 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
             "figure_legend": legends.build(spec, params, figure=figure, table=table),
             "guardrails": guardrails.build(spec, path, params),
             "table": table,                              # Statistics node (Pillar 1) | None
+            # The surfaced is-my-data-clean verdict + suggested next steps for THIS run (P1c/P3a).
+            # `kind`=unknown / `qc`=null when the upload couldn't be inspected (fail-soft).
+            "data_check": ({"kind": bundle.kind, "qc": qc.model_dump(),
+                            "routing": routing.model_dump() if routing is not None else None}
+                           if bundle is not None else {"kind": "unknown", "qc": None, "routing": None}),
         }
     finally:
         if design_path:
