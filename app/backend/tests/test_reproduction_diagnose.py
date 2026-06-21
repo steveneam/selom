@@ -134,3 +134,23 @@ def test_to_markdown_is_readable_and_complete():
     # no silent caps: every panel key appears in the rendered table.
     for key in ("1", "3", "4", "5", "6"):
         assert f"| {key} |" in md
+
+
+# --- Slice 5: cited-dataset provenance surfaced in the report -----------------
+
+
+def test_accessions_surface_in_report_and_markdown():
+    from extract.accessions import find_accessions
+
+    accs = find_accessions("Data Availability. The data are in GEO: GSE213152 (77).")
+    rep = diagnose(_driven_result(), paper_id="harmony", accessions=accs)
+    assert [a.id for a in rep.accessions] == ["GSE213152"]
+    assert "1 accession" in rep.data_provenance and "fetchable" in rep.data_provenance
+    md = to_markdown(rep)
+    assert "Cited datasets" in md and "GSE213152" in md and "cited data (Slice 5)" in md
+
+
+def test_no_accessions_reports_honest_empty_provenance():
+    rep = diagnose(_driven_result(), paper_id="harmony")   # no accessions passed
+    assert rep.accessions == []
+    assert rep.data_provenance == "no dataset accession recognized in the paper text"
