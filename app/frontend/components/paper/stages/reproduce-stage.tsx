@@ -18,8 +18,10 @@ import { skillColor } from "@/lib/catalog/modality";
 import type { SkillCatalogEntry } from "@/lib/catalog/types";
 import { oosLabel } from "@/lib/skill-match/api";
 import { paperFiles, usePaperFiles } from "@/lib/paper/run-files";
+import { useDataFit } from "@/lib/reproduction/data-fit";
 import type { PaperRun } from "@/lib/reproduction/run";
 import { workspaceStore } from "@/lib/workspace/store";
+import { DataFitPanel } from "@/components/reproduction/data-fit-panel";
 import {
   KIND_LABEL,
   SUPPLEMENT_ACCEPT,
@@ -44,11 +46,13 @@ import { Dropzone } from "@/components/project/dropzone";
  */
 export function ReproduceStage({ paper, run }: { paper: SavedPaper; run: PaperRun }) {
   const fv = usePaperFiles(paper.id);
+  const fit = useDataFit(paper.id);
   return (
     <div className="space-y-10">
       <MatchedSkills paper={paper} />
       <PaperPdfSection paper={paper} hasMain={fv.hasMain} mainName={fv.mainName} />
       <SupplementsSection paper={paper} attached={fv.attached} />
+      <DataFitPanel fits={fit.fits} loading={fit.loading} error={fit.error} />
       <ReproduceStatus paper={paper} run={run} attached={fv.attached} hasMain={fv.hasMain} />
     </div>
   );

@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 
 import { paperFiles, usePaperFiles } from "@/lib/paper/run-files";
 import { workspaceStore } from "@/lib/workspace/store";
+import type { FileFitReport } from "./data-fit";
 import type { Ledger } from "./types";
 
 export type RunStatus = "queued" | "running" | "succeeded" | "failed";
@@ -28,6 +29,7 @@ export interface RunPayload {
   error?: string;
   ledger?: Ledger;
   drive_summary?: Record<string, number>;
+  data_fits?: FileFitReport[];
 }
 
 const TERMINAL: readonly RunStatus[] = ["succeeded", "failed"];
@@ -134,34 +136,45 @@ export function usePaperRun(paperId: string): PaperRun {
 export interface LoadedRun {
   status: RunStatus | null;
   ledger: Ledger | null;
+  /** The dropped-data fit ranking the run actually fed on (Slice 2) — surfaced on the Score stage. */
+  dataFits: FileFitReport[];
   /** "expired" when the run is gone (the in-process store cleared / a reload outlived it). */
   error: string | null;
   loading: boolean;
 }
 
+const EMPTY_RUN: LoadedRun = {
+  status: null,
+  ledger: null,
+  dataFits: [],
+  error: null,
+  loading: false,
+};
+
 export function useReproductionRun(runId: string | undefined): LoadedRun {
-  const [state, setState] = React.useState<LoadedRun>({
-    status: null,
-    ledger: null,
-    error: null,
-    loading: !!runId,
-  });
+  const [state, setState] = React.useState<LoadedRun>({ ...EMPTY_RUN, loading: !!runId });
 
   React.useEffect(() => {
     if (!runId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when the run id clears
-      setState({ status: null, ledger: null, error: null, loading: false });
+      setState(EMPTY_RUN);
       return;
     }
     let on = true;
-    setState({ status: null, ledger: null, error: null, loading: true });
+    setState({ ...EMPTY_RUN, loading: true });
     fetchRun(runId)
       .then((p) => {
         if (!on) return;
-        setState({ status: p.status, ledger: p.ledger ?? null, error: p.error ?? null, loading: false });
+        setState({
+          status: p.status,
+          ledger: p.ledger ?? null,
+          dataFits: p.data_fits ?? [],
+          error: p.error ?? null,
+          loading: false,
+        });
       })
       .catch(() => {
-        if (on) setState({ status: null, ledger: null, error: "expired", loading: false });
+        if (on) setState({ ...EMPTY_RUN, error: "expired" });
       });
     return () => {
       on = false;

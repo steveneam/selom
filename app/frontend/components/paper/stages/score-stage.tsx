@@ -20,10 +20,11 @@ import type { SavedPaper } from "@/lib/workspace/types";
  */
 export function ScoreStage({ paper }: { paper: SavedPaper }) {
   const runId = paper.reproductionRunId;
-  const { ledger, status, error, loading } = useReproductionRun(runId);
+  const { ledger, dataFits, status, error, loading } = useReproductionRun(runId);
 
   if (runId && loading) return <ScoreLoading />;
-  if (runId && status === "succeeded" && ledger) return <ScoreReport ledger={ledger} />;
+  if (runId && status === "succeeded" && ledger)
+    return <ScoreReport ledger={ledger} dataFits={dataFits} />;
   if (runId && (error || status === "failed" || status === "succeeded")) {
     // status==="succeeded" with no ledger shouldn't happen, but treat it as unavailable, not blank.
     return <ScoreUnavailable paperId={paper.id} failed={status === "failed"} />;

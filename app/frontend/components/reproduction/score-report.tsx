@@ -4,7 +4,9 @@ import * as React from "react";
 import { GitCompareArrows } from "lucide-react";
 
 import { tierLabel } from "@/lib/reproduction/api";
+import type { FileFitReport } from "@/lib/reproduction/data-fit";
 import type { Ledger, PaperScore } from "@/lib/reproduction/types";
+import { DataFitPanel } from "./data-fit-panel";
 import { ReproHeatmap } from "./repro-heatmap";
 import { PanelTable } from "./panel-table";
 
@@ -16,7 +18,15 @@ import { PanelTable } from "./panel-table";
  * the layout doesn't reflow when the live run fills it (U6). Callers own the surrounding chrome
  * (back-link, metadata header, container); this renders only the score.
  */
-export function ScoreReport({ ledger }: { ledger: Ledger }) {
+export function ScoreReport({
+  ledger,
+  dataFits = [],
+}: {
+  ledger: Ledger;
+  /** The dropped-data fit ranking the run fed on (Slice 2) — surfaced on the live Score stage only;
+   *  the showcase detail omits it (empty → the panel renders nothing). */
+  dataFits?: FileFitReport[];
+}) {
   const sc = ledger.scorecard;
   const score = sc?.score ?? null;
   return (
@@ -27,6 +37,16 @@ export function ScoreReport({ ledger }: { ledger: Ledger }) {
 
       {sc && sc.provenance_divergences.length > 0 && (
         <ProvenanceCallout divergences={sc.provenance_divergences} />
+      )}
+
+      {dataFits.length > 0 && (
+        <div className="mt-8">
+          <DataFitPanel
+            fits={dataFits}
+            title="Data you ran on"
+            sub="How well each file you attached fit these analyses — the same check shown before the run, kept with the result."
+          />
+        </div>
       )}
 
       {sc && sc.panel_scores.length > 0 && (
