@@ -115,3 +115,82 @@ def test_unsupported_skill_returns_none():
 def test_empty_figure_is_honest_none():
     assert synthesize_table("composition", {"data": []}) is None
     assert synthesize_table("regression", {"layout": {}}) is None
+
+
+# --- Tier B (clean trio) ----------------------------------------------------------------
+
+def test_corr_heatmap_symmetric_upper_triangle():
+    # a symmetric corr matrix -> only the upper triangle (no mirrored half, no r=1 diagonal)
+    fig = {"data": [{"type": "heatmap", "x": ["S1", "S2", "S3"], "y": ["S1", "S2", "S3"],
+                     "z": [[1.0, 0.8, 0.2], [0.8, 1.0, 0.5], [0.2, 0.5, 1.0]]}]}
+    t = synthesize_table("corr_heatmap", fig)
+    assert t["columns"] == ["row", "col", "r"]
+    assert t["rows"] == [["S1", "S2", 0.8], ["S1", "S3", 0.2], ["S2", "S3", 0.5]]
+    assert t["synthesized"] is True
+
+
+def test_corr_heatmap_asymmetric_is_full_grid():
+    # different row/col labels (or a non-symmetric matrix) -> every cell, faithfully
+    fig = {"data": [{"type": "heatmap", "x": ["g1", "g2"], "y": ["sA", "sB"],
+                     "z": [[0.1, 0.2], [0.3, 0.4]]}]}
+    t = synthesize_table("corr_heatmap", fig)
+    assert t["rows"] == [["sA", "g1", 0.1], ["sA", "g2", 0.2], ["sB", "g1", 0.3], ["sB", "g2", 0.4]]
+
+
+def test_corr_heatmap_gate_rejects_ragged_z():
+    fig = {"data": [{"type": "heatmap", "x": ["a", "b"], "y": ["a", "b"], "z": [[1.0, 0.5], [0.5]]}]}
+    assert synthesize_table("corr_heatmap", fig) is None
+
+
+def test_sankey_resolves_node_labels():
+    fig = {"data": [{"type": "sankey",
+                     "node": {"label": ["Raw", "QC", "Rods"]},
+                     "link": {"source": [0, 1], "target": [1, 2], "value": [900, 500]}}]}
+    t = synthesize_table("sankey", fig)
+    assert t["columns"] == ["source", "target", "value"]
+    assert t["rows"] == [["Raw", "QC", 900.0], ["QC", "Rods", 500.0]]
+
+
+def test_sankey_gate_rejects_out_of_range_index():
+    fig = {"data": [{"type": "sankey",
+                     "node": {"label": ["A", "B"]},
+                     "link": {"source": [0], "target": [5], "value": [10]}}]}  # 5 ∉ labels
+    assert synthesize_table("sankey", fig) is None
+
+
+def test_upset_intersections_with_members():
+    fig = {"data": [
+        {"type": "bar", "x": ["c0", "c1", "c2"], "y": [30, 24, 18]},  # vertical size bars
+        {"type": "bar", "orientation": "h", "x": [63, 48], "y": ["A", "B"]},  # set-size bars (ignored)
+        {"type": "scatter", "mode": "markers", "x": ["c0", "c1", "c2", "c2"], "y": ["A", "B", "A", "B"],
+         "marker": {"color": "#33404d"}},  # present-membership dots
+    ]}
+    t = synthesize_table("upset", fig)
+    assert t["columns"] == ["intersection", "sets", "size"]
+    assert t["rows"] == [["A", 1, 30], ["B", 1, 24], ["A ∩ B", 2, 18]]
+
+
+def test_upset_gate_requires_size_bars():
+    fig = {"data": [{"type": "bar", "orientation": "h", "x": [63], "y": ["A"]}]}  # only set-size bars
+    assert synthesize_table("upset", fig) is None
+
+
+def test_tier_b_from_live_stub_figures():
+    """Drive each skill's OWN stub engine -> figure -> synthesize (not just a hand fixture), the same
+    end-to-end guard the Tier-A trace-length synthesizers use."""
+    from skills.corr_heatmap.run import _stub_figure as corr_stub
+    from skills.sankey.run import _stub_figure as sankey_stub
+    from skills.upset.run import _stub_figure as upset_stub
+
+    ct = synthesize_table("corr_heatmap", corr_stub())
+    assert ct["columns"] == ["row", "col", "r"]
+    assert len(ct["rows"]) == 15  # 6×6 symmetric -> C(6,2) upper-triangle cells, diagonal dropped
+
+    st = synthesize_table("sankey", sankey_stub())
+    assert st["rows"][0] == ["Raw cells", "Pass QC", 9200.0]
+    assert len(st["rows"]) == 6
+
+    ut = synthesize_table("upset", upset_stub())
+    assert ut["rows"][2] == ["A ∩ B", 2, 18]
+    assert ut["rows"][-1] == ["A ∩ B ∩ C", 3, 6]
+    assert len(ut["rows"]) == 6

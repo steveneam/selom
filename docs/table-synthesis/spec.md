@@ -2,14 +2,21 @@
 
 > Status: **SIGNED OFF (s43, 2026-06-21) — building.** Owner accepted the spec defaults
 > (D-t1 A-first · D-t2 synthesized MAY feed the score, tagged · D-t3 Tier A first · D-t4 proprietary).
-> **Tier A COMPLETE (9/9) + reader integration SHIPPED (s43).** `extract/synthesize.py`: pca ·
-> composition · cluster · pvca · regression · integration · trajectory (part 1, `39b44b3`) **+
-> `umap_scrna`/`annotate`** (trace-length synthesizers, verified against the live stub panels —
-> per-type *cluster* counts aren't in the figure so they're not faked, S4; subtitle totals fold into
-> the title). **Build step 2 done:** `extract/readers.py` `read_metric` now falls back to
-> `synthesize_table` when the skill emits no native table, re-tagged `L3`/synthesized at reduced
-> confidence (S3) — a real computed value, so it MAY feed the score (S2). **Remaining:** Tier B (the
-> lossy/careful synthesizers) · FE Statistics-node wiring (cross-lane) · `proteomics_de` at source.
+> **Tier A COMPLETE (9/9) + reader integration SHIPPED (s43)** + **the Tier-B clean trio SHIPPED
+> (s44).** `extract/synthesize.py`: pca · composition · cluster · pvca · regression · integration ·
+> trajectory (part 1, `39b44b3`) **+ `umap_scrna`/`annotate`** (trace-length synthesizers, verified
+> against the live stub panels — per-type *cluster* counts aren't in the figure so they're not faked,
+> S4; subtitle totals fold into the title) **+ `corr_heatmap`/`sankey`/`upset`** (s44, each behind a
+> faithfulness gate → `None` on a non-conforming shape: corr_heatmap → long-form `[row,col,r]`
+> dropping the redundant lower triangle + r=1 diagonal when square-symmetric; sankey → `[source,
+> target,value]` resolving link indices→labels, out-of-range index → None; upset → `[intersection,
+> sets,size]` from the size bars + member sets read back from the "present" dots). Each verified on
+> its skill's own live stub figure. **Build step 2 done:** `extract/readers.py` `read_metric` now
+> falls back to `synthesize_table` when the skill emits no native table, re-tagged `L3`/synthesized at
+> reduced confidence (S3) — a real computed value, so it MAY feed the score (S2); registering the new
+> synthesizers auto-extended reader coverage (no reader edit). **Remaining:** the **lossy** Tier-B set
+> (`scorecard`/`boxplot`/`violin`/`heatmap`, each gated or → L4) · FE Statistics-node wiring
+> (cross-lane) · `proteomics_de` at source.
 > Original directive (s41): make our own custom Statistics tables so skills that don't emit one *do*;
 > skills that genuinely can't → don't force it → L4 Pro AI. Sequenced after the L1/L2 reader (shipped).
 > Companions: `docs/reproduction-engine/skill-table-schemas.md` (the inventory this builds on),
@@ -150,8 +157,11 @@ build first; **Tier B** = synthesizable but lossy/needs care; **L4** = leave to 
 2. **Reader integration** — `extract/readers.py` tries `synthesize_table` when `table is None`
    (synthesized read tagged at lower confidence); re-verify the drive on a Tier-A panel
    (e.g. composition %, pca variance) end-to-end.
-3. **Tier B** — the lossy/careful synthesizers (corr_heatmap, sankey, upset, scorecard, boxplot,
-   violin, heatmap), each gated by a faithfulness check.
+3. **Tier B (clean trio)** — `corr_heatmap`, `sankey`, `upset`, each gated by a faithfulness check.
+   **DONE (s44).** Read directly off well-formed traces (heatmap `z`+labels, sankey links, upset size
+   bars + present dots); the gate returns `None` on a ragged/out-of-range/missing shape.
+3b. **Tier B (lossy)** — `scorecard`, `boxplot`, `violin`, `heatmap`, each gated by a faithfulness
+   check OR deferred to L4 where a deterministic faithful table can't be synthesized (S4). *(open)*
 4. **FE Statistics-node wiring** (cross-lane) — attach synthesized tables in the run/job response so
    tableless skills show an editable table in the editor; labelled provenance.
 5. **proteomics_de at source** (Codex lane) — attach a native `de_table` (the one real source fix).

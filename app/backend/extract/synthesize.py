@@ -8,7 +8,9 @@ pixel-digitized read it MAY feed the Reproducibility Score (S2), tagged via ``sy
 
 The third layer of Selom's extraction stack ([[layered-deterministic-extraction]]): L1 skill-specific
 reader · L2 generic reader · **L3 synthesis** · L4 AI. Source shapes: ``docs/reproduction-engine/
-skill-table-schemas.md``. Spec + decisions: ``docs/table-synthesis/spec.md`` (Tier A, D-t1..D-t4 owner-signed).
+skill-table-schemas.md``. Spec + decisions: ``docs/table-synthesis/spec.md`` (Tier A 9/9 + the Tier-B
+clean trio ``corr_heatmap``/``sankey``/``upset``; D-t1..D-t4 owner-signed). The lossy Tier-B set
+(``scorecard``/``boxplot``/``violin``/``heatmap``) is deferred to a gated follow-up or L4.
 """
 
 from __future__ import annotations
@@ -190,6 +192,103 @@ def _trajectory(fig: dict) -> dict | None:
     return _tbl(["metric", "value"], rows, "Trajectory structure") if rows else None
 
 
+# --- Tier-B synthesizers (each behind a faithfulness gate -> None on a non-conforming shape) ---
+
+# UpSet's "present" membership dots carry this colour (``skills/upset/run.py`` ``_DOT_ON``); it is the
+# figure's own present/absent channel, so reading it back is faithful (S1). Absent dots use a paler
+# token, connectors are lines -> filtered out by the mode/colour checks.
+_UPSET_DOT_ON = "#33404d"
+
+
+def _is_square_symmetric(z: list, tol: float = 1e-9) -> bool:
+    """True when ``z`` is a square matrix equal to its transpose within ``tol`` — the shape that lets
+    a correlation table drop the redundant lower triangle + unit diagonal without losing a value."""
+    n = len(z)
+    for i in range(n):
+        if not isinstance(z[i], (list, tuple)) or len(z[i]) != n:
+            return False
+        for j in range(i + 1, n):
+            a, b = z[i][j], z[j][i]
+            if a is None or b is None or abs(float(a) - float(b)) > tol:
+                return False
+    return True
+
+
+def _corr_heatmap(fig: dict) -> dict | None:
+    # Read the heatmap ``z`` matrix against its emitted ``x``/``y`` labels (clustering reorders, so the
+    # emitted order IS the truth). Gate: rectangular numeric ``z`` matching both label axes.
+    tr = next((t for t in (fig.get("data", []) or []) if t.get("type") == "heatmap"), None)
+    if not tr:
+        return None
+    z = tr.get("z")
+    xs, ys = list(tr.get("x") or []), list(tr.get("y") or [])
+    if not isinstance(z, list) or not z or not xs or not ys or len(z) != len(ys):
+        return None
+    if any(not isinstance(r, (list, tuple)) or len(r) != len(xs) for r in z):
+        return None
+    # symmetric corr matrix -> upper triangle only (drop the mirrored half + the r=1 diagonal); a
+    # non-symmetric / non-square grid -> every cell (still faithful, just denser).
+    upper_only = xs == ys and _is_square_symmetric(z)
+    rows = []
+    for i, rlab in enumerate(ys):
+        for j, clab in enumerate(xs):
+            if upper_only and j <= i:
+                continue
+            val = z[i][j]
+            if val is None:
+                continue
+            rows.append([str(rlab), str(clab), round(float(val), 4)])
+    return _tbl(["row", "col", "r"], rows, "Correlation matrix") if rows else None
+
+
+def _sankey(fig: dict) -> dict | None:
+    # Resolve each integer link index back to its node label. Gate: aligned source/target/value link
+    # arrays + every index in range (an out-of-range index can't be faithfully resolved -> None).
+    tr = next((t for t in (fig.get("data", []) or []) if t.get("type") == "sankey"), None)
+    if not tr:
+        return None
+    labels = list((tr.get("node", {}) or {}).get("label") or [])
+    link = tr.get("link", {}) or {}
+    src, tgt, val = list(link.get("source") or []), list(link.get("target") or []), list(link.get("value") or [])
+    if not labels or not src or not (len(src) == len(tgt) == len(val)):
+        return None
+    rows = []
+    for s, t, v in zip(src, tgt, val):
+        si, ti = int(s), int(t)
+        if not (0 <= si < len(labels) and 0 <= ti < len(labels)):
+            return None
+        rows.append([labels[si], labels[ti], round(float(v), 4)])
+    return _tbl(["source", "target", "value"], rows, "Sankey flows")
+
+
+def _upset(fig: dict) -> dict | None:
+    # Intersection sizes are the reproducible numbers (Venn/UpSet counts) — read from the vertical
+    # size-bar trace. Member sets enrich the label, recovered from the "present" dots (S1). Gate: the
+    # size bars must be present with aligned x ids / numeric y; members are best-effort.
+    data = fig.get("data", []) or []
+    bars = next((t for t in data if t.get("type") == "bar" and t.get("orientation") != "h"), None)
+    if not bars:
+        return None
+    ids = list(bars.get("x") or [])
+    sizes = list(bars.get("y") or [])
+    if not ids or len(sizes) != len(ids):
+        return None
+    members: dict = {}
+    for t in data:
+        if t.get("type") not in ("scatter", "scattergl") or "markers" not in (t.get("mode") or ""):
+            continue
+        if (t.get("marker", {}) or {}).get("color") != _UPSET_DOT_ON:
+            continue
+        for cid, s in zip(t.get("x") or [], t.get("y") or []):
+            members.setdefault(cid, []).append(str(s))
+    rows = []
+    for cid, size in zip(ids, sizes):
+        mem = members.get(cid)
+        label = " ∩ ".join(mem) if mem else str(cid)
+        rows.append([label, len(mem) if mem else None, int(size)])
+    return _tbl(["intersection", "sets", "size"], rows, "Set intersections")
+
+
 _SYNTHESIZERS = {
     "pca": _pca,
     "composition": _composition,
@@ -200,4 +299,8 @@ _SYNTHESIZERS = {
     "regression": _regression,
     "integration": _integration,
     "trajectory": _trajectory,
+    # Tier B (clean trio):
+    "corr_heatmap": _corr_heatmap,
+    "sankey": _sankey,
+    "upset": _upset,
 }
