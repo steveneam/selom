@@ -194,3 +194,106 @@ def test_tier_b_from_live_stub_figures():
     assert ut["rows"][2] == ["A ∩ B", 2, 18]
     assert ut["rows"][-1] == ["A ∩ B ∩ C", 3, 6]
     assert len(ut["rows"]) == 6
+
+
+# --- Tier B (lossy set) -----------------------------------------------------------------
+
+def test_boxplot_five_number_summary():
+    # one box trace per group, raw values on y (vertical) -> the five-number summary Plotly draws.
+    fig = {"data": [{"type": "box", "name": "Cepo",
+                     "y": [0.86, 0.88, 0.84, 0.90, 0.87, 0.89, 0.83, 0.91]}]}
+    t = synthesize_table("boxplot", fig)
+    assert t["columns"] == ["group", "n", "min", "q1", "median", "q3", "max"]
+    # n/min/median/max exact; q1/q3 = Plotly's default linear quartile method
+    assert t["rows"] == [["Cepo", 8, 0.83, 0.855, 0.875, 0.8925, 0.91]]
+    assert t["synthesized"] is True
+
+
+def test_boxplot_horizontal_reads_x_values():
+    # orientation="h" -> the distribution sits on x, not y
+    fig = {"data": [{"type": "box", "name": "g", "x": [1.0, 2.0, 3.0, 4.0, 5.0]}]}
+    t = synthesize_table("boxplot", fig)
+    assert t["rows"] == [["g", 5, 1.0, 2.0, 3.0, 4.0, 5.0]]
+
+
+def test_boxplot_gate_requires_a_box_trace():
+    assert synthesize_table("boxplot", {"data": [{"type": "scatter", "y": [1, 2, 3]}]}) is None
+
+
+def test_heatmap_wide_z_score_table():
+    fig = {"data": [{"type": "heatmap", "x": ["c0", "c1"], "y": ["GENE1", "GENE2"],
+                     "z": [[0.5, -0.5], [1.2, -1.2]]}]}
+    t = synthesize_table("heatmap", fig)
+    assert t["columns"] == ["gene", "c0", "c1"]
+    assert t["rows"] == [["GENE1", 0.5, -0.5], ["GENE2", 1.2, -1.2]]
+
+
+def test_heatmap_ignores_dendrogram_scatter_and_gates_ragged_z():
+    # a clustermap carries a 2nd scatter (dendrogram) trace -> read the heatmap trace, ignore it
+    fig = {"data": [{"type": "scatter", "mode": "lines", "x": [0, 1], "y": [0, 1]},
+                    {"type": "heatmap", "x": ["s1"], "y": ["g1", "g2"], "z": [[0.3], [0.7]]}]}
+    assert synthesize_table("heatmap", fig)["rows"] == [["g1", 0.3], ["g2", 0.7]]
+    ragged = {"data": [{"type": "heatmap", "x": ["a", "b"], "y": ["g1", "g2"], "z": [[0.1, 0.2], [0.3]]}]}
+    assert synthesize_table("heatmap", ragged) is None
+
+
+def test_scorecard_radar_drops_closing_point():
+    # scatterpolar polygon is closed (first metric/value repeated at the end) -> de-close it
+    fig = {"data": [
+        {"type": "scatterpolar", "name": "Protocol A",
+         "theta": ["Identity", "Maturation", "Identity"], "r": [0.92, 0.61, 0.92]},
+    ]}
+    t = synthesize_table("scorecard", fig)
+    assert t["columns"] == ["condition", "metric", "score"]
+    assert t["rows"] == [["Protocol A", "Identity", 0.92], ["Protocol A", "Maturation", 0.61]]
+
+
+def test_scorecard_heatmap_layout():
+    fig = {"data": [{"type": "heatmap", "x": ["A", "B"], "y": ["Identity", "Coverage"],
+                     "z": [[0.9, 0.7], [0.8, 0.95]]}]}
+    t = synthesize_table("scorecard", fig)
+    assert t["rows"] == [["A", "Identity", 0.9], ["B", "Identity", 0.7],
+                         ["A", "Coverage", 0.8], ["B", "Coverage", 0.95]]
+
+
+def test_violin_pubmed_known_novel_from_annotation():
+    from skills.violin.run import annotate_pubmed
+
+    known = annotate_pubmed({"data": [], "layout": {}}, "RHO", 12345, known_min=5, context="retina")
+    t = synthesize_table("violin", known)
+    assert t["columns"] == ["gene", "pubmed hits", "verdict"]
+    assert t["rows"] == [["RHO", 12345, "known marker"]]
+
+    novel = annotate_pubmed({"data": [], "layout": {}}, "NOVELG", 2, known_min=5)
+    assert synthesize_table("violin", novel)["rows"] == [["NOVELG", 2, "novel marker"]]
+
+
+def test_violin_unannotated_is_honest_none():
+    # no pubmed annotation (the common case) -> None (-> L4); distributions aren't tabulated here
+    from skills.violin.run import _stub_figure
+
+    assert synthesize_table("violin", _stub_figure()) is None
+
+
+def test_lossy_tier_b_from_live_stub_figures():
+    """Drive each skill's OWN stub engine -> figure -> synthesize, the same end-to-end guard as the
+    Tier-A and clean-trio sets."""
+    from skills.boxplot.run import _stub_figure as box_stub
+    from skills.heatmap.run import _stub_figure as heat_stub
+    from skills.scorecard.run import _stub_figure as score_stub
+
+    bt = synthesize_table("boxplot", box_stub({}))
+    assert len(bt["rows"]) == 3  # Cepo / Limma / HVG
+    assert bt["rows"][0] == ["Cepo", 8, 0.83, 0.855, 0.875, 0.8925, 0.91]
+
+    ht = synthesize_table("heatmap", heat_stub())
+    assert ht["columns"] == ["gene", "c0", "c1", "c2", "c3", "c4", "c5"]
+    assert len(ht["rows"]) == 20 and ht["rows"][0][0] == "GENE1"
+
+    rt = synthesize_table("scorecard", score_stub({}))  # default radar layout
+    assert rt["columns"] == ["condition", "metric", "score"]
+    assert len(rt["rows"]) == 15  # 3 conditions × 5 metrics, closing point dropped
+    assert rt["rows"][0] == ["Protocol A", "Identity", 0.92]
+
+    ht2 = synthesize_table("scorecard", score_stub({"layout": "heatmap"}))  # heatmap layout
+    assert len(ht2["rows"]) == 15 and ht2["columns"] == ["condition", "metric", "score"]

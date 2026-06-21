@@ -8,9 +8,11 @@ pixel-digitized read it MAY feed the Reproducibility Score (S2), tagged via ``sy
 
 The third layer of Selom's extraction stack ([[layered-deterministic-extraction]]): L1 skill-specific
 reader · L2 generic reader · **L3 synthesis** · L4 AI. Source shapes: ``docs/reproduction-engine/
-skill-table-schemas.md``. Spec + decisions: ``docs/table-synthesis/spec.md`` (Tier A 9/9 + the Tier-B
-clean trio ``corr_heatmap``/``sankey``/``upset``; D-t1..D-t4 owner-signed). The lossy Tier-B set
-(``scorecard``/``boxplot``/``violin``/``heatmap``) is deferred to a gated follow-up or L4.
+skill-table-schemas.md``. Spec + decisions: ``docs/table-synthesis/spec.md`` (Tier A 9/9 + the full
+Tier-B set; D-t1..D-t4 owner-signed). Tier B = the clean trio (``corr_heatmap``/``sankey``/``upset``)
+plus the lossy set (``boxplot``/``heatmap``/``scorecard``/``violin``), each behind a faithfulness gate
+(a non-conforming shape -> ``None`` -> L4). ``proteomics_de`` is the one remaining at-source fix
+(attach a native ``de_table`` — Codex lane).
 """
 
 from __future__ import annotations
@@ -214,9 +216,11 @@ def _is_square_symmetric(z: list, tol: float = 1e-9) -> bool:
     return True
 
 
-def _corr_heatmap(fig: dict) -> dict | None:
-    # Read the heatmap ``z`` matrix against its emitted ``x``/``y`` labels (clustering reorders, so the
-    # emitted order IS the truth). Gate: rectangular numeric ``z`` matching both label axes.
+def _heatmap_grid(fig: dict) -> tuple[list, list, list] | None:
+    """The first ``heatmap`` trace's ``(z, x, y)`` when ``z`` is a rectangular numeric grid matching
+    both label axes (clustering reorders, so the emitted label order IS the truth) — else ``None``.
+    Shared gate for the correlation (long-form), expression (wide-form), and scorecard synthesizers;
+    any extra trace (a dendrogram ``scatter``) is ignored — we read the ``heatmap`` trace."""
     tr = next((t for t in (fig.get("data", []) or []) if t.get("type") == "heatmap"), None)
     if not tr:
         return None
@@ -226,6 +230,16 @@ def _corr_heatmap(fig: dict) -> dict | None:
         return None
     if any(not isinstance(r, (list, tuple)) or len(r) != len(xs) for r in z):
         return None
+    return z, xs, ys
+
+
+def _corr_heatmap(fig: dict) -> dict | None:
+    # Read the heatmap ``z`` matrix against its emitted ``x``/``y`` labels. Gate: rectangular numeric
+    # ``z`` matching both label axes.
+    grid = _heatmap_grid(fig)
+    if grid is None:
+        return None
+    z, xs, ys = grid
     # symmetric corr matrix -> upper triangle only (drop the mirrored half + the r=1 diagonal); a
     # non-symmetric / non-square grid -> every cell (still faithful, just denser).
     upper_only = xs == ys and _is_square_symmetric(z)
@@ -289,6 +303,127 @@ def _upset(fig: dict) -> dict | None:
     return _tbl(["intersection", "sets", "size"], rows, "Set intersections")
 
 
+# --- Tier-B synthesizers (lossy set — gated; a non-conforming shape -> None -> L4) -------
+
+def _percentile(sv: list[float], q: float) -> float:
+    """The ``q``-th percentile (0–100) of a *sorted* non-empty list by linear interpolation between
+    closest ranks — numpy's default method and Plotly's default box ``quartilemethod`` ("linear"), so
+    the synthesized quartiles reproduce the box Plotly actually draws."""
+    if len(sv) == 1:
+        return float(sv[0])
+    rank = (q / 100.0) * (len(sv) - 1)
+    lo = int(rank)  # floor (rank is non-negative)
+    frac = rank - lo
+    return float(sv[lo]) if frac == 0 else float(sv[lo]) * (1 - frac) + float(sv[lo + 1]) * frac
+
+
+def _close(a: Any, b: Any, tol: float = 1e-9) -> bool:
+    try:
+        return abs(float(a) - float(b)) <= tol
+    except (TypeError, ValueError):
+        return False
+
+
+def _numeric_array(seq: Any) -> list[float] | None:
+    """``seq`` as a list of floats when it is a non-empty all-numeric sequence (bools excluded) —
+    else ``None``. Lets a synthesizer pick the numeric axis of a trace without guessing."""
+    if not isinstance(seq, (list, tuple)) or not seq:
+        return None
+    if any(not isinstance(v, (int, float)) or isinstance(v, bool) for v in seq):
+        return None
+    return [float(v) for v in seq]
+
+
+def _boxplot(fig: dict) -> dict | None:
+    # Each group is one ``box`` trace carrying its RAW values (Plotly draws the quartiles client-side);
+    # synthesize the five-number summary the box itself encodes — n/min/median/max are exact order
+    # statistics, q1/q3 use Plotly's default "linear" quartile method, so the table == the drawn box.
+    # The raw values sit on ``y`` (vertical) or ``x`` (horizontal). Gate: >=1 box trace with a numeric
+    # value array.
+    rows = []
+    for t in fig.get("data", []) or []:
+        if t.get("type") != "box":
+            continue
+        vals = _numeric_array(t.get("y")) or _numeric_array(t.get("x"))
+        if vals is None:
+            continue
+        sv = sorted(vals)
+        rows.append([str(t.get("name", f"group {len(rows)}")), len(sv),
+                     round(sv[0], 4), round(_percentile(sv, 25), 4), round(_percentile(sv, 50), 4),
+                     round(_percentile(sv, 75), 4), round(sv[-1], 4)])
+    return _tbl(["group", "n", "min", "q1", "median", "q3", "max"], rows,
+                "Distribution summary") if rows else None
+
+
+def _heatmap(fig: dict) -> dict | None:
+    # Expression z-score grid: rows = genes (``y``), columns = groups (``x``), values = ``z`` (the
+    # z-scores the figure draws — faithful; absolute expression isn't recoverable, S4 honest). Wide
+    # form, one row per gene. Gate: rectangular numeric ``z`` matching both axes (``_heatmap_grid``).
+    grid = _heatmap_grid(fig)
+    if grid is None:
+        return None
+    z, xs, ys = grid
+    rows = []
+    for i, gene in enumerate(ys):
+        row: list = [str(gene)]
+        for j in range(len(xs)):
+            v = z[i][j]
+            row.append(round(float(v), 4) if isinstance(v, (int, float)) and not isinstance(v, bool) else None)
+        rows.append(row)
+    return _tbl(["gene", *[str(x) for x in xs]], rows, "Expression (row z-score)")
+
+
+def _scorecard(fig: dict) -> dict | None:
+    # Long-form ``[condition, metric, score]`` from either layout of the same benchmark: the radar
+    # (one ``scatterpolar`` per condition — ``theta`` = metrics, ``r`` = scores, polygon closed by a
+    # repeated first point, dropped) or the heatmap (``x`` = conditions, ``y`` = metrics, ``z`` =
+    # scores). Scores are the normalized values the figure draws (raw not recoverable — faithful to the
+    # panel, S2). Gate: aligned theta/r per polar trace, or a rectangular heatmap ``z``.
+    polar = [t for t in (fig.get("data", []) or []) if t.get("type") == "scatterpolar"]
+    if polar:
+        rows = []
+        for t in polar:
+            cond = str(t.get("name", ""))
+            theta, r = list(t.get("theta") or []), list(t.get("r") or [])
+            if not theta or len(theta) != len(r):
+                return None
+            if len(theta) >= 2 and theta[0] == theta[-1] and _close(r[0], r[-1]):
+                theta, r = theta[:-1], r[:-1]  # drop the repeated closing point
+            rows.extend([cond, str(metric), round(float(score), 4)] for metric, score in zip(theta, r))
+        return _tbl(["condition", "metric", "score"], rows, "Benchmark scorecard") if rows else None
+    grid = _heatmap_grid(fig)
+    if grid is None:
+        return None
+    z, conds, metrics = grid
+    rows = [[str(cond), str(metric), round(float(z[i][j]), 4)]
+            for i, metric in enumerate(metrics) for j, cond in enumerate(conds)]
+    return _tbl(["condition", "metric", "score"], rows, "Benchmark scorecard")
+
+
+# violin's one faithful single-statistic is the PubMed known/novel marker call (``annotate=pubmed``),
+# formatted into a corner annotation by ``violin.annotate_pubmed`` as
+# ``<b>{gene}</b> — {n:,} PubMed hits[ in {context}]<br>{known|novel} marker``.
+_VIOLIN_PUBMED_RE = re.compile(
+    r"<b>(?P<gene>[^<]+)</b>\s*[-—]\s*(?P<hits>[\d,]+)\s+PubMed hits.*?(?P<verdict>known|novel)\s+marker",
+    re.I | re.S,
+)
+
+
+def _violin(fig: dict) -> dict | None:
+    # Read the literature-support call back from the annotation. No annotation (the common,
+    # un-annotated case — raw per-cluster distributions only) -> None (-> L4); the distributions are
+    # not tabulated here (S4: don't force).
+    for ann in reversed(fig.get("layout", {}).get("annotations", []) or []):
+        text = ann.get("text", "") if isinstance(ann, dict) else ""
+        m = _VIOLIN_PUBMED_RE.search(text or "")
+        if m:
+            hits = int(m.group("hits").replace(",", ""))
+            return _tbl(["gene", "pubmed hits", "verdict"],
+                        [[m.group("gene").strip(), hits, f"{m.group('verdict').lower()} marker"]],
+                        "Marker literature support")
+    return None
+
+
 _SYNTHESIZERS = {
     "pca": _pca,
     "composition": _composition,
@@ -303,4 +438,9 @@ _SYNTHESIZERS = {
     "corr_heatmap": _corr_heatmap,
     "sankey": _sankey,
     "upset": _upset,
+    # Tier B (lossy set — each gated):
+    "boxplot": _boxplot,
+    "heatmap": _heatmap,
+    "scorecard": _scorecard,
+    "violin": _violin,
 }
