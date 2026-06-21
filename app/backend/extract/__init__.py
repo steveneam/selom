@@ -33,6 +33,7 @@ from .classify import (
 )
 from .golden import (
     build_extracted_spec,
+    extract_dataset_size,
     extract_de_counts,
     extract_methods_digest,
     find_figures_vs_methods,
@@ -67,6 +68,7 @@ __all__ = [
     "VisionUnavailable",
     "classify_scope",
     "build_extracted_spec",
+    "extract_dataset_size",
     "extract_de_counts",
     "extract_methods_digest",
     "find_figures_vs_methods",

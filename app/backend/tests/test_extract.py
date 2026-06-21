@@ -26,6 +26,7 @@ from extract import (
     build_extracted_spec,
     venn3_totals,
     classify_scope,
+    extract_dataset_size,
     extract_de_counts,
     extract_methods_digest,
     find_figures_vs_methods,
@@ -81,6 +82,47 @@ def test_de_total_is_up_plus_down_not_a_neighbouring_count():
     t = _by_metric(extract_de_counts(CONFLATION, "p"))
     assert (t["de_total"].value, t["de_up"].value, t["de_down"].value) == (180, 61, 119)
     assert "printed total 50" in t["de_total"].note
+
+
+# --- analyzed-dataset-size (n_cells) extraction (Slice 1; text-layer-exact) ---------
+
+# The real Yoshimura phrasing (kidney-organoid multiome): the atlas size, double-anchored.
+YOSHIMURA = ("These merged datasets for each time point were then aggregated together to generate "
+             "an organoid differentiation multiome atlas. This resulted in 56,865 cells after "
+             "filtering. For a comparison to human adult kidney, we used a merged dataset.")
+# Real benchmark-paper traps (Harmony phrasings + an epidemiology %/cell-line) that must NOT extract.
+HARMONY_TRAPS = ("We analyzed 15,875 cells from 8 time points of mouse and 64,373 cells from one "
+                 "donor. We down-sampled to 250,000, 125,000, and 30,000 cells to benchmark "
+                 "runtime. CKD affects 9.1% of the population. We used 1565 293T cells and 100 "
+                 "cells per cluster as a threshold.")
+
+
+def test_dataset_size_extracts_atlas_count_from_real_phrasing():
+    g = extract_dataset_size(YOSHIMURA, "yoshimura")
+    assert [t.value for t in g] == [56865]            # the two anchors dedup to one golden
+    t = g[0]
+    assert t.metric == "n_cells" and t.confidence == 1.0 and t.source == "figure"
+    assert "after filtering" in t.note or "resulted in" in t.note
+
+
+def test_dataset_size_is_silent_on_benchmark_and_epidemiology_traps():
+    # A benchmark paper states many cell counts that are *parameters*, not the analyzed atlas;
+    # an epidemiology "9.1% of the population", a "293T" cell line, and "100 cells" thresholds are
+    # not dataset sizes. None has a result/QC anchor → nothing extracted (precision-first, E2).
+    assert extract_dataset_size(HARMONY_TRAPS, "harmony") == []
+
+
+def test_dataset_size_threshold_count_is_not_a_dataset():
+    # "transcripts detected in at least 10% of cells" / "at least 3 cells" are filters, not sizes.
+    assert extract_dataset_size("genes detected in at least 3 cells were kept", "p") == []
+
+
+def test_dataset_size_flows_into_extracted_spec_and_engine_panel():
+    spec = build_extracted_spec(None, "yoshimura", text=YOSHIMURA)
+    n = [g for g in spec.goldens if g.metric == "n_cells"]
+    assert n and n[0].value == 56865
+    g = to_golden(n[0])
+    assert isinstance(g, R.Golden) and g.value == 56865 and g.metric_type == ""  # count → strict
 
 
 # --- methods digest -----------------------------------------------------------

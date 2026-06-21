@@ -165,6 +165,61 @@ def extract_de_counts(text: str, paper_id: str = "") -> list[GoldenTarget]:
     return out
 
 
+# --- analyzed-dataset-size extraction (text-layer-exact; tight result/QC anchors) ---------
+
+# A real cell/nucleus *count*: comma-grouped thousands or ≥4 bare digits. Excludes method
+# mentions ("100 cells"), bare percentages, and cell-line numbers ("293T" — 3 bare digits, and
+# never directly followed by the cell noun anyway).
+_CELL_NUM = r"(\d{1,3}(?:,\d{3})+|\d{4,})"
+_CELL_NOUN = r"(?:high[- ]quality |quality[- ]assured |singlet )?(?:single[- ]?)?(?:cells|nuclei)"
+# Anchor BEFORE the count — phrasings that denote the *final analyzed* dataset/atlas, not a
+# benchmark parameter. "we analyzed N cells from 8 time points" is deliberately NOT an anchor: a
+# methods/benchmark paper states many such sizes (down-sampling, per-replicate) that are inputs,
+# not the result (calibrated on Harmony — 28 cell-count mentions, 0 of these anchors → 0 goldens).
+_DATASET_PRE_RE = re.compile(
+    r"\b(?:resulted in|resulting in|yielded|retained|generated|recovered|obtained|"
+    r"comprising|comprised of|consisting of|composed of|"
+    r"(?:final |combined |integrated |merged |aggregated )?(?:dataset|atlas) (?:of|with|containing)|"
+    r"a total of)\s+" + _CELL_NUM + r"\s+" + _CELL_NOUN, re.I)
+# Anchor AFTER the count — QC / retention phrasings.
+_DATASET_POST_RE = re.compile(
+    _CELL_NUM + r"\s+" + _CELL_NOUN +
+    r"\s+(?:after (?:filtering|filtration|qc|quality[- ]control|quality filtering)|"
+    r"that passed|passing (?:qc|quality)|were retained|were kept|were obtained|remained|passed qc)",
+    re.I)
+
+
+def extract_dataset_size(text: str, paper_id: str = "") -> list[GoldenTarget]:
+    """Recover the analyzed dataset size (``n_cells`` — total cells/nuclei after QC) from the text.
+
+    Fires only on tight result/QC anchors (``"resulted in 56,865 cells"``, ``"56,865 cells after
+    filtering"``, ``"a dataset of N cells"``), never on a bare ``"N cells"`` mention: a
+    benchmark/methods paper states many cell counts that are *parameters* (down-sampling sizes,
+    per-replicate sizes), not the analyzed atlas. Calibrated on Harmony (a benchmark paper, 28
+    cell-count mentions → 0 false positives) and Yoshimura (``"resulted in 56,865 cells after
+    filtering"`` → ``n_cells = 56,865``). Deduped by value; the entry with a figure ref wins.
+
+    A count number is comma-grouped thousands or ≥4 bare digits, so ``"100 cells"`` (a method
+    threshold) and the ``"293T"`` cell line never match. Text-layer-exact → ``confidence = 1.0``
+    (E2). ``n_cells`` is a count → ``infer_metric_type`` leaves it untyped (graded at the strict
+    default), the right band for an exact cell count reproduced from the same matrix."""
+    flat = re.sub(r"\s+", " ", text)
+    best: dict[int, dict] = {}
+    for rx in (_DATASET_PRE_RE, _DATASET_POST_RE):
+        for m in rx.finditer(flat):
+            value = int(m.group(1).replace(",", ""))
+            left, right = _sentence_bounds(flat, m.start())
+            fig, panel = _nearest_figure(flat[left:right], m.start() - left)
+            phrase = re.sub(r"\s+", " ", m.group(0)).strip()
+            cand = {"value": value, "fig": fig, "panel": panel,
+                    "note": f"analyzed dataset size — '{phrase}'", "score": 1 if fig else 0}
+            if value not in best or cand["score"] > best[value]["score"]:
+                best[value] = cand
+    return [GoldenTarget(paper_id=paper_id, figure=c["fig"], panel=c["panel"], metric="n_cells",
+                         value=c["value"], unit="cells", source=SOURCE_FIGURE, confidence=1.0,
+                         note=c["note"]) for c in best.values()]
+
+
 # --- inconsistency capture (guard 2: figures ≠ methods) -----------------------
 
 
@@ -206,7 +261,7 @@ def build_extracted_spec(ingested, paper_id: str, *, classifier: Classifier | No
         methods_body = counts_body = ingested.text
     classifier = classifier or CaptionRuleClassifier()
     methods = [extract_methods_digest(methods_body)]
-    goldens = extract_de_counts(counts_body, paper_id)
+    goldens = extract_de_counts(counts_body, paper_id) + extract_dataset_size(counts_body, paper_id)
     panels: list[PanelDraft] = []
     seen: set[str] = set()
     for g in goldens:

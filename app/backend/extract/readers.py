@@ -182,12 +182,35 @@ def _read_pca(metric: str, figure: dict | None, table: dict | None) -> Reading |
                    confidence=1.0, note=f"read from {axis} title '{text}'")
 
 
+def _read_umap(metric: str, figure: dict | None, table: dict | None) -> Reading | None:
+    """``umap_scrna`` carries the analyzed dataset size as the number of *plotted points* —
+    ``n_cells`` = total points across the embedding's scatter traces (one trace per cluster), no
+    table. This is the read-back twin of ``extract.golden.extract_dataset_size`` (which lifts the
+    printed ``n_cells``): when the matrix is matched, the UMAP's point count is graded against the
+    paper's stated cell count. Returns ``None`` for any other metric (falls through to L2/L3)."""
+    if _norm(metric) != "ncells":
+        return None
+    data = (figure or {}).get("data") or []
+    total, seen = 0, False
+    for tr in data:
+        xs = tr.get("x") if isinstance(tr, dict) else None
+        if isinstance(xs, (list, tuple)):
+            total += len(xs)
+            seen = True
+    if not seen:
+        return None
+    return Reading(metric=metric, value=total, layer=L1, source=SRC_FIGURE, confidence=1.0,
+                   note=f"counted {total} plotted points across {len(data)} UMAP trace(s)")
+
+
 # skill_id -> its L1 reader. Adding a skill is one entry (and one function). volcano and
 # proteomics_de share the canonical de_table, so both map to _read_de_table (proteomics_de
-# needs L1 so de_total reads as up+down, not its tested-protein row count). The 8 other
-# table-emitting skills (cepo/gsea/enrichment/pseudotime_genes/diff_abundance/markers/ssgsea/deg)
-# resolve through the L2 generic reader by table key/count today; promote any to L1 as needed.
-_SKILL_READERS = {"volcano": _read_de_table, "proteomics_de": _read_de_table, "pca": _read_pca}
+# needs L1 so de_total reads as up+down, not its tested-protein row count). umap_scrna reads
+# n_cells off the plotted point count. The 8 other table-emitting skills (cepo/gsea/enrichment/
+# pseudotime_genes/diff_abundance/markers/ssgsea/deg) resolve through the L2 generic reader by
+# table key/count today; promote any to L1 as needed.
+_SKILL_READERS = {"volcano": _read_de_table, "proteomics_de": _read_de_table, "pca": _read_pca,
+                  "umap_scrna": _read_umap}
 
 
 # --- L2: generic reader -------------------------------------------------------

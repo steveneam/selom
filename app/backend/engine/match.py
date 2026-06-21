@@ -38,11 +38,13 @@ def _fig_sort_key(panel: R.Panel):
 
 
 # A golden metric implies its skill class — and the schema inventory says DE counts read cleanly
-# only from `volcano`'s de_table (not `deg`), and PC variance only from `pca`. So a golden figure
-# whose per-figure route didn't assign a skill is backfilled from the metric it printed.
+# only from `volcano`'s de_table (not `deg`), PC variance only from `pca`, and the analyzed cell
+# count only from `umap_scrna`'s plotted points. So a golden figure whose per-figure route didn't
+# assign a skill is backfilled from the metric it printed.
 _METRIC_SKILL = {
     "de_total": "volcano", "de_up": "volcano", "de_down": "volcano",
     "pc1_var": "pca", "pc2_var": "pca",
+    "n_cells": "umap_scrna",
 }
 
 

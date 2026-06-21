@@ -199,3 +199,34 @@ def test_drive_bundle_end_to_end_is_honest():
     # every panel is accounted for — one drive record + one heatmap cell each.
     assert len(res.panel_drives) == len(res.ledger.panels)
     assert len(res.ledger.scorecard.panel_scores) == len(res.ledger.panels)
+
+
+# --- Slice 1: the analyzed-dataset-size (n_cells) loop, extractor → grade ------
+
+_UMAP_TEXT = ("Results. After quality control, the integrated atlas resulted in 1,234 cells after "
+              "filtering, visualised as a UMAP embedding in Figure 1.")
+
+
+def _umap_runner(n):
+    def runner(skill_id, data_path, params):
+        # umap_scrna's real shape: one scatter trace per cluster, n plotted points == the cell count.
+        return {"data": [{"type": "scatter", "x": list(range(n)), "y": list(range(n))}]}, None
+    return runner
+
+
+def test_drive_n_cells_closes_the_loop_extractor_to_grade():
+    # Slice 1 end-to-end: the printed dataset size is extracted (n_cells), its golden panel is
+    # backfilled to umap_scrna, and the matched run's UMAP point count is read back and graded —
+    # the new family drives a real score with no hand ledger, exactly like the DE-count loop.
+    res = drive_bundle(_bundle(_UMAP_TEXT), paper_id="t", runner=_umap_runner(1234))
+    driven = [d for d in res.panel_drives if d.status == DRIVEN and "n_cells" in d.metrics_read]
+    assert driven, res.summary               # the n_cells figure reached a real score
+    assert driven[0].skill_id == "umap_scrna"  # skill backfilled from the n_cells metric
+    assert res.ledger.scorecard.findings["selom_engine_bugs"] == 0
+
+
+def test_drive_n_cells_mismatch_is_honest_not_a_defect():
+    # If the recount disagrees with the printed size, it scores honestly on the reproducibility
+    # axis but is never a Selom-side defect (the two-axis guard, same as every other metric).
+    res = drive_bundle(_bundle(_UMAP_TEXT), paper_id="t", runner=_umap_runner(900))
+    assert res.ledger.scorecard.findings["selom_engine_bugs"] == 0

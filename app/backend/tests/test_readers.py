@@ -86,6 +86,33 @@ def test_pca_handles_bare_string_title():
     assert read_metric("pca", "pc1_var", fig, None).value == 42.0
 
 
+# --- L1: umap_scrna analyzed cell count (Slice 1) -----------------------------
+
+
+def _umap_fig():
+    # The real umap_scrna output shape: one scatter trace per cluster, x/y point arrays.
+    return {"data": [
+        {"type": "scatter", "name": "0", "x": [1, 2, 3], "y": [1, 2, 3]},
+        {"type": "scatter", "name": "1", "x": [4, 5], "y": [4, 5]},
+        {"type": "scatter", "name": "2", "x": [6], "y": [6]},
+    ]}
+
+
+def test_umap_n_cells_from_plotted_points():
+    # n_cells = total plotted points across the embedding traces — the read-back twin of the
+    # printed dataset size (extract.golden.extract_dataset_size). 3 + 2 + 1 = 6.
+    r = read_metric("umap_scrna", "n_cells", _umap_fig(), None)
+    assert r.value == 6 and r.layer == L1 and r.source == SRC_FIGURE and r.confidence == 1.0
+
+
+def test_umap_l1_n_cells_and_l3_n_clusters_coexist():
+    # The same skill: n_cells reads at L1 (point count), n_clusters still falls to L3 synthesis
+    # (trace count) — the L1 reader returns None for anything but n_cells, so neither shadows.
+    fig = _umap_fig()
+    assert read_metric("umap_scrna", "n_cells", fig, None).layer == L1
+    assert read_metric("umap_scrna", "n_clusters", fig, None).layer == L3
+
+
 # --- L2: generic count (enrichment / unknown direction tables) ----------------
 
 
