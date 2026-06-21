@@ -145,6 +145,18 @@ measure before we build**.
 > compatible / good data or not — we have a filter for this, our own engine should recognize if the
 > dropped data is good or not"*; (b) *"the score must be visible **before** a user clicks Run (so
 > they can drop different data) **and** after."* Matcher honesty IS that score, made the gate.
+>
+> **SHIPPED.** s52: `engine/compat.py` (the data-fit scorer) + matcher honesty + the before/after
+> data-fit panel (Product B). **s53: the per-panel data PICKER (R4) + the Product-A data-fit band.**
+> The picker surfaces `panel_drives` on the run contract, offers a file Select for each
+> `data_unmatched` panel, persists the choice on the paper (`SavedPaper.dataMap`), and re-runs with a
+> `data_map` override (filename → saved path, resolved server-side in `POST /papers/{id}/reproduce`).
+> Verified: `match_data` honours the override end-to-end on the real Yoshimura paper (an unmatched
+> `umap_scrna` panel left `data_unmatched`, was fed the picked file, `run_failed` honestly, **0 Selom
+> defects** — a compatible pick would `drive`). Product A: `POST /skills/{id}/run`'s `data_fit` now
+> renders a `DataFitVerdict` band on the own-data figure (same engine, same band vocabulary).
+> Fix folded in: uploads now save into a per-file subdir keeping the ORIGINAL name, so the data-fit
+> filenames the user sees (and the picker round-trips) match what they dropped — no uuid prefix.
 
 **The bridge being built.** The engine already has the two halves of the owner's "filter":
 `engine.classify` (what modality is this file) + `engine.qc.run_qc` (is it clean). What's missing
