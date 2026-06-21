@@ -13,7 +13,9 @@ import reproduction as R
 from extract.readers import (
     L1,
     L2,
+    L3,
     SRC_FIGURE,
+    SRC_SYNTH,
     SRC_TABLE,
     panel_extractor,
     panel_readings,
@@ -118,6 +120,40 @@ def test_figure_number_percentage():
                                 "subtitle": {"text": "batch 42.0% · residual 12.0%"}}}}
     r = read_metric("pvca", "batch_var", fig, None)
     assert r.value == 86.0 and r.layer == L2 and r.source == SRC_FIGURE
+
+
+# --- L3: synthesize a table when the skill emits none -------------------------
+
+
+def test_l3_synthesizes_table_for_tableless_composition():
+    # composition emits no native table; its %s live in bar traces. L3 synthesizes a canonical
+    # table from the figure, then the named-cell reader resolves the category — tagged synthesized.
+    fig = {"data": [
+        {"name": "Control", "x": ["Müller", "Rod"], "y": [40.0, 60.0]},
+        {"name": "AMD", "x": ["Müller", "Rod"], "y": [35.0, 65.0]},
+    ]}
+    r = read_metric("composition", "muller_pct", fig, None, key="Müller")
+    assert r.layer == L3 and r.source == SRC_SYNTH
+    assert r.value == 40.0                     # Control (first numeric column)
+    assert 0 < r.confidence < 0.6              # synthesized → below a native-table read
+    assert "synthesized" in r.note
+
+
+def test_l3_umap_cluster_count_via_synthesis():
+    fig = {"data": [
+        {"type": "scatter", "name": "0", "x": [1, 2, 3], "y": [1, 2, 3]},
+        {"type": "scatter", "name": "1", "x": [4, 5], "y": [4, 5]},
+        {"type": "scatter", "name": "2", "x": [6], "y": [6]},
+    ]}
+    r = read_metric("umap_scrna", "n_clusters", fig, None)
+    assert r.layer == L3 and r.value == 3      # 3 named scatter traces = 3 clusters
+
+
+def test_l3_never_overrides_a_native_table():
+    # when a native table is present, L3 synthesis is not consulted (S5).
+    table = {"columns": ["pathway", "-log10 padj"], "rows": [["P1", 5.0], ["P2", 4.0]]}
+    r = read_metric("enrichment", "n_terms", None, table)
+    assert r.layer == L2 and r.source == SRC_TABLE
 
 
 # --- panel-level extractor (run_panel-compatible) -----------------------------

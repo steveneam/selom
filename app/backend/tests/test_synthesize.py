@@ -55,6 +55,51 @@ def test_integration_before_after():
     assert t["rows"] == [["batch mixing (kNN entropy)", 0.49, 0.83]]
 
 
+def test_umap_scrna_cluster_sizes_from_traces():
+    # px.scatter(color="leiden") -> one named scatter trace per cluster level; cells = len(x).
+    fig = {"data": [
+        {"type": "scatter", "name": "0", "x": [1, 2, 3], "y": [1, 2, 3]},
+        {"type": "scatter", "name": "1", "x": [4, 5], "y": [4, 5]},
+    ]}
+    t = synthesize_table("umap_scrna", fig)
+    assert t["columns"] == ["cluster", "cells"]
+    assert t["rows"] == [["0", 3], ["1", 2]]
+    assert t["synthesized"] is True
+
+
+def test_umap_scrna_continuous_colour_is_honest_none():
+    # a single continuous-colour trace has no discrete clusters to tabulate -> None (-> L4)
+    fig = {"data": [{"type": "scatter", "x": [1, 2, 3], "y": [1, 2, 3], "marker": {"color": [0.1, 0.5, 0.9]}}]}
+    assert synthesize_table("umap_scrna", fig) is None
+
+
+def test_annotate_cell_type_counts_with_subtitle():
+    # real shape: one scattergl trace per assigned type + the production subtitle string.
+    fig = {"data": [
+        {"type": "scattergl", "name": "Rod photoreceptors", "x": [0, 0, 0], "y": [0, 0, 0]},
+        {"type": "scattergl", "name": "Müller glia", "x": [1, 1], "y": [1, 1]},
+    ], "layout": {"title": {"subtitle": {"text": "2 types assigned across 5 clusters · scored 4 marker sets"}}}}
+    t = synthesize_table("annotate", fig)
+    assert t["columns"] == ["cell type", "cells"]
+    assert t["rows"] == [["Rod photoreceptors", 3], ["Müller glia", 2]]
+    assert "2 types across 5 clusters" in t["title"]  # totals folded in, per-type clusters not faked
+
+
+def test_synthesizes_from_live_stub_panels():
+    """Verify the two trace-length synthesizers against a LIVE panel: drive the real skills' own
+    stub engines (skill code -> figure -> synthesize), not just a hand-built fixture."""
+    from skills.annotate.run import _stub_figure as annotate_stub
+    from skills.umap_scrna.run import _stub_figure as umap_stub
+
+    ut = synthesize_table("umap_scrna", umap_stub())
+    assert ut["columns"] == ["cluster", "cells"]
+    assert len(ut["rows"]) == 3 and all(r[1] == 10 for r in ut["rows"])  # 3 clusters × 10 cells
+
+    at = synthesize_table("annotate", annotate_stub())
+    assert at["columns"] == ["cell type", "cells"]
+    assert len(at["rows"]) == 4 and all(r[1] == 10 for r in at["rows"])  # 4 types × 10 cells
+
+
 def test_trajectory_structure_counts():
     fig = {"layout": {"title": {"subtitle": {"text": "DPT · 9 clusters · 12 edges (≥0.1) · 3 lineage(s)"}}}}
     t = synthesize_table("trajectory", fig)

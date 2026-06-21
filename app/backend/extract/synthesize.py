@@ -60,6 +60,21 @@ def _first_bar(fig: dict) -> dict | None:
     return next((t for t in data if t.get("type") == "bar"), data[0] if data else None)
 
 
+def _scatter_counts(fig: dict, label_col: str, title: str) -> dict | None:
+    """One row per *named* scatter trace -> ``[name, len(x)]``. ``px.scatter(color=…)`` and
+    ``scattergl`` emit one trace per categorical level, so the trace length IS that level's member
+    count (S1: a real count, read not recomputed). A single continuous-colour trace carries no
+    discrete levels (no per-trace ``name``) -> no rows -> ``None`` (-> L4)."""
+    rows = []
+    for t in fig.get("data", []) or []:
+        if t.get("type", "scatter") not in ("scatter", "scattergl"):
+            continue
+        name, xs = t.get("name"), t.get("x")
+        if name and isinstance(xs, (list, tuple)):
+            rows.append([str(name), len(xs)])
+    return _tbl([label_col, "cells"], rows, title) if rows else None
+
+
 # --- Tier-A synthesizers ----------------------------------------------------------------
 
 def _pca(fig: dict) -> dict | None:
@@ -144,6 +159,25 @@ def _integration(fig: dict) -> dict | None:
                 "Batch integration")
 
 
+def _umap_scrna(fig: dict) -> dict | None:
+    # ``px.scatter(color=color_by)`` -> one named scatter trace per cluster level; the real
+    # n_clusters is ``len(fig.data)`` (schema doc), per-cluster cells = the trace length.
+    return _scatter_counts(fig, "cluster", "Cluster sizes (UMAP)")
+
+
+def _annotate(fig: dict) -> dict | None:
+    # ``_umap_by_type_spec`` -> one scattergl trace per assigned cell type; cells = trace length.
+    # Per-type *cluster* counts are NOT in the figure (the cluster->type map is aggregated away) ->
+    # don't fabricate them (S4); fold the subtitle's totals into the title instead.
+    tbl = _scatter_counts(fig, "cell type", "Cell-type composition")
+    if tbl is None:
+        return None
+    m = re.search(r"(\d+)\s+types?\s+assigned across\s+(\d+)\s+clusters", _subtitle(fig))
+    if m:
+        tbl["title"] += f" ({m.group(1)} types across {m.group(2)} clusters)"
+    return tbl
+
+
 def _trajectory(fig: dict) -> dict | None:
     sub = _title_and_sub(fig)
     rows = []
@@ -160,6 +194,8 @@ _SYNTHESIZERS = {
     "pca": _pca,
     "composition": _composition,
     "cluster": _cluster,
+    "umap_scrna": _umap_scrna,
+    "annotate": _annotate,
     "pvca": _pvca,
     "regression": _regression,
     "integration": _integration,

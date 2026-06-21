@@ -12,7 +12,10 @@ The reproduction drive runs a panel's matched skill, then must read the panel's 
   counts, ``pca``'s axis-title variance). Must-be-right.
 * **L2 — generic reader** (best-effort gap-filler). No L1 entry → count directional rows / scan the
   figure strings for a percentage. Recall-first, lower confidence; degrades for unknown/new skills.
-* **L3 — proprietary table synthesis** (the moat) and **L4 — Pro AI** are separate, later tiers.
+* **L3 — proprietary table synthesis** (the moat): when a skill emits *no* native table, this reader
+  synthesizes a canonical one from the figure (``extract.synthesize``) and re-reads it, re-tagged
+  ``L3``/synthesized at a reduced confidence (S3) — a real computed value re-shaped, so it MAY feed
+  the score (S2), unlike a pixel-digitized read. **L4 — Pro AI** remains a separate, later tier.
   A metric no layer can reach returns ``None`` → the drive marks the panel ``needs_recipe``
   (reproducibility-axis only, **0 Selom-confidence defects**; never a false fail).
 
@@ -26,11 +29,15 @@ import re
 
 from pydantic import BaseModel
 
+from extract.synthesize import synthesize_table
+
 # Reading layers + sources (provenance for the honest classification).
 L1 = "L1"  # skill-specific
 L2 = "L2"  # generic
+L3 = "L3"  # proprietary table synthesis (extract.synthesize)
 SRC_TABLE = "table"
 SRC_FIGURE = "figure"
+SRC_SYNTH = "synthesized"
 
 # Directional vocab across skills (volcano up/down, diff_abundance expanding/shrinking, …).
 _DIR_UP = {"up", "expanding", "increased", "gain", "enriched"}
@@ -243,9 +250,22 @@ def _read_generic(metric: str, figure: dict | None, table: dict | None,
 # --- public API ---------------------------------------------------------------
 
 
+def _as_synthesized(r: Reading) -> Reading:
+    """Re-tag a reading taken from an L3-synthesized table: distinct ``L3``/synthesized provenance
+    and a reduced, capped confidence so it is never passed off as a native-table read (S3). The value
+    is the engine's own number re-shaped, so it still MAY feed the score (S2)."""
+    return r.model_copy(update={
+        "layer": L3,
+        "source": SRC_SYNTH,
+        "confidence": round(min(r.confidence, 0.6) * 0.9, 3),
+        "note": f"{r.note}; via L3-synthesized table",
+    })
+
+
 def read_metric(skill_id: str | None, metric: str, figure: dict | None, table: dict | None,
                 *, key: str | None = None) -> Reading | None:
-    """Resolve one golden ``metric`` from a skill's output — L1 (skill-specific) then L2 (generic).
+    """Resolve one golden ``metric`` from a skill's output — L1 (skill-specific), L2 (generic),
+    then L3 (synthesize a table from the figure when the skill emits none).
 
     ``key`` is an optional named entity (a gene/term/cell-type the golden refers to) for table
     cell lookup. Returns ``None`` when no layer can read it (→ the drive marks ``needs_recipe``)."""
@@ -254,7 +274,19 @@ def read_metric(skill_id: str | None, metric: str, figure: dict | None, table: d
         r = l1(metric, figure, table)
         if r is not None:
             return r
-    return _read_generic(metric, figure, table, key)
+    r = _read_generic(metric, figure, table, key)
+    if r is not None:
+        return r
+    # L3 — no native table yielded the metric: synthesize a canonical table from the figure
+    # (read-not-recompute) and re-read it, re-tagged as synthesized. Only when the skill emits no
+    # native table (S5: never overrides a real one); a skill with a synthesizer otherwise -> None.
+    if table is None and skill_id:
+        synth = synthesize_table(skill_id, figure)
+        if synth is not None:
+            r = _read_generic(metric, figure, synth, key)
+            if r is not None:
+                return _as_synthesized(r)
+    return None
 
 
 def panel_extractor(panel, figure: dict | None, table: dict | None) -> dict:

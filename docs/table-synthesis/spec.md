@@ -2,10 +2,14 @@
 
 > Status: **SIGNED OFF (s43, 2026-06-21) — building.** Owner accepted the spec defaults
 > (D-t1 A-first · D-t2 synthesized MAY feed the score, tagged · D-t3 Tier A first · D-t4 proprietary).
-> **Tier-A part 1 SHIPPED** (`extract/synthesize.py` + 9 tests, commit `39b44b3`): pca · composition ·
-> cluster · pvca · regression · integration · trajectory. **Remaining:** the 2 trace-length
-> synthesizers (`umap_scrna`/`annotate`, need live-panel verification) · reader integration (build
-> step 2: `extract/readers.py` tries `synthesize_table` when the native table is None) · Tier B.
+> **Tier A COMPLETE (9/9) + reader integration SHIPPED (s43).** `extract/synthesize.py`: pca ·
+> composition · cluster · pvca · regression · integration · trajectory (part 1, `39b44b3`) **+
+> `umap_scrna`/`annotate`** (trace-length synthesizers, verified against the live stub panels —
+> per-type *cluster* counts aren't in the figure so they're not faked, S4; subtitle totals fold into
+> the title). **Build step 2 done:** `extract/readers.py` `read_metric` now falls back to
+> `synthesize_table` when the skill emits no native table, re-tagged `L3`/synthesized at reduced
+> confidence (S3) — a real computed value, so it MAY feed the score (S2). **Remaining:** Tier B (the
+> lossy/careful synthesizers) · FE Statistics-node wiring (cross-lane) · `proteomics_de` at source.
 > Original directive (s41): make our own custom Statistics tables so skills that don't emit one *do*;
 > skills that genuinely can't → don't force it → L4 Pro AI. Sequenced after the L1/L2 reader (shipped).
 > Companions: `docs/reproduction-engine/skill-table-schemas.md` (the inventory this builds on),
