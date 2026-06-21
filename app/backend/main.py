@@ -346,6 +346,16 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
             })
         figure, table = (run_bundle_with_table(skill_id, bundle, params) if bundle is not None
                          else run_skill_with_table(skill_id, path, params))
+        # L3 table synthesis (docs/table-synthesis/spec.md §4 / §8 step 4): a tableless skill that
+        # has a deterministic synthesizer gets a canonical Statistics table re-shaped from its OWN
+        # figure (S1 read-not-recompute -> tagged synthesized:True, S3), so the FE Statistics node
+        # renders for purely-visual skills too. None when no synthesizer exists (-> L4 Pro-AI, S4) or
+        # the skill already has a native table; never a fabricated table. Symmetric with the
+        # reproduction reader, which attaches the same synthesis when a native table is absent.
+        if table is None:
+            from extract.synthesize import synthesize_table
+
+            table = synthesize_table(skill_id, figure)
         # B4 publish-confidence: every figure ships with its reproducibility bundle +
         # auto methods-text. Pillar 1 adds the Statistics `table` (None for purely-visual
         # skills). Additive — the FE still reads `.figure`.
