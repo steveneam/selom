@@ -14,9 +14,12 @@
 > its skill's own live stub figure. **Build step 2 done:** `extract/readers.py` `read_metric` now
 > falls back to `synthesize_table` when the skill emits no native table, re-tagged `L3`/synthesized at
 > reduced confidence (S3) — a real computed value, so it MAY feed the score (S2); registering the new
-> synthesizers auto-extended reader coverage (no reader edit). **Remaining:** the **lossy** Tier-B set
-> (`scorecard`/`boxplot`/`violin`/`heatmap`, each gated or → L4) · FE Statistics-node wiring
-> (cross-lane) · `proteomics_de` at source.
+> synthesizers auto-extended reader coverage (no reader edit). **The lossy Tier-B set
+> (`boxplot`/`heatmap`/`scorecard`/`violin`) SHIPPED (s45)** — each behind a faithfulness gate; all
+> four had a faithful deterministic table so none was punted to L4 (§8 step 3b). **Remaining:** FE
+> Statistics-node wiring (cross-lane) · `proteomics_de` at source (Codex lane). The full synthesizer
+> set is now 16 skills; the only L4-only skills are the node-link trio (`go_graph`/`pathway`/
+> `string_network`).
 > Original directive (s41): make our own custom Statistics tables so skills that don't emit one *do*;
 > skills that genuinely can't → don't force it → L4 Pro AI. Sequenced after the L1/L2 reader (shipped).
 > Companions: `docs/reproduction-engine/skill-table-schemas.md` (the inventory this builds on),
@@ -160,8 +163,16 @@ build first; **Tier B** = synthesizable but lossy/needs care; **L4** = leave to 
 3. **Tier B (clean trio)** — `corr_heatmap`, `sankey`, `upset`, each gated by a faithfulness check.
    **DONE (s44).** Read directly off well-formed traces (heatmap `z`+labels, sankey links, upset size
    bars + present dots); the gate returns `None` on a ragged/out-of-range/missing shape.
-3b. **Tier B (lossy)** — `scorecard`, `boxplot`, `violin`, `heatmap`, each gated by a faithfulness
-   check OR deferred to L4 where a deterministic faithful table can't be synthesized (S4). *(open)*
+3b. **Tier B (lossy)** — `boxplot`, `heatmap`, `scorecard`, `violin`, each gated by a faithfulness
+   check. **DONE (s45).** All four had a faithful deterministic table after all, so none was punted to
+   L4: `boxplot` → `[group, n, min, q1, median, q3, max]` (the five-number summary the box encodes —
+   exact order stats + Plotly's default *linear* quartile method, so the table == the drawn box);
+   `heatmap` → wide `[gene, <group…> z]` (the z-scores drawn; reuses the `_heatmap_grid` gate, ignores
+   any dendrogram trace); `scorecard` → long `[condition, metric, score]` from either layout (radar
+   `scatterpolar`, closing point dropped · or the heatmap grid); `violin` → `[gene, pubmed hits,
+   verdict]` from the `annotate=pubmed` corner annotation, else `None` (the un-annotated distributions
+   aren't tabulated). The gate returns `None` on a non-conforming shape (no box trace · ragged `z` ·
+   misaligned theta/r · no annotation).
 4. **FE Statistics-node wiring** (cross-lane) — attach synthesized tables in the run/job response so
    tableless skills show an editable table in the editor; labelled provenance.
 5. **proteomics_de at source** (Codex lane) — attach a native `de_table` (the one real source fix).
