@@ -253,7 +253,7 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
     # analysis. ingest() classifies the loaded payload; run_qc() emits honest, modality-aware flags
     # the user reads and can override. The cheap routing inventory in extract.ingest is the
     # paper-side complement. `sheet` selects an xlsx sheet; `hint` forces the modality.
-    from engine import ALL_KINDS, ingest, run_qc
+    from engine import ALL_KINDS, ingest, route_data, run_qc
 
     if hint is not None and hint not in ALL_KINDS:
         raise HTTPException(status_code=400, detail=f"hint must be one of {ALL_KINDS}")
@@ -261,6 +261,7 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
     try:
         bundle = ingest(path, hint=hint, sheet=sheet)
         bundle.qc = run_qc(bundle)
+        routing = route_data(bundle)               # which analyses fit this modality (P3 guidance)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     finally:
@@ -271,6 +272,7 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
         "kind": bundle.kind,
         "source": bundle.source.model_dump(),
         "qc": bundle.qc.model_dump(),
+        "routing": routing.model_dump(),           # suggested skill pipeline + honest note
     }
 
 

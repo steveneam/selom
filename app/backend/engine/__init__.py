@@ -13,6 +13,7 @@ from __future__ import annotations
 from engine.databundle import DataBundle, classify
 from engine.ingest import ingest
 from engine.qc import run_qc
+from engine.route import route_data
 from engine.models import (
     ALL_KINDS,
     BULK_COUNTS,
@@ -32,6 +33,7 @@ __all__ = [
     "classify",
     "ingest",
     "run_qc",
+    "route_data",
     "ALL_KINDS",
     "SC_COUNTS",
     "BULK_COUNTS",

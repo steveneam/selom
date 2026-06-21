@@ -35,6 +35,9 @@ def test_inspect_clean_bulk_counts_ok():
     assert body["kind"] == "bulk_counts"
     assert body["qc"]["ok"] is True
     assert body["qc"]["blocked"] is False
+    # P3 guidance rides along: a registry-validated pipeline for this modality.
+    assert body["routing"]["confident"] is True
+    assert "deg" in [s["skill_id"] for s in body["routing"]["steps"]]
 
 
 def test_inspect_hint_forces_kind_and_qc_blocks_non_integer_counts():
