@@ -54,6 +54,18 @@ def test_volcano_only_handles_de_metrics():
     assert read_metric("volcano", "pc1_var", None, _de_table([])) is None
 
 
+def test_proteomics_de_shares_the_de_table_l1_reader():
+    # proteomics_de emits the canonical de_table; it must read at L1 so de_total = up + down,
+    # NOT the L2 row count (which would return the tested-protein total — the schema-doc trap).
+    rows = [["A", 2.1, 0.001, "up"], ["B", 1.5, 0.01, "up"], ["C", -2.0, 0.002, "down"],
+            ["D", 0.1, 0.9, "n.s."]]
+    table = _de_table(rows)
+    up = read_metric("proteomics_de", "de_up", None, table)
+    total = read_metric("proteomics_de", "de_total", None, table)
+    assert (up.value, total.value) == (2, 3)  # 3 = up + down, not 4 (all rows)
+    assert up.layer == L1 and up.source == SRC_TABLE
+
+
 # --- L1: pca variance from axis titles ----------------------------------------
 
 

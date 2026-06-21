@@ -92,7 +92,21 @@ def run(data_path: str, params: dict) -> dict:
         f"Proteomics differential abundance — {len(cols_a)}v{len(cols_b)} samples, "
         f"{int(keep.sum())} proteins ({stat_label}{imp_label})"
     )
-    return _assemble(up, down, ns, labels, fc_t, y_cut, title)
+    spec = _assemble(up, down, ns, labels, fc_t, y_cut, title)
+    # Statistics node + machine-readable DE counts (live-reproduction L3, table-synthesis
+    # spec §8 step 5): proteomics_de computed real per-protein logFC+padj but attached no
+    # table, so its DE counts were not readable at source (the §5 gap — the figure title's
+    # protein-tested count is easily mistaken for a DE total). Attach the full DE table the
+    # volcano was drawn from, restricted to the tested (kept) proteins — exactly as the
+    # volcano skill does (the figure keeps only plotted points + top-N labels).
+    from skills._table import de_table
+
+    kept = np.where(keep)[0]
+    spec["table"] = de_table(
+        [str(genes.iloc[i]) for i in kept], lfc[kept], padj[kept],
+        fc_t=fc_t, fdr_t=fdr_t, title="Proteomics differential abundance",
+    )
+    return spec
 
 
 def _impute(M, mode, np):

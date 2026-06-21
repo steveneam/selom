@@ -24,6 +24,8 @@ def run(data_path: str, params: dict) -> dict:
 
 
 def _stub_figure(params: dict) -> dict:
+    from skills._table import de_table
+
     fc_t = float(params.get("fc_threshold", 1.0))
     fdr_t = float(params.get("fdr_threshold", 0.05))
     top_n = int(params.get("top_n", 10))
@@ -43,4 +45,13 @@ def _stub_figure(params: dict) -> dict:
     down = ([x for x, _, _ in pts if x < 0], [y for x, y, _ in pts if x < 0])
     ns = ([x for x, _ in ns_pts], [y for _, y in ns_pts])
     labels = [(x, y, n) for x, y, n in pts if y >= 3.5][:top_n]
-    return _assemble(up, down, ns, labels, fc_t, y_cut, "Proteomics differential abundance (stub)")
+    spec = _assemble(up, down, ns, labels, fc_t, y_cut, "Proteomics differential abundance (stub)")
+    # Statistics node (Pillar 1) — like the volcano stub, ship the DE table alongside the
+    # figure (invert the synthetic -log10 padj back to padj). run_skill pops it, so the
+    # golden figure is unchanged.
+    genes = [n for _, _, n in pts] + [f"P{i + 1}" for i in range(len(ns_pts))]
+    lfcs = [x for x, _, _ in pts] + [x for x, _ in ns_pts]
+    padjs = [10 ** (-y) for _, y, _ in pts] + [10 ** (-y) for _, y in ns_pts]
+    spec["table"] = de_table(genes, lfcs, padjs, fc_t=fc_t, fdr_t=fdr_t,
+                             title="Proteomics differential abundance (stub)")
+    return spec

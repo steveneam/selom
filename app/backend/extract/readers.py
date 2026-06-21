@@ -123,9 +123,12 @@ def _title_total(table: dict | None) -> int | None:
 # --- L1: skill-specific readers -----------------------------------------------
 
 
-def _read_volcano(metric: str, figure: dict | None, table: dict | None) -> Reading | None:
-    """``volcano`` (``de_table``: gene·log2FC·padj·direction). DE counts = directional row tallies;
-    the true total comes from the title when the table is capped at 300 rows."""
+def _read_de_table(metric: str, figure: dict | None, table: dict | None) -> Reading | None:
+    """Shared DE-table reader for any skill emitting the canonical ``de_table``
+    (gene·log2FC·padj·direction) — ``volcano`` and ``proteomics_de``. DE counts = directional
+    row tallies; the true total comes from the title when the table is capped at 300 rows.
+    (de_total = up + down, *not* the table's tested-protein row count — the trap the schema
+    doc warns about for proteomics_de.)"""
     m = _norm(metric)
     if m not in {"detotal", "deup", "dedown"}:
         return None
@@ -164,10 +167,12 @@ def _read_pca(metric: str, figure: dict | None, table: dict | None) -> Reading |
                    confidence=1.0, note=f"read from {axis} title '{text}'")
 
 
-# skill_id -> its L1 reader. Adding a skill is one entry (and one function). The 8 other
+# skill_id -> its L1 reader. Adding a skill is one entry (and one function). volcano and
+# proteomics_de share the canonical de_table, so both map to _read_de_table (proteomics_de
+# needs L1 so de_total reads as up+down, not its tested-protein row count). The 8 other
 # table-emitting skills (cepo/gsea/enrichment/pseudotime_genes/diff_abundance/markers/ssgsea/deg)
 # resolve through the L2 generic reader by table key/count today; promote any to L1 as needed.
-_SKILL_READERS = {"volcano": _read_volcano, "pca": _read_pca}
+_SKILL_READERS = {"volcano": _read_de_table, "proteomics_de": _read_de_table, "pca": _read_pca}
 
 
 # --- L2: generic reader -------------------------------------------------------

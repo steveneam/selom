@@ -73,6 +73,35 @@ def test_proteomics_de_recovers_planted_de():
     assert not (set(labels) & set(NULL)), "no null protein should be called significant"
 
 
+def test_emits_de_table_with_machine_readable_counts():
+    """§8 step 5: proteomics_de now attaches the canonical de_table so its DE counts are
+    machine-readable at source (the prior gap). The shared L1 reader resolves
+    de_up/de_down/de_total from the direction column — de_total = up + down, NOT the
+    tested-protein row count (the trap the schema doc warns about)."""
+    from extract.readers import L1, SRC_TABLE, read_metric
+    from skills.contract import run_skill_with_table
+
+    fd, path = tempfile.mkstemp(suffix=".csv")
+    os.close(fd)
+    try:
+        _synthetic_csv(path)
+        figure, table = run_skill_with_table(
+            "proteomics_de", path,
+            {"group_a": "A", "group_b": "B", "log_input": True, "top_n": 40},
+        )
+    finally:
+        os.unlink(path)
+
+    assert table is not None and "table" not in figure  # table popped from the figure (D7)
+    assert table["columns"] == ["gene", "log2FC", "padj", "direction"]
+
+    up = read_metric("proteomics_de", "de_up", figure, table)
+    down = read_metric("proteomics_de", "de_down", figure, table)
+    total = read_metric("proteomics_de", "de_total", figure, table)
+    assert (up.value, down.value, total.value) == (len(UP), len(DOWN), len(UP) + len(DOWN))
+    assert up.layer == L1 and up.source == SRC_TABLE  # shared volcano de_table reader, not L2
+
+
 def test_moderated_recovers_more_de_at_small_n():
     """Empirical-Bayes moderation beats an un-moderated t-test at small N: more true DE at the
     same FDR threshold, without inflating false positives. This is the point of the mode."""
