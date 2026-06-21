@@ -1,9 +1,13 @@
 # Proprietary table synthesis (L3) — spec
 
-> Status: **DRAFT for owner sign-off (s41, 2026-06-21).** Owner-directed (s41): make our own custom
-> Statistics tables so skills that don't emit one *do*; some skills genuinely can't have a table →
-> don't force it → that's the Pro-tier AI. Owner sequenced this **after** the L1/L2 reader (now
-> shipped). This is the design + the decisions to confirm BEFORE code.
+> Status: **SIGNED OFF (s43, 2026-06-21) — building.** Owner accepted the spec defaults
+> (D-t1 A-first · D-t2 synthesized MAY feed the score, tagged · D-t3 Tier A first · D-t4 proprietary).
+> **Tier-A part 1 SHIPPED** (`extract/synthesize.py` + 9 tests, commit `39b44b3`): pca · composition ·
+> cluster · pvca · regression · integration · trajectory. **Remaining:** the 2 trace-length
+> synthesizers (`umap_scrna`/`annotate`, need live-panel verification) · reader integration (build
+> step 2: `extract/readers.py` tries `synthesize_table` when the native table is None) · Tier B.
+> Original directive (s41): make our own custom Statistics tables so skills that don't emit one *do*;
+> skills that genuinely can't → don't force it → L4 Pro AI. Sequenced after the L1/L2 reader (shipped).
 > Companions: `docs/reproduction-engine/skill-table-schemas.md` (the inventory this builds on),
 > `docs/reproduction-engine/live-reproduction-spec.md` (the consumer), `extract/readers.py` (L1/L2),
 > [[selom-proprietary-skills-folder]] [[layered-deterministic-extraction]] [[selom-extract-reproduction-bridge]].
