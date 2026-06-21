@@ -41,6 +41,12 @@ class DataBundle:
     design: Design | None = None
     qc: QCReport = field(default_factory=QCReport)
     meta: dict = field(default_factory=dict)
+    # Runtime handle to the source file (set by :func:`engine.ingest.ingest`): the re-openable
+    # path a still-path-based skill runs from — the ANALYZE entry (``run_bundle``) executes from
+    # it. Distinct from ``source`` (the *serialized* provenance — filename/sha, not a path); this
+    # field is not serialized (the wrapper is a dataclass, not pydantic). ``None`` when the bundle
+    # was built in-memory rather than ingested from a file (E4). See ``docs/engine-spine/spec.md`` §9.
+    path: str | None = None
 
 
 # --- modality classification ------------------------------------------------------------

@@ -89,6 +89,31 @@ def run_skill_with_table(skill_id: str, data_path: str, params: dict) -> tuple[d
     return _execute(skill_id, data_path, params)
 
 
+def run_bundle(skill_id: str, bundle, params: dict) -> dict:
+    """Run a skill from an engine ``DataBundle`` → its themed figure (the table is dropped —
+    use :func:`run_bundle_with_table` when the bundle needs it). See :func:`run_bundle_with_table`."""
+    figure, _table = run_bundle_with_table(skill_id, bundle, params)
+    return figure
+
+
+def run_bundle_with_table(skill_id: str, bundle, params: dict) -> tuple[dict, dict | None]:
+    """The engine-spine ANALYZE entry (E4): run a skill from an ingested ``DataBundle``.
+
+    Both products flow through ``engine.ingest`` to one classified, QC'd ``DataBundle`` and then
+    here, so analysis loads through one canonical front door (engine-spine spec §6/§9). Skills are
+    still path-based, so we execute from ``bundle.path`` — the output is therefore *byte-identical*
+    to ``run_skill_with_table(skill_id, bundle.path, params)`` (E4: additive, nothing coerced yet;
+    a future per-skill opt-in can consume ``bundle.payload`` directly to skip the re-load). The
+    bundle is duck-typed (no ``engine`` import here) to keep the spine boundary one-directional."""
+    path = getattr(bundle, "path", None)
+    if path is None:
+        raise ValueError(
+            "DataBundle has no source path to run from — engine.ingest sets .path; an in-memory "
+            "bundle can't yet feed a path-based skill."
+        )
+    return _execute(skill_id, path, params)
+
+
 def defaults(spec: SkillSpec) -> dict:
     return {k: v["default"] for k, v in spec.param_spec.items()}
 

@@ -118,4 +118,9 @@ def ingest(
         )
     payload = loader.load(path, sheet=sheet, sep=sep)
     source = _source_ref(path, sheet=sheet)
-    return DataBundle(payload=payload, kind=classify(payload, hint=hint, source=source), source=source)
+    return DataBundle(
+        payload=payload,
+        kind=classify(payload, hint=hint, source=source),
+        source=source,
+        path=str(path),  # the runner handle (E4): skills are still path-based, so the ANALYZE
+    )                    # entry runs from here while the rest of the spine keys on the payload.

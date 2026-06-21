@@ -81,10 +81,22 @@ class DriveResult(BaseModel):
 
 
 def _default_runner(skill_id: str, data_path: str, params: dict):
-    """Run the real skill → (figure, table). Lazy import keeps the orchestration import-light."""
-    from skills.contract import run_skill_with_table
+    """Run the real skill → (figure, table), loading the matched data through the engine ingest
+    front door so reproduce() flows ``ingest -> analyze`` end-to-end like Product A (engine-spine
+    spec §9 step 5). Byte-identical to the prior path: ``run_bundle_with_table`` executes from the
+    bundle's path, and ``engine.ingest`` already speaks the matcher's tabular vocabulary (xlsx/csv).
+    Fail-soft — a path engine.ingest can't recognize (an exotic ``data_map`` override) falls back to
+    the path-based runner, so the matcher's data choice always reaches the skill. Lazy import keeps
+    the orchestration import-light."""
+    from skills.contract import run_bundle_with_table, run_skill_with_table
 
-    return run_skill_with_table(skill_id, data_path, params)
+    try:
+        from engine import ingest
+
+        bundle = ingest(data_path)
+    except Exception:  # noqa: BLE001 — unrecognized/unloadable here is an honest fall-back, not a bug
+        return run_skill_with_table(skill_id, data_path, params)
+    return run_bundle_with_table(skill_id, bundle, params)
 
 
 # Gap #1 (merge routed skeleton + extracted goldens) and gap #2 (match a data file to a panel) now
