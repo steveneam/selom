@@ -300,7 +300,11 @@ text. One engine, two instantiations.
 ### New pieces
 - **Figure-legend generator** — a sibling of `build_body`: `{skill, params, result}` → a legend
   template ("Figure N. <skill> of <data>; n=<…>; thresholds <…>"). Deterministic, reuses the methods
-  seam. New but small.
+  seam. New but small. **SHIPPED (s47):** `legends.py` `build_caption(spec, params, *, figure, table)`
+  — honest from params, enriched with the run's real DE split via the canonical `readers.de_counts`;
+  surfaced as `figure_legend` on `/skills/{id}/run` and per-panel via
+  `litsynth/legends_from_ledger.compose_ledger_legends` + `GET /papers/{slug}/legends`. (No "Figure N."
+  number baked in — the caller owns the numbering.) The Pro/AI polish tier + FE panel remain.
 - **FE surface** — a "Methods & legend" panel after a run (Reproduction view now; own-data run later),
   paste-ready with Copy. Extends this session's export (Copy/CSV → also export the methods/legend text).
 - **Pro/AI polish tier** — the deterministic baseline (free, always: we have params + results, so the

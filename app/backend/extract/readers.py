@@ -113,6 +113,22 @@ def _direction_col(columns: list[str], rows: list[list]) -> int | None:
     return None
 
 
+def de_counts(table: dict | None) -> tuple[int, int] | None:
+    """``(up, down)`` regulated-row tallies from a canonical ``de_table``'s direction column,
+    or ``None`` when the table carries no direction column.
+
+    The single shared DE-count tally: ``_read_de_table`` (the grading read-back) and the figure-
+    legend layer both reuse this rather than re-deriving the up/down split, so the count can never
+    drift between the two (one source of truth, per the directional vocab above)."""
+    columns, rows = _table_parts(table)
+    di = _direction_col(columns, rows)
+    if di is None:
+        return None
+    up = sum(1 for r in rows if di < len(r) and str(r[di]).lower() in _DIR_UP)
+    down = sum(1 for r in rows if di < len(r) and str(r[di]).lower() in _DIR_DOWN)
+    return up, down
+
+
 def _title_total(table: dict | None) -> int | None:
     """The true total a capped ``de_table`` hides in its title: ``(top 300 of 1450 …)``."""
     title = (table or {}).get("title", "")
@@ -132,12 +148,11 @@ def _read_de_table(metric: str, figure: dict | None, table: dict | None) -> Read
     m = _norm(metric)
     if m not in {"detotal", "deup", "dedown"}:
         return None
-    columns, rows = _table_parts(table)
-    di = _direction_col(columns, rows)
-    if di is None:
+    counts = de_counts(table)
+    if counts is None:
         return None
-    up = sum(1 for r in rows if di < len(r) and str(r[di]).lower() in _DIR_UP)
-    down = sum(1 for r in rows if di < len(r) and str(r[di]).lower() in _DIR_DOWN)
+    up, down = counts
+    rows = _table_parts(table)[1]
     capped = len(rows) >= 300  # de_table max_rows; an exact count is no longer guaranteed
     note = "counted from de_table direction column"
     if m == "deup":

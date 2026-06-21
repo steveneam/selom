@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 import export
 import guardrails
+import legends
 import methods
 import paper_metadata
 import papers_api
@@ -22,6 +23,7 @@ from extract import routing
 from gene_sets import library as gene_sets
 from litsynth import SkillRunRef, compose_methods
 from litsynth import from_ledger as ledger_methods
+from litsynth import legends_from_ledger as ledger_legends
 from litsynth import lookup as citations_lookup
 from jobs.queue import get_job, result_store, submit
 from jobs.store import TERMINAL
@@ -129,6 +131,21 @@ def get_paper_methods(slug: str, modality: str = ""):
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return section.model_dump()
+
+
+@app.get("/papers/{slug}/legends")
+def get_paper_legends(slug: str):
+    # The legend twin of /methods: this paper's driven ledger -> one paste-ready figure caption
+    # per in-scope analysis panel (deterministic, offline), enriched with each panel's reproduced
+    # figure/table when present. See docs/workspace-library/spec.md Sec 11.
+    if slug not in papers_api.SLUGS:
+        raise HTTPException(status_code=404, detail=f"unknown paper '{slug}'")
+    ledger = papers_api.driven_ledger(slug)
+    try:
+        items = ledger_legends.compose_ledger_legends(ledger)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"slug": slug, "legends": [fl.model_dump() for fl in items]}
 
 
 async def _save_capped(run_dir: str, upload: UploadFile, max_bytes: int) -> str:
@@ -298,6 +315,7 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
             "figure": figure,                            # Plotly JSON -> frontend
             "provenance": provenance.build(spec, path, matrix.filename, params),
             "methods": methods.build(spec, params),
+            "figure_legend": legends.build(spec, params, figure=figure, table=table),
             "guardrails": guardrails.build(spec, path, params),
             "table": table,                              # Statistics node (Pillar 1) | None
         }

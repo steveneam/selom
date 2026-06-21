@@ -108,7 +108,7 @@ the gap is contract uniformity + the methods/legend wiring.
 **Slices:**
 - **4a** Skill-contract uniformity audit — every in-scope skill emits `{figure, table}` (via L3 where native is absent); fill only the gaps the two products actually hit.
 - **4b** Editor-as-sink hardening (any `{figure, table}` renders + edits anywhere — the chart-extractor already proved the sink).
-- **4c** Methods / figure-legend layer wiring (umbrella §11 remainder, ~70% on lit-synth) — paste-ready methods + legend for any run.
+- **4c** Methods / figure-legend layer wiring (umbrella §11 remainder, ~70% on lit-synth) — paste-ready methods + legend for any run. **DONE (s47):** the methods half already shipped (lit-synth); the legend half is new — `legends.py` (the per-skill caption sibling of `methods.build_body`, params-honest + result-enriched via the canonical `readers.de_counts`), wired onto `/skills/{id}/run` as `figure_legend`, plus `litsynth/legends_from_ledger.compose_ledger_legends` + `GET /papers/{slug}/legends` (the reproduction twin of `/methods`).
 
 ### P5 — Reproduction & Scoring  ·  the proving ground (consumes P1–P4)
 **Goal:** paper + data → route → drive → grade → two-axis Score. **The floor shipped (s41/s42).**
@@ -151,6 +151,6 @@ s25–s42 drift.
 |---|---|
 | **Done — engine-relevant** | ~30 analysis skills · clean-room Melody + Harmony2 · `ingest_paper`/`PaperBundle` · routing (skill-keyword-index 4-layer) · `extract/golden` · L1/L2 readers · `reproduction_drive` (merge+match+drive+grade) · `reproduction_runs` + Phase-3 FE · two-axis Score · figure editor + publication theme · lit-synth methods (~70%) · 4 validated ledgers |
 | **Done — surfaces** | Workspace Library · umbrella shell (`/paper/[id]`) · Skill Match FE · chart extractor (`/extract`) · paper metadata + auto-rename · gene-set builder Phase A |
-| **Not done — engine-core** | **is-my-data-clean? + RAW-data routing** · canonical `DataBundle` / unified ingest · P4 methods/figure-legend layer wiring _(L3 table-synthesis, metric-type tolerance grader, `proteomics_de` native `de_table` all DONE s43–s46; only the L3 FE Statistics-node wiring remains, in the circle-back FE pass)_ |
+| **Not done — engine-core** | **is-my-data-clean? + RAW-data routing** · canonical `DataBundle` / unified ingest _(L3 table-synthesis, metric-type tolerance grader, `proteomics_de` native `de_table`, P4 methods/figure-legend layer wiring all DONE s43–s47; only the L3 FE Statistics-node wiring + the methods/legend FE panel remain, in the circle-back FE pass)_ |
 | **On-hold (P6)** | journal styles · BAM ingest · Ask-Selom chat · atlas reproductions · external-tool builds (ARCHS4/phylo/eggNOG) · ClawBio HOST slice · pipeline flow animation · digitize-this-panel bridge · gene-set messy lists · command-center C/B platform · Supabase/arq/Kaleido infra · OSCA Gap E · pdf.js region-capture |
 | **Good to do (serves P1–P5)** | RAW-data router (P3a) · is-my-data-clean (P1c) · P4 methods/legend wiring (P4c) · P1 step-5 consolidation (fold reproduction onto engine/ingest + `engine/match.py`) |
