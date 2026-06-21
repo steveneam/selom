@@ -115,8 +115,8 @@ the own-data workbench become **consumers**, not owners:
 | INGEST | `engine/ingest.py` `ingest()` → `DataBundle` | **new (P1)** |
 | classify / QC | `engine/databundle.py` `classify()` + `engine/qc.py` `run_qc()` | **new (P1)** |
 | ROUTE | `engine/route.py` — wraps `extract/routing` (paper) **+** new raw-data router (P3a) | partial |
-| JOIN / MATCH | `engine/match.py` — ledger merge + data↔panel matching (lifted from `reproduction_drive`) | **done (s47)** — `merge_ledger`/`match_data`/`tabular_paths`; `DataBundle`↔skill matching follows when the runner takes a `DataBundle` (E4) |
-| ANALYZE | `run_skill(skill_id, DataBundle, params)` → `{figure, table}` (adds a `DataBundle` entry to the existing runner) | mostly |
+| JOIN / MATCH | `engine/match.py` — ledger merge + data↔panel matching (lifted from `reproduction_drive`) | **done (s47)** — `merge_ledger`/`match_data`/`tabular_paths` |
+| ANALYZE | `run_bundle(skill_id, DataBundle, params)` → `{figure, table}` (the `DataBundle` entry alongside the path runner) | **done (s48)** — `skills.contract.run_bundle`/`run_bundle_with_table`; both products load through `engine.ingest` → bundle → run (byte-identical, E4) |
 | READ-BACK | `extract/readers.py` (L1/L2) + `extract/synthesize.py` (L3, P2) | partial |
 | GRADE | `reproduction.py` (consumer-only; **Product B**) | done (floor) |
 | OUTPUT | figure editor + L3 table + lit-synth methods | mostly |
@@ -124,6 +124,15 @@ the own-data workbench become **consumers**, not owners:
 Reproduction's `reproduce()` then reads as: `ingest → route → match → analyze → read-back →
 grade` — i.e. it *calls the spine* and adds only the grade step. Product A calls
 `ingest → (qc gate) → route → analyze → output` — the same spine, minus grading.
+
+**The qc gate is live (s48).** `POST /skills/{id}/run` is the own-data ANALYZE surface; it now
+ingests the upload through `engine.ingest`, runs `run_qc`, and **blocks a `block`-severity problem
+unless `override=true`** (D-e5: warn + require an explicit override, structured 422 carrying the
+flags + fix hints), then runs the skill from the same `DataBundle` via `run_bundle_with_table`. A
+clean run additionally surfaces the verdict + suggested pipeline as `data_check` (kind + QC + the
+P3 routing). It is **fail-soft**: an upload the engine can't load yields no bundle and runs the
+path-based way, so the guardrail never breaks a previously-valid run. (The async `…/jobs` path is
+not gated yet — a follow-up.)
 
 ## 7. Invariants
 
@@ -174,10 +183,14 @@ grade` — i.e. it *calls the spine* and adds only the grade step. Product A cal
    verbatim into `engine/match.py`; `reproduction_drive` now consumes it and keeps only the
    orchestration (run + read-back + grade), re-exporting the three names for back-compat. Behaviour
    is byte-identical — the 4 hand ledgers (RPGRIP1/JEV/Hani/Dorgau) + drive + drive_honest all pass
-   unchanged (59 tests). The matcher already speaks the engine-ingest tabular vocabulary (xlsx/csv);
-   the **remaining** increment is making the runner take a `DataBundle` so `reproduce()` and Product A
-   load analysis data through `engine.ingest` end-to-end (E4 additive — deliberately not forced now,
-   since skills are still path-based).
+   unchanged. **The runner-takes-a-`DataBundle` increment landed s48:** `skills.contract` gained
+   `run_bundle`/`run_bundle_with_table` (the ANALYZE entry; reads `bundle.path`, so output is
+   byte-identical to the path runner — E4, nothing coerced), `engine.ingest` sets `DataBundle.path`
+   (the runner handle, distinct from the serialized `source` provenance), and **both products now
+   load through `engine.ingest` → bundle → run end-to-end**: reproduction's `_default_runner` ingests
+   the matched data (fail-soft fall-back to the path runner for an exotic `data_map` override), and
+   `POST /skills/{id}/run` ingests the upload (also feeding the QC gate, §6). A future per-skill
+   opt-in can consume `bundle.payload` directly to skip the re-load.
 
 **No new infra.** Pure library + the existing inline path; ASK before any Redis/arq/Docker
 ([[ask-before-docker-wsl]]).

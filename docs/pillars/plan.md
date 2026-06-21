@@ -72,9 +72,9 @@ Each pillar lists **agile slices** sized to roughly one scoped commit / session.
 **Today:** scattered & paper-centric — `extract/ingest.py` (`PaperBundle`), per-dataset loaders,
 `normalization_qc` (QC + doublets + adaptive-MAD). No single canonical data representation.
 **Slices:**
-- **1a** Spec + build the canonical `DataBundle` + an ingest **registry** (one loader per input type). *(→ `docs/engine-spine/spec.md`)*
-- **1b** Unify paper-supplement ingest and own-data ingest onto `DataBundle` (retire the duplication between `ingest.py` and the dataset loaders).
-- **1c** "Is-my-data-clean?" pass — adaptive QC + **honest "your data has a problem" flags** (wrong shape, NaNs, non-integer counts where counts are required, batch≈condition confound), as a structured report per modality. *(s42 native-moat pick #2.)*
+- **1a** Spec + build the canonical `DataBundle` + an ingest **registry** (one loader per input type). *(→ `docs/engine-spine/spec.md`)* **DONE (s43).**
+- **1b** Unify paper-supplement ingest and own-data ingest onto `DataBundle`. **DONE (s48):** the runner takes a `DataBundle` (`skills.contract.run_bundle`/`run_bundle_with_table` + `DataBundle.path`), and **both products now load through `engine.ingest` → bundle → run end-to-end** — reproduction's `_default_runner` and `POST /skills/{id}/run`. Byte-identical (E4). *(The cheap paper-side sheet inventory in `extract/ingest.py` stays as the routing complement — it finds ST2/ST6 by name without a full read.)*
+- **1c** "Is-my-data-clean?" pass — adaptive QC + **honest "your data has a problem" flags** (wrong shape, NaNs, non-integer counts where counts are required, batch≈condition confound), as a structured report per modality. *(s42 native-moat pick #2.)* **DONE:** the report (`engine/qc.py`, s43) + the **guardrail on the run path** (s48) — `POST /skills/{id}/run` blocks a `block`-severity problem unless `override=true` (D-e5, structured 422 + fix hints) and surfaces the verdict as `data_check`.
 - **1d** Modality / shape detection (raw counts vs DE-results vs proteomics matrix vs metabolomics vs generic) — feeds P3 routing.
 
 ### P2 — Table Joining & Synthesis  ·  "table joining"
@@ -96,8 +96,8 @@ half of Product A.
 **Today:** the paper→skill router is strong (skill-keyword-index, 4-layer, `extract/routing/`).
 **RAW-data routing does not exist.**
 **Slices:**
-- **3a** RAW-data router — data shape/modality (from 1d) → suggested skills + a proposed pipeline ("raw counts + 2 conditions → `deg` → `volcano`").
-- **3b** Surface suggestions in the workbench (the guided own-data flow; the C3 intake idea, real).
+- **3a** RAW-data router — data shape/modality (from 1d) → suggested skills + a proposed pipeline ("raw counts + 2 conditions → `deg` → `volcano`"). **DONE:** `engine/route.py` `route_data` (s43, registry-validated), now **surfaced for own data** on every run (`POST /skills/{id}/run` → `data_check.routing`) + `POST /data/inspect`, s48.
+- **3b** Surface suggestions in the workbench (the guided own-data flow; the C3 intake idea, real). _(Backend surfaced via `data_check`; the FE workbench panel is part of the circle-back FE pass.)_
 - **3c** Honest "we're not sure → here are options" + the skill-gap signal (reuse the unmatched-term pattern, for data).
 
 ### P4 — Analysis & Editable Output
@@ -151,6 +151,6 @@ s25–s42 drift.
 |---|---|
 | **Done — engine-relevant** | ~30 analysis skills · clean-room Melody + Harmony2 · `ingest_paper`/`PaperBundle` · routing (skill-keyword-index 4-layer) · `extract/golden` · L1/L2 readers · `reproduction_drive` (merge+match+drive+grade) · `reproduction_runs` + Phase-3 FE · two-axis Score · figure editor + publication theme · lit-synth methods (~70%) · 4 validated ledgers |
 | **Done — surfaces** | Workspace Library · umbrella shell (`/paper/[id]`) · Skill Match FE · chart extractor (`/extract`) · paper metadata + auto-rename · gene-set builder Phase A |
-| **Not done — engine-core** | **is-my-data-clean? + RAW-data routing** · canonical `DataBundle` / unified ingest _(L3 table-synthesis, metric-type tolerance grader, `proteomics_de` native `de_table`, P4 methods/figure-legend layer wiring all DONE s43–s47; only the L3 FE Statistics-node wiring + the methods/legend FE panel remain, in the circle-back FE pass)_ |
+| **Not done — engine-core** | _(All engine-core skeletons now exist. DONE s43–s48: canonical `DataBundle` + unified ingest registry · is-my-data-clean? QC **+ the run-path guardrail** · RAW-data routing **surfaced for own data** · runner-takes-a-`DataBundle` (both products load through `engine.ingest` end-to-end) · `engine/match.py` · L3 table-synthesis · metric-type tolerance grader · `proteomics_de` native `de_table` · P4 methods/figure-legend wiring.)_ **Remaining = the circle-back FE pass only:** the guided-workbench panel (`data_check` surfaced, P3b) · the L3 FE Statistics-node wiring · the methods/legend FE panel · the async `…/jobs` QC gate (small BE follow-up). |
 | **On-hold (P6)** | journal styles · BAM ingest · Ask-Selom chat · atlas reproductions · external-tool builds (ARCHS4/phylo/eggNOG) · ClawBio HOST slice · pipeline flow animation · digitize-this-panel bridge · gene-set messy lists · command-center C/B platform · Supabase/arq/Kaleido infra · OSCA Gap E · pdf.js region-capture |
-| **Good to do (serves P1–P5)** | RAW-data router (P3a) · is-my-data-clean (P1c) _(P4 methods/legend wiring P4c + P1 step-5 consolidation = `engine/match.py` both DONE s47)_ |
+| **Good to do (serves P1–P5)** | _(The engine-core backlog is cleared — RAW-data router P3a, is-my-data-clean P1c + guardrail, runner-takes-`DataBundle` P1§1b all DONE s43–s48.)_ Next: the single circle-back FE/UX pass across all pillars (P3b workbench · L3 Statistics node · methods/legend panel). |
