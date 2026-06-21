@@ -307,6 +307,9 @@ text. One engine, two instantiations.
   number baked in — the caller owns the numbering.) The Pro/AI polish tier + FE panel remain.
 - **FE surface** — a "Methods & legend" panel after a run (Reproduction view now; own-data run later),
   paste-ready with Copy. Extends this session's export (Copy/CSV → also export the methods/legend text).
+  **Own-data run SHIPPED (s49):** the run response's `figure_legend` is carried as `Figure.legend`, and
+  `PublishConfidence` renders a paste-ready "Figure legend" section beside Methods (Copy + a "draft —
+  edit before use" note). Browser-verified vs the live BE. The Pro/AI polish tier remains.
 - **Pro/AI polish tier** — the deterministic baseline (free, always: we have params + results, so the
   template fills honestly) is *polished* by AI into fluid, journal-styled manuscript prose / synthesised
   cohesively across many skills. Same AI-proposes / human-edits model; ties into journal style packs

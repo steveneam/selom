@@ -19,9 +19,10 @@
 > four had a faithful deterministic table so none was punted to L4 (§8 step 3b). **`proteomics_de` at
 > source SHIPPED (s46)** — it now attaches the canonical `de_table` (real engine + stub), and the
 > shared `de_table` L1 reader (`_read_de_table`) is registered for it so `de_total` reads as up+down
-> (§8 step 5). **Remaining: only the FE Statistics-node wiring** (cross-lane, §8 step 4 — folded into
-> the deferred circle-back FE pass). The full synthesizer set is 16 skills; the only L4-only skills
-> are the node-link trio (`go_graph`/`pathway`/`string_network`).
+> (§8 step 5). **The FE Statistics-node wiring SHIPPED (s49, cross-lane, §8 step 4)** — the run path
+> attaches a synthesized table for any tableless skill that has a synthesizer, and the FE labels it
+> "Computed by Selom"; this closes the L3 build plan. The full synthesizer set is 16 skills; the only
+> L4-only skills are the node-link trio (`go_graph`/`pathway`/`string_network`).
 > Original directive (s41): make our own custom Statistics tables so skills that don't emit one *do*;
 > skills that genuinely can't → don't force it → L4 Pro AI. Sequenced after the L1/L2 reader (shipped).
 > Companions: `docs/reproduction-engine/skill-table-schemas.md` (the inventory this builds on),
@@ -176,7 +177,12 @@ build first; **Tier B** = synthesizable but lossy/needs care; **L4** = leave to 
    aren't tabulated). The gate returns `None` on a non-conforming shape (no box trace · ragged `z` ·
    misaligned theta/r · no annotation).
 4. **FE Statistics-node wiring** (cross-lane) — attach synthesized tables in the run/job response so
-   tableless skills show an editable table in the editor; labelled provenance.
+   tableless skills show an editable table in the editor; labelled provenance. **DONE (s49.)**
+   Backend: `POST /skills/{id}/run` now attaches `table = table or synthesize_table(skill_id, figure)`
+   when a skill emits no native table (symmetric with the reproduction reader; `test_run_synthesized_table`
+   — pca synthesizes, deg's native table is untouched, go_graph stays L4-only). Frontend: `StatsTable`
+   carries `synthesized`/`source`; the `StatsPanel` shows a "Computed by Selom" badge + a read-not-recompute
+   explainer. Browser-verified vs the live BE (pca → `[component, variance %]` synthesized node).
 5. **proteomics_de at source** — attach a native `de_table` (the one real source fix). **DONE
    (s46, Claude acting BE).** `proteomics_de` computed real per-protein logFC+padj but attached no
    table (the figure title's tested-protein count was easily mistaken for a DE total); it now
