@@ -95,7 +95,14 @@ so a future engine change that silently regresses an earlier win fails CI.
 Every slice is one scoped commit/session, independently shippable, and ordered so that **we
 measure before we build**.
 
-### Slice 0 — Cold-drive diagnostic  *(START HERE)*
+### Slice 0 — Cold-drive diagnostic  *(SHIPPED s50–51)*
+
+> **Done.** Built `app/backend/reproduction_diagnose.py` and ran it cold on **two** calibration
+> papers: Harmony (`findings-harmony.md`, s50) and Yoshimura (`findings-yoshimura.md`, s51, chosen
+> for deposited tabular data). Both: 0 goldens, 0 driven, **0 Selom defects** — the gap is recall +
+> data-availability, not credibility. Two baselines → two independent confirmations of the same
+> extractor + matcher gaps, which drove Slices 1 + 5.
+
 
 - **Goal:** run `reproduce()` on **Harmony** (Korsunsky 2019; staged `…/Data/Harmony` — main PDF
   + `NIHMS1539299-supplement-8.xlsx` + supplement zips/htmls) **cold**, and emit a gap report.
@@ -113,7 +120,14 @@ measure before we build**.
   for Slice 1 (which metrics/captions the extractor missed and why).
 - **Depends on:** nothing. **Size:** ~1 session (most code is projection over `panel_drives`).
 
-### Slice 1 — Extractor recall (P5b)
+### Slice 1 — Extractor recall (P5b)  *(SHIPPED s51 — `n_cells` family)*
+
+> **Done (first family).** `extract.golden.extract_dataset_size` lifts the analyzed dataset size
+> (`n_cells`) on tight result/QC anchors ("resulted in 56,865 cells after filtering") — calibrated
+> 0-false-positive against Harmony's 28 benchmark cell-counts. Closed end-to-end: backfill
+> `n_cells → umap_scrna` (`engine.match`), L1 read-back `extract.readers._read_umap` (UMAP point
+> count). 4 hand ledgers byte-identical (30/30). `n_clusters`/correlation deferred (no clean signal
+> in the 2 calibration papers — measure-before-build). Numbers in `findings-yoshimura.md`.
 
 - **Goal:** widen `extract/readers.py` (L1/L2) and/or `extract/golden.py` for the *specific*
   gaps Slice 0 surfaces, so more printed numbers auto-grade with no hand ledger. THE scaling
@@ -167,7 +181,15 @@ measure before we build**.
   pattern is documented so each future blessed paper is a copy-paste.
 - **Depends on:** Slices 1–2. **Size:** ~1 session.
 
-### Slice 5 — Accession recognizer (data-side; P1 ingest)  ·  *NEXT BUILD (s51)*
+### Slice 5 — Accession recognizer (data-side; P1 ingest)  ·  *SHIPPED s51 (Phase A)*
+
+> **Done (Phase A).** `extract/accessions.py` — deterministic recognizer over `bundle.text`
+> (availability-section weighted) → `Accession{repo, id, access: open|raw|controlled, ingestable,
+> url, section, note}`. All listed repos (GEO/SRA/ENA/ArrayExpress/GSA/PRIDE/MetaboLights+MW/
+> Zenodo/Figshare/Dryad/dbGaP/EGA). Validated on Yoshimura's real availability statement (3 GEO,
+> citation-marker + `ST`-table traps handled). Surfaced in the diagnostic gap report (header line +
+> Cited-datasets table). 10 unit tests. **Phase B (fetch) remains GATED** (D6). `findings-yoshimura.md`.
+
 
 - **Goal:** recognize dataset **accessions** in the paper text (esp. the *Data/Code Availability*
   statement) and classify each by repository + access type, so a paper whose data is *cited not
