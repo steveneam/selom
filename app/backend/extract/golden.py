@@ -224,9 +224,16 @@ def build_extracted_spec(ingested, paper_id: str, *, classifier: Classifier | No
 
 
 def to_golden(t: GoldenTarget) -> R.Golden:
-    """Convert an extracted :class:`GoldenTarget` into the engine's ``Golden``."""
+    """Convert an extracted :class:`GoldenTarget` into the engine's ``Golden``.
+
+    Auto-extracted goldens carry no hand-set tolerance, so stamp the metric family (P5) — the
+    grader then uses the type-appropriate band instead of the blanket default. Today's extracted
+    metrics are DE counts (→ strict ``de_count``, identical to the default), but typing the
+    auto-golden path means a future GSEA/integration extraction is graded engine-sensitively for
+    free, not mislabelled irreproducible. Unknown metrics infer ``""`` (untyped → unchanged)."""
     return R.Golden(metric=t.metric, value=t.value, unit=t.unit, source=t.source,
-                    confidence=t.confidence, note=t.note, inconsistency_ref=t.inconsistency_ref)
+                    confidence=t.confidence, note=t.note, inconsistency_ref=t.inconsistency_ref,
+                    metric_type=R.infer_metric_type(t.metric))
 
 
 def to_engine_panels(spec: ExtractedSpec, *, feasibility=None) -> list[R.Panel]:

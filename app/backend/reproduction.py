@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import math
 import pathlib
+import re
 from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
@@ -136,6 +137,12 @@ class Golden(BaseModel):
     deterministic: bool = False
     # Set by the prepare stage / guards: the deposited data structurally can't reach this.
     structural_limit: bool = False
+    # Optional metric-family tag for type-aware grading (P5). When set, it supplies the DEFAULT
+    # tolerance band for that family (METRIC_TYPE_TOLERANCES) — so an engine-sensitive metric
+    # (GSEA term counts, integration mixing) isn't graded at the tight default and a measured
+    # engine-delta isn't mislabelled irreproducible. Empty = untyped (graded at the fields above,
+    # byte-identical to before). An explicitly-set rel_tol/close_tol/etc. still overrides the type.
+    metric_type: str = ""
 
 
 class MethodSub(BaseModel):
@@ -415,6 +422,69 @@ def _rel(golden: float, computed: float) -> float:
     return diff / abs(golden) if golden != 0 else diff
 
 
+# --- metric-type-aware tolerance (P5: engine-delta ≠ irreproducible) ----------
+#
+# The band a metric is graded at should follow its TYPE, not be hand-set per golden. Exact-count
+# and ID-set metrics are strict; engine-sensitive families legitimately differ by a wide margin
+# under a *measured* engine substitution (D5), so grading them at the tight default would mislabel
+# a known engine-delta as a reproduction failure:
+#   * GSEA enriched-term counts — gseapy.prerank calls far fewer terms than fgsea on the same
+#     ranking (RISKS #10; RPGRIP1 6E: paper 119, fgsea 95, gseapy 36).
+#   * integration batch-mixing scores — Melody vs Harmony differ in absolute mixing.
+# A metric_type supplies the DEFAULT band; an explicitly-set tolerance on the Golden still wins
+# (type = default, explicit = override), so a hand-tuned ledger golden is never altered.
+MT_DE_COUNT = "de_count"                # DE up/down/total — exact (volcano de_table is exact)
+MT_ID_SET = "id_set"                    # gene/term ID-set + shared-core sizes — exact
+MT_PROPORTION = "proportion"            # %s / variance-explained / composition — a few points
+MT_CONTINUOUS = "continuous"            # slope / R² / NES / fold / silhouette — engine-tolerant
+MT_GSEA_TERM_COUNT = "gsea_term_count"  # enriched-term counts — engine-sensitive, WIDE
+MT_INTEGRATION = "integration_score"    # batch-mixing / LISI — engine-sensitive, WIDE + sign
+
+# metric_type -> (rel_tol, close_tol, ints_exact, direction_close).
+METRIC_TYPE_TOLERANCES: dict[str, tuple[float, float, bool, bool]] = {
+    MT_DE_COUNT:        (0.01, 0.25, True, False),   # == the strict default (counts stay exact)
+    MT_ID_SET:          (0.0,  0.0,  True, False),    # must-be-exact set sizes
+    MT_PROPORTION:      (0.02, 0.15, False, False),
+    MT_CONTINUOUS:      (0.05, 0.25, False, True),
+    MT_GSEA_TERM_COUNT: (0.10, 0.30, False, False),
+    MT_INTEGRATION:     (0.10, 0.50, False, True),
+}
+
+_TOL_FIELDS = ("rel_tol", "close_tol", "ints_exact", "direction_close")
+
+
+def infer_metric_type(metric: str, skill_id: str | None = None) -> str:
+    """Best-effort metric family from the metric name (+ skill, the strong signal); ``""`` when
+    nothing matches → the caller leaves the golden untyped (graded at the defaults).
+
+    Deliberately conservative: only families with a characteristic reproducibility behaviour are
+    named (the two engine-sensitive ones the grader must widen, plus the strict DE counts the drive
+    auto-extracts), so typing never silently widens a metric that should be strict."""
+    m = re.sub(r"[^a-z0-9]", "", (metric or "").lower())
+    s = (skill_id or "").lower()
+    if s in {"gsea", "ssgsea"} or "enrichedterm" in m or m.endswith("terms") or "goterm" in m:
+        return MT_GSEA_TERM_COUNT
+    if s == "integration" or any(k in m for k in ("lisi", "mixing", "batchmix", "ikbr")):
+        return MT_INTEGRATION
+    if m in {"detotal", "deup", "dedown"}:
+        return MT_DE_COUNT
+    return ""
+
+
+def resolve_tolerances(gold) -> dict:
+    """The tolerance kwargs to grade ``gold`` with: the ``metric_type`` profile as the default,
+    with any explicitly-set tolerance field on the Golden overriding it (type = default, explicit
+    = win). An untyped golden (or an unknown type) returns its own fields unchanged — so existing
+    ledgers grade byte-identically."""
+    own = {f: getattr(gold, f) for f in _TOL_FIELDS}
+    prof = METRIC_TYPE_TOLERANCES.get(getattr(gold, "metric_type", "") or "")
+    if prof is None:
+        return own
+    profile = dict(zip(_TOL_FIELDS, prof))
+    explicit = getattr(gold, "model_fields_set", set())
+    return {f: (own[f] if f in explicit else profile[f]) for f in _TOL_FIELDS}
+
+
 def classify_metric(
     golden,
     computed,
@@ -561,14 +631,10 @@ def validate_panel(
     results: list[ValidationResult] = []
     for gold in panel.golden:
         got = computed.get(gold.metric)
-        verdict, delta = classify_metric(
-            gold.value,
-            got,
-            rel_tol=gold.rel_tol,
-            close_tol=gold.close_tol,
-            ints_exact=gold.ints_exact,
-            direction_close=gold.direction_close,
-        )
+        # Type-aware band (P5): a metric_type supplies the default tolerance for its family
+        # (engine-sensitive ones graded wider so a measured engine-delta isn't read as
+        # irreproducible); an explicit per-golden tolerance still wins. Untyped → unchanged.
+        verdict, delta = classify_metric(gold.value, got, **resolve_tolerances(gold))
         oracle = oracles.get(gold.metric)
         blame = assign_blame(
             verdict,
