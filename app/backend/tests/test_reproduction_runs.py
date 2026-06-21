@@ -8,6 +8,7 @@ and never touches a real PDF or skill.
 from __future__ import annotations
 
 import io
+import json
 
 from fastapi.testclient import TestClient
 
@@ -79,6 +80,16 @@ def test_public_surfaces_data_fits_with_confidence_band():
     assert full["data_fits"][0]["confidence"] == "confident"  # computed band, serialized for the FE
 
 
+def test_public_surfaces_panel_drives_for_the_picker():
+    # the per-panel drive record rides the run contract so the FE can offer a data picker for exactly
+    # the data_unmatched panels (Slice 2). The light tick omits it (no heavy payload).
+    rec = reproduction_runs.start_run("m.pdf", ["d.csv"], drive_fn=_fake_drive)
+    full = reproduction_runs.public(rec)
+    assert full["panel_drives"][0]["panel_key"] == "4"
+    assert full["panel_drives"][0]["status"] == "driven"
+    assert "panel_drives" not in reproduction_runs.public(rec, light=True)
+
+
 # --- routes -------------------------------------------------------------------
 
 
@@ -100,6 +111,45 @@ def test_reproduce_route_returns_run_handle(monkeypatch):
     # the run is retrievable with the full ledger.
     got = client.get(f"/reproduction-runs/{body['run_id']}")
     assert got.status_code == 200 and got.json()["ledger"]["paper"]["slug"]
+
+
+def test_reproduce_route_threads_data_map(monkeypatch):
+    # The per-panel picker (Slice 2 R4): a {panel_key: filename} JSON form field resolves to the
+    # SAVED path of that supplement and reaches the drive as the data_map override.
+    captured: dict = {}
+
+    def _capturing_drive(main_path, supplement_paths, **kw):
+        captured.update(kw)
+        captured["supps"] = supplement_paths
+        return _canned_result()
+
+    monkeypatch.setattr(reproduction_runs, "reproduction_drive",
+                        type("M", (), {"reproduce": staticmethod(_capturing_drive)}))
+    r = client.post("/papers/p/reproduce",
+                    files=_multipart(supp=[("de.csv", b"gene,lfc\nA,2")]),
+                    data={"data_map": json.dumps({"4": "de.csv"})})
+    assert r.status_code == 200
+    dm = captured.get("data_map")
+    assert dm and list(dm.keys()) == ["4"]
+    # the filename resolved to the real saved temp path of that supplement (not the bare name).
+    assert dm["4"] in captured["supps"] and dm["4"].endswith("de.csv")
+
+
+def test_reproduce_route_drops_unknown_data_map_filename(monkeypatch):
+    # An honest no-op: a picked filename that wasn't uploaded is dropped (the panel stays
+    # auto-matched), never a 4xx — so a stale persisted pick can't break a run.
+    captured: dict = {}
+
+    def _capturing_drive(main_path, supplement_paths, **kw):
+        captured.update(kw)
+        return _canned_result()
+
+    monkeypatch.setattr(reproduction_runs, "reproduction_drive",
+                        type("M", (), {"reproduce": staticmethod(_capturing_drive)}))
+    r = client.post("/papers/p/reproduce",
+                    files=_multipart(supp=[("de.csv", b"gene,lfc\nA,2")]),
+                    data={"data_map": json.dumps({"4": "nope.csv"})})
+    assert r.status_code == 200 and captured.get("data_map") is None
 
 
 def test_reproduce_route_rejects_oversized_upload(monkeypatch):

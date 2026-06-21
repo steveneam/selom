@@ -33,6 +33,7 @@ class RunRecord(BaseModel):
     ledger: R.Ledger | None = None
     drive_summary: dict = Field(default_factory=dict)
     data_fits: list = Field(default_factory=list)  # list[engine.compat.FileFitReport] — Slice 2
+    panel_drives: list = Field(default_factory=list)  # list[reproduction_drive.PanelDrive] — Slice 2
     error: str | None = None
     created_at: float = 0.0
     updated_at: float = 0.0
@@ -77,7 +78,8 @@ def start_run(main_path: str, supplement_paths: list | None = None, *, paper_id:
                        paper=paper, data_map=data_map, params=params)
         run_store.update(rec.id, status=JobStatus.SUCCEEDED, ledger=result.ledger,
                          drive_summary=result.summary,
-                         data_fits=getattr(result, "data_fits", []), progress="scored")
+                         data_fits=getattr(result, "data_fits", []),
+                         panel_drives=getattr(result, "panel_drives", []), progress="scored")
     except Exception as exc:  # noqa: BLE001 — surface a clean failed run, never a 500 stack
         run_store.update(rec.id, status=JobStatus.FAILED, error=str(exc), progress="failed")
     return run_store.get(rec.id)
@@ -101,4 +103,8 @@ def public(rec: RunRecord, *, light: bool = False) -> dict:
         # The dropped-data fit ranking (Slice 2) — surfaced AFTER the run so the Score stage shows
         # how good/compatible each supplement was, with the confidence band the score means.
         out["data_fits"] = [f.model_dump() if hasattr(f, "model_dump") else f for f in rec.data_fits]
+        # The honest per-panel drive record (Slice 2) — lets the Score stage offer a data picker for
+        # exactly the `data_unmatched` panels (point one at a chosen file → re-run with `data_map`).
+        out["panel_drives"] = [d.model_dump() if hasattr(d, "model_dump") else d
+                               for d in rec.panel_drives]
     return out

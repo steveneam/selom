@@ -151,14 +151,18 @@ def get_paper_legends(slug: str):
 
 async def _save_capped(run_dir: str, upload: UploadFile, max_bytes: int) -> str:
     # Save one multipart upload into the per-run temp dir, rejecting oversized files (413 upstream).
-    # Keeps a sanitized original name (prefixed for uniqueness) so the suffix-based kind inference
-    # in extract.ingest still works.
+    # Each file lands in its OWN unique subdir so its ORIGINAL name (and extension) is preserved
+    # verbatim: the suffix-based kind inference in extract.ingest still works, AND the name the engine
+    # reports back (the data-fit filenames + the per-panel picker round-trip) matches what the user
+    # dropped — no uuid prefix to strip, so a picked filename resolves cleanly to its saved path.
     data = await upload.read()
     if len(data) > max_bytes:
         raise ValueError(
             f"'{upload.filename}' exceeds the {max_bytes // (1024 * 1024)} MB upload limit")
     name = pathlib.Path(upload.filename or "file").name or "file"
-    path = pathlib.Path(run_dir) / f"{uuid.uuid4().hex[:8]}-{name}"
+    sub = pathlib.Path(run_dir) / uuid.uuid4().hex[:8]
+    sub.mkdir(parents=True, exist_ok=True)
+    path = sub / name
     path.write_bytes(data)
     return str(path)
 
@@ -169,28 +173,59 @@ async def reproduce_paper(
     main: UploadFile,
     supplements: list[UploadFile] = File(default=[]),
     design: UploadFile | None = File(None),
+    data_map: str = Form(""),
 ):
     # Live-reproduction drive (docs/reproduction-engine/live-reproduction-spec.md §5): the user's
     # paper PDF + its supplements -> a graded two-axis ledger. Bytes are saved to a per-run temp dir
     # (cleaned after the inline drive), submitted as a reproduce run (reproduction_runs.start_run),
     # which orchestrates the matched skills over the supplements. Inline -> already terminal on
     # return; the FE then GETs /reproduction-runs/{run_id} to fill the Score stage.
+    # `data_map` (JSON {panel_key: filename}) is the per-panel data picker (Slice 2 R4): the FE points
+    # a `data_unmatched` panel at a chosen supplement by filename; we resolve it to that file's saved
+    # path so the matcher's override (which wins over the auto-heuristic) feeds the picked file.
     import reproduction_runs
 
     max_bytes = settings.max_upload_mb * 1024 * 1024
     run_dir = tempfile.mkdtemp(prefix="selom-repro-")
     try:
         main_path = await _save_capped(run_dir, main, max_bytes)
-        supp_paths = [await _save_capped(run_dir, s, max_bytes) for s in supplements]
+        supp_paths: list[str] = []
+        path_by_name: dict[str, str] = {}
+        for s in supplements:
+            p = await _save_capped(run_dir, s, max_bytes)
+            supp_paths.append(p)
+            path_by_name[pathlib.Path(s.filename or "").name] = p
         params = None
         if design is not None:  # a design sheet (sample->condition) threads to the DE skills
             params = {"_design_path": await _save_capped(run_dir, design, max_bytes)}
-        rec = reproduction_runs.start_run(main_path, supp_paths, paper_id=paper_id, params=params)
+        resolved_map = _resolve_data_map(data_map, path_by_name)
+        rec = reproduction_runs.start_run(main_path, supp_paths, paper_id=paper_id, params=params,
+                                          data_map=resolved_map)
         return reproduction_runs.public(rec, light=True)
     except ValueError as exc:  # the size cap
         raise HTTPException(status_code=413, detail=str(exc)) from exc
     finally:
         shutil.rmtree(run_dir, ignore_errors=True)
+
+
+def _resolve_data_map(data_map: str, path_by_name: dict[str, str]) -> dict[str, str] | None:
+    # Turn the picker's {panel_key: filename} (JSON) into {panel_key: saved_path}, keeping only
+    # filenames that were actually uploaded this run. Malformed JSON / unknown filenames are dropped
+    # silently (an honest no-op — the panel just stays auto-matched), never a 4xx.
+    if not data_map:
+        return None
+    try:
+        requested = json.loads(data_map)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(requested, dict):
+        return None
+    resolved = {
+        str(pk): path_by_name[pathlib.Path(str(fn)).name]
+        for pk, fn in requested.items()
+        if isinstance(fn, str) and pathlib.Path(fn).name in path_by_name
+    }
+    return resolved or None
 
 
 @app.post("/papers/{paper_id}/assess-data")
