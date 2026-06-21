@@ -5,8 +5,9 @@ import Link from "next/link";
 import { ArrowUpRight, GitCompareArrows, Hourglass, Loader2, TriangleAlert } from "lucide-react";
 
 import { tierLabel } from "@/lib/reproduction/api";
-import { useReproductionRun } from "@/lib/reproduction/run";
+import { useReproductionRun, type PaperRun } from "@/lib/reproduction/run";
 import { ScoreReport } from "@/components/reproduction/score-report";
+import { DataPicker } from "@/components/reproduction/data-picker";
 import type { SavedPaper } from "@/lib/workspace/types";
 
 /**
@@ -18,13 +19,18 @@ import type { SavedPaper } from "@/lib/workspace/types";
  *  - run succeeded         → the REAL `ScoreReport` (the same component the showcase detail renders)
  *  - run expired / failed  → an honest banner (runs are session-scoped; re-run from the Reproduce tab)
  */
-export function ScoreStage({ paper }: { paper: SavedPaper }) {
+export function ScoreStage({ paper, run }: { paper: SavedPaper; run: PaperRun }) {
   const runId = paper.reproductionRunId;
-  const { ledger, dataFits, status, error, loading } = useReproductionRun(runId);
+  const { ledger, dataFits, panelDrives, status, error, loading } = useReproductionRun(runId);
 
   if (runId && loading) return <ScoreLoading />;
   if (runId && status === "succeeded" && ledger)
-    return <ScoreReport ledger={ledger} dataFits={dataFits} />;
+    return (
+      <>
+        <ScoreReport ledger={ledger} dataFits={dataFits} />
+        <DataPicker paper={paper} run={run} panelDrives={panelDrives} dataFits={dataFits} />
+      </>
+    );
   if (runId && (error || status === "failed" || status === "succeeded")) {
     // status==="succeeded" with no ledger shouldn't happen, but treat it as unavailable, not blank.
     return <ScoreUnavailable paperId={paper.id} failed={status === "failed"} />;

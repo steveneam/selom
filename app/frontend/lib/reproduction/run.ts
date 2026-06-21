@@ -15,11 +15,24 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 
 import { paperFiles, usePaperFiles } from "@/lib/paper/run-files";
-import { workspaceStore } from "@/lib/workspace/store";
+import { workspaceStore, wselect } from "@/lib/workspace/store";
 import type { FileFitReport } from "./data-fit";
 import type { Ledger } from "./types";
 
 export type RunStatus = "queued" | "running" | "succeeded" | "failed";
+
+/** The honest per-panel drive record (reproduction_drive.PanelDrive) — what the drive did per panel.
+ *  The Score stage reads it to offer a data picker for exactly the `data_unmatched` panels (Slice 2). */
+export interface PanelDrive {
+  panel_key: string;
+  status: string; // driven | no_golden | data_unmatched | needs_recipe | no_skill | run_failed | out_of_scope
+  skill_id?: string | null;
+  data_ref?: string;
+  note?: string;
+}
+
+/** A per-panel data-picker choice: panel_key → the supplement filename to feed that panel. */
+export type DataMap = Record<string, string>;
 
 /** The wire shape of a run (GET full; POST returns the light subset). */
 export interface RunPayload {
@@ -30,19 +43,23 @@ export interface RunPayload {
   ledger?: Ledger;
   drive_summary?: Record<string, number>;
   data_fits?: FileFitReport[];
+  panel_drives?: PanelDrive[];
 }
 
 const TERMINAL: readonly RunStatus[] = ["succeeded", "failed"];
 
-/** POST the paper PDF + supplements → start a reproduce run. Returns the light payload. */
+/** POST the paper PDF + supplements → start a reproduce run. Returns the light payload.
+ *  `dataMap` (panel_key → filename) carries the per-panel data-picker overrides (Slice 2). */
 export async function startReproduction(
   paperId: string,
   main: File,
   supplements: File[],
+  dataMap?: DataMap,
 ): Promise<RunPayload> {
   const body = new FormData();
   body.append("main", main);
   for (const s of supplements) body.append("supplements", s);
+  if (dataMap && Object.keys(dataMap).length > 0) body.append("data_map", JSON.stringify(dataMap));
   const url = `/api/papers/${encodeURIComponent(paperId)}/reproduce`;
   const res = await fetch(url, { method: "POST", body });
   if (!res.ok) {
@@ -77,7 +94,9 @@ export interface PaperRun {
   supplementCount: number;
   /** Both the paper PDF and ≥1 supplement have bytes this session, and no run is in flight. */
   canRun: boolean;
-  start: () => void;
+  /** Start a run. An explicit `dataMap` (the per-panel picker) overrides the auto-matcher; with none
+   *  given, the paper's persisted picks are used, so a saved choice survives until it's changed. */
+  start: (dataMap?: DataMap) => void;
 }
 
 /**
@@ -94,15 +113,18 @@ export function usePaperRun(paperId: string): PaperRun {
 
   const canRun = fv.hasMain && fv.supplementCount >= 1 && phase !== "running";
 
-  const start = React.useCallback(() => {
+  const start = React.useCallback((dataMap?: DataMap) => {
     const main = paperFiles.getMain(paperId);
     const supps = paperFiles.getSupplementFiles(paperId);
     if (!main || supps.length === 0) return;
+    // Effective picks: an explicit picker map (the Score-stage re-run) wins; otherwise the paper's
+    // persisted choices, so a previously-saved pick is honoured on a plain "Run reproduction" too.
+    const effectiveMap = dataMap ?? wselect.paper(workspaceStore.getSnapshot(), paperId)?.dataMap;
     setPhase("running");
     setError(null);
     void (async () => {
       try {
-        let payload = await startReproduction(paperId, main, supps);
+        let payload = await startReproduction(paperId, main, supps, effectiveMap);
         // Inline → already terminal. Poll only if a future async path hands back a running run.
         for (let i = 0; i < 600 && !TERMINAL.includes(payload.status); i += 1) {
           await new Promise((r) => setTimeout(r, 500));
@@ -138,6 +160,8 @@ export interface LoadedRun {
   ledger: Ledger | null;
   /** The dropped-data fit ranking the run actually fed on (Slice 2) — surfaced on the Score stage. */
   dataFits: FileFitReport[];
+  /** The per-panel drive record (Slice 2) — drives the data picker for `data_unmatched` panels. */
+  panelDrives: PanelDrive[];
   /** "expired" when the run is gone (the in-process store cleared / a reload outlived it). */
   error: string | null;
   loading: boolean;
@@ -147,6 +171,7 @@ const EMPTY_RUN: LoadedRun = {
   status: null,
   ledger: null,
   dataFits: [],
+  panelDrives: [],
   error: null,
   loading: false,
 };
@@ -169,6 +194,7 @@ export function useReproductionRun(runId: string | undefined): LoadedRun {
           status: p.status,
           ledger: p.ledger ?? null,
           dataFits: p.data_fits ?? [],
+          panelDrives: p.panel_drives ?? [],
           error: p.error ?? null,
           loading: false,
         });

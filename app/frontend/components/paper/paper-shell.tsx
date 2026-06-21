@@ -100,7 +100,9 @@ export function PaperShell({ id }: { id: string }) {
             label: run.phase === "running" ? "Running…" : "Run reproduction",
             icon: FlaskConical,
             disabled: !run.canRun,
-            onClick: run.start,
+            // Wrap so the click event isn't passed as the `dataMap` arg (start uses the paper's
+            // persisted picks when called with none).
+            onClick: () => run.start(),
             title:
               run.phase === "running"
                 ? "Reproduction is running…"
@@ -138,7 +140,7 @@ export function PaperShell({ id }: { id: string }) {
       <div className="mt-8">
         {stage === "skill-match" && <SkillMatchStage paper={paper} />}
         {stage === "reproduce" && <ReproduceStage paper={paper} run={run} />}
-        {stage === "score" && <ScoreStage paper={paper} />}
+        {stage === "score" && <ScoreStage paper={paper} run={run} />}
       </div>
     </div>
   );

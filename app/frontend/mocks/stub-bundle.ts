@@ -1,4 +1,5 @@
 import type { DataCheck, FigureLegend, SkillGuardrail, SkillMethods, SkillProvenance, StatsTable } from "@/lib/skills-api";
+import type { DataFit } from "@/lib/reproduction/data-fit";
 
 /**
  * A representative publish-confidence bundle for the MSW mock (B4), so the panel
@@ -144,6 +145,26 @@ export function mockDataCheck(): DataCheck {
         { skill_id: "composition", role: "visualize", reason: "cell-type composition across conditions" },
       ],
     },
+  };
+}
+
+/**
+ * A representative data-fit verdict for the mock (Slice 2, engine/compat) — the clean sc-counts
+ * matrix is a confident fit for its skill — so the own-data DataFitVerdict band renders offline
+ * (`npm run dev:mock`). The real verdict comes from the backend `compat.fit`.
+ */
+export function mockDataFit(skillId: string): DataFit {
+  return {
+    filename: "demo.h5ad",
+    skill_id: skillId,
+    kind: "sc_counts",
+    score: 100,
+    compatible: true,
+    verdict: "fit",
+    qc_ok: true,
+    reason: `single-cell matrix — fits ${skillId}`,
+    confidence: "confident",
+    confidence_label: "Confident — the right, clean data for this analysis",
   };
 }
 

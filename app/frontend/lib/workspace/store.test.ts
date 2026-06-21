@@ -204,6 +204,19 @@ describe("workspaceStore — paper supplements (Reproduction stage 2)", () => {
     expect(wselect.paper(workspaceStore.getSnapshot(), p.id)?.reproductionRunId).toBe("run_abc");
     expect(() => workspaceStore.setPaperReproductionRun("nope", "run_x")).not.toThrow();
   });
+
+  it("setPaperDataMap persists the per-panel picks and clears with an empty map", async () => {
+    const { workspaceStore, wselect } = await freshStore();
+    const p = workspaceStore.savePaper(base);
+    workspaceStore.setPaperDataMap(p.id, { "4a": "mmc2.xlsx", "5b": "de.csv" });
+    expect(wselect.paper(workspaceStore.getSnapshot(), p.id)?.dataMap).toEqual({
+      "4a": "mmc2.xlsx",
+      "5b": "de.csv",
+    });
+    workspaceStore.setPaperDataMap(p.id, {}); // empty → cleared
+    expect(wselect.paper(workspaceStore.getSnapshot(), p.id)?.dataMap).toBeUndefined();
+    expect(() => workspaceStore.setPaperDataMap("nope", { "1": "x.csv" })).not.toThrow();
+  });
 });
 
 describe("workspaceStore — gene sets + skills", () => {

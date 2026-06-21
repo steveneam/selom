@@ -194,6 +194,17 @@ export const workspaceStore = {
     const updated: SavedPaper = { ...paper, reproductionRunId: runId };
     setState({ ...state, papers: state.papers.map((p) => (p.id === paperId ? updated : p)) });
   },
+  /** Persist the per-panel data-picker overrides (Slice 2 R4): panel_key → supplement filename.
+   *  Replaces the whole map (the picker owns the full set each save). Empty → clears it. No-op if
+   *  the paper is gone or the map is unchanged. */
+  setPaperDataMap(paperId: string, dataMap: Record<string, string>) {
+    const paper = state.papers.find((p) => p.id === paperId);
+    if (!paper) return;
+    const next = Object.keys(dataMap).length > 0 ? dataMap : undefined;
+    if (JSON.stringify(paper.dataMap ?? null) === JSON.stringify(next ?? null)) return;
+    const updated: SavedPaper = { ...paper, dataMap: next };
+    setState({ ...state, papers: state.papers.map((p) => (p.id === paperId ? updated : p)) });
+  },
   /** Detach one supplement from a paper by its id. */
   removePaperSupplement(paperId: string, supplementId: string) {
     const paper = state.papers.find((p) => p.id === paperId);

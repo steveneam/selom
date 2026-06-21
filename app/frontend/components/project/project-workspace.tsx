@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Lock, Redo2, RefreshCw, Sparkles, Table2, Trash2, Undo2 } from "lucide-react";
 import { DataPanel, type AnalyzeArgs } from "./data-panel";
 import { DataCheckPanel } from "./data-check";
+import { DataFitVerdict } from "@/components/reproduction/data-fit-panel";
 import { Dropzone } from "./dropzone";
 import { WorkbenchPanel } from "./workbench-panel";
 import { PublishConfidence } from "./publish-confidence";
@@ -237,6 +238,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           guardrails: res.guardrails,
           table: res.table ?? undefined,
           dataCheck: res.dataCheck,
+          dataFit: res.dataFit ?? undefined,
         });
         setActiveFigureId(saved.id);
         figure.init(res.figure); // fresh spec carries no style stamp → activeStyle derives the default
@@ -277,6 +279,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           guardrails: res.guardrails,
           table: res.table ?? undefined,
           dataCheck: res.dataCheck,
+          dataFit: res.dataFit ?? undefined,
           parentFigureId: fig.id,
           variantLabel: "re-run",
         });
@@ -320,6 +323,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
               guardrails: res.guardrails,
               table: res.table ?? undefined,
               dataCheck: res.dataCheck,
+              dataFit: res.dataFit ?? undefined,
               parentFigureId: origin.id,
               variantLabel: `${param} = ${value}`,
             }),
@@ -672,6 +676,12 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                 )}
                 {activeFigure?.dataCheck && (
                   <DataCheckPanel dataCheck={activeFigure.dataCheck} onPickSkill={pickSuggestedSkill} />
+                )}
+                {activeFigure?.dataFit && (
+                  <DataFitVerdict
+                    fit={activeFigure.dataFit}
+                    skillName={getSkill(activeFigure.skillId ?? "")?.name}
+                  />
                 )}
                 <PublishConfidence
                   provenance={bundle?.provenance}

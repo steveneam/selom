@@ -40,6 +40,30 @@ describe("startReproduction", () => {
     expect(body.getAll("supplements")).toHaveLength(1);
   });
 
+  it("includes the data_map override (per-panel picker) when provided", async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    vi.stubGlobal("fetch", (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return Promise.resolve(res(200, { run_id: "r2", status: "succeeded" }));
+    });
+    const main = new File(["pdf"], "paper.pdf");
+    const supp = new File(["a,b"], "data.csv");
+    await startReproduction("p1", main, [supp], { "4": "data.csv" });
+    const body = calls[0].init.body as FormData;
+    expect(JSON.parse(body.get("data_map") as string)).toEqual({ "4": "data.csv" });
+  });
+
+  it("omits data_map when the picker map is empty", async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    vi.stubGlobal("fetch", (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return Promise.resolve(res(200, { run_id: "r3", status: "succeeded" }));
+    });
+    const main = new File(["pdf"], "paper.pdf");
+    await startReproduction("p1", main, [], {});
+    expect((calls[0].init.body as FormData).get("data_map")).toBeNull();
+  });
+
   it("maps a 413 to a friendly upload-limit error", async () => {
     vi.stubGlobal("fetch", () => Promise.resolve(res(413, { detail: "exceeds the 50 MB upload limit" })));
     const main = new File(["x"], "p.pdf");

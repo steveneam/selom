@@ -1,4 +1,5 @@
 import type { FigureSpec } from "./figure-spec";
+import type { DataFit } from "@/lib/reproduction/data-fit";
 
 /** Per-figure reproducibility bundle (backend provenance.py — charter B4). */
 export interface SkillProvenance {
@@ -110,6 +111,10 @@ export interface SkillRunResponse {
   // The is-my-data-clean verdict + suggested next steps for this run (P1c/P3a). Absent when
   // an older backend / mock omits it.
   dataCheck?: DataCheck;
+  // The data-fit verdict for THIS run (Slice 2, product-agnostic engine/compat): is the uploaded
+  // file the right + clean data for this skill — a 0-100 score + a confidence band. null when the
+  // upload couldn't be inspected (fail-soft) or an older backend / mock omits it.
+  dataFit?: DataFit | null;
 }
 
 /**
@@ -211,6 +216,7 @@ export async function runSkill(
     guardrails: json.guardrails,
     table: json.table ?? null,
     dataCheck: (json.data_check as DataCheck | undefined) ?? undefined,
+    dataFit: (json.data_fit as DataFit | null | undefined) ?? null,
   };
 }
 

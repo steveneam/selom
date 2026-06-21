@@ -77,6 +77,10 @@ export interface SavedPaper {
   /** Supplementary files attached in the Reproduction stage (stage 2) — Excel / CSV tables +
    *  extended-methods PDFs. Metadata only (no bytes; spec I5). */
   supplements?: SavedSupplement[];
+  /** Per-panel data-picker overrides (Slice 2 R4): panel_key → the supplement *filename* to feed
+   *  that panel. Filenames, not bytes (bytes are session-only; spec I5), so the choice persists and
+   *  is re-applied to the matching re-attached file on the next run. */
+  dataMap?: Record<string, string>;
   /** Recovered-figure ids saved from the in-viewer region grab (stage 3). */
   recoveredFigures?: string[];
 }

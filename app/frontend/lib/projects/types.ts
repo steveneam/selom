@@ -9,6 +9,7 @@
 
 import type { FigureSpec } from "@/lib/figure-spec";
 import type { DataCheck, FigureLegend, SkillGuardrail, SkillMethods, SkillProvenance, StatsTable } from "@/lib/skills-api";
+import type { DataFit } from "@/lib/reproduction/data-fit";
 
 export type Modality = "scRNA-seq" | "bulk RNA-seq" | "proteomics" | "unknown";
 
@@ -118,6 +119,7 @@ export interface Figure {
   guardrails?: SkillGuardrail[];
   table?: StatsTable;          // the Statistics result (wired in S2)
   dataCheck?: DataCheck;       // the is-my-data-clean verdict + routing for this run (P1c/P3a)
+  dataFit?: DataFit;           // the data-fit verdict + confidence band for this run (Slice 2)
   // lineage / versioning
   parentFigureId?: string;     // set on a fork / variant / re-run
   variantLabel?: string;       // e.g. "resolution = 1.0"

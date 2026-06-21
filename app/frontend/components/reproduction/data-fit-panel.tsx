@@ -119,6 +119,40 @@ function FitCard({ ff }: { ff: FileFitReport }) {
   );
 }
 
+/**
+ * A single (file, skill) data-fit verdict — the Product-A own-data band. Where {@link DataFitPanel}
+ * ranks many dropped supplements against many analyses (reproduction), an own-data run is one file
+ * against one skill, so this renders just that band: the confidence chip, the 0-100 fit, and the
+ * engine's reason. Same source of truth (engine/compat) + the same band vocabulary as Product B, so
+ * "is this the right, clean data for this analysis?" reads identically across both products. Renders
+ * nothing when there's no fit (an uninspectable upload → `data_fit` is null, fail-soft).
+ */
+export function DataFitVerdict({ fit, skillName }: { fit?: DataFit | null; skillName?: string }) {
+  if (!fit) return null;
+  const meta = CONFIDENCE_META[fit.confidence];
+  const swap = fit.confidence === "not_a_fit" || fit.confidence === "unreadable";
+  return (
+    <div className="rounded-xl border border-border bg-card/60 p-4" data-testid="data-fit-verdict">
+      <div className="flex items-start gap-3">
+        <BandChip band={fit.confidence} />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">
+            Data fit{skillName ? <span className="text-muted-foreground"> · {skillName}</span> : null}
+          </p>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{fit.reason}</p>
+          <FitScoreBar score={fit.score} color={meta.color} bestSkill="" />
+          {swap && (
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+              This isn&apos;t the data this analysis needs — the figure may be misleading. Run another
+              file, or treat this result with caution.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BandChip({ band }: { band: ConfidenceBand }) {
   const meta = CONFIDENCE_META[band];
   const Icon = BAND_ICON[band];
