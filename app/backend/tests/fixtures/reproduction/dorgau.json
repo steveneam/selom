@@ -1,0 +1,55 @@
+{
+  "paper_id": "dorgau",
+  "panels": [
+    {
+      "panel_key": "1",
+      "status": "no_golden",
+      "skill_id": "markers",
+      "metrics": {}
+    },
+    {
+      "panel_key": "2",
+      "status": "no_golden",
+      "skill_id": "umap_scrna",
+      "metrics": {}
+    },
+    {
+      "panel_key": "3",
+      "status": "no_golden",
+      "skill_id": "violin",
+      "metrics": {}
+    },
+    {
+      "panel_key": "4",
+      "status": "no_golden",
+      "skill_id": "markers",
+      "metrics": {}
+    },
+    {
+      "panel_key": "5",
+      "status": "run_failed",
+      "skill_id": "heatmap",
+      "metrics": {}
+    },
+    {
+      "panel_key": "6",
+      "status": "run_failed",
+      "skill_id": "deg",
+      "metrics": {}
+    },
+    {
+      "panel_key": "7",
+      "status": "no_golden",
+      "skill_id": "enrichment",
+      "metrics": {}
+    }
+  ],
+  "summary": {
+    "no_golden": 5,
+    "run_failed": 2
+  },
+  "n_panels": 7,
+  "n_driven": 0,
+  "selom_defects": 0,
+  "n_accessions": 4
+}
