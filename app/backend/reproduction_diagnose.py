@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 
 import reproduction as R
 from engine.compat import FileFitReport
-from extract.accessions import Accession, AccessionReport, find_accessions
+from extract.accessions import Accession, AccessionReport
 from extract.ingest import ingest_paper
 from reproduction_drive import DRIVEN, DriveResult, drive_bundle
 
@@ -41,6 +41,7 @@ class DiagnosticPanel(BaseModel):
     figure: str = ""
     status: str
     skill_id: str | None = None
+    scope: str = ""                                            # panel.scope (wet_lab / modality_unsupported / …)
     data_ref: str = ""
     goldens_expected: list[str] = Field(default_factory=list)  # metric names the paper printed
     metrics_read: list[str] = Field(default_factory=list)      # metric names a read-back layer caught
@@ -101,6 +102,7 @@ def diagnose(result: DriveResult, *, paper_id: str = "",
             figure=panel.figure if panel else "",
             status=d.status,
             skill_id=d.skill_id,
+            scope=panel.scope if panel else "",
             data_ref=d.data_ref,
             goldens_expected=goldens,
             metrics_read=list(d.metrics_read),
@@ -120,7 +122,7 @@ def diagnose(result: DriveResult, *, paper_id: str = "",
         n_gradable=n_gradable,
         n_driven=n_driven,
         auto_grade_rate=(n_driven / n_gradable) if n_gradable else None,
-        accessions=accessions or [],
+        accessions=(result.accessions if accessions is None else accessions),
         data_fits=(result.data_fits if data_fits is None else data_fits),
     )
 
@@ -130,13 +132,13 @@ def diagnose_paper(main_path: str, supplement_paths: list | None = None, *, pape
     """Run a cold drive on a paper (no hand ledger) and return its gap report. Heavy path: it drives
     the real scientific stack. ``kw`` forwards ``data_map`` / ``runner`` / ``index`` to the drive.
 
-    Ingests once and reuses the bundle for the drive + the accession scan (Slice 5). The dropped-data
-    fit ranking (Slice 2) rides on the ``DriveResult`` (the drive already classified each supplement),
-    so the gap report carries cited-dataset provenance AND an honest score on the data the user
-    attached, alongside the per-panel statuses."""
+    The dropped-data fit ranking (Slice 2) AND the cited-dataset accessions (Slice 5) both ride on the
+    ``DriveResult`` (the drive already classified each supplement and scanned the paper text), so the
+    gap report carries cited-dataset provenance AND an honest score on the data the user attached,
+    alongside the per-panel statuses."""
     bundle = ingest_paper(main_path, supplement_paths or [], paper_id=paper_id)
     result = drive_bundle(bundle, paper_id=paper_id, **kw)
-    return diagnose(result, paper_id=paper_id, accessions=find_accessions(bundle.text))
+    return diagnose(result, paper_id=paper_id)
 
 
 def to_markdown(report: DiagnosticReport) -> str:
@@ -152,13 +154,16 @@ def to_markdown(report: DiagnosticReport) -> str:
         + f"\n- **cited data (Slice 5):** {report.data_provenance}\n\n"
     )
     if report.accessions:
-        head += "## Cited datasets\n\n"
-        acols = ["repo", "accession", "access", "fetchable", "where", "note"]
+        head += ("## Cited datasets\n\n"
+                 "_The data these panels need is deposited here, not attached — download the right "
+                 "file and drop it into the per-panel picker (Slice 5B handoff)._\n\n")
+        acols = ["repo", "accession", "access", "ingestable", "where", "how to get the data"]
         head += "| " + " | ".join(acols) + " |\n|" + "|".join(["---"] * len(acols)) + "|\n"
         for a in report.accessions:
             head += "| " + " | ".join([
                 a.label or a.repo, f"[{a.id}]({a.url})", a.access,
-                "yes" if a.ingestable else "no", a.section, a.note or "—",
+                "yes" if a.ingestable else "no", a.section,
+                (a.download_hint or a.note or "—").replace("|", "\\|"),
             ]) + " |\n"
         head += "\n"
     if report.data_fits:
@@ -172,6 +177,19 @@ def to_markdown(report: DiagnosticReport) -> str:
                 ff.best_skill or "—", f"{ff.score}/100", ff.confidence,
                 ((best.reason if best else ff.note) or "—").replace("|", "\\|"),
             ]) + " |\n"
+        head += "\n"
+    from skill_gaps import gaps_in_report  # lazy: keeps this module's import light + avoids a cycle
+
+    run_gaps = {g.key: g for g in gaps_in_report(report)}  # dedup: one row per capability key
+    if run_gaps:
+        head += ("## Skill gaps (this run)\n\n"
+                 "_Buildable capability gaps this paper surfaced — accumulated + ranked across papers "
+                 "in `docs/skill-gaps.md` (Slice 3)._\n\n")
+        gcols = ["gap", "kind", "what would close it"]
+        head += "| " + " | ".join(gcols) + " |\n|" + "|".join(["---"] * len(gcols)) + "|\n"
+        for g in run_gaps.values():
+            head += "| " + " | ".join(
+                [g.analysis, g.kind, g.closes_with.replace("|", "\\|")]) + " |\n"
         head += "\n"
     cols = ["panel", "fig", "status", "skill", "data", "goldens(exp)", "read", "reason"]
     lines = ["| " + " | ".join(cols) + " |", "|" + "|".join(["---"] * len(cols)) + "|"]

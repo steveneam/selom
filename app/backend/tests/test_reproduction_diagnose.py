@@ -154,3 +154,36 @@ def test_no_accessions_reports_honest_empty_provenance():
     rep = diagnose(_driven_result(), paper_id="harmony")   # no accessions passed
     assert rep.accessions == []
     assert rep.data_provenance == "no dataset accession recognized in the paper text"
+
+
+def test_accessions_default_from_drive_result():
+    # Slice 5: the drive now scans the paper text + carries the accessions on the DriveResult, so the
+    # diagnostic surfaces them without re-scanning (no explicit `accessions=` needed).
+    from extract.accessions import find_accessions
+
+    result = _driven_result()
+    result.accessions = find_accessions("Data Availability. The data are in GEO: GSE213152.")
+    rep = diagnose(result, paper_id="harmony")            # accessions ride on the result
+    assert [a.id for a in rep.accessions] == ["GSE213152"]
+
+
+def test_panel_scope_is_projected():
+    # The diagnostic carries panel.scope so the skill-gap signal can tell a buildable modality gap
+    # from a wet-lab dead-end (Slice 3).
+    rep = diagnose(_driven_result())
+    assert {p.panel_key: p.scope for p in rep.panels}["6"] == R.WET_LAB
+
+
+def test_markdown_cited_datasets_shows_download_handoff():
+    from extract.accessions import find_accessions
+
+    accs = find_accessions("Data Availability. The data are in GEO: GSE213152.")
+    md = to_markdown(diagnose(_driven_result(), paper_id="harmony", accessions=accs))
+    assert "how to get the data" in md and "Supplementary file" in md  # the per-repo handoff copy
+
+
+def test_markdown_shows_per_run_skill_gaps():
+    # The needs_recipe panel (fig3, gsea: ran but no reader caught the NES) is a buildable read-back
+    # gap → it shows in the run's own "Skill gaps" section (accumulated in docs/skill-gaps.md).
+    md = to_markdown(diagnose(_driven_result(), paper_id="harmony"))
+    assert "Skill gaps (this run)" in md and "read_back" in md and "gsea" in md

@@ -34,6 +34,7 @@ class RunRecord(BaseModel):
     drive_summary: dict = Field(default_factory=dict)
     data_fits: list = Field(default_factory=list)  # list[engine.compat.FileFitReport] — Slice 2
     panel_drives: list = Field(default_factory=list)  # list[reproduction_drive.PanelDrive] — Slice 2
+    accessions: list = Field(default_factory=list)  # list[extract.accessions.Accession] — Slice 5
     error: str | None = None
     created_at: float = 0.0
     updated_at: float = 0.0
@@ -79,7 +80,8 @@ def start_run(main_path: str, supplement_paths: list | None = None, *, paper_id:
         run_store.update(rec.id, status=JobStatus.SUCCEEDED, ledger=result.ledger,
                          drive_summary=result.summary,
                          data_fits=getattr(result, "data_fits", []),
-                         panel_drives=getattr(result, "panel_drives", []), progress="scored")
+                         panel_drives=getattr(result, "panel_drives", []),
+                         accessions=getattr(result, "accessions", []), progress="scored")
     except Exception as exc:  # noqa: BLE001 — surface a clean failed run, never a 500 stack
         run_store.update(rec.id, status=JobStatus.FAILED, error=str(exc), progress="failed")
     return run_store.get(rec.id)
@@ -107,4 +109,9 @@ def public(rec: RunRecord, *, light: bool = False) -> dict:
         # exactly the `data_unmatched` panels (point one at a chosen file → re-run with `data_map`).
         out["panel_drives"] = [d.model_dump() if hasattr(d, "model_dump") else d
                                for d in rec.panel_drives]
+        # The datasets the paper cites but didn't attach (Slice 5) — so the Score stage can hand the
+        # user a direct link + per-repo download instructions for the data the `data_unmatched`
+        # panels need, then back to the picker. No fetch happens; this is provenance + a how-to.
+        out["accessions"] = [a.model_dump() if hasattr(a, "model_dump") else a
+                             for a in rec.accessions]
     return out

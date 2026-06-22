@@ -90,6 +90,23 @@ def test_public_surfaces_panel_drives_for_the_picker():
     assert "panel_drives" not in reproduction_runs.public(rec, light=True)
 
 
+def test_public_surfaces_cited_accessions_with_download_handoff():
+    # the datasets a paper cites-but-doesn't-attach ride the run contract (Slice 5B) so the Score
+    # stage can hand the user a link + per-repo download instructions, then back to the picker.
+    from extract.accessions import find_accessions
+
+    def _drive_with_accessions(main_path, supplement_paths, **kw):
+        res = _canned_result()
+        res.accessions = find_accessions("Data Availability. The data are in GEO: GSE213152.")
+        return res
+
+    rec = reproduction_runs.start_run("m.pdf", ["d.csv"], drive_fn=_drive_with_accessions)
+    full = reproduction_runs.public(rec)
+    assert full["accessions"][0]["id"] == "GSE213152"
+    assert full["accessions"][0]["download_hint"]  # the per-repo "which file, how" copy
+    assert "accessions" not in reproduction_runs.public(rec, light=True)  # heavy → full payload only
+
+
 # --- routes -------------------------------------------------------------------
 
 

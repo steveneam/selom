@@ -111,3 +111,37 @@ def test_report_summary_line_is_honest():
     line = rep.summary_line()
     assert "3 accession" in line and "fetchable" in line
     assert report("no data here").summary_line() == "no dataset accession recognized in the paper text"
+
+
+# --- Slice 5B: the per-repo download handoff (which file to grab, and how) ----
+
+
+def test_open_geo_download_hint_names_the_processed_matrix():
+    # The single useful sentence for someone staring at a GEO page: grab the processed matrix.
+    a = _by_id(YOSHIMURA)["GSE213152"]
+    assert a.download_hint and "Supplementary file" in a.download_hint
+    assert "matrix" in a.download_hint.lower() and "raw reads" in a.download_hint.lower()
+
+
+def test_raw_download_hint_is_honest_not_a_handoff():
+    # A raw-reads accession must NOT send the user chasing a file Selom can't ingest.
+    a = _by_id("Data Availability. Raw reads are in SRA under PRJNA734567.")["PRJNA734567"]
+    assert "not directly usable" in a.download_hint and "quantif" in a.download_hint
+
+
+def test_controlled_download_hint_says_apply():
+    a = _by_id("Data Availability. Data are in dbGaP (phs001234.v1.p1).")["phs001234.v1.p1"]
+    assert "apply" in a.download_hint.lower() and "can't be downloaded" in a.download_hint
+
+
+def test_geo_platform_download_hint_is_not_data():
+    # GPL is a platform annotation record, not a dataset → no file to attach.
+    a = _by_id("We used the Illumina platform GPL24676 for sequencing.")["GPL24676"]
+    assert not a.ingestable and "not a dataset" in a.download_hint
+
+
+def test_zenodo_and_pride_download_hints_are_repo_specific():
+    accs = _by_id("Data are at Zenodo (10.5281/zenodo.7654321) and PRIDE (PXD012345).")
+    assert ".xlsx" in accs["10.5281/zenodo.7654321"].download_hint.lower() \
+        or ".csv" in accs["10.5281/zenodo.7654321"].download_hint.lower()
+    assert "quantification" in accs["PXD012345"].download_hint and "*.raw" in accs["PXD012345"].download_hint

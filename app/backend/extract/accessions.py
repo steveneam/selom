@@ -20,8 +20,14 @@ is typed by repository and by **access class** — the load-bearing honesty:
 * ``controlled`` — application-gated (dbGaP / EGA / GSA-Human HRA). NOT ingestable: "requires a
   data-access application; cannot auto-fetch" — surfaced honestly, never a silent failure.
 
-**Phase B (fetch + ingest) is GATED and deferred** (network + size cap + cache + likely async — ASK
-first, [[ask-before-docker-wsl]]). This module only points at the data; it never downloads it.
+**Phase B = a manual deposit-data HANDOFF (owner decision s53), not an auto-fetch.** Instead of
+downloading anything, each accession carries a ``download_hint`` — concrete, per-repository "which
+file to grab, and how" copy — so the user fetches the right file themselves and drops it into the
+per-panel data picker (Slice 2). Deterministic, no network on the shipped path → **un-gated**. The
+honest part: a ``raw``/``controlled`` accession's hint says plainly that the file *can't* be dropped
+in as-is (reads need quantifying; controlled data needs an application), so the handoff never sends a
+user chasing a file Selom can't use. The network/large-file/async **auto-fetch (Phase B2) is on hold**
+([[ask-before-docker-wsl]], ``docs/on-hold/README.md``). This module still never downloads anything.
 """
 
 from __future__ import annotations
@@ -52,6 +58,7 @@ class Accession(BaseModel):
     label: str = ""                 # human repository name ("Gene Expression Omnibus")
     section: str = SEC_BODY         # availability | body
     note: str = ""                  # honest guidance, esp. for raw/controlled
+    download_hint: str = ""         # Phase B: concrete "which file to grab, how" for the manual handoff
 
 
 # --- repository registry ------------------------------------------------------
@@ -123,6 +130,49 @@ _REGISTRY: list[tuple[re.Pattern, str, str, str, bool, object, str]] = [
      _u("https://ega-archive.org/datasets/{id}"), _CTRL_NOTE),
 ]
 
+# --- per-repository download instructions (Phase B manual handoff) ------------
+# The concrete "which file do I grab?" copy for an *ingestable* (open) repository — the single most
+# useful sentence for a non-bioinformatician staring at a GEO page full of files. Keyed by repo; a
+# raw/controlled/non-ingestable accession instead gets an honest can't-use-this-directly hint below.
+_DOWNLOAD_BY_REPO: dict[str, str] = {
+    "geo": ("On the GEO record, open the “Supplementary file” block and download the "
+            "processed matrix — a *_counts/_matrix.tsv.gz, an mtx.gz + barcodes/features triple, "
+            "or the *_RAW.tar (NOT the linked SRA raw reads)."),
+    "arrayexpress": ("Open the study and download the processed data files (the normalized/processed "
+                     "matrix), not the raw array/image files."),
+    "pride": ("Download the processed result files (the protein/peptide quantification tables), "
+              "not the raw *.raw mass-spec spectra."),
+    "metabolights": ("Download the metabolite measurement table (the m_*.tsv / MAF file), "
+                     "not the raw spectra."),
+    "metabolomics_workbench": ("On the study page, open “Data” and download the named-metabolite "
+                               "measurement table, not the raw spectra."),
+    "zenodo": "Open the record and download the data file (commonly an .xlsx / .csv / .h5ad).",
+    "figshare": "Open the record and download the data file (commonly an .xlsx / .csv / .h5ad).",
+    "dryad": "Open the record and download the data file (commonly an .xlsx / .csv).",
+}
+
+_DL_RAW = ("Raw sequencing reads — not directly usable. They must be quantified into a count "
+           "matrix first (Selom can't ingest reads yet), so there's no file to drop in here.")
+_DL_CONTROLLED = ("Controlled access — you must apply for data-access authorization through the "
+                  "repository; the file can't be downloaded directly.")
+_DL_NOT_DATA = "A reference/annotation record, not a dataset — nothing to attach here."
+
+
+def _download_hint(repo: str, access: str, ingestable: bool) -> str:
+    """The honest per-accession "how to get the right file" line for the manual handoff (Phase B).
+
+    Open + ingestable → the repo-specific which-file copy. Raw/controlled/non-ingestable → an honest
+    can't-use-this-directly line, so the picker handoff never points a user at a file Selom can't take."""
+    if access == RAW:
+        return _DL_RAW
+    if access == CONTROLLED:
+        return _DL_CONTROLLED
+    if not ingestable:                      # e.g. a GEO platform (GPL) annotation record
+        return _DL_NOT_DATA
+    return _DOWNLOAD_BY_REPO.get(
+        repo, "Open the record and download the processed data table, then attach it on the Reproduce tab.")
+
+
 # Headers that open a Data/Code-Availability statement (weight accessions found inside it).
 _AVAIL_HEADER_RE = re.compile(
     r"(data,?\s+materials,?\s+and\s+software\s+availability"
@@ -170,7 +220,8 @@ def find_accessions(text: str) -> list[Accession]:
                 continue
             best[key] = (m.start(), Accession(
                 repo=repo, id=acc_id, access=access, ingestable=ingestable, url=url_fn(acc_id),
-                label=label, section=SEC_AVAILABILITY if in_avail else SEC_BODY, note=note))
+                label=label, section=SEC_AVAILABILITY if in_avail else SEC_BODY, note=note,
+                download_hint=_download_hint(repo, access, ingestable)))
     rows = [v for _, v in sorted(best.values(), key=lambda t: t[0])]
     rows.sort(key=lambda a: a.section != SEC_AVAILABILITY)  # availability first (stable)
     return rows

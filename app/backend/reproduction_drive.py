@@ -68,11 +68,13 @@ class PanelDrive(BaseModel):
 
 class DriveResult(BaseModel):
     """The driven ledger (same shape as ``GET /papers/{slug}``) + the per-panel drive report +
-    the dropped-data fit ranking (Slice 2: how good/compatible each supplement is for the run)."""
+    the dropped-data fit ranking (Slice 2: how good/compatible each supplement is for the run) +
+    the datasets the paper *cites but does not attach* (Slice 5: the deposit-data handoff)."""
 
     ledger: R.Ledger
     panel_drives: list[PanelDrive] = Field(default_factory=list)
     data_fits: list = Field(default_factory=list)  # list[engine.compat.FileFitReport]
+    accessions: list = Field(default_factory=list)  # list[extract.accessions.Accession] — Slice 5
 
     @property
     def summary(self) -> dict[str, int]:
@@ -208,7 +210,12 @@ def drive_bundle(bundle: PaperBundle, *, paper_id: str = "", paper: R.Paper | No
     skills = [p.skill_id for p in ledger.panels
               if p.skill_id and p.scope not in R.OUT_OF_SCOPE_SCOPES]
     data_fits = compat.report_files(tabular, skills, assessments=assessments)
-    return DriveResult(ledger=ledger, panel_drives=drives, data_fits=data_fits)
+    # The datasets the paper CITES but did not attach (Slice 5) — recognized off the paper text so the
+    # gap report + run contract show honest data provenance + a per-repo download handoff (no fetch).
+    from extract.accessions import find_accessions
+
+    accessions = find_accessions(bundle.text)
+    return DriveResult(ledger=ledger, panel_drives=drives, data_fits=data_fits, accessions=accessions)
 
 
 def reproduce(main_path: str, supplement_paths: list | None = None, *, paper_id: str = "",
