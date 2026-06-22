@@ -13,6 +13,7 @@ import {
   Pencil,
   Play,
   Plus,
+  SlidersHorizontal,
   Sparkles,
   Table2,
   Trash2,
@@ -45,7 +46,7 @@ import type { Dataset, Figure } from "@/lib/projects/types";
  * chat will scope itself by). Colours reuse the pipeline's --stage-* system.
  */
 
-export type RailView = "home" | "data" | "skill" | "stats" | "figure" | "compare";
+export type RailView = "home" | "data" | "skill" | "stats" | "figuredata" | "figure" | "compare";
 
 /** A figure plus the derived state the rail needs to render its node. */
 export interface FigureNode {
@@ -66,6 +67,7 @@ const CONTEXT: Record<RailView, { color: string; label: string }> = {
   data: { color: "var(--stage-data)", label: "Data" },
   skill: { color: "var(--stage-skill)", label: "Run a skill" },
   stats: { color: "var(--stage-publish)", label: "Statistics" },
+  figuredata: { color: "var(--stage-figure)", label: "Figure data" },
   figure: { color: "var(--stage-figure)", label: "Figure" },
   compare: { color: "var(--stage-figure)", label: "Compare" },
 };
@@ -82,6 +84,8 @@ export function Workrail({
   onSelectData,
   onRunSkill,
   onSelectStats,
+  onFigureData,
+  hasActiveFigure,
   onSelectFigure,
   onDeleteFigure,
   onRenameDataset,
@@ -100,6 +104,10 @@ export function Workrail({
   onSelectData: (datasetId?: string) => void;
   onRunSkill: () => void;
   onSelectStats: (fig: Figure) => void;
+  /** Open the Figure-data stage for the active figure (tune inputs + re-run). */
+  onFigureData: () => void;
+  /** The Figure-data stage is contextual — enabled only with a figure open. */
+  hasActiveFigure: boolean;
   onSelectFigure: (fig: Figure) => void;
   onDeleteFigure: (fig: Figure) => void;
   onRenameDataset: (id: string, label: string) => void;
@@ -330,6 +338,30 @@ export function Workrail({
           )}
         </Section>
 
+        {/* FIGURE DATA — the inputs behind the open figure (params re-run + data checks).
+            An action node like "Run a skill", but contextual: enabled only with a figure open. */}
+        <Stage color="var(--stage-figure)" filled action />
+        <div className="min-w-0 pb-4 pt-0.5">
+          <button
+            type="button"
+            onClick={onFigureData}
+            disabled={!hasActiveFigure}
+            aria-current={view === "figuredata" ? "page" : undefined}
+            title={hasActiveFigure ? "Adjust the inputs behind the open figure and re-run" : "Open a figure to edit its inputs"}
+            className={cn(
+              "group flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+              view === "figuredata"
+                ? "border-[color-mix(in_oklab,var(--stage-figure)_50%,transparent)] bg-[color-mix(in_oklab,var(--stage-figure)_12%,var(--card))] text-foreground"
+                : "border-dashed border-[color-mix(in_oklab,var(--stage-figure)_35%,transparent)] text-foreground hover:bg-[color-mix(in_oklab,var(--stage-figure)_8%,transparent)]",
+            )}
+          >
+            <span aria-hidden className="grid size-6 place-items-center rounded-md [&_svg]:size-3.5" style={{ color: "var(--stage-figure)" }}>
+              <SlidersHorizontal />
+            </span>
+            Figure data
+          </button>
+        </div>
+
         {/* FIGURE — the editable figures. Cyan (brand). */}
         <Stage color="var(--stage-figure)" filled={figureNodes.length > 0} last />
         <Section
@@ -417,6 +449,7 @@ function CollapsedRail({
       <CollapsedDot icon={Database} label="Data" active={view === "data"} color="var(--stage-data)" filled={counts.data > 0} onClick={onData} />
       <CollapsedDot icon={Play} label="Run a skill" active={view === "skill"} color="var(--stage-skill)" filled onClick={onRunSkill} />
       <CollapsedDot icon={Table2} label="Statistics" active={view === "stats"} color="var(--stage-publish)" filled={counts.stats > 0} onClick={onExpand} />
+      <CollapsedDot icon={SlidersHorizontal} label="Figure data" active={view === "figuredata"} color="var(--stage-figure)" filled={counts.figure > 0} onClick={onExpand} />
       <CollapsedDot icon={Sparkles} label="Figure" active={view === "figure" || view === "compare"} color="var(--stage-figure)" filled={counts.figure > 0} onClick={onExpand} />
     </nav>
   );

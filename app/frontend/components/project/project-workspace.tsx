@@ -2,10 +2,10 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Lock, Redo2, RefreshCw, Sparkles, Table2, Trash2, Undo2 } from "lucide-react";
+import { ArrowRight, Lock, Redo2, RefreshCw, SlidersHorizontal, Sparkles, Table2, Trash2, Undo2 } from "lucide-react";
 import { DataPanel, type AnalyzeArgs } from "./data-panel";
 import { DataCheckPanel } from "./data-check";
-import { DataFitVerdict } from "@/components/reproduction/data-fit-panel";
+import { FigureDataPanel } from "./figure-data-panel";
 import { Dropzone } from "./dropzone";
 import { WorkbenchPanel } from "./workbench-panel";
 import { PublishConfidence } from "./publish-confidence";
@@ -33,7 +33,7 @@ import type { ParamValue } from "@/lib/lineage/diff";
 import { datasetDisplayName, familyColorMap } from "@/lib/lineage/family";
 import { defaultParams } from "@/lib/catalog/params";
 import { readStyleStamp } from "@/lib/figure-spec";
-import { DataCheckError, runSkill, runtimeSkillId, type DataCheck, type SkillProvenance } from "@/lib/skills-api";
+import { DataCheckError, runSkill, runtimeSkillId, type DataCheck, type SkillParams, type SkillProvenance } from "@/lib/skills-api";
 import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
 import { pushUndo } from "@/lib/workspace/undo";
 
@@ -163,7 +163,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // The active figure's lineage — light its source dataset + its own stats/figure nodes
   // in the rail (only while a figure or its stats is in focus).
   const lineage: Lineage =
-    (view === "figure" || view === "stats") && activeFigure
+    (view === "figure" || view === "stats" || view === "figuredata") && activeFigure
       ? { datasetId: activeFigure.datasetId, figureId: activeFigure.id }
       : {};
 
@@ -340,6 +340,50 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Sweep failed. Please try again.");
+      } finally {
+        setRunning(null);
+      }
+    },
+    [activeFigure, datasets, lastFile, designFile, figure, projectId],
+  );
+
+  // Re-run the open figure from the Figure-data stage with EDITED inputs (P2): replay its
+  // skill with new params → a NEW linked version (`parentFigureId`), the original kept.
+  // Mirrors `rerunFigure`/`runSweep`; lands on the figure view with the new version open.
+  const rerunFigureWithParams = React.useCallback(
+    async (params: SkillParams) => {
+      const origin = activeFigure;
+      if (!origin?.skillId) return;
+      setRunning(origin.skillId);
+      setError(null);
+      setBlocked(null);
+      try {
+        const dataset = origin.datasetId ? datasets.find((d) => d.id === origin.datasetId) : undefined;
+        const file = lastFile ?? new File(["mock"], dataset?.filename ?? "data.csv");
+        const res = await runSkill(runtimeSkillId(origin.skillId), file, params, designFile);
+        const saved = projectStore.addFigure(projectId, {
+          title: origin.title,
+          datasetId: origin.datasetId,
+          skillId: origin.skillId,
+          spec: res.figure,
+          provenance: stampDataVersion(res.provenance, dataset),
+          methods: res.methods,
+          legend: res.legend,
+          guardrails: res.guardrails,
+          table: res.table ?? undefined,
+          dataCheck: res.dataCheck,
+          dataFit: res.dataFit ?? undefined,
+          parentFigureId: origin.id,
+          variantLabel: "edited inputs",
+        });
+        setActiveFigureId(saved.id);
+        figure.init(res.figure);
+        setView("figure");
+      } catch (e) {
+        // A block-severity QC problem surfaces the same reviewable block card as a fresh run.
+        if (e instanceof DataCheckError)
+          setBlocked({ check: e.dataCheck, step: { skillId: origin.skillId, params, rationale: "", confidence: 0 } });
+        else setError(e instanceof Error ? e.message : "Re-run failed. Please try again.");
       } finally {
         setRunning(null);
       }
@@ -591,6 +635,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           }}
           onRunSkill={() => setView("skill")}
           onSelectStats={openStats}
+          onFigureData={() => setView("figuredata")}
+          hasActiveFigure={!!activeFigure}
           onSelectFigure={openFigure}
           onDeleteFigure={deleteFigure}
           onRenameDataset={(id, label) => projectStore.renameDataset(id, label)}
@@ -658,6 +704,16 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                         value={activeStyle.id}
                       />
                     )}
+                    {activeFigure?.skillId && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setView("figuredata")}
+                        title="Tune the inputs behind this figure and re-run"
+                      >
+                        <SlidersHorizontal /> Figure data
+                      </Button>
+                    )}
                     <ExportMenu
                       spec={figure.spec}
                       filename={`selom-${bundle?.provenance?.skill?.id ?? "figure"}`}
@@ -681,19 +737,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     onToggleFreeze={toggleFreeze}
                   />
                 )}
-                {activeFigure?.dataCheck && (
-                  <DataCheckPanel
-                    dataCheck={activeFigure.dataCheck}
-                    onPickSkill={pickSuggestedSkill}
-                    onPickManually={() => setView("skill")}
-                  />
-                )}
-                {activeFigure?.dataFit && (
-                  <DataFitVerdict
-                    fit={activeFigure.dataFit}
-                    skillName={getSkill(activeFigure.skillId ?? "")?.name}
-                  />
-                )}
+                {/* Figure-forward (§3.7): the data-check routing + data-fit verdict relocate to the
+                    Figure-data stage (reachable from the toolbar / rail) so the artboard is the hero. */}
                 <PublishConfidence
                   provenance={bundle?.provenance}
                   methods={bundle?.methods}
@@ -765,6 +810,29 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
               {view === "skill" && (
                 <WorkbenchPanel installs={installs} proposal={proposal} running={running} onRun={runFlow} preselect={preselect} />
               )}
+
+              {view === "figuredata" &&
+                (activeFigure?.skillId ? (
+                  <FigureDataPanel
+                    key={activeFigure.id}
+                    skillId={activeFigure.skillId}
+                    skillName={getSkill(activeFigure.skillId)?.name ?? activeFigure.skillId}
+                    baseParams={activeFigure.provenance?.params ?? defaultParams(activeFigure.skillId)}
+                    running={running != null}
+                    dataCheck={activeFigure.dataCheck}
+                    dataFit={activeFigure.dataFit}
+                    onRerun={rerunFigureWithParams}
+                    onPickSkill={pickSuggestedSkill}
+                    onPickManually={() => setView("skill")}
+                  />
+                ) : (
+                  <EmptyState
+                    title="No figure selected"
+                    body="Open a figure to tune the inputs behind it and re-run."
+                    action="Run a skill"
+                    onAction={() => setView("skill")}
+                  />
+                ))}
 
               {view === "stats" &&
                 (activeFigure && activeStatsTable ? (
