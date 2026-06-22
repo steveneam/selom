@@ -27,14 +27,16 @@ COL_LABELS = {
     "AAV8-RK-PDE6B-3UTR": "AAV8-RK-PDE6B-3UTR",
 }
 
-# Per-condition trace colour. Two therapies coloured (PDE6B blue, 3'UTR red — the
-# pair Reviewer 2 contrasts); WT control black; negative controls grey. All editable.
+# Per-condition trace colour (owner-set 2026-06-22). The three-way story is highlighted:
+# WT Control black (healthy reference) · Untreated rd10 blue (disease baseline) ·
+# AAV8-RK-PDE6B-3'UTR red (the rescue). The remaining arms are muted so they don't compete:
+# PDE6B (no 3'UTR) + GFP-polyA-stuffer grey, CMV-GFP amber. All editable in the figure.
 COLORS = {
     "Control": "#111111",
-    "Untreated": "#9aa3ad",
-    "AAV8-RK-PDE6B": "#2c7fb8",
+    "Untreated": "#0072B2",
+    "AAV8-RK-PDE6B": "#9aa3ad",
     "AAV8-RK-GFP-polyA-stuffer": "#9aa3ad",
-    "AAV8-CMV-GFP": "#9aa3ad",
+    "AAV8-CMV-GFP": "#E69F00",
     "AAV8-RK-PDE6B-3UTR": "#c0392b",
 }
 

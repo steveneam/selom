@@ -617,7 +617,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#9aa3ad"
+        "color": "#0072B2"
       },
       "xaxis": "x2",
       "yaxis": "y2",
@@ -695,7 +695,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#9aa3ad"
+        "color": "#0072B2"
       },
       "xaxis": "x8",
       "yaxis": "y8",
@@ -773,7 +773,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#9aa3ad"
+        "color": "#0072B2"
       },
       "xaxis": "x14",
       "yaxis": "y14",
@@ -851,7 +851,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#9aa3ad"
+        "color": "#0072B2"
       },
       "xaxis": "x20",
       "yaxis": "y20",
@@ -929,7 +929,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#9aa3ad"
+        "color": "#0072B2"
       },
       "xaxis": "x26",
       "yaxis": "y26",
@@ -1007,7 +1007,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#9aa3ad"
+        "color": "#0072B2"
       },
       "xaxis": "x32",
       "yaxis": "y32",
@@ -1085,7 +1085,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#9aa3ad"
+        "color": "#0072B2"
       },
       "xaxis": "x38",
       "yaxis": "y38",
@@ -1163,7 +1163,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#2c7fb8"
+        "color": "#9aa3ad"
       },
       "xaxis": "x3",
       "yaxis": "y3",
@@ -1241,7 +1241,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#2c7fb8"
+        "color": "#9aa3ad"
       },
       "xaxis": "x9",
       "yaxis": "y9",
@@ -1319,7 +1319,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#2c7fb8"
+        "color": "#9aa3ad"
       },
       "xaxis": "x15",
       "yaxis": "y15",
@@ -1397,7 +1397,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#2c7fb8"
+        "color": "#9aa3ad"
       },
       "xaxis": "x21",
       "yaxis": "y21",
@@ -1475,7 +1475,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#2c7fb8"
+        "color": "#9aa3ad"
       },
       "xaxis": "x27",
       "yaxis": "y27",
@@ -1553,7 +1553,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#2c7fb8"
+        "color": "#9aa3ad"
       },
       "xaxis": "x33",
       "yaxis": "y33",
@@ -1631,7 +1631,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#2c7fb8"
+        "color": "#9aa3ad"
       },
       "xaxis": "x39",
       "yaxis": "y39",
@@ -2255,7 +2255,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#9aa3ad"
+        "color": "#E69F00"
       },
       "xaxis": "x5",
       "yaxis": "y5",
@@ -2333,7 +2333,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#9aa3ad"
+        "color": "#E69F00"
       },
       "xaxis": "x11",
       "yaxis": "y11",
@@ -2411,7 +2411,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#9aa3ad"
+        "color": "#E69F00"
       },
       "xaxis": "x17",
       "yaxis": "y17",
@@ -2489,7 +2489,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#9aa3ad"
+        "color": "#E69F00"
       },
       "xaxis": "x23",
       "yaxis": "y23",
@@ -2567,7 +2567,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#9aa3ad"
+        "color": "#E69F00"
       },
       "xaxis": "x29",
       "yaxis": "y29",
@@ -2645,7 +2645,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#9aa3ad"
+        "color": "#E69F00"
       },
       "xaxis": "x35",
       "yaxis": "y35",
@@ -2723,7 +2723,7 @@
       ],
       "line": {
         "width": 1.2,
-        "color": "#9aa3ad"
+        "color": "#E69F00"
       },
       "xaxis": "x41",
       "yaxis": "y41",
