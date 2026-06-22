@@ -73,11 +73,15 @@ export function ParamControl({
   }
 
   if (field.type === "range") {
+    // Show the value at the step's precision: integer steps read "15"/"50" (not "15.0"),
+    // fine steps keep their decimals ("0.20" for step 0.05).
+    const decimals =
+      field.step != null && field.step < 1 ? (String(field.step).split(".")[1]?.length ?? 1) : 0;
     return (
       <label className="block sm:col-span-2">
         <span className="flex items-center justify-between">
           <span className="text-xs font-medium text-foreground">{field.label}</span>
-          <span className="tabular text-xs text-primary">{Number(v).toFixed(1)}</span>
+          <span className="tabular text-xs text-primary">{Number(v).toFixed(decimals)}</span>
         </span>
         <input
           type="range"

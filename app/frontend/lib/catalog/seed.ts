@@ -43,6 +43,17 @@ export const CATALOG: SkillCatalogEntry[] = [
     provenance: { repo: "selom/skills", path: "cluster" }, version: "1.0.0", popularity: 81,
   }),
   e({
+    id: "selom.integration",
+    name: "Integration (Melody)",
+    summary:
+      "Batch-correct and co-embed multiple single-cell libraries with Selom Melody — our clean-room Harmony-method engine (pure numpy, no GPL). Optional Harmony2 mode for large, heterogeneous data.",
+    source: "selom", category: "single-cell", omics: ["scRNA-seq"],
+    tier: "verified", status: "beta", engine: "python",
+    inputFormats: [".h5ad", ".csv"], chainsWith: ["selom.umap_scrna", "selom.deg"],
+    outputs: ["figure"], license: "Proprietary",
+    provenance: { repo: "selom/skills", path: "integration" }, version: "0.3.0", popularity: 70,
+  }),
+  e({
     id: "selom.violin",
     name: "Marker-gene violins",
     summary: "Per-cluster expression violins for a marker gene (log1p).",

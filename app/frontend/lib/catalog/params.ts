@@ -20,16 +20,56 @@ export interface ParamField {
   help?: string;
   /** Choices for a `select` field. */
   options?: { value: string; label: string }[];
+  /**
+   * Conditional visibility: only render this field when another field in the same
+   * schema currently equals `equals`. Lets a "method" select reveal method-specific
+   * knobs (e.g. Melody's `alpha` only when the engine is set to Harmony2 mode). The
+   * field still carries its default, so it is always sent on run — just hidden until
+   * relevant. See `visibleParamFields`.
+   */
+  showWhen?: { key: string; equals: string | number | boolean };
 }
 
 const SCHEMAS: Record<string, ParamField[]> = {
+  // scRNA UMAP — the prep/QC + embedding knobs the runner honours (umap_scrna/run_scanpy:
+  // normalize, n_hvg, n_neighbors, n_pcs). Resolution lives on `cluster`, not here (the UMAP
+  // runner's Leiden uses the default), so it is deliberately absent rather than a dead knob.
   umap_scrna: [
-    { key: "resolution", label: "Cluster resolution", type: "range", default: 1.0, min: 0.1, max: 2.0, step: 0.1, help: "Higher = more, finer clusters." },
-    { key: "normalize", label: "Normalize input", type: "switch", default: true, help: "Off for already-normalized data." },
+    { key: "normalize", label: "Normalize input", type: "switch", default: true, help: "Log-normalize raw counts. Off for already-normalized data." },
+    { key: "n_hvg", label: "Highly variable genes", type: "range", default: 0, min: 0, max: 5000, step: 250, help: "Top-N variable genes used for PCA (0 = all genes; ~2000 is the standard choice)." },
+    { key: "n_neighbors", label: "Neighbours (kNN)", type: "range", default: 15, min: 2, max: 100, step: 1, help: "Local neighbourhood size for the graph + UMAP." },
+    { key: "n_pcs", label: "Principal components", type: "range", default: 50, min: 2, max: 200, step: 1, help: "PCs that build the neighbour graph." },
   ],
+  // Leiden clustering — the runner honours resolution + the same graph knobs (cluster/run_real).
   cluster: [
-    { key: "resolution", label: "Cluster resolution", type: "range", default: 1.0, min: 0.1, max: 2.0, step: 0.1, help: "Higher = more, finer clusters." },
-    { key: "normalize", label: "Normalize input", type: "switch", default: true },
+    { key: "resolution", label: "Cluster resolution", type: "range", default: 1.0, min: 0.1, max: 4.0, step: 0.1, help: "Higher = more, finer clusters." },
+    { key: "n_neighbors", label: "Neighbours (kNN)", type: "range", default: 15, min: 2, max: 100, step: 1, help: "Local neighbourhood size for the graph." },
+    { key: "n_pcs", label: "Principal components", type: "range", default: 50, min: 2, max: 200, step: 1, help: "PCs that build the neighbour graph." },
+    { key: "normalize", label: "Normalize input", type: "switch", default: true, help: "Log-normalize raw counts. Off for already-normalized data." },
+  ],
+  // scRNA batch integration — Selom Melody, our clean-room Harmony-method engine (no GPL; see
+  // skills/integration/melody.py). The engine select reveals Harmony2-only knobs (alpha) when in
+  // Harmony2 mode — never exposes literal "Harmony" (GPL); the engine is always branded "Melody".
+  // Keys + ranges mirror skills/integration/skill.json `param_spec` exactly; `harmony2` uses the
+  // string values to_bool() accepts ("true"/"false") so the select round-trips the backend bool.
+  integration: [
+    { key: "batch_key", label: "Batch key", type: "text", default: "sample", placeholder: "e.g. sample, donor, batch", help: "The obs column labelling each library/batch to correct across (falls back to a known alias if absent)." },
+    {
+      key: "harmony2", label: "Integration engine", type: "select", default: "false",
+      options: [
+        { value: "false", label: "Selom Melody — 2019 method" },
+        { value: "true", label: "Selom Melody — Harmony2 mode" },
+      ],
+      help: "Melody is Selom's clean-room batch-correction engine. Harmony2 mode adds the 2026 anti-over-integration improvements for large, heterogeneous data.",
+    },
+    { key: "theta", label: "Mixing strength (θ)", type: "range", default: 2.0, min: 0, max: 10, step: 0.5, help: "Higher = stronger batch mixing. Too high can blur real cell-type differences." },
+    {
+      key: "alpha", label: "Outlier-batch shrinkage (α)", type: "range", default: 0.2, min: 0, max: 1, step: 0.05,
+      help: "Harmony2 only — shrinks the correction of batches that contribute few cells to a cluster, preventing over-integration.",
+      showWhen: { key: "harmony2", equals: "true" },
+    },
+    { key: "n_hvg", label: "Highly variable genes", type: "range", default: 0, min: 0, max: 5000, step: 250, help: "Top-N variable genes for PCA before integration (0 = all; ~2000–5000 is standard for multi-batch)." },
+    { key: "normalize", label: "Normalize input", type: "switch", default: true, help: "Log-normalize raw counts. Off for already-normalized data." },
   ],
   deg: [
     { key: "reference", label: "Reference group", type: "text", default: "", placeholder: "e.g. control", help: "Baseline condition for the contrast." },
@@ -126,6 +166,22 @@ const SCHEMAS: Record<string, ParamField[]> = {
 
 export function skillParamSchema(catalogOrRuntimeId: string): ParamField[] {
   return SCHEMAS[runtimeSkillId(catalogOrRuntimeId)] ?? [];
+}
+
+/**
+ * The fields to render right now, given the current param values — drops any `showWhen`
+ * field whose gate doesn't match (e.g. Melody's `alpha` while the engine is the 2019
+ * method). Shared by both surfaces (Workbench + Figure-data) so the conditional reveal is
+ * identical wherever a skill is parameterised. The gate reads the *effective* value (the
+ * current param or, if unset, that gate field's default) so it's correct before any edit.
+ */
+export function visibleParamFields(schema: ParamField[], params: SkillParams): ParamField[] {
+  return schema.filter((f) => {
+    if (!f.showWhen) return true;
+    const gate = f.showWhen;
+    const current = params[gate.key] ?? schema.find((x) => x.key === gate.key)?.default;
+    return current === gate.equals;
+  });
 }
 
 /** Default param values for a skill (what a one-click Apply sends). */

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
 import { skillColor, skillIcon } from "@/lib/catalog/modality";
-import { defaultParams, skillParamSchema } from "@/lib/catalog/params";
+import { defaultParams, skillParamSchema, visibleParamFields } from "@/lib/catalog/params";
 import { getSkill } from "@/lib/catalog/seed";
 import type { SkillParams } from "@/lib/skills-api";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
@@ -185,7 +185,7 @@ export function WorkbenchPanel({
 
               {schema.length > 0 && (
                 <div className="grid gap-3 rounded-lg border border-border bg-background/40 p-4 sm:grid-cols-2">
-                  {schema.map((f) => (
+                  {visibleParamFields(schema, params).map((f) => (
                     <ParamControl
                       key={f.key}
                       field={f}

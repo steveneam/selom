@@ -6,7 +6,7 @@ import { ParamControl } from "./param-control";
 import { DataCheckPanel } from "./data-check";
 import { DataFitVerdict } from "@/components/reproduction/data-fit-panel";
 import { Button } from "@/components/ui/button";
-import { skillParamSchema } from "@/lib/catalog/params";
+import { skillParamSchema, visibleParamFields } from "@/lib/catalog/params";
 import type { SkillParams } from "@/lib/skills-api";
 import type { Figure } from "@/lib/projects/types";
 
@@ -82,7 +82,7 @@ export function FigureDataPanel({
         ) : (
           <>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {schema.map((f) => (
+              {visibleParamFields(schema, params).map((f) => (
                 <ParamControl
                   key={f.key}
                   field={f}
