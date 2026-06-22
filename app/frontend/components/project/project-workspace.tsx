@@ -16,6 +16,7 @@ import { CompareView } from "./compare-view";
 import { Workrail, type FigureNode, type Lineage, type RailView } from "./workrail";
 import { Pipeline, type StageKey, type StageState } from "@/components/pipeline";
 import { EditorWorkspace } from "@/components/figure/editor-workspace";
+import { FigureCanvas } from "@/components/figure/figure-canvas";
 import { ExportMenu } from "@/components/figure/export-menu";
 import { StylePicker } from "@/components/figure/style-picker";
 import { Button } from "@/components/ui/button";
@@ -379,7 +380,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         });
         setActiveFigureId(saved.id);
         figure.init(res.figure);
-        setView("figure");
+        // Stay on the Figure-data view: the live preview beside the inputs updates in place
+        // (and the styling box shows the same shared figure when opened) — no view switch.
       } catch (e) {
         // A block-severity QC problem surfaces the same reviewable block card as a fresh run.
         if (e instanceof DataCheckError)
@@ -782,6 +784,66 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                 onAction={() => setView("skill")}
               />
             )
+          ) : view === "figuredata" ? (
+            activeFigure?.skillId ? (
+              // Figure-data is figure-forward: the inputs sit beside a LIVE preview of the same
+              // figure the styling box edits (shared `figure` store), so tuning a param + re-run
+              // updates the graph in place — no switching to the artboard to see the change.
+              <div className="flex min-h-0 flex-1 gap-4">
+                <div className="flex min-h-[520px] flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background">
+                  <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      Live preview {running != null && <span className="text-primary">· re-running…</span>}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openFigure(activeFigure)}
+                      title="Open this figure in the editor to style it"
+                    >
+                      <Sparkles /> Style this figure
+                    </Button>
+                  </div>
+                  {figure.spec ?? activeFigure.spec ? (
+                    <div className="relative flex min-h-0 flex-1 items-start justify-center overflow-auto p-6">
+                      <div
+                        className="relative flex rounded-xl border border-border bg-artboard p-3 shadow-2xl ring-1 ring-black/5"
+                        style={{ width: "100%", maxWidth: "56rem", height: "min(70vh, 680px)" }}
+                      >
+                        <div className="min-h-0 min-w-0 flex-1">
+                          <FigureCanvas spec={(figure.spec ?? activeFigure.spec)!} displayModeBar={false} />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid flex-1 place-items-center p-6 text-center text-xs text-muted-foreground">
+                      Re-run to generate this figure’s preview.
+                    </div>
+                  )}
+                </div>
+                <div className="w-[360px] shrink-0 overflow-y-auto pr-1">
+                  <FigureDataPanel
+                    key={activeFigure.id}
+                    skillId={activeFigure.skillId}
+                    skillName={getSkill(activeFigure.skillId)?.name ?? activeFigure.skillId}
+                    baseParams={activeFigure.provenance?.params ?? {}}
+                    running={running != null}
+                    dataCheck={activeFigure.dataCheck}
+                    dataFit={activeFigure.dataFit}
+                    onRerun={rerunFigureWithParams}
+                    onPickSkill={pickSuggestedSkill}
+                    onPickManually={() => setView("skill")}
+                  />
+                </div>
+              </div>
+            ) : (
+              <EmptyState
+                title="No figure selected"
+                body="Open a figure to tune the inputs behind it and re-run."
+                action="Run a skill"
+                onAction={() => setView("skill")}
+              />
+            )
           ) : (
             <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
               {view === "home" && (
@@ -811,29 +873,6 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
               {view === "skill" && (
                 <WorkbenchPanel installs={installs} proposal={proposal} running={running} onRun={runFlow} preselect={preselect} />
               )}
-
-              {view === "figuredata" &&
-                (activeFigure?.skillId ? (
-                  <FigureDataPanel
-                    key={activeFigure.id}
-                    skillId={activeFigure.skillId}
-                    skillName={getSkill(activeFigure.skillId)?.name ?? activeFigure.skillId}
-                    baseParams={activeFigure.provenance?.params ?? {}}
-                    running={running != null}
-                    dataCheck={activeFigure.dataCheck}
-                    dataFit={activeFigure.dataFit}
-                    onRerun={rerunFigureWithParams}
-                    onPickSkill={pickSuggestedSkill}
-                    onPickManually={() => setView("skill")}
-                  />
-                ) : (
-                  <EmptyState
-                    title="No figure selected"
-                    body="Open a figure to tune the inputs behind it and re-run."
-                    action="Run a skill"
-                    onAction={() => setView("skill")}
-                  />
-                ))}
 
               {view === "stats" &&
                 (activeFigure && activeStatsTable ? (
