@@ -396,9 +396,17 @@ this does not block the diagnostic.
 
 Kept here so the *next* phases are focused, not ad-hoc. Parent: `docs/pillars/plan.md`.
 
+> **Post-phase items SHIPPED (s56).** Both light items below the phase ran before the
+> pillars-complete flag: **P4a contract-uniformity audit** (`docs/reproduction-engine/
+> skill-table-contract.md` + the guard `tests/test_skill_table_contract.py` — every shipped skill
+> partitioned native 11 / L3 16 / L4-only 3, enforced so no tableless skill enters a graded path
+> unclassified) and the **P3 routing-confidence "not sure" surface** (the FE data-check panel now
+> honestly surfaces `DataRouting.confident === false` instead of presenting a guess as a
+> recommendation; `e2e/data-check-routing.spec.ts`).
+
 | Task | Pillar | Goal | Acceptance |
 |---|---|---|---|
-| **Contract uniformity audit** | P4a | Every in-scope skill emits `{figure, table}` (via L3 where native absent); fill only the gaps the two products hit | A checked list of all in-scope skills with table-source (native / L3 / L4-only); no surprise tableless skill in a graded path |
+| **Contract uniformity audit** ✅ s56 | P4a | Every in-scope skill emits `{figure, table}` (via L3 where native absent); fill only the gaps the two products hit | A checked list of all in-scope skills with table-source (native / L3 / L4-only); no surprise tableless skill in a graded path — **done: `skill-table-contract.md` + the partition guard test** |
 | **Generic-extractor coverage** | P5b | (folds into Slice 1 above, then continues) more metrics readable without a hand ledger | auto-grade rate rises across ≥3 dogfooded papers |
 | **Live-repro edge hardening** | P5d | `data_unmatched`/`needs_recipe` honesty under more real papers | each new dogfooded paper either grades or classifies honestly with 0 defects |
 | **Pro/AI legend-polish tier** | P4c / wkspc §11 | an AI pass that polishes the deterministic methods/legend draft | opt-in; deterministic draft unchanged when AI off |
