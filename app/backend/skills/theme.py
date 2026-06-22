@@ -24,6 +24,7 @@ _KIND = {
     "trajectory": "trajectory",
     "upset": "upset",
     "normalization_qc": "qc",
+    "erg_traces": "trace_grid",
 }
 
 
@@ -154,6 +155,32 @@ def _style_upset(st, spec):
     return spec
 
 
+def _style_trace_grid(st, spec):
+    """Axis-less small-multiples (ERG trace grid): base font/colour/title, but EVERY
+    per-panel axis stays hidden. Unlike ``_apply_base`` we must not restyle the bare
+    ``xaxis``/``yaxis`` (the first panel) into a visible axis — the scale bar is the
+    only axis cue. Scale-bar shapes + label annotations are left as the primitive set them."""
+    lay = spec.setdefault("layout", {})
+    lay["font"] = dict(family=st.font_family, size=st.size_base, color=st.ink)
+    lay["paper_bgcolor"] = st.paper
+    lay["plot_bgcolor"] = st.paper
+    lay["colorway"] = list(st.colorway)
+    lay.setdefault("margin", dict(t=10, r=10, b=10, l=10))
+    t = lay.get("title")
+    tfont = dict(family=st.font_family, size=st.size_title, color=st.ink_strong)
+    tx, txa = (0.01, "left") if st.title_align == "left" else (0.5, "center")
+    if isinstance(t, dict):
+        lay["title"] = {**t, "font": tfont, "x": tx, "xanchor": txa}
+    elif isinstance(t, str):
+        lay["title"] = dict(text=t, font=tfont, x=tx, xanchor=txa)
+    for k in list(lay):
+        if k.startswith(("xaxis", "yaxis")):
+            lay[k]["visible"] = False
+    for ann in lay.get("annotations", []):
+        ann.setdefault("font", {}).setdefault("family", st.font_family)
+    return spec
+
+
 # ---- public entrypoint -------------------------------------------------------
 def apply(spec, skill_id, style=DEFAULT_STYLE):
     """Return a themed copy of a Plotly figure spec for ``skill_id`` in ``style``."""
@@ -174,5 +201,7 @@ def apply(spec, skill_id, style=DEFAULT_STYLE):
     if kind == "qc":
         # multi-panel QC violins: gridless to match the secondary panels theme skips
         return _apply_base(st, spec, grid=False)
+    if kind == "trace_grid":
+        return _style_trace_grid(st, spec)
     grid = True if st.force_grid is None else st.force_grid
     return _apply_base(st, spec, grid=grid)

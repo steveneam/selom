@@ -1,0 +1,33 @@
+{
+  "id": "erg_traces",
+  "version": "0.1.0",
+  "title": "ERG representative trace grid",
+  "engine": "python",
+  "omics": "electrophysiology",
+  "omics_type": ["general"],
+  "entrypoint": "skills.proprietary.erg_traces.run:run",
+  "origin": "proprietary",
+  "inputs": [{ "name": "table", "kind": "csv", "required": true }],
+  "param_spec": {
+    "role": { "type": "str", "default": "representative" },
+    "filter": { "type": "bool", "default": true },
+    "lowpass_hz": { "type": "float", "default": 300.0, "min": 30.0, "max": 1000.0 },
+    "scale_uv": { "type": "float", "default": 200.0, "min": 10.0, "max": 1000.0 },
+    "scale_ms": { "type": "float", "default": 100.0, "min": 10.0, "max": 500.0 }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table", "kind": "csv" }
+  ],
+  "catalog": {
+    "name": "Selom ERG Trace Grid",
+    "summary": "Stacked floating ERG waveforms — flash-intensity series down the rows, conditions across the columns, no per-panel axes, one shared scale bar. The publication layout GraphPad/Excel can't make. Ingests raw iWorx .iwxdata, LabScribe .txt, or a long waveform table; 'clean flats, keep OPs' filtering; attaches an a/b-wave table.",
+    "category": "electrophysiology",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".csv", ".txt", ".iwxdata"],
+    "chains_with": ["erg_bwave_bar", "erg_intensity_response"],
+    "license": "proprietary",
+    "popularity": 1
+  }
+}
