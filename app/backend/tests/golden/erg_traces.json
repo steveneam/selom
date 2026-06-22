@@ -76,7 +76,8 @@
       "xaxis": "x",
       "yaxis": "y",
       "name": "Control g1",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "Control"
     },
     {
       "type": "scatter",
@@ -154,7 +155,8 @@
       "xaxis": "x7",
       "yaxis": "y7",
       "name": "Control g2",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "Control"
     },
     {
       "type": "scatter",
@@ -232,7 +234,8 @@
       "xaxis": "x13",
       "yaxis": "y13",
       "name": "Control g3",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "Control"
     },
     {
       "type": "scatter",
@@ -310,7 +313,8 @@
       "xaxis": "x19",
       "yaxis": "y19",
       "name": "Control g4",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "Control"
     },
     {
       "type": "scatter",
@@ -388,7 +392,8 @@
       "xaxis": "x25",
       "yaxis": "y25",
       "name": "Control g5",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "Control"
     },
     {
       "type": "scatter",
@@ -466,7 +471,8 @@
       "xaxis": "x31",
       "yaxis": "y31",
       "name": "Control g6",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "Control"
     },
     {
       "type": "scatter",
@@ -544,7 +550,8 @@
       "xaxis": "x37",
       "yaxis": "y37",
       "name": "Control g7",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "Control"
     },
     {
       "type": "scatter",
@@ -622,7 +629,8 @@
       "xaxis": "x2",
       "yaxis": "y2",
       "name": "Untreated g1",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "Untreated"
     },
     {
       "type": "scatter",
@@ -700,7 +708,8 @@
       "xaxis": "x8",
       "yaxis": "y8",
       "name": "Untreated g2",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "Untreated"
     },
     {
       "type": "scatter",
@@ -778,7 +787,8 @@
       "xaxis": "x14",
       "yaxis": "y14",
       "name": "Untreated g3",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "Untreated"
     },
     {
       "type": "scatter",
@@ -856,7 +866,8 @@
       "xaxis": "x20",
       "yaxis": "y20",
       "name": "Untreated g4",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "Untreated"
     },
     {
       "type": "scatter",
@@ -934,7 +945,8 @@
       "xaxis": "x26",
       "yaxis": "y26",
       "name": "Untreated g5",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "Untreated"
     },
     {
       "type": "scatter",
@@ -1012,7 +1024,8 @@
       "xaxis": "x32",
       "yaxis": "y32",
       "name": "Untreated g6",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "Untreated"
     },
     {
       "type": "scatter",
@@ -1090,7 +1103,8 @@
       "xaxis": "x38",
       "yaxis": "y38",
       "name": "Untreated g7",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "Untreated"
     },
     {
       "type": "scatter",
@@ -1168,7 +1182,8 @@
       "xaxis": "x3",
       "yaxis": "y3",
       "name": "AAV8-RK-PDE6B g1",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-PDE6B"
     },
     {
       "type": "scatter",
@@ -1246,7 +1261,8 @@
       "xaxis": "x9",
       "yaxis": "y9",
       "name": "AAV8-RK-PDE6B g2",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-PDE6B"
     },
     {
       "type": "scatter",
@@ -1324,7 +1340,8 @@
       "xaxis": "x15",
       "yaxis": "y15",
       "name": "AAV8-RK-PDE6B g3",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-PDE6B"
     },
     {
       "type": "scatter",
@@ -1402,7 +1419,8 @@
       "xaxis": "x21",
       "yaxis": "y21",
       "name": "AAV8-RK-PDE6B g4",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-PDE6B"
     },
     {
       "type": "scatter",
@@ -1480,7 +1498,8 @@
       "xaxis": "x27",
       "yaxis": "y27",
       "name": "AAV8-RK-PDE6B g5",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-PDE6B"
     },
     {
       "type": "scatter",
@@ -1558,7 +1577,8 @@
       "xaxis": "x33",
       "yaxis": "y33",
       "name": "AAV8-RK-PDE6B g6",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-PDE6B"
     },
     {
       "type": "scatter",
@@ -1636,7 +1656,8 @@
       "xaxis": "x39",
       "yaxis": "y39",
       "name": "AAV8-RK-PDE6B g7",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-PDE6B"
     },
     {
       "type": "scatter",
@@ -1714,7 +1735,8 @@
       "xaxis": "x4",
       "yaxis": "y4",
       "name": "AAV8-RK-GFP-polyA-stuffer g1",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-GFP-polyA-stuffer"
     },
     {
       "type": "scatter",
@@ -1792,7 +1814,8 @@
       "xaxis": "x10",
       "yaxis": "y10",
       "name": "AAV8-RK-GFP-polyA-stuffer g2",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-GFP-polyA-stuffer"
     },
     {
       "type": "scatter",
@@ -1870,7 +1893,8 @@
       "xaxis": "x16",
       "yaxis": "y16",
       "name": "AAV8-RK-GFP-polyA-stuffer g3",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-GFP-polyA-stuffer"
     },
     {
       "type": "scatter",
@@ -1948,7 +1972,8 @@
       "xaxis": "x22",
       "yaxis": "y22",
       "name": "AAV8-RK-GFP-polyA-stuffer g4",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-GFP-polyA-stuffer"
     },
     {
       "type": "scatter",
@@ -2026,7 +2051,8 @@
       "xaxis": "x28",
       "yaxis": "y28",
       "name": "AAV8-RK-GFP-polyA-stuffer g5",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-GFP-polyA-stuffer"
     },
     {
       "type": "scatter",
@@ -2104,7 +2130,8 @@
       "xaxis": "x34",
       "yaxis": "y34",
       "name": "AAV8-RK-GFP-polyA-stuffer g6",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-GFP-polyA-stuffer"
     },
     {
       "type": "scatter",
@@ -2182,7 +2209,8 @@
       "xaxis": "x40",
       "yaxis": "y40",
       "name": "AAV8-RK-GFP-polyA-stuffer g7",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-GFP-polyA-stuffer"
     },
     {
       "type": "scatter",
@@ -2260,7 +2288,8 @@
       "xaxis": "x5",
       "yaxis": "y5",
       "name": "AAV8-CMV-GFP g1",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-CMV-GFP"
     },
     {
       "type": "scatter",
@@ -2338,7 +2367,8 @@
       "xaxis": "x11",
       "yaxis": "y11",
       "name": "AAV8-CMV-GFP g2",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-CMV-GFP"
     },
     {
       "type": "scatter",
@@ -2416,7 +2446,8 @@
       "xaxis": "x17",
       "yaxis": "y17",
       "name": "AAV8-CMV-GFP g3",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-CMV-GFP"
     },
     {
       "type": "scatter",
@@ -2494,7 +2525,8 @@
       "xaxis": "x23",
       "yaxis": "y23",
       "name": "AAV8-CMV-GFP g4",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-CMV-GFP"
     },
     {
       "type": "scatter",
@@ -2572,7 +2604,8 @@
       "xaxis": "x29",
       "yaxis": "y29",
       "name": "AAV8-CMV-GFP g5",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-CMV-GFP"
     },
     {
       "type": "scatter",
@@ -2650,7 +2683,8 @@
       "xaxis": "x35",
       "yaxis": "y35",
       "name": "AAV8-CMV-GFP g6",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-CMV-GFP"
     },
     {
       "type": "scatter",
@@ -2728,7 +2762,8 @@
       "xaxis": "x41",
       "yaxis": "y41",
       "name": "AAV8-CMV-GFP g7",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-CMV-GFP"
     },
     {
       "type": "scatter",
@@ -2806,7 +2841,8 @@
       "xaxis": "x6",
       "yaxis": "y6",
       "name": "AAV8-RK-PDE6B-3UTR g1",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-PDE6B-3UTR"
     },
     {
       "type": "scatter",
@@ -2884,7 +2920,8 @@
       "xaxis": "x12",
       "yaxis": "y12",
       "name": "AAV8-RK-PDE6B-3UTR g2",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-PDE6B-3UTR"
     },
     {
       "type": "scatter",
@@ -2962,7 +2999,8 @@
       "xaxis": "x18",
       "yaxis": "y18",
       "name": "AAV8-RK-PDE6B-3UTR g3",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-PDE6B-3UTR"
     },
     {
       "type": "scatter",
@@ -3040,7 +3078,8 @@
       "xaxis": "x24",
       "yaxis": "y24",
       "name": "AAV8-RK-PDE6B-3UTR g4",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-PDE6B-3UTR"
     },
     {
       "type": "scatter",
@@ -3118,7 +3157,8 @@
       "xaxis": "x30",
       "yaxis": "y30",
       "name": "AAV8-RK-PDE6B-3UTR g5",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-PDE6B-3UTR"
     },
     {
       "type": "scatter",
@@ -3196,7 +3236,8 @@
       "xaxis": "x36",
       "yaxis": "y36",
       "name": "AAV8-RK-PDE6B-3UTR g6",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-PDE6B-3UTR"
     },
     {
       "type": "scatter",
@@ -3274,7 +3315,8 @@
       "xaxis": "x42",
       "yaxis": "y42",
       "name": "AAV8-RK-PDE6B-3UTR g7",
-      "hoverinfo": "x+y"
+      "hoverinfo": "x+y",
+      "legendgroup": "AAV8-RK-PDE6B-3UTR"
     }
   ],
   "layout": {
@@ -4550,6 +4592,108 @@
         }
       }
     ],
+    "meta": {
+      "selom": {
+        "figureKind": "trace_grid",
+        "series": [
+          {
+            "label": "Control",
+            "traceIndices": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "colorPath": "/data/0/line/color"
+          },
+          {
+            "label": "Untreated",
+            "traceIndices": [
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13
+            ],
+            "colorPath": "/data/7/line/color"
+          },
+          {
+            "label": "AAV8-RK-PDE6B",
+            "traceIndices": [
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20
+            ],
+            "colorPath": "/data/14/line/color"
+          },
+          {
+            "label": "AAV8-RK-GFP-polyA-stuffer",
+            "traceIndices": [
+              21,
+              22,
+              23,
+              24,
+              25,
+              26,
+              27
+            ],
+            "colorPath": "/data/21/line/color"
+          },
+          {
+            "label": "AAV8-CMV-GFP",
+            "traceIndices": [
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34
+            ],
+            "colorPath": "/data/28/line/color"
+          },
+          {
+            "label": "AAV8-RK-PDE6B-3UTR",
+            "traceIndices": [
+              35,
+              36,
+              37,
+              38,
+              39,
+              40,
+              41
+            ],
+            "colorPath": "/data/35/line/color"
+          }
+        ],
+        "primitives": [
+          {
+            "kind": "scalebar",
+            "shapeIdx": [
+              0,
+              1
+            ],
+            "annoIdx": [
+              0,
+              1
+            ],
+            "xLen": 100.0,
+            "xUnit": "ms",
+            "yLen": 200.0,
+            "yUnit": "\u00b5V"
+          }
+        ]
+      }
+    },
     "font": {
       "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
       "size": 13,

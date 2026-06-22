@@ -94,7 +94,7 @@ def grid_spec(
         line = {"width": line_width}
         if p.get("color"):
             line["color"] = p["color"]
-        data.append({
+        trace = {
             "type": "scatter",
             "mode": "lines",
             "x": [round(float(v), 4) for v in p["x"]],
@@ -104,7 +104,13 @@ def grid_spec(
             "yaxis": yref,
             "name": str(p.get("name", f"r{p['row']}c{p['col']}")),
             "hoverinfo": "x+y",
-        })
+        }
+        # Optional grouping hint: traces sharing a `group` (e.g. an ERG condition spanning
+        # the 7 intensity panels) carry a `legendgroup` so the editor edits them as one
+        # series. No legend is shown (showlegend=False), so this only tags identity.
+        if p.get("group") is not None:
+            trace["legendgroup"] = str(p["group"])
+        data.append(trace)
         ax = {"domain": x_domain(p["col"]), "anchor": yref, "visible": False}
         ay = {"domain": y_domain(p["row"]), "anchor": xref, "visible": False}
         if share_x:
@@ -129,6 +135,10 @@ def grid_spec(
             })
 
     # Shared scale bar (paper coords), sized to the data→paper mapping of one panel.
+    # Record the shape + annotation indices so the editor can find this primitive
+    # deterministically (show/hide/restyle) instead of guessing among layout.shapes.
+    sb_shape_idx = [len(shapes), len(shapes) + 1]
+    sb_anno_idx = [len(annotations), len(annotations) + 1]
     hlen = (sb["x_len"] / xspan) * col_w
     vlen = (sb["y_len"] / yspan) * row_h
     bx, by = gx0 * 0.5, 0.02
@@ -172,6 +182,34 @@ def grid_spec(
 
     layout["shapes"] = shapes
     layout["annotations"] = annotations
+
+    # Render-inert editor hint (Plotly ignores layout.meta): deterministic series grouping +
+    # the scale-bar primitive's shape/annotation indices, so the agnostic editor edits the 6
+    # ERG conditions (not 42 traces) and manages the scale bar without guessing. See
+    # docs/figure-editor-contract/spec.md §3.1.
+    selom: dict = {"figureKind": "trace_grid"}
+    grouped: dict[str, list[int]] = {}
+    order: list[str] = []
+    for i, p in enumerate(panels):
+        g = p.get("group")
+        if g is None:
+            continue
+        g = str(g)
+        if g not in grouped:
+            grouped[g] = []
+            order.append(g)
+        grouped[g].append(i)
+    if order:
+        selom["series"] = [
+            {"label": g, "traceIndices": grouped[g], "colorPath": f"/data/{grouped[g][0]}/line/color"}
+            for g in order
+        ]
+    selom["primitives"] = [{
+        "kind": "scalebar", "shapeIdx": sb_shape_idx, "annoIdx": sb_anno_idx,
+        "xLen": sb["x_len"], "xUnit": sb["x_unit"], "yLen": sb["y_len"], "yUnit": sb["y_unit"],
+    }]
+    layout.setdefault("meta", {})["selom"] = selom
+
     return {"data": data, "layout": layout}
 
 

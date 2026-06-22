@@ -69,7 +69,7 @@ def run(data_path: str, params: dict) -> dict:
             fs = _fs_from(t)
             yv = _erg.clean_trace(y, fs=fs, lowpass=lowpass) if do_filter else [float(v) for v in y]
             panels.append({"row": row_of[g], "col": col_of[cond], "x": t, "y": yv,
-                           "color": _erg.COLORS.get(cond), "name": f"{cond} {g}"})
+                           "color": _erg.COLORS.get(cond), "name": f"{cond} {g}", "group": cond})
             # Measure on the RAW baseline-corrected trace (the validated metric), not the
             # display-cleaned copy — the dual smooth is internal to landmarks().
             lm = _erg.landmarks(t, y, fs=fs)

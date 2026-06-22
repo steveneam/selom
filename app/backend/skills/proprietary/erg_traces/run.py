@@ -49,7 +49,7 @@ def _stub_figure(params: dict) -> dict:
             panels.append({
                 "row": row, "col": col, "x": times,
                 "y": [_wave(t, amp) for t in times],
-                "color": _erg.COLORS[cond], "name": f"{cond} g{row + 1}",
+                "color": _erg.COLORS[cond], "name": f"{cond} g{row + 1}", "group": cond,
             })
             rows_tbl.append([cond, _erg.INTENSITIES_LOG[row],
                              round(118.0 * amp, 1), round(42.0 * amp, 1)])
