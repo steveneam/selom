@@ -102,6 +102,15 @@ const SCHEMAS: Record<string, ParamField[]> = {
       help: "Moderated borrows variance across proteins for better power at small N.",
     },
   ],
+  // Proprietary ERG module — the few knobs a vision scientist reaches for before publishing:
+  // smoothing (filter + low-pass cutoff) and the shared scale-bar size. Colours/labels are then
+  // edited directly on the figure (JSON-Patch). Backend defaults: skills/proprietary/erg_traces.
+  erg_traces: [
+    { key: "filter", label: "Clean traces", type: "switch", default: true, help: "Notch line-noise + low-pass, keeping oscillatory potentials (“clean flats, keep OPs”)." },
+    { key: "lowpass_hz", label: "Low-pass cutoff (Hz)", type: "range", default: 300, min: 30, max: 1000, step: 10, help: "Lower = smoother. 300 Hz keeps OPs; drop toward 60 Hz for a cleaner a/b-wave envelope." },
+    { key: "scale_uv", label: "Scale bar — amplitude (µV)", type: "number", default: 200, min: 10, max: 1000, step: 10, help: "Vertical scale-bar length." },
+    { key: "scale_ms", label: "Scale bar — time (ms)", type: "number", default: 100, min: 10, max: 500, step: 10, help: "Horizontal scale-bar length." },
+  ],
   annotate: [
     {
       key: "marker_set", label: "Marker panel", type: "select", default: "retinal",

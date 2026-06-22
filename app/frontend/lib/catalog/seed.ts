@@ -223,6 +223,18 @@ export const CATALOG: SkillCatalogEntry[] = [
     outputs: ["figure"], license: "MIT",
     provenance: { repo: "selom/skills", path: "string_network" }, version: "0.1.0", popularity: 62,
   }),
+  e({
+    id: "selom.erg_traces",
+    name: "Selom ERG Trace Grid",
+    summary:
+      "Stacked floating ERG waveforms — flash-intensity series down the rows, conditions across the columns, no per-panel axes, one shared scale bar. The publication layout GraphPad/Excel can't make. Ingests raw iWorx .iwxdata, LabScribe .txt, or a long waveform table; 'clean flats, keep OPs' filtering; attaches an a/b-wave table.",
+    source: "selom", category: "electrophysiology", omics: ["electrophysiology"],
+    tier: "verified", status: "beta", engine: "python",
+    inputFormats: [".csv", ".txt", ".iwxdata"], chainsWith: ["selom.erg_bwave_bar", "selom.erg_intensity_response"],
+    // Proprietary module (docs/erg-module/spec.md) — the trace-grid primitive + native .iwxdata decode.
+    outputs: ["figure", "tables"], license: "proprietary",
+    provenance: { repo: "selom/skills", path: "erg_traces" }, version: "0.1.0", popularity: 1,
+  }),
 
   // ── ClawBio runnable (Verified — wrap the ~29 production pipelines) ────────
   e({

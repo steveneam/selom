@@ -26,8 +26,10 @@ export function EditorWorkspace({
 
   return (
     <div className="flex min-h-0 flex-1">
-      {/* Workspace: the figure lives on a luminous white artboard floating on dark canvas. */}
-      <div className="relative flex min-w-0 flex-1 items-center justify-center overflow-auto p-6 lg:p-10">
+      {/* Workspace: the figure lives on a luminous white artboard floating on dark canvas.
+          Top-align (not center): a tall figure overflows the scroll region, and centering
+          would push its top out of view AND make it unreachable by scrolling. */}
+      <div className="relative flex min-w-0 flex-1 items-start justify-center overflow-auto p-6 lg:p-10">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"

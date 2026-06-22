@@ -128,6 +128,12 @@ export const CATEGORY_GROUPS: {
     categories: ["epigenomics", "chip-seq"],
   },
   {
+    title: "Electrophysiology",
+    subtitle: "Floating-trace grids and intensity-response curves — ERG, ECG, EEG, patch-clamp.",
+    color: "#2dd4bf",
+    categories: ["electrophysiology"],
+  },
+  {
     title: "Workflows & pipelines",
     subtitle: "End-to-end reference pipelines from raw reads to results.",
     color: "#fb923c",
@@ -169,6 +175,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   epigenomics: "Epigenomics",
   "chip-seq": "ChIP-seq",
   "clip-seq": "CLIP-seq",
+  electrophysiology: "Electrophysiology",
   immunoinformatics: "Immunoinformatics",
   crispr: "CRISPR",
   workflow: "Workflow",
@@ -190,6 +197,7 @@ export function humanizeCategory(category: string): string {
  */
 export function skillIcon(skill: SkillCatalogEntry): LucideIcon {
   const hay = `${skill.category} ${skill.name} ${skill.id}`.toLowerCase();
+  if (/(erg|electrophysiolog|trace|waveform|ecg|eeg|patch[-_ ]clamp)/.test(hay)) return Activity;
   if (/(umap|tsne|t-sne|embedding|cluster|dimension)/.test(hay)) return ChartScatter;
   if (/(deg|differential|volcano|expression|fold)/.test(hay)) return Activity;
   if (/(enrichment|pathway|gsea|go[-_ ]|ontology|network)/.test(hay)) return Network;
