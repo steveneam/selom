@@ -42,6 +42,24 @@ function viewFromTab(tab: WorkspaceTab): RailView {
   return tab === "overview" ? "home" : tab === "workbench" ? "skill" : tab;
 }
 
+/** Resolve a catalog entry from a namespaced ("selom.erg_traces") OR bare ("erg_traces") id. */
+function resolveSkill(skillId: string) {
+  return getSkill(skillId) ?? getSkill(`selom.${skillId}`);
+}
+
+/** Display name for the editor's Skill pane (catalog name, falling back to the id). */
+function skillDisplayName(skillId: string): string {
+  return resolveSkill(skillId)?.name ?? skillId;
+}
+
+/** Compact origin/version line for the editor's Skill pane ("proprietary · v0.1.0"). */
+function skillBadge(skillId: string): string | undefined {
+  const sk = resolveSkill(skillId);
+  if (!sk) return undefined;
+  const origin = sk.license === "proprietary" ? "proprietary" : sk.source;
+  return `${origin} · v${sk.version}`;
+}
+
 /**
  * Stamp the figure's input hash with the dataset's CURRENT version (Pillar 1). The
  * input hash is the dataset bytes' hash; in the dogfood mock the backend hash is a
@@ -749,7 +767,21 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                   guardrails={bundle?.guardrails}
                 />
                 <div className="flex min-h-[520px] flex-1 overflow-hidden rounded-xl border border-border bg-background">
-                  <EditorWorkspace store={figure} elevated={exportOpen} readOnly={frozen} onEditCopy={editCopy} />
+                  <EditorWorkspace
+                    store={figure}
+                    elevated={exportOpen}
+                    readOnly={frozen}
+                    onEditCopy={editCopy}
+                    skill={
+                      activeFigure?.skillId
+                        ? {
+                            skillName: skillDisplayName(activeFigure.skillId),
+                            badge: skillBadge(activeFigure.skillId),
+                            onOpenFigureData: () => setView("figuredata"),
+                          }
+                        : undefined
+                    }
+                  />
                 </div>
               </div>
             ) : activeFigure && !activeFigure.spec ? (

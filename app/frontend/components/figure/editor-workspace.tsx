@@ -3,15 +3,25 @@
 import { Lock } from "lucide-react";
 import { FigureCanvas } from "./figure-canvas";
 import { PropertyPanel } from "./property-panel";
+import { SkillCard } from "./skill-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import type { FigureStore } from "@/hooks/use-figure-store";
+
+/** The editor's slim skill-identity pane (metadata + hand-off to Figure data for inputs). */
+export interface EditorSkill {
+  skillName: string;
+  badge?: string;
+  /** Open the Figure-data stage where this skill's re-run inputs live. */
+  onOpenFigureData?: () => void;
+}
 
 export function EditorWorkspace({
   store,
   elevated = false,
   readOnly = false,
   onEditCopy,
+  skill,
 }: {
   store: FigureStore;
   elevated?: boolean;
@@ -19,6 +29,8 @@ export function EditorWorkspace({
    *  gestures, and replace the inspector with an "Edit a copy" notice (Decision D6). */
   readOnly?: boolean;
   onEditCopy?: () => void;
+  /** Skill-specific pane shown atop the cosmetic inspector (owner layout 2026-06-23). */
+  skill?: EditorSkill;
 }) {
   const spec = store.spec;
   if (!spec) return null;
@@ -56,8 +68,20 @@ export function EditorWorkspace({
         </div>
       </div>
 
+      {/* Right panel: a smaller skill-specific pane (which skill made this figure + its
+          inputs) atop the figure-AGNOSTIC cosmetic inspector. Both adapt to any skill/figure
+          (owner-chosen layout 2026-06-23). A frozen version shows the fork notice instead. */}
       <aside className="flex w-[330px] shrink-0 flex-col border-l border-border bg-card">
-        {readOnly ? <FrozenNotice onEditCopy={onEditCopy} /> : <PropertyPanel store={store} />}
+        {readOnly ? (
+          <FrozenNotice onEditCopy={onEditCopy} />
+        ) : (
+          <>
+            {skill && <SkillCard {...skill} />}
+            <div className="flex min-h-0 flex-1 flex-col">
+              <PropertyPanel store={store} />
+            </div>
+          </>
+        )}
       </aside>
     </div>
   );
