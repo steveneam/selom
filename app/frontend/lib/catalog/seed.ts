@@ -246,6 +246,28 @@ export const CATALOG: SkillCatalogEntry[] = [
     outputs: ["figure", "tables"], license: "proprietary",
     provenance: { repo: "selom/skills", path: "erg_traces" }, version: "0.1.0", popularity: 1,
   }),
+  e({
+    id: "selom.erg_bwave_bar",
+    name: "Selom ERG b-wave Bar",
+    summary:
+      "Peak scotopic b-wave at one flash intensity per condition — bar of the group mean ± SEM with every eye overlaid as an individual data point (the reviewer ask for quantitative graphs). Reads the long ERG metrics table; condition colours + order match the trace grid; attaches a per-condition n / mean / SEM table.",
+    source: "selom", category: "electrophysiology", omics: ["electrophysiology"],
+    tier: "verified", status: "beta", engine: "python",
+    inputFormats: [".csv"], chainsWith: ["selom.erg_traces", "selom.erg_intensity_response"],
+    outputs: ["figure", "tables"], license: "proprietary",
+    provenance: { repo: "selom/skills", path: "erg_bwave_bar" }, version: "0.1.0", popularity: 1,
+  }),
+  e({
+    id: "selom.erg_intensity_response",
+    name: "Selom ERG Intensity-Response",
+    summary:
+      "b-wave amplitude versus flash intensity per condition, with a Naka-Rushton saturating fit (V = Vmax·Iⁿ/(Iⁿ+Kⁿ)) overlaid; reports Vmax, semi-saturation log K, and slope n. The slope is adjustable, and null conditions that can't be fit are left honestly unfit. Reads the long ERG metrics table; colours + order match the trace grid.",
+    source: "selom", category: "electrophysiology", omics: ["electrophysiology"],
+    tier: "verified", status: "beta", engine: "python",
+    inputFormats: [".csv"], chainsWith: ["selom.erg_traces", "selom.erg_bwave_bar"],
+    outputs: ["figure", "tables"], license: "proprietary",
+    provenance: { repo: "selom/skills", path: "erg_intensity_response" }, version: "0.1.0", popularity: 1,
+  }),
 
   // ── ClawBio runnable (Verified — wrap the ~29 production pipelines) ────────
   e({

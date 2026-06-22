@@ -189,9 +189,35 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   // edited directly on the figure (JSON-Patch). The `role` knob is pipeline-level, not surfaced.
   erg_traces: [
     { key: "filter", label: "Clean traces", type: "switch", help: "Notch line-noise + low-pass, keeping oscillatory potentials (“clean flats, keep OPs”)." },
-    { key: "lowpass_hz", label: "Low-pass cutoff (Hz)", type: "range", step: 10, help: "Lower = smoother. 300 Hz keeps OPs; drop toward 60 Hz for a cleaner a/b-wave envelope." },
+    { key: "lowpass_hz", label: "Low-pass cutoff (Hz)", type: "range", step: 10, help: "Lower = smoother. Default 120 Hz cuts mains/instrument hum while keeping the partial-rescue b-wave; raise toward 300 Hz to retain all oscillatory potentials." },
     { key: "scale_uv", label: "Scale bar — amplitude (µV)", type: "number", step: 10, help: "Vertical scale-bar length." },
     { key: "scale_ms", label: "Scale bar — time (ms)", type: "number", step: 10, help: "Horizontal scale-bar length." },
+  ],
+  // ERG b-wave bar — one flash intensity, mean ± SEM + every eye as a point (reviewer ask).
+  erg_bwave_bar: [
+    {
+      key: "intensity_group", label: "Flash intensity", type: "select",
+      options: [
+        { value: "Group1", label: "−1.7 log cd·s/m² (dimmest)" },
+        { value: "Group2", label: "−0.8 log cd·s/m²" },
+        { value: "Group3", label: "0.1 log cd·s/m²" },
+        { value: "Group4", label: "1.0 log cd·s/m²" },
+        { value: "Group5", label: "1.9 log cd·s/m²" },
+        { value: "Group6", label: "2.8 log cd·s/m²" },
+        { value: "Group7", label: "3.1 log cd·s/m² (brightest)" },
+      ],
+      help: "Which scotopic flash the per-condition b-wave bar is taken at.",
+    },
+    { key: "points", label: "Show individual eyes", type: "switch", help: "Overlay each eye as a data point (reviewer ask for quantitative graphs)." },
+  ],
+  // ERG intensity-response — b-wave vs flash energy with the adjustable Naka-Rushton fit.
+  erg_intensity_response: [
+    { key: "fit", label: "Naka-Rushton fit", type: "switch", help: "Overlay the saturating V = Vmax·Iⁿ/(Iⁿ+Kⁿ) curve per condition." },
+    {
+      key: "nr_slope", label: "Fit slope (n)", type: "range", step: 0.1,
+      help: "0 = auto-fit each condition's slope (falling back to n=1 where under-constrained). Set a value to fix the slope and compare all conditions at one slope.",
+    },
+    { key: "min_r2", label: "Fit-quality gate (R²)", type: "range", step: 0.05, help: "Minimum R² to report a fit; lower keeps more marginal fits, higher only the cleanest." },
   ],
   annotate: [
     {

@@ -88,9 +88,20 @@ export const SKILL_PARAM_SPECS: Record<string, BackendParamSpec> = {
   erg_traces: {
     role: { type: "str", default: "representative" },
     filter: { type: "bool", default: true },
-    lowpass_hz: { type: "float", default: 300.0, min: 30.0, max: 1000.0 },
+    lowpass_hz: { type: "float", default: 120.0, min: 30.0, max: 1000.0 },
     scale_uv: { type: "float", default: 200.0, min: 10.0, max: 1000.0 },
     scale_ms: { type: "float", default: 100.0, min: 10.0, max: 500.0 },
+  },
+  erg_bwave_bar: {
+    intensity_group: { type: "str", default: "Group4" },
+    value_col: { type: "str", default: "b_wave_uv" },
+    points: { type: "bool", default: true },
+  },
+  erg_intensity_response: {
+    value_col: { type: "str", default: "b_wave_uv" },
+    fit: { type: "bool", default: true },
+    nr_slope: { type: "float", default: 0.0, min: 0.0, max: 4.0 },
+    min_r2: { type: "float", default: 0.3, min: 0.0, max: 1.0 },
   },
   annotate: {
     marker_set: { type: "str", default: "retinal", options: ["retinal", "retinal_cepo"] },
