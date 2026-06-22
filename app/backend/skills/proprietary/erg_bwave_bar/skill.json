@@ -1,0 +1,31 @@
+{
+  "id": "erg_bwave_bar",
+  "version": "0.1.0",
+  "title": "ERG b-wave bar (individual points)",
+  "engine": "python",
+  "omics": "electrophysiology",
+  "omics_type": ["general"],
+  "entrypoint": "skills.proprietary.erg_bwave_bar.run:run",
+  "origin": "proprietary",
+  "inputs": [{ "name": "table", "kind": "csv", "required": true }],
+  "param_spec": {
+    "intensity_group": { "type": "str", "default": "Group4" },
+    "value_col": { "type": "str", "default": "b_wave_uv" },
+    "points": { "type": "bool", "default": true }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table", "kind": "csv" }
+  ],
+  "catalog": {
+    "name": "Selom ERG b-wave Bar",
+    "summary": "Peak scotopic b-wave at one flash intensity per condition — bar of the group mean ± SEM with every eye overlaid as an individual point (the reviewer ask for quantitative graphs). Reads the long ERG metrics table; condition colours + order match the trace grid; attaches a per-condition n / mean / SEM table.",
+    "category": "electrophysiology",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".csv"],
+    "chains_with": ["erg_traces", "erg_intensity_response"],
+    "license": "proprietary",
+    "popularity": 1
+  }
+}

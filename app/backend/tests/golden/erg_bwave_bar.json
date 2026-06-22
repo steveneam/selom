@@ -1,0 +1,268 @@
+{
+  "data": [
+    {
+      "type": "bar",
+      "x": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "y": [
+        208.09,
+        42.6,
+        85.23,
+        39.17,
+        37.42,
+        146.9
+      ],
+      "error_y": {
+        "type": "data",
+        "array": [
+          6.73,
+          3.72,
+          14.18,
+          9.64,
+          9.33,
+          20.13
+        ],
+        "visible": true,
+        "thickness": 1.2,
+        "width": 6,
+        "color": "#333333"
+      },
+      "marker": {
+        "color": [
+          "#111111",
+          "#0072B2",
+          "#9aa3ad",
+          "#9aa3ad",
+          "#E69F00",
+          "#c0392b"
+        ],
+        "line": {
+          "color": "#333333",
+          "width": 1
+        }
+      },
+      "width": 0.62,
+      "name": "mean \u00b1 SEM",
+      "showlegend": false,
+      "hoverinfo": "x+y"
+    },
+    {
+      "type": "scatter",
+      "mode": "markers",
+      "x": [
+        -0.17,
+        -0.1214,
+        -0.0729,
+        -0.0243,
+        0.0243,
+        0.0729,
+        0.1214,
+        0.17,
+        0.83,
+        0.9433,
+        1.0567,
+        1.17,
+        1.83,
+        1.8867,
+        1.9433,
+        2.0,
+        2.0567,
+        2.1133,
+        2.17,
+        2.83,
+        3.0,
+        3.17,
+        3.83,
+        3.9433,
+        4.0567,
+        4.17,
+        4.83,
+        5.0,
+        5.17
+      ],
+      "y": [
+        214.5,
+        195.1,
+        209.9,
+        232.2,
+        191.2,
+        200.4,
+        184.4,
+        237.0,
+        42.4,
+        33.5,
+        51.7,
+        42.8,
+        22.2,
+        107.3,
+        41.0,
+        102.1,
+        99.1,
+        106.4,
+        118.5,
+        30.7,
+        28.4,
+        58.4,
+        22.1,
+        41.8,
+        23.8,
+        62.0,
+        123.7,
+        187.0,
+        130.0
+      ],
+      "marker": {
+        "color": "rgba(20,20,20,0.82)",
+        "size": 6,
+        "line": {
+          "color": "#ffffff",
+          "width": 0.8
+        }
+      },
+      "name": "eyes",
+      "showlegend": false,
+      "hoverinfo": "y"
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Scotopic b-wave by condition (stub)",
+      "font": {
+        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "size": 16,
+        "color": "#1f2a37"
+      },
+      "x": 0.01,
+      "xanchor": "left"
+    },
+    "xaxis": {
+      "showline": true,
+      "linecolor": "#c4ccd4",
+      "linewidth": 1,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#c4ccd4",
+      "ticklen": 4,
+      "tickwidth": 1,
+      "tickfont": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "zeroline": false,
+      "showgrid": true,
+      "gridcolor": "#eef1f5",
+      "gridwidth": 1,
+      "range": [
+        -0.6,
+        5.6
+      ],
+      "type": "linear",
+      "tickmode": "array",
+      "tickvals": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "ticktext": [
+        "Control",
+        "Untreated",
+        "AAV8-Rk-PDE6B",
+        "AAV8-RK-GFP-<br>PolyA stuffer",
+        "AAV8-CMV-GFP",
+        "AAV8-RK-PDE6B-3UTR"
+      ],
+      "tickangle": -20
+    },
+    "yaxis": {
+      "showline": true,
+      "linecolor": "#c4ccd4",
+      "linewidth": 1,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#c4ccd4",
+      "ticklen": 4,
+      "tickwidth": 1,
+      "tickfont": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "zeroline": false,
+      "showgrid": true,
+      "gridcolor": "#eef1f5",
+      "gridwidth": 1,
+      "rangemode": "tozero",
+      "title": {
+        "text": "b-wave amplitude (\u00b5V)",
+        "font": {
+          "size": 13,
+          "color": "#1f2a37"
+        }
+      }
+    },
+    "bargap": 0.35,
+    "showlegend": false,
+    "plot_bgcolor": "#ffffff",
+    "annotations": [
+      {
+        "xref": "paper",
+        "yref": "paper",
+        "x": 0.99,
+        "y": 0.99,
+        "xanchor": "right",
+        "yanchor": "top",
+        "showarrow": false,
+        "text": "1.0 log cd\u00b7s/m\u00b2",
+        "font": {
+          "size": 11,
+          "color": "#555555"
+        }
+      }
+    ],
+    "font": {
+      "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      "size": 13,
+      "color": "#33404d"
+    },
+    "paper_bgcolor": "#ffffff",
+    "colorway": [
+      "#2f6db0",
+      "#e08a2b",
+      "#3f9b6b",
+      "#c0392b",
+      "#7d5ba6",
+      "#1f9aa6",
+      "#9aa017",
+      "#6b7280"
+    ],
+    "hoverlabel": {
+      "font": {
+        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "size": 12
+      },
+      "bgcolor": "#1f2a37"
+    },
+    "margin": {
+      "t": 46,
+      "r": 24,
+      "b": 52,
+      "l": 64
+    },
+    "legend": {
+      "font": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "bgcolor": "rgba(0,0,0,0)",
+      "bordercolor": "rgba(0,0,0,0)"
+    }
+  }
+}

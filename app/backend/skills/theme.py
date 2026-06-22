@@ -47,7 +47,11 @@ def _style_axis(st, orig, grid=True):
     orig = dict(orig or {})
     title = orig.get("title")
     keep = {k: orig[k] for k in ("range", "type", "scaleanchor", "scaleratio", "domain", "anchor",
-                                 "categoryorder", "categoryarray", "side") if k in orig}
+                                 "categoryorder", "categoryarray", "side",
+                                 # explicit tick + range specs a skill set deliberately (e.g. a bar
+                                 # chart's category tick labels, a zero-pinned axis) — preserve them
+                                 # so base theming restyles the axis without discarding its structure.
+                                 "tickmode", "tickvals", "ticktext", "tickangle", "rangemode") if k in orig}
     new = _axis(st, grid=grid)
     new.update(keep)
     tfont = dict(size=st.size_axis_title, color=st.ink_strong)

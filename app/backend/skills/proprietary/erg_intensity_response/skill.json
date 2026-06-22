@@ -1,0 +1,32 @@
+{
+  "id": "erg_intensity_response",
+  "version": "0.1.0",
+  "title": "ERG intensity-response (Naka-Rushton)",
+  "engine": "python",
+  "omics": "electrophysiology",
+  "omics_type": ["general"],
+  "entrypoint": "skills.proprietary.erg_intensity_response.run:run",
+  "origin": "proprietary",
+  "inputs": [{ "name": "table", "kind": "csv", "required": true }],
+  "param_spec": {
+    "value_col": { "type": "str", "default": "b_wave_uv" },
+    "fit": { "type": "bool", "default": true },
+    "nr_slope": { "type": "float", "default": 0.0, "min": 0.0, "max": 4.0 },
+    "min_r2": { "type": "float", "default": 0.3, "min": 0.0, "max": 1.0 }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table", "kind": "csv" }
+  ],
+  "catalog": {
+    "name": "Selom ERG Intensity-Response",
+    "summary": "b-wave amplitude versus flash intensity for each condition, with a Naka-Rushton saturating fit (V = Vmax·Iⁿ/(Iⁿ+Kⁿ)) overlaid. Reports Vmax, semi-saturation log K, and slope n per condition. Reads the long ERG metrics table; condition colours + order match the trace grid; the fit is honestly omitted for null conditions that can't be fit.",
+    "category": "electrophysiology",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".csv"],
+    "chains_with": ["erg_traces", "erg_bwave_bar"],
+    "license": "proprietary",
+    "popularity": 1
+  }
+}

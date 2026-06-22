@@ -12,6 +12,7 @@ attribution sentence and returns ``{"text", "citations"}``.
 
 from __future__ import annotations
 
+from skills import _erg
 from skills.contract import SkillSpec, resolved_params
 
 # --- Canonical citations, referenced by the per-skill templates -----------------
@@ -43,6 +44,8 @@ CEPO = "Kim, H.J., Wang, K., Chen, C. et al. Uncovering cell identity through di
 PVCA = "Boedigheimer, M.J. et al. Sources of variation in baseline gene expression levels from toxicogenomics study control animals across multiple laboratories. BMC Genomics 9, 285 (2008)."
 HARMONY = "Korsunsky, I. et al. Fast, sensitive and accurate integration of single-cell data with Harmony. Nature Methods 16, 1289-1296 (2019)."
 ENTREZ = "Sayers, E.W. et al. Database resources of the National Center for Biotechnology Information. Nucleic Acids Research 50, D20-D26 (2022)."
+ISCEV = "Robson, A.G. et al. ISCEV Standard for full-field clinical electroretinography (2022 update). Documenta Ophthalmologica 144, 165-177 (2022)."
+NAKA_RUSHTON = "Naka, K.I. & Rushton, W.A.H. S-potentials from luminosity units in the retina of fish (Cyprinidae). Journal of Physiology 185, 587-599 (1966)."
 
 
 def _umap(p: dict):
@@ -578,8 +581,66 @@ def _cepo(p: dict):
     return text, [CEPO, SCANPY]
 
 
+def _erg_traces(p: dict):
+    ladder = ", ".join(f"{v:g}" for v in _erg.INTENSITIES_LOG)
+    filtered = str(p.get("filter", True)).lower() not in ("false", "0", "no")
+    lp = float(p.get("lowpass_hz", 120.0) or 120.0)
+    display = (
+        f"For display, traces were notch-filtered to remove mains/instrument line noise and "
+        f"low-pass filtered at {lp:g} Hz while preserving the oscillatory potentials; "
+        if filtered else ""
+    )
+    text = (
+        "Full-field scotopic (rod-driven) electroretinograms were recorded from overnight "
+        "dark-adapted mice with an iWorx/LabScribe data-acquisition system. Responses were elicited "
+        f"by a series of seven flashes of increasing energy ({ladder} log cd·s/m²); sweeps were "
+        "averaged within each intensity and baseline-corrected to the pre-stimulus mean. "
+        f"{display}the a-wave was measured from baseline to the initial cornea-negative trough and "
+        "the b-wave from that trough to the following cornea-positive peak. For each condition a "
+        "single representative eye is shown, selected as the eye whose full b-wave-versus-intensity "
+        "series lay closest (minimum sum-of-squared deviations) to its group mean; cataractous or "
+        "failed-acquisition eyes were excluded, and representatives are labelled as such rather than "
+        "shown as group means."
+    )
+    return text, [ISCEV]
+
+
+def _erg_bwave_bar(p: dict):
+    text = (
+        "Peak scotopic b-wave amplitudes at a single flash intensity were compared across conditions. "
+        "Each bar shows the group mean with the standard error of the mean, and every eye is overlaid "
+        "as an individual data point. Amplitudes were measured as the trough-to-peak b-wave on "
+        "baseline-corrected, intensity-averaged traces (iWorx/LabScribe); cataractous or "
+        "failed-acquisition eyes were excluded."
+    )
+    return text, [ISCEV]
+
+
+def _erg_intensity_response(p: dict):
+    slope = float(p.get("nr_slope", 0.0) or 0.0)
+    if slope > 0:
+        slope_txt = (f"the slope n was fixed at {slope:g} and Vmax and K were estimated")
+    else:
+        slope_txt = (
+            "Vmax, K and the slope n were estimated where the data constrained the slope; for a "
+            "responder whose slope was under-constrained, n was fixed at a physiological value (1.0)"
+        )
+    text = (
+        "b-wave amplitude was plotted against flash intensity for each condition (mean ± standard "
+        "error across eyes). The intensity-response relationship was fit per condition with the "
+        "Naka-Rushton function V = Vmax·Iⁿ/(Iⁿ + Kⁿ), where I is flash energy, Vmax the saturated "
+        f"amplitude, K the semi-saturation intensity and n the slope; {slope_txt} by bounded "
+        "non-linear least-squares regression (SciPy). Conditions whose response did not support a "
+        "saturating fit were left unfit."
+    )
+    return text, [ISCEV, NAKA_RUSHTON, SCIPY]
+
+
 _TEMPLATES = {
     "umap_scrna": _umap,
+    "erg_traces": _erg_traces,
+    "erg_bwave_bar": _erg_bwave_bar,
+    "erg_intensity_response": _erg_intensity_response,
     "integration": _integration,
     "boxplot": _boxplot,
     "pvca": _pvca,

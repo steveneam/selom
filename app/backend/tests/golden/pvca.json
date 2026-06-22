@@ -86,6 +86,7 @@
       "showgrid": true,
       "gridcolor": "#eef1f5",
       "gridwidth": 1,
+      "rangemode": "tozero",
       "title": {
         "text": "weighted variance fraction",
         "font": {

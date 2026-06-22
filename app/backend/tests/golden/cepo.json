@@ -259,6 +259,7 @@
         "TRPM1",
         "CABP5"
       ],
+      "tickangle": -45,
       "title": {
         "text": "gene",
         "font": {

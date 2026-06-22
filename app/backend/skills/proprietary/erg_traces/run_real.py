@@ -30,7 +30,10 @@ def run(data_path: str, params: dict) -> dict:
         raise ValueError(f"erg_traces: no rows for role={role!r}")
 
     do_filter = to_bool(params.get("filter", True))
-    lowpass = float(params.get("lowpass_hz", 300.0))
+    # Display smoothing default = 120 Hz (owner sign-off 2026-06-23): cuts mains/instrument
+    # hum so flat conditions settle while preserving the PDE6B partial-rescue b-wave. The
+    # a/b-wave metric below reads the RAW trace, so selection is unaffected by this cutoff.
+    lowpass = float(params.get("lowpass_hz", 120.0))
 
     # Column order: explicit condition_order if present, else canonical, else first-seen.
     if "condition_order" in df.columns and df["condition_order"].notna().any():

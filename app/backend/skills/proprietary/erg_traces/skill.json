@@ -11,7 +11,7 @@
   "param_spec": {
     "role": { "type": "str", "default": "representative" },
     "filter": { "type": "bool", "default": true },
-    "lowpass_hz": { "type": "float", "default": 300.0, "min": 30.0, "max": 1000.0 },
+    "lowpass_hz": { "type": "float", "default": 120.0, "min": 30.0, "max": 1000.0 },
     "scale_uv": { "type": "float", "default": 200.0, "min": 10.0, "max": 1000.0 },
     "scale_ms": { "type": "float", "default": 100.0, "min": 10.0, "max": 500.0 }
   },

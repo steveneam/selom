@@ -59,7 +59,7 @@ def _skill_dir(skill_id: str) -> pathlib.Path:
 
 def load_skill(skill_id: str) -> SkillSpec:
     p = _skill_dir(skill_id) / "skill.json"
-    return SkillSpec(**json.loads(p.read_text()))
+    return SkillSpec(**json.loads(p.read_text(encoding="utf-8")))
 
 
 def _execute(skill_id: str, data_path: str, params: dict) -> tuple[dict, dict | None]:

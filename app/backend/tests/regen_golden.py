@@ -21,7 +21,7 @@ SKILLS = [
     "markers", "annotate", "trajectory", "pca", "composition", "proteomics_de", "gsea",
     "corr_heatmap", "upset", "scorecard", "normalization_qc", "sankey", "string_network",
     "cepo", "boxplot", "pvca", "regression", "integration", "pseudotime_genes",
-    "diff_abundance", "ssgsea", "erg_traces",
+    "diff_abundance", "ssgsea", "erg_traces", "erg_bwave_bar", "erg_intensity_response",
 ]
 
 

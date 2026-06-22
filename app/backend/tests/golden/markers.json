@@ -257,6 +257,7 @@
         "GNLY",
         "PPBP"
       ],
+      "tickangle": -45,
       "title": {
         "text": "gene",
         "font": {
