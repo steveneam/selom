@@ -192,6 +192,20 @@ and it drives the matcher.
 
 ### Slice 3 — Skill-gap signal (P3 3c)
 
+> **SHIPPED s54.** `app/backend/skill_gaps.py` + the committed `docs/skill-gaps.md`. The updater
+> (`update_skill_gaps_doc`) accumulates each cold-drive's *buildable* gaps — `needs_recipe`
+> (read-back), `no_skill` (routing), and `out_of_scope`+`modality_unsupported` (modality) — into a
+> ranked doc, **idempotently** (paper ids + examples de-dup; `papers_seen` accumulates). Two regions:
+> an auto-region the updater owns (machine JSON + ranked table) and a hand-authored **curated** region
+> it never clobbers (where the qualitative gaps no status can name live — e.g. integration
+> mixing-metrics). Deliberately **not** counted as skill gaps: `data_unmatched`/`run_failed`
+> (data-side → Slice 2/5), `no_golden` (ambiguous), and `wet_lab`/`data_not_deposited` out-of-scope
+> (dead-ends, not buildable). Seeded from the two dogfooded papers (Harmony + Yoshimura): their gaps
+> are **all data-availability**, so the auto-region honestly reports "no buildable skill gaps yet" and
+> the real signal (LISI/kBET mixing-metrics, from `findings-harmony.md`) is curated by hand. The
+> diagnostic's markdown also shows each run's own gaps ("Skill gaps (this run)"). Idempotency +
+> ranking + curated-preservation tests in `test_skill_gaps.py`.
+
 - **Goal:** turn every `out_of_scope` / `needs_recipe` into a durable, prioritized "Selom can't
   do X yet" backlog, so dogfooding becomes a feedback engine, not just a score.
 - **Build:** the diagnostic appends gaps (paper · panel · skill/analysis · reason · frequency) to
@@ -243,13 +257,20 @@ and it drives the matcher.
   deterministically (no dependency — avoid GEOparse on the shipped path unless its license is
   verified). Surface in the diagnostic gap report **and** Product A's `data_check`.
 - **Phase B — deposit-data HANDOFF (link + download instructions; do now, NO infra) — owner
-  decision s53.** Instead of auto-fetching, surface for each recognized accession a **direct link +
-  concrete per-repo download instructions** (which file to grab, how) so the user fetches it
-  themselves and drops it into the **per-panel picker** (Slice 2, shipped s53). Deterministic, no
-  network on the shipped path → **NOT gated**. This closes `data_unmatched` via *the user + the
-  picker* with zero fetch infra. The recognizer (Phase A) already builds the `url`; Phase B adds the
-  per-repo "how to download the right file" copy + the FE surface (in the gap report / Reproduce
-  stage, next to the Cited-datasets table) that hands the user to the link and back to the picker.
+  decision s53. SHIPPED s54.** Instead of auto-fetching, each recognized accession now carries a
+  **direct link + concrete per-repo download instructions** (`Accession.download_hint`: GEO →
+  "open the Supplementary file block, grab the processed matrix, not the SRA reads"; PRIDE →
+  "the quantification tables, not the *.raw spectra"; Zenodo/Figshare → "the .xlsx/.csv/.h5ad"; …) so
+  the user fetches the right file themselves and drops it into the **per-panel picker** (Slice 2,
+  shipped s53). **Honest:** a `raw`/`controlled`/non-data accession's hint says plainly it *can't* be
+  dropped in (reads need quantifying; controlled needs an application; a platform record isn't data),
+  so the handoff never sends a user chasing a file Selom can't use. Deterministic, no network on the
+  shipped path → **NOT gated**. Surfaced two ways: the cited-datasets table in the diagnostic markdown
+  gained a "how to get the data" column, and the **run contract** now rides `accessions` (computed on
+  the `DriveResult` from the paper text) → a new `CitedDatasets` FE surface on the Score stage,
+  rendered above the picker, that hands the user out to each repository link and back to the picker
+  (it adapts its lead-in when there are `data_unmatched` panels). `test_accessions.py` covers the
+  per-repo/honest hints; `test_reproduction_runs.py` covers the run-contract surfacing.
 - **Phase B2 — auto-fetch + ingest (ON HOLD, P6).** The original network/large-file/async
   auto-download (open/processed GEO-suppl / Zenodo / Figshare → `engine.ingest` → feed the matcher).
   The hard part is GEO-supplement heterogeneity (tar / mtx-triplet / per-sample). **Parked** in
