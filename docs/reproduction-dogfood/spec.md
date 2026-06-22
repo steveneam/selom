@@ -217,7 +217,38 @@ and it drives the matcher.
   doesn't double-count).
 - **Depends on:** Slice 0. **Size:** ~1 session.
 
-### Slice 4 — Regression fixtures (P5c)
+### Slice 4 — Regression fixtures (P5c)  *(SHIPPED s55)*
+
+> **SHIPPED s55.** `app/backend/reproduction_fixtures.py` (the reusable framework: `DriveSnapshot`
+> + `snapshot()` projects a `DriveResult` → status-shape + driven metric values; `diff()`/
+> `assert_reproduces()` is the regression contract — same panel set · same status per panel · 0 Selom
+> defects · every driven metric within its golden's `resolve_tolerances` band, graded with the exact
+> s46 grader so an engine delta inside the metric-type band stays green and a broken reader flips
+> red) + `scripts/regen_reproduction_fixtures.py` (the bless/refresh generator + the shared
+> `FIXTURE_PAPERS` registry) + committed snapshots `tests/fixtures/reproduction/{jev,hani,dorgau}.json`
+> + `tests/test_reproduction_fixtures.py` (three tiers) + the fixtures `README.md`.
+>
+> **Measured reality (the design driver).** Cold-driving JEV / Hani / Dorgau drives **0 panels** —
+> every panel is `no_golden` / `data_unmatched` / `run_failed` (the Slice-0/1 strategic insight —
+> data-availability + recall, not the engine — confirmed on the hand-ledger papers; every panel is
+> still classified honestly, **0 Selom defects**). So the win these fixtures lock today is the
+> **honest classification shape**; `metrics` are empty and populate automatically as recall rises,
+> with no fixture-code change. The two CI tiers had to follow that reality:
+> - **Tier (a) — cheap, normal CI, no data:** the framework's behavioural unit tests (a synthetic
+>   stub-runner drive proves snapshot/diff/assert + the metric-type tolerance: status flip → red,
+>   within-band metric → green, out-of-band → red) **+** characterization tests over every committed
+>   snapshot (statuses honest, `summary` == tally, 0 defects). This is the "break a reader → fixture
+>   goes red" check (Testing Strategy) without real data.
+> - **Tier (b) — opt-in real re-drive, owner machine only:** the genuine engine-regression guard —
+>   `reproduce()` each blessed paper and `assert_reproduces(committed_snapshot, result)`; skips
+>   automatically where the PDF isn't staged (CI stays green). Verified green here on all three.
+>
+> **The 4 hand ledgers stay as-is** (untouched, byte-identical — this only ADDS the auto-drive
+> fixtures). **RPGRIP1** has a `FIXTURE_PAPERS` slot but no staged PDF on this machine → a documented
+> pending slot (drops in identically once staged). The DoD's "Harmony first" became "the 3
+> hand-ledger papers with staged PDFs" — Harmony/Yoshimura are calibration papers and slot in the
+> same way. **Gates:** new fixtures test 15 + 1 skip (RPGRIP1 re-drive) · 4 hand ledgers + drive +
+> drive_honest 63 + 1 skip (no regression, byte-identical) · ruff clean · 780 tests collect clean.
 
 - **Goal:** each paper the owner **blesses** becomes a fixture over the auto-drive so engine
   growth never silently regresses an earlier win.
