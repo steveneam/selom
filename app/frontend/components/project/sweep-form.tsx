@@ -4,7 +4,8 @@ import * as React from "react";
 import { Play, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { skillParamSchema, type ParamField } from "@/lib/catalog/params";
+import { type ParamField } from "@/lib/catalog/params";
+import { useSkillParams } from "@/lib/catalog/use-skill-params";
 import type { SkillParams } from "@/lib/skills-api";
 import type { ParamValue } from "@/lib/lineage/diff";
 
@@ -30,11 +31,19 @@ export function SweepForm({
   onRun: (param: string, values: ParamValue[]) => void;
   onCancel: () => void;
 }) {
-  const schema = React.useMemo(() => skillParamSchema(skillId), [skillId]);
-  const sweepable = schema; // every knob is sweepable; numeric/select read best
-  const [param, setParam] = React.useState(() => pickDefaultParam(sweepable));
+  // The sweepable knobs are the skill's spec-driven param fields (loaded async).
+  const { fields: sweepable, loading } = useSkillParams(skillId);
+  const [param, setParam] = React.useState("");
   const field = sweepable.find((f) => f.key === param);
-  const [raw, setRaw] = React.useState(() => suggestValues(field, baseParams[param ?? ""]));
+  const [raw, setRaw] = React.useState("");
+
+  // Pick a default parameter once the fields load (or the skill changes).
+  React.useEffect(() => {
+    if (sweepable.length > 0 && !sweepable.some((f) => f.key === param)) {
+      setParam(pickDefaultParam(sweepable));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-pick only when the field set changes
+  }, [sweepable]);
 
   // Re-suggest values when the chosen parameter changes.
   React.useEffect(() => {
@@ -44,6 +53,14 @@ export function SweepForm({
 
   const values = React.useMemo(() => parseValues(field, raw), [field, raw]);
   const canRun = !!field && values.length >= 2 && !running;
+
+  if (loading) {
+    return (
+      <div className="rounded-lg border border-border bg-card/60 px-3.5 py-3 text-xs text-muted-foreground">
+        Loading parameters…
+      </div>
+    );
+  }
 
   if (sweepable.length === 0) {
     return (

@@ -6,7 +6,8 @@ import { ParamControl } from "./param-control";
 import { DataCheckPanel } from "./data-check";
 import { DataFitVerdict } from "@/components/reproduction/data-fit-panel";
 import { Button } from "@/components/ui/button";
-import { skillParamSchema, visibleParamFields } from "@/lib/catalog/params";
+import { visibleParamFields } from "@/lib/catalog/params";
+import { useSkillParams } from "@/lib/catalog/use-skill-params";
 import type { SkillParams } from "@/lib/skills-api";
 import type { Figure } from "@/lib/projects/types";
 
@@ -45,7 +46,7 @@ export function FigureDataPanel({
   /** From the data-check routing card: take over and pick a skill manually. */
   onPickManually: () => void;
 }) {
-  const schema = React.useMemo(() => skillParamSchema(skillId), [skillId]);
+  const { fields: schema, loading } = useSkillParams(skillId);
   const [params, setParams] = React.useState<SkillParams>(() => ({ ...baseParams }));
   // Did the user change anything from the figure's current inputs?
   const dirty = React.useMemo(
@@ -75,7 +76,9 @@ export function FigureDataPanel({
       {/* Inputs → re-run. */}
       <div className="rounded-xl border border-border bg-card/60 p-4">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Inputs</p>
-        {schema.length === 0 ? (
+        {loading ? (
+          <p className="mt-2 text-xs text-muted-foreground">Loading inputs…</p>
+        ) : schema.length === 0 ? (
           <p className="mt-2 text-xs text-muted-foreground">
             This skill runs with fixed defaults — there are no adjustable inputs to re-run.
           </p>

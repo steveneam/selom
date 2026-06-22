@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
 import { skillColor, skillIcon } from "@/lib/catalog/modality";
-import { defaultParams, skillParamSchema, visibleParamFields } from "@/lib/catalog/params";
+import { visibleParamFields } from "@/lib/catalog/params";
+import { useSkillParams } from "@/lib/catalog/use-skill-params";
 import { getSkill } from "@/lib/catalog/seed";
 import type { SkillParams } from "@/lib/skills-api";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
@@ -53,8 +54,10 @@ export function WorkbenchPanel({
   const appliedPrefill = React.useRef<number>(-1);
 
   const isVerified = (id: string) => getSkill(id)?.tier === "verified";
+  // One-click / quick apply sends no params — the backend fills every default server-side
+  // (resolved_params). The selected-skill Apply sends only what the user changed.
   const apply = (skillId: string, p?: SkillParams) =>
-    onRun({ skillId, rationale: "", params: p ?? defaultParams(skillId), confidence: 0 });
+    onRun({ skillId, rationale: "", params: p ?? {}, confidence: 0 });
 
   // Select a skill when the command palette / Gene Sets surface deep-links one in.
   React.useEffect(() => {
@@ -71,18 +74,20 @@ export function WorkbenchPanel({
       setParams({});
       return;
     }
-    const base = defaultParams(selected);
+    // Params hold only what the user changes from the backend defaults (sent on Apply; the
+    // controls display each field's default until touched). A fresh preselect (e.g. a gene
+    // set applied as a volcano highlight) seeds those values once.
     if (preselect && preselect.id === selected && preselect.params && preselect.n !== appliedPrefill.current) {
       appliedPrefill.current = preselect.n;
-      setParams({ ...base, ...preselect.params });
+      setParams({ ...preselect.params });
     } else {
-      setParams(base);
+      setParams({});
     }
   }, [selected, preselect]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const selectedSkill = selected ? getSkill(selected) : undefined;
-  const schema = selected ? skillParamSchema(selected) : [];
+  const { fields: schema, loading: paramsLoading } = useSkillParams(selected);
 
   // Quick apply = the most popular Verified installed skills (one-click favourites).
   const quick = installs
@@ -166,9 +171,11 @@ export function WorkbenchPanel({
                   <p className="truncate text-sm font-semibold text-foreground">{selectedSkill.name}</p>
                   <p className="text-xs text-muted-foreground">
                     {isVerified(selectedSkill.id)
-                      ? schema.length > 0
-                        ? "Tune the options, then apply to your data."
-                        : "Runs with smart defaults — ready to apply."
+                      ? paramsLoading
+                        ? "Loading options…"
+                        : schema.length > 0
+                          ? "Tune the options, then apply to your data."
+                          : "Runs with smart defaults — ready to apply."
                       : "Community skill — runs in a future sandbox."}
                   </p>
                 </div>

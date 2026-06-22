@@ -31,7 +31,6 @@ import { figureTable } from "@/lib/lineage/figure-table";
 import { versionFamily } from "@/lib/lineage/versions";
 import type { ParamValue } from "@/lib/lineage/diff";
 import { datasetDisplayName, familyColorMap } from "@/lib/lineage/family";
-import { defaultParams } from "@/lib/catalog/params";
 import { readStyleStamp } from "@/lib/figure-spec";
 import { DataCheckError, runSkill, runtimeSkillId, type DataCheck, type SkillParams, type SkillProvenance } from "@/lib/skills-api";
 import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
@@ -304,7 +303,9 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       setRunning(origin.skillId);
       setError(null);
       const dataset = origin.datasetId ? datasets.find((d) => d.id === origin.datasetId) : undefined;
-      const base = origin.provenance?.params ?? defaultParams(origin.skillId);
+      // The non-swept params hold at the figure's recorded config; the backend fills any
+      // gap with the skill defaults, so a provenance-less origin sweeps from {} safely.
+      const base = origin.provenance?.params ?? {};
       const saved: Figure[] = [];
       try {
         for (const value of values) {
@@ -731,7 +732,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     familyCount={activeFamily.length}
                     running={running != null}
                     skillId={activeFigure.skillId}
-                    baseParams={activeFigure.provenance?.params ?? (activeFigure.skillId ? defaultParams(activeFigure.skillId) : {})}
+                    baseParams={activeFigure.provenance?.params ?? {}}
                     onSweep={runSweep}
                     onCompare={() => openCompare(activeFamily.map((f) => f.id))}
                     onToggleFreeze={toggleFreeze}
@@ -817,7 +818,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     key={activeFigure.id}
                     skillId={activeFigure.skillId}
                     skillName={getSkill(activeFigure.skillId)?.name ?? activeFigure.skillId}
-                    baseParams={activeFigure.provenance?.params ?? defaultParams(activeFigure.skillId)}
+                    baseParams={activeFigure.provenance?.params ?? {}}
                     running={running != null}
                     dataCheck={activeFigure.dataCheck}
                     dataFit={activeFigure.dataFit}

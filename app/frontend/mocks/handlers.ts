@@ -7,6 +7,7 @@ import { compileFixture, getFixtureSet, searchFixture } from "./gene-sets-fixtur
 import { EXPORT_PRESETS, mockExportFile } from "./export-fixture";
 import { FIGURE_STYLES, mockApplyStyle } from "./styles-fixture";
 import { mockExtractChart } from "./extract-fixture";
+import { SKILL_PARAM_SPECS } from "./skill-spec-fixture";
 import { REPRO_LEDGERS, REPRO_PAPERS } from "@/lib/reproduction/fixture";
 
 // Mirrors the live contract from app/backend/main.py:
@@ -20,6 +21,13 @@ export const handlers = [
   http.get("/api/skills", () =>
     HttpResponse.json(CATALOG.filter((s) => s.source === "selom")),
   ),
+  // Per-skill describe (P2.5c): the backend serves the full SkillSpec here, but the FE
+  // only reads `param_spec` to build the spec-driven param controls. Mirror that with the
+  // offline param-spec fixture; an unknown skill yields an empty spec (no controls).
+  http.get("/api/skills/:skillId", ({ params }) => {
+    const id = String(params.skillId);
+    return HttpResponse.json({ id, param_spec: SKILL_PARAM_SPECS[id] ?? {} });
+  }),
   // Gene-set catalog (gene-set builder Phase A): search + members from the offline fixture.
   http.get("/api/gene-sets", ({ request }) => {
     const url = new URL(request.url);
