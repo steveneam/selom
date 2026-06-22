@@ -1,9 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
 import { FileText, Layers, Palette, Ruler, Tags } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { FigureStore } from "@/hooks/use-figure-store";
+import { deriveFigureModel } from "@/lib/figure-model";
 import { StylePanel } from "./panels/style-panel";
 import { AxesPanel } from "./panels/axes-panel";
 import { LegendPanel } from "./panels/legend-panel";
@@ -20,7 +22,10 @@ const TABS = [
 
 export function PropertyPanel({ store }: { store: FigureStore }) {
   const spec = store.spec;
-  if (!spec) return null;
+  // The adaptive inspector is driven by the derived model (inference-first); memoised so
+  // it recomputes only when the spec changes. Style + Data render from it.
+  const model = useMemo(() => (spec ? deriveFigureModel(spec) : null), [spec]);
+  if (!spec || !model) return null;
 
   return (
     <Tabs defaultValue="style" className="flex h-full min-h-0 flex-col">
@@ -43,7 +48,7 @@ export function PropertyPanel({ store }: { store: FigureStore }) {
       <ScrollArea className="min-h-0 flex-1">
         <div className="p-4">
           <TabsContent value="style">
-            <StylePanel store={store} spec={spec} />
+            <StylePanel store={store} spec={spec} model={model} />
           </TabsContent>
           <TabsContent value="axes">
             <AxesPanel store={store} spec={spec} />
@@ -52,7 +57,7 @@ export function PropertyPanel({ store }: { store: FigureStore }) {
             <LegendPanel store={store} spec={spec} />
           </TabsContent>
           <TabsContent value="data">
-            <DataPanel store={store} spec={spec} />
+            <DataPanel store={store} spec={spec} model={model} />
           </TabsContent>
           <TabsContent value="page">
             <PagePanel store={store} spec={spec} />

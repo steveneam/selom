@@ -10,6 +10,8 @@
  * Types are intentionally loose (Plotly's schema is enormous); we keep just enough
  * structure to be ergonomic and document the editable paths the panel touches.
  */
+import { inferTraceKind } from "./figure-model";
+
 export type PlotlyTrace = Record<string, any>;
 export type PlotlyLayout = Record<string, any>;
 
@@ -107,9 +109,20 @@ export function normalizeSpec(input: FigureSpec): FigureSpec {
 
   L.margin ??= { l: 64, r: 28, t: 52, b: 56 };
 
+  // Ensure ONLY the substructure each trace's kind will actually edit — so a JSON-Patch
+  // `add` always has a live parent — WITHOUT force-injecting `marker` onto line/heatmap/
+  // sankey traces (which made the inspector falsely marker-centric; see figure-model.ts).
   spec.data = (Array.isArray(spec.data) ? spec.data : []).map((t) => {
     const trace: PlotlyTrace = { ...t };
-    trace.marker = { size: 7, opacity: 0.9, ...(trace.marker ?? {}) };
+    const kind = inferTraceKind(trace);
+    if (kind === "markerScatter" || kind === "lineMarkerScatter") {
+      trace.marker = { size: 7, opacity: 0.9, ...(trace.marker ?? {}) };
+    } else if (kind === "bar" || kind === "box" || kind === "violin") {
+      trace.marker = { ...(trace.marker ?? {}) }; // parent for marker.color, no point defaults
+    }
+    if (kind === "lineScatter" || kind === "lineMarkerScatter") {
+      trace.line = { ...(trace.line ?? {}) }; // parent for line.color / line.width edits
+    }
     return trace;
   });
 
