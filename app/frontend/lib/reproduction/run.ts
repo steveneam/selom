@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 
 import { paperFiles, usePaperFiles } from "@/lib/paper/run-files";
 import { workspaceStore, wselect } from "@/lib/workspace/store";
+import type { Accession } from "./accessions";
 import type { FileFitReport } from "./data-fit";
 import type { Ledger } from "./types";
 
@@ -44,6 +45,8 @@ export interface RunPayload {
   drive_summary?: Record<string, number>;
   data_fits?: FileFitReport[];
   panel_drives?: PanelDrive[];
+  /** Datasets the paper cites but didn't attach (Slice 5B) — for the deposit-data handoff. */
+  accessions?: Accession[];
 }
 
 const TERMINAL: readonly RunStatus[] = ["succeeded", "failed"];
@@ -162,6 +165,8 @@ export interface LoadedRun {
   dataFits: FileFitReport[];
   /** The per-panel drive record (Slice 2) — drives the data picker for `data_unmatched` panels. */
   panelDrives: PanelDrive[];
+  /** Datasets the paper cites but didn't attach (Slice 5B) — the deposit-data handoff. */
+  accessions: Accession[];
   /** "expired" when the run is gone (the in-process store cleared / a reload outlived it). */
   error: string | null;
   loading: boolean;
@@ -172,6 +177,7 @@ const EMPTY_RUN: LoadedRun = {
   ledger: null,
   dataFits: [],
   panelDrives: [],
+  accessions: [],
   error: null,
   loading: false,
 };
@@ -195,6 +201,7 @@ export function useReproductionRun(runId: string | undefined): LoadedRun {
           ledger: p.ledger ?? null,
           dataFits: p.data_fits ?? [],
           panelDrives: p.panel_drives ?? [],
+          accessions: p.accessions ?? [],
           error: p.error ?? null,
           loading: false,
         });

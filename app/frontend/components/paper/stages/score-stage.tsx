@@ -8,6 +8,7 @@ import { tierLabel } from "@/lib/reproduction/api";
 import { useReproductionRun, type PaperRun } from "@/lib/reproduction/run";
 import { ScoreReport } from "@/components/reproduction/score-report";
 import { DataPicker } from "@/components/reproduction/data-picker";
+import { CitedDatasets } from "@/components/reproduction/cited-datasets";
 import type { SavedPaper } from "@/lib/workspace/types";
 
 /**
@@ -21,16 +22,20 @@ import type { SavedPaper } from "@/lib/workspace/types";
  */
 export function ScoreStage({ paper, run }: { paper: SavedPaper; run: PaperRun }) {
   const runId = paper.reproductionRunId;
-  const { ledger, dataFits, panelDrives, status, error, loading } = useReproductionRun(runId);
+  const { ledger, dataFits, panelDrives, accessions, status, error, loading } =
+    useReproductionRun(runId);
 
   if (runId && loading) return <ScoreLoading />;
-  if (runId && status === "succeeded" && ledger)
+  if (runId && status === "succeeded" && ledger) {
+    const hasUnmatched = panelDrives.some((d) => d.status === "data_unmatched");
     return (
       <>
         <ScoreReport ledger={ledger} dataFits={dataFits} />
+        <CitedDatasets accessions={accessions} hasUnmatched={hasUnmatched} />
         <DataPicker paper={paper} run={run} panelDrives={panelDrives} dataFits={dataFits} />
       </>
     );
+  }
   if (runId && (error || status === "failed" || status === "succeeded")) {
     // status==="succeeded" with no ledger shouldn't happen, but treat it as unavailable, not blank.
     return <ScoreUnavailable paperId={paper.id} failed={status === "failed"} />;
