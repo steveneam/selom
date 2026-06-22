@@ -378,7 +378,14 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     const skillId = sp.get("demo") || installs[0]?.skillId;
     if (!skillId) return;
     demoRan.current = true;
-    void runFlow({ skillId, params: {} } as ProposedStep);
+    // Forward any other query params as skill params so mock-variant routes (e.g.
+    // `?data_check=unsure`, which the MSW handler keys off the run query) are reachable
+    // for a manual check. Dev/mock-only — dead code in a production build.
+    const params: Record<string, string> = {};
+    sp.forEach((v, k) => {
+      if (k !== "demo") params[k] = v;
+    });
+    void runFlow({ skillId, params } as ProposedStep);
   }, [installs, runFlow]);
 
   function onAnalyze({ datasetId: id, file, proposal: p, designFile: df }: AnalyzeArgs) {
@@ -675,7 +682,11 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                   />
                 )}
                 {activeFigure?.dataCheck && (
-                  <DataCheckPanel dataCheck={activeFigure.dataCheck} onPickSkill={pickSuggestedSkill} />
+                  <DataCheckPanel
+                    dataCheck={activeFigure.dataCheck}
+                    onPickSkill={pickSuggestedSkill}
+                    onPickManually={() => setView("skill")}
+                  />
                 )}
                 {activeFigure?.dataFit && (
                   <DataFitVerdict

@@ -123,8 +123,40 @@ function titleize(slug: string): string {
  * scRNA matrix with the standard scRNA pipeline — so the Data check panel renders offline
  * (`npm run dev:mock`). The real verdict comes from the backend engine (engine/qc.py +
  * engine/route.py). The block + override affordance is exercised against the live backend.
+ *
+ * `?data_check=unsure` / `?data_check=comingsoon` switch to a NOT-confident routing
+ * (`DataRouting.confident === false`) so the honest "not sure how to analyze this" surface
+ * (P3 routing-confidence) is browser-verifiable offline — `unsure` is an unclassifiable table
+ * with exploratory options, `comingsoon` is a recognized-but-unsupported modality with none.
  */
-export function mockDataCheck(): DataCheck {
+export function mockDataCheck(query: Record<string, string> = {}): DataCheck {
+  if (query.data_check === "unsure") {
+    return {
+      kind: "generic_table",
+      qc: { ran: true, ok: true, blocked: false, flags: [], stats: { n_rows: 480, n_cols: 12 } },
+      routing: {
+        kind: "generic_table",
+        confident: false,
+        note: "Modality unclear — these are exploratory options, or choose a skill yourself.",
+        steps: [
+          { skill_id: "pca", role: "analyze", reason: "explore sample structure" },
+          { skill_id: "corr_heatmap", role: "visualize", reason: "correlation structure across columns" },
+        ],
+      },
+    };
+  }
+  if (query.data_check === "comingsoon") {
+    return {
+      kind: "metabolomics",
+      qc: { ran: true, ok: true, blocked: false, flags: [], stats: { n_features: 1240 } },
+      routing: {
+        kind: "metabolomics",
+        confident: false,
+        note: "Metabolomics detected — dedicated analysis is coming soon.",
+        steps: [],
+      },
+    };
+  }
   return {
     kind: "sc_counts",
     qc: {

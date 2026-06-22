@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ArrowRight,
   ChevronDown,
+  Compass,
   Info,
   Loader2,
   ShieldAlert,
@@ -14,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { getSkill } from "@/lib/catalog/seed";
-import type { DataCheck, QcFlag } from "@/lib/skills-api";
+import type { DataCheck, DataRouting, QcFlag, SuggestedStep } from "@/lib/skills-api";
 
 /**
  * "Is-my-data-clean?" verdict (P1c / P3a — the native moat for non-bioinformaticians).
@@ -24,8 +25,11 @@ import type { DataCheck, QcFlag } from "@/lib/skills-api";
  *
  *  - **verdict** — alongside a produced figure: the modality Selom detected, any QC flags
  *    (each with a plain message + a concrete fix), and the suggested analysis pipeline for
- *    that modality (clickable to set up the next step). A collapsible panel mirroring
- *    `PublishConfidence`; auto-opens only when there's something to review.
+ *    that modality (clickable to set up the next step). When the engine ISN'T confident about
+ *    the routing (`DataRouting.confident === false` — modality unclear / coming-soon /
+ *    unclassifiable), the pipeline is reframed as an honest, calm "not sure" surface instead of
+ *    masquerading as a recommendation, with a "Choose a skill yourself" hand-off. A collapsible
+ *    panel mirroring `PublishConfidence`; auto-opens when there's something to review OR to decide.
  *  - **blocked** — the run was halted by a `block`-severity problem (engine-spine D-e5: warn +
  *    require an explicit override, never a silent misleading figure). Always open, calm tone:
  *    the fix is the hero; "Review & run anyway" is a deliberately-subordinate escape hatch
@@ -36,6 +40,7 @@ export function DataCheckPanel({
   variant = "verdict",
   skillName,
   onPickSkill,
+  onPickManually,
   onOverride,
   onDismiss,
   overriding = false,
@@ -46,6 +51,8 @@ export function DataCheckPanel({
   skillName?: string;
   /** Set up a suggested pipeline step in the workbench (verdict variant). */
   onPickSkill?: (skillId: string) => void;
+  /** Take over and browse skills when Selom isn't sure how to route (verdict variant, not confident). */
+  onPickManually?: () => void;
   /** Run the analysis anyway, past the block (blocked variant). */
   onOverride?: () => void;
   /** Dismiss the block card (blocked variant). */
@@ -123,9 +130,9 @@ export function DataCheckPanel({
       ok={qc.ok && reviewCount === 0}
       reviewCount={reviewCount}
       flags={[...blockFlags, ...warnFlags, ...infoFlags]}
-      routingNote={routing?.note ?? ""}
-      steps={routing?.steps ?? []}
+      routing={routing}
       onPickSkill={onPickSkill}
+      onPickManually={onPickManually}
     />
   );
 }
@@ -135,20 +142,24 @@ function VerdictPanel({
   ok,
   reviewCount,
   flags,
-  routingNote,
-  steps,
+  routing,
   onPickSkill,
+  onPickManually,
 }: {
   kind: string;
   ok: boolean;
   reviewCount: number;
   flags: QcFlag[];
-  routingNote: string;
-  steps: { skill_id: string; role: string; reason: string }[];
+  routing: DataRouting | null;
   onPickSkill?: (skillId: string) => void;
+  onPickManually?: () => void;
 }) {
-  // Auto-open when there's something to review; stay collapsed when it's clean.
-  const [open, setOpen] = React.useState(reviewCount > 0);
+  // Selom couldn't confidently match this data to an analysis (engine/route.py confident=false).
+  const notSure = !!routing && !routing.confident;
+  const steps = routing?.steps ?? [];
+  // Auto-open when there's something to review (QC) OR to decide (routing isn't sure); collapsed
+  // only when it's clean AND confidently routed.
+  const [open, setOpen] = React.useState(reviewCount > 0 || notSure);
 
   return (
     <div className="rounded-xl border border-border bg-card/60" data-testid="data-check-verdict">
@@ -166,7 +177,11 @@ function VerdictPanel({
         <span className="text-sm font-medium text-foreground">Data check</span>
         <KindChip kind={kind} />
         <span className="hidden text-xs text-muted-foreground sm:inline">
-          {ok ? "looks clean to analyze" : `${reviewCount} to review`}
+          {reviewCount > 0
+            ? `${reviewCount} to review`
+            : notSure
+              ? "clean, but not sure how to analyze"
+              : "looks clean to analyze"}
         </span>
         <ChevronDown
           className={cn("ml-auto size-4 text-muted-foreground transition-transform", open && "rotate-180")}
@@ -188,28 +203,102 @@ function VerdictPanel({
             </p>
           )}
 
-          {steps.length > 0 && (
-            <section aria-labelledby="dc-pipeline" className="min-w-0">
-              <div className="flex items-center gap-2">
-                <Sparkles className="size-3.5 text-muted-foreground" />
-                <h3
-                  id="dc-pipeline"
-                  className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Suggested next steps
-                </h3>
-              </div>
-              {routingNote && <p className="mt-1.5 text-xs text-muted-foreground">{routingNote}</p>}
-              <ol className="mt-2.5 space-y-1.5">
-                {steps.map((s, i) => (
-                  <StepRow key={`${s.skill_id}-${i}`} index={i + 1} step={s} onPick={onPickSkill} />
-                ))}
-              </ol>
-            </section>
-          )}
+          {routing &&
+            (notSure ? (
+              <UncertainRouting
+                note={routing.note}
+                steps={steps}
+                onPickSkill={onPickSkill}
+                onPickManually={onPickManually}
+              />
+            ) : steps.length > 0 ? (
+              <section aria-labelledby="dc-pipeline" className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="size-3.5 text-muted-foreground" />
+                  <h3
+                    id="dc-pipeline"
+                    className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                  >
+                    Suggested next steps
+                  </h3>
+                </div>
+                {routing.note && <p className="mt-1.5 text-xs text-muted-foreground">{routing.note}</p>}
+                <ol className="mt-2.5 space-y-1.5">
+                  {steps.map((s, i) => (
+                    <StepRow key={`${s.skill_id}-${i}`} index={i + 1} step={s} onPick={onPickSkill} />
+                  ))}
+                </ol>
+              </section>
+            ) : null)}
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Routing the engine ISN'T sure about (engine/route.py `confident: false` — modality unclear,
+ * a coming-soon modality, or unclassifiable). Honest + calm, NOT an error: a dashed "tentative"
+ * card that names the uncertainty, explains why (the engine's note), reframes any suggestions as
+ * exploratory starting points (still runnable), and hands control back with a clear "Choose a
+ * skill yourself" CTA — so a low-confidence guess never masquerades as a recommendation.
+ */
+function UncertainRouting({
+  note,
+  steps,
+  onPickSkill,
+  onPickManually,
+}: {
+  note: string;
+  steps: SuggestedStep[];
+  onPickSkill?: (skillId: string) => void;
+  onPickManually?: () => void;
+}) {
+  return (
+    <section
+      aria-labelledby="dc-unsure"
+      className="rounded-lg border border-dashed border-border bg-muted/20 p-3.5"
+      data-testid="data-check-unsure"
+    >
+      <div className="flex items-start gap-2.5">
+        <Compass className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1">
+          <h3 id="dc-unsure" className="text-sm font-medium text-foreground">
+            Not sure how to analyze this
+          </h3>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+            {note ||
+              "Selom couldn't confidently match this data to an analysis. Choose a skill yourself, or try a starting point below."}
+          </p>
+        </div>
+      </div>
+
+      {steps.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+            Exploratory starting points
+          </p>
+          <ol className="mt-2 space-y-1.5">
+            {steps.map((s, i) => (
+              <StepRow key={`${s.skill_id}-${i}`} index={i + 1} step={s} onPick={onPickSkill} />
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {onPickManually && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-3"
+          onClick={onPickManually}
+          data-testid="data-check-pick-manually"
+        >
+          Choose a skill yourself
+          <ArrowRight />
+        </Button>
+      )}
+    </section>
   );
 }
 

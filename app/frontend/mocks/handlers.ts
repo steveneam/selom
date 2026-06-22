@@ -97,7 +97,7 @@ export const handlers = [
       ...mockBundle(skillId, query),
       table: mockTable(skillId, query),
       figure_legend: mockLegend(skillId),
-      data_check: mockDataCheck(),
+      data_check: mockDataCheck(query),
       data_fit: mockDataFit(skillId),
     });
   }),
