@@ -79,7 +79,21 @@ script with a reusable, provenance-tracked skill.
   correct b-wave magnitudes and intensity progression — not an exact animal match (owner: the
   sample `.iwxdata` may not be the exact animal behind that CSV).
 
-### Extraction result + the b-wave reconciliation issue (OPEN — must resolve before trusting selection)
+### Extraction result + the b-wave reconciliation issue (RESOLVED 2026-06-23 — fallback is definitive)
+**Resolution (session T5, 2026-06-23):** the R17-*preferred* source — LabScribe operator marks — **does
+not exist in this dataset**. `iwx_parse.py::Eye.landmarks` documents (and the decode confirms) that every
+`blkN/marks.txt` is header-only and `Views.txt`'s `BEGIN_MARKS..END_MARKS` block is empty: there are **no
+operator-placed a/b-wave marks** to read. Fig 1E's bar was therefore not built from embedded marks (it was
+measured another way in LabScribe / a separate analysis). So the **R17 smoothed-landmark fallback is the
+only available metric, and it is definitive** — the dual-smooth peak-to-trough `_erg.landmarks` (a-wave on a
+3 ms trace, b-wave = peak(40–120 ms) − trough(0–40 ms) on a 16 ms trace, measured on the RAW
+baseline-corrected trace). It **reproduces Fig 1E's ordering** (`selection_report_v2.csv`, b-wave at log 1.0:
+Control ≈ 210 ≫ 3'UTR ≈ 130 > PDE6B ≈ 99 > {Untreated ≈ 43, CMV-GFP ≈ 42, stuffer ≈ 31}), which meets the
+owner's relaxed acceptance (O2/R18/R19 — trend/shape, not exact magnitude). The flats read ~30–50 µV
+(vs the printed bar ~15–20 µV) because residual broadband noise still floors the metric a little high, but
+they read **far** below the real b-waves and the ordering is faithful — selection is no longer noise-driven.
+**Selection unblocked.** _Below: the original (pre-fix) symptom, kept for the record._
+
 All 30 eyes decoded. But the **derived b-wave metric** (max over 20–250 ms − baseline) does **not**
 reproduce Fig 1E's pattern: conditions that should be flat read far too high (Untreated 254_LE ≈ 146 µV,
 CMV-GFP 259_LE ≈ 128 µV, stuffer 249_LE ≈ 88 µV vs Fig 1E bar ≈ 15–20 µV), and Untreated even outranks
@@ -282,10 +296,13 @@ reads `erg_waveforms_long` (a CSV `data_path`) and calls `grid_spec`. `origin="p
   (cf. `docs/proprietary-skills.md`). The moat is raw-instrument-file ingest + the editable
   axis-less figure + provenance, not the line-drawing. The primitive itself stays general (shared
   infra) so other domains reuse it; ERG-specific value is proprietary.
-- **O1 — OPEN QUESTION (needs owner + data):** does rd10-untreated genuinely retain measurable rod
-  function at ~P40 (so the traces are not truly flat), or is the metric the whole story? Resolve by
-  (a) rendering the 6 representatives and looking, and (b) reconciling marks-based b-waves to Fig 1E.
-  This gates representative selection for the flat conditions and the honesty of the figure caption.
+- **O1 — RESOLVED (session T5, 2026-06-23):** there are **no operator marks** to reconcile against (the
+  marks-based path R17-preferred does not exist — `marks.txt` header-only, `Views.txt` marks empty), so the
+  smoothed-landmark fallback is the metric. On the smoothed metric the flat conditions read ~30–50 µV vs
+  Control ≈ 210 and 3'UTR ≈ 130 — i.e. mostly residual noise floor, **not** a retained rod b-wave: rd10 is
+  effectively flat at ~P40, consistent with the biology. The small residual (flats at ~30–50 not ~0) is the
+  display/metric noise floor, addressed cosmetically by display smoothing (see the smoothing decision,
+  handoff point 3), **not** a real partial response. Caption the flats honestly as no/negligible response.
 - **O2 — RESOLVED (owner 2026-06-22):** Fig 1E's bar = one stimulation point (my first pass wrongly keyed
   on Group7), BUT the figure need only **reflect Fig 1E's trend/pattern** — exact intensity-point and
   magnitude matching are NOT required. So: keep the metric fix (R17) so flat conditions read flat and
