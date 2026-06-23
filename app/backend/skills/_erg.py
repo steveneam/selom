@@ -4,6 +4,17 @@ signal-processing helpers lazy-import numpy so the dependency-free stubs never p
 """
 from __future__ import annotations
 
+# Generic chart-styling primitives now live in skills._charts (owner steer 2026-06-24: the styling
+# vocabulary is for ALL bar/line graphs, not ERG-only). Re-exported here so existing
+# _erg.spread_stats / compare_groups / sig_stars / rgba / ERR_LABEL callers keep working.
+from skills._charts import (  # noqa: F401  (re-export)
+    ERR_LABEL,
+    compare_groups,
+    rgba,
+    sig_stars,
+    spread_stats,
+)
+
 # Scotopic flash-intensity ladder (log cd·s/m²) — Group1 (dim) … Group7 (bright).
 INTENSITIES_LOG = [-1.7, -0.8, 0.1, 1.0, 1.9, 2.8, 3.1]
 
@@ -440,89 +451,3 @@ def summary_stats(values) -> dict:
     else:
         sem = 0.0
     return {"mean": round(mean, 2), "sem": round(sem, 2), "n": n}
-
-
-def spread_stats(values, kind: str = "sem") -> dict:
-    """Mean + an error metric for a group of amplitudes → ``{mean, err, lo, hi, sd, n}`` (raw,
-    unrounded — the caller rescales/rounds). ``kind``:
-
-    * ``sem`` (default) — standard error of the mean (sd/√n); the owner's default.
-    * ``sd``  — standard deviation (the biological spread).
-    * ``ci95`` — 95 % CI half-width via the t-quantile (not a hard-coded 1.96), the most defensible.
-    * ``minmax`` — asymmetric range: ``lo = mean − min``, ``hi = max − mean``.
-
-    ``err`` is the symmetric magnitude (= ``max(lo, hi)`` for minmax); ``lo``/``hi`` carry the
-    asymmetric arms for ``error_y``. n<2 guard built in (err 0 — never a NaN bar). Non-finite
-    values are dropped. SEM/SD/min/max are pure-Python; ci95 lazy-imports scipy for the t-quantile."""
-    import math
-
-    vals = [float(v) for v in values if v is not None and math.isfinite(float(v))]
-    n = len(vals)
-    if n == 0:
-        return {"mean": 0.0, "err": 0.0, "lo": 0.0, "hi": 0.0, "sd": 0.0, "n": 0}
-    mean = sum(vals) / n
-    if n < 2:
-        return {"mean": mean, "err": 0.0, "lo": 0.0, "hi": 0.0, "sd": 0.0, "n": n}
-    sd = math.sqrt(sum((v - mean) ** 2 for v in vals) / (n - 1))
-    sem = sd / math.sqrt(n)
-    k = str(kind or "sem").strip().lower()
-    if k == "sd":
-        err = lo = hi = sd
-    elif k == "ci95":
-        from scipy.stats import t
-        err = lo = hi = float(t.ppf(0.975, n - 1)) * sem
-    elif k == "minmax":
-        lo, hi = mean - min(vals), max(vals) - mean
-        err = max(lo, hi)
-    else:  # sem
-        err = lo = hi = sem
-    return {"mean": mean, "err": err, "lo": lo, "hi": hi, "sd": sd, "n": n}
-
-
-# Display label for an error metric (caption / table header).
-ERR_LABEL = {"sem": "SEM", "sd": "SD", "ci95": "95% CI", "minmax": "range"}
-
-
-def rgba(hexcolor, alpha) -> str:
-    """``'#rrggbb'`` (or 3-digit shorthand) → ``'rgba(r,g,b,a)'`` — for translucent fills / band
-    colours Plotly won't derive from a hex line colour. Mirrors ``_tracegrid._rgba``."""
-    h = str(hexcolor or "#888888").lstrip("#")
-    if len(h) == 3:
-        h = "".join(c * 2 for c in h)
-    try:
-        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-    except (ValueError, IndexError):
-        r = g = b = 136
-    return f"rgba({r},{g},{b},{round(float(alpha), 3)})"
-
-
-def sig_stars(p) -> str:
-    """p-value → significance stars (GraphPad convention): ``***`` <0.001 · ``**`` <0.01 ·
-    ``*`` <0.05 · ``ns`` otherwise. None/non-finite → ``ns``."""
-    import math
-
-    if p is None or not math.isfinite(float(p)):
-        return "ns"
-    p = float(p)
-    return "***" if p < 0.001 else "**" if p < 0.01 else "*" if p < 0.05 else "ns"
-
-
-def compare_groups(a, b, test: str = "welch"):
-    """Two-group two-sided p-value, or None when either side has n<2. ``test``: ``welch``
-    (default, unequal-variance t) · ``student`` (equal-variance t) · ``mannwhitney`` (rank, no
-    normality assumption). scipy lazy-imported (already a dep via the Naka-Rushton fit)."""
-    import math
-
-    a = [float(x) for x in a if x is not None and math.isfinite(float(x))]
-    b = [float(x) for x in b if x is not None and math.isfinite(float(x))]
-    if len(a) < 2 or len(b) < 2:
-        return None
-    from scipy import stats
-
-    t = str(test or "welch").strip().lower()
-    try:
-        if t in ("mannwhitney", "mwu", "u"):
-            return float(stats.mannwhitneyu(a, b, alternative="two-sided").pvalue)
-        return float(stats.ttest_ind(a, b, equal_var=(t == "student")).pvalue)
-    except (ValueError, ZeroDivisionError):
-        return None

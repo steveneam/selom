@@ -21,16 +21,30 @@ below). "Scope this out and plan… build it next session." This is the durable 
   (~330 µV Control) reflect their own measurement/cohort, not a styling concern; the Selom extraction
   `D:\selom-data\erg-fig1e\erg_metrics_long.csv` reads ~208 µV at Group4. The styling LOOK is the deliverable.
 
-## Built this session (bar half)
-- `_erg.spread_stats(values, kind)` (sem|sd|ci95|minmax, n<2 guard, asymmetric minmax) · `_erg.rgba` ·
-  `_erg.sig_stars` · `_erg.compare_groups(test=welch|student|mannwhitney)` · `_erg.ERR_LABEL`.
-- `erg_bwave_bar.bar_spec` extended: `error`, `bar_fill` (pattern/filled/open via `marker.pattern.shape`),
-  `comparisons` → significance brackets (shapes + star annotations, computed or overridden), `hline`/`vline`
-  reference lines, optional per-condition pattern `legend` (proxy traces). Default (sem·filled·none) byte-identical.
+## D11 — The styling is GENERIC, not ERG-locked (owner steer 2026-06-24)
+The owner confirmed (with the 7 reference figures + "applies to all line graphs and bar graphs in
+general") that this vocabulary is for **any** bar/line skill, not the ERG ones only. So the
+primitives live in a new generic module **`app/backend/skills/_charts.py`** (the canonical home),
+and the ERG skills are thin consumers. Any future categorical-bar or line skill calls the same
+builder → one look + one param vocabulary everywhere. Also: **show/hide toggles** for *both* the
+individual points (`points`) and the error bars (`show_error`).
+
+## Built this session (bar half — GENERIC)
+- **`skills/_charts.py`** (new generic module): `spread_stats(kind=sem|sd|ci95|minmax)` (n<2 guard,
+  asymmetric minmax) · `rgba` · `sig_stars` · `compare_groups(welch|student|mannwhitney)` · `ERR_LABEL`
+  · `jitter` · `resolve_stars` · `sig_brackets` · `ref_line` · **`bar_figure(...)`** — the generic mean
+  ± spread bar (any categories): `error`, `show_error`, `points`, `bar_fill` (pattern/filled/open via
+  `marker.pattern.shape`), `comparisons` → significance brackets (computed or overridden `(a,b[,ovr])`),
+  `hline`/`vline` reference lines, per-category `legend`. `_erg` re-exports the stats primitives for back-compat.
+- `erg_bwave_bar.bar_spec` is now a **thin wrapper** over `_charts.bar_figure` (supplies ERG colours/
+  labels/`_PATTERN`/unit rounder). Default (filled·sem·no brackets/line/legend) byte-identical → golden unchanged.
 - `run_real` param wiring + dynamic table header (`mean ± {SEM|SD|…}`); skill.json + FE `params.ts` controls.
-- Tests: `test_erg_units.py` (patterns/legend · error metric · significance + override · reference line); golden unchanged.
-- **TRACE half still pending** (`central=mean`, band/error/individual reps on the grid) — gated on C6 for real n
-  (one .iwxdata = one eye); the `_tracegrid` overlay hook (M3) is ready to consume.
+- Tests: **`test_charts.py`** (generic, non-ERG categories) + `test_erg_units.py` (ERG wrapper: patterns/
+  legend · error metric · significance + override · reference line · show/hide). Golden unchanged.
+- **Rollout to other bar/line skills** = incremental: each categorical-bar skill (composition, abundance,
+  dose-response, …) can drop in `_charts.bar_figure`; do it per-skill (each has its own golden) — not retrofitted in bulk this session.
+- **TRACE / line half still pending** (`central=mean`, band/error/individual reps; flat-line band builder in
+  `_charts`) — gated on C6 for real n (one .iwxdata = one eye); the `_tracegrid` overlay hook (M3) is ready.
 
 Sibling of `docs/erg-module/spec.md` + `docs/diagnosys-erg/spec.md`. Applies to `erg_traces` (the grid)
 and `erg_bwave_bar` (the amplitude bar); the primitives are generic (reusable by any future line/bar skill).
