@@ -213,8 +213,16 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     { key: "scale_uv", label: "Scale bar — amplitude (µV)", type: "number", step: 10, help: "Vertical scale-bar length, set in µV (shown in the chosen display unit)." },
     { key: "scale_ms", label: "Scale bar — time (ms)", type: "number", step: 10, help: "Horizontal scale-bar length." },
   ],
-  // ERG b-wave bar — one flash intensity, mean ± SEM + every eye as a point (reviewer ask).
+  // ERG a/b-wave bar — one flash intensity, mean ± SEM + every eye as a point (reviewer ask).
   erg_bwave_bar: [
+    {
+      key: "wave", label: "Wave", type: "select",
+      options: [
+        { value: "b", label: "b-wave (inner retina)" },
+        { value: "a", label: "a-wave (photoreceptor)" },
+      ],
+      help: "Which ERG component to bar. The peak comes from the device markers when present, else it is measured from the same traces the grid draws.",
+    },
     {
       key: "adaptation", label: "Adaptation", type: "select",
       options: [
@@ -235,7 +243,7 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
         { value: "Group6", label: "2.8 log cd·s/m²" },
         { value: "Group7", label: "3.1 log cd·s/m² (brightest)" },
       ],
-      help: "Which scotopic flash the per-condition b-wave bar is taken at.",
+      help: "Which flash the per-condition a/b-wave bar is taken at — the intensity you set yourself.",
     },
     { key: "points", label: "Show individual eyes", type: "switch", help: "Overlay each eye as a data point (reviewer ask for quantitative graphs)." },
     {

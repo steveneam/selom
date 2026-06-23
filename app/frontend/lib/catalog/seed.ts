@@ -248,12 +248,12 @@ export const CATALOG: SkillCatalogEntry[] = [
   }),
   e({
     id: "selom.erg_bwave_bar",
-    name: "Selom ERG b-wave Bar",
+    name: "Selom ERG a/b-wave Bar",
     summary:
-      "Peak scotopic b-wave at one flash intensity per condition — bar of the group mean ± SEM with every eye overlaid as an individual data point (the reviewer ask for quantitative graphs). Reads the long ERG metrics table; condition colours + order match the trace grid; attaches a per-condition n / mean / SEM table.",
+      "Peak a-wave or b-wave at one flash intensity per condition (scotopic or photopic) — bar of the group mean ± SEM with every eye overlaid as an individual data point (the reviewer ask for quantitative graphs). Runs straight off the dropped recording: uses the device markers when present, else measures the peak from the same traces the grid draws, at the intensity you set. Condition colours + order match the trace grid; attaches a per-condition n / mean / SEM table.",
     source: "selom", category: "electrophysiology", omics: ["electrophysiology"],
     tier: "verified", status: "beta", engine: "python",
-    inputFormats: [".csv"], chainsWith: ["selom.erg_traces", "selom.erg_intensity_response"],
+    inputFormats: [".csv", ".txt", ".iwxdata"], chainsWith: ["selom.erg_traces", "selom.erg_intensity_response"],
     outputs: ["figure", "tables"], license: "proprietary",
     provenance: { repo: "selom/skills", path: "erg_bwave_bar" }, version: "0.1.0", popularity: 1,
   }),
