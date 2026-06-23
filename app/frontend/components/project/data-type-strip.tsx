@@ -2,6 +2,13 @@
 
 import * as React from "react";
 import { Microscope, Loader2, Check } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/cn";
 import type { Modality, QcReport } from "@/lib/projects/types";
 import type { DataTypeOverride } from "@/lib/intake/inspect";
@@ -81,34 +88,33 @@ export function DataTypeStrip({
         </div>
       </div>
 
-      {/* L3 override — proposed, not imposed: the scientist owns the final call. */}
+      {/* L3 override — proposed, not imposed: the scientist owns the final call. Uses the same
+          Radix Select as the intake questionnaire + inspector, so the form-control vocabulary is
+          consistent across the surface (not a one-off native control). */}
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/60 pt-2.5">
-        <label htmlFor="data-type-override" className="text-[11px] text-muted-foreground">
+        <span className="shrink-0 text-[11px] text-muted-foreground">
           {canOverride ? "Not right?" : "Re-upload to reclassify"}
-        </label>
-        <select
-          id="data-type-override"
-          value={code && OVERRIDE_OPTIONS.some((o) => o.code === code) ? code : ""}
+        </span>
+        <Select
+          value={code && OVERRIDE_OPTIONS.some((o) => o.code === code) ? code : undefined}
           disabled={!canOverride}
-          onChange={(e) => {
-            const v = e.target.value as DataTypeOverride;
-            if (v) onSetDataType(v);
-          }}
-          aria-label="Set the data type"
-          title={canOverride ? "Override the detected data type" : "Re-upload this file to reclassify it"}
-          className={cn(
-            "max-w-[60%] rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-            !canOverride && "cursor-not-allowed opacity-50",
-          )}
+          onValueChange={(v) => onSetDataType(v as DataTypeOverride)}
         >
-          <option value="">Set data type…</option>
-          {OVERRIDE_OPTIONS.map((o) => (
-            <option key={o.code} value={o.code}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger
+            aria-label="Set the data type"
+            title={canOverride ? "Override the detected data type" : "Re-upload this file to reclassify it"}
+            className="h-8 w-[58%] text-xs"
+          >
+            <SelectValue placeholder="Set data type…" />
+          </SelectTrigger>
+          <SelectContent>
+            {OVERRIDE_OPTIONS.map((o) => (
+              <SelectItem key={o.code} value={o.code} className="text-xs">
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );
