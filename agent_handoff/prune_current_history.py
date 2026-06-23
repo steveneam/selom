@@ -33,15 +33,23 @@ import argparse
 import datetime
 import os
 import re
+import sys
+
+# The progress output includes a "↓" in the session-range label; the Windows console defaults to
+# cp1252, which can't encode it. Force utf-8 on stdout so the tool runs anywhere (file writes are
+# already utf-8). Guarded — `reconfigure` exists on Python 3.7+ TextIO, absent on some wrapped streams.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CURRENT = os.path.join(HERE, "CURRENT.md")
 ARCHIVE_DIR = os.path.join(HERE, "archive")
 
-# Strict: only true per-session comments (a `\d` after "session"); the pointer comments this
-# script writes say "(sessions … archived)" — no digit immediately after "session " — so they
-# are skipped, which keeps re-runs idempotent.
-PRIOR_RE = re.compile(r"<!-- prior live-state \(session \d.*?-->", re.S)
+# Strict: only true per-session comments — a digit OR a `T<n>` tangent-session id after "session ".
+# The pointer comments this script writes say "(sessions … archived)" — the `s` (no space) after
+# "session" can't match the required "session " + [0-9T], so pointers are skipped and re-runs stay
+# idempotent.
+PRIOR_RE = re.compile(r"<!-- prior live-state \(session [0-9T].*?-->", re.S)
 
 
 def _read_keep_eol(path: str) -> tuple[str, str]:
@@ -62,7 +70,7 @@ def prune(current: str, keep: int, date: str, dry_run: bool) -> int:
     to_archive = matches[keep:]
     start, end = to_archive[0].start(), to_archive[-1].end()
     block = text[start:end]  # verbatim span (may include blank lines / nested pointers)
-    sessions = [re.search(r"session (\d+)", m.group(0)).group(1) for m in to_archive]
+    sessions = [re.search(r"session ([0-9T]+)", m.group(0)).group(1) for m in to_archive]
     label = f"sessions {sessions[0]} ↓ {sessions[-1]}" if len(sessions) > 1 else f"session {sessions[0]}"
     archive_path = os.path.join(ARCHIVE_DIR, f"{date}-current-history.md")
     rel_archive = os.path.relpath(archive_path, os.path.dirname(current)).replace(os.sep, "/")
