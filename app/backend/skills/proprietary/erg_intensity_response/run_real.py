@@ -106,8 +106,13 @@ def run(data_path: str, params: dict) -> dict:
     if not cond_series:
         raise ValueError("erg_intensity_response: no series to plot after filtering")
 
-    spec, tbl_rows = ir_spec(cond_series, fits, title="b-wave intensity-response")
+    # Display unit (default µV → byte-identical). Peak = the largest mean b-wave (µV).
+    peak_uv = max((max(ys) for (_c, _xs, ys, _s) in cond_series), default=0.0)
+    unit = _erg.resolve_display_unit(params.get("display_unit", "uV"), peak_uv)
+    factor = _erg.unit_factor(unit)
+    spec, tbl_rows = ir_spec(cond_series, fits, title="b-wave intensity-response",
+                             unit=unit, factor=factor)
     spec["table"] = table(
-        ["condition", "Vmax (µV)", "log K (cd·s/m²)", "n", "R²"], tbl_rows,
+        ["condition", f"Vmax ({unit})", "log K (cd·s/m²)", "n", "R²"], tbl_rows,
         title="Naka-Rushton fit")
     return spec

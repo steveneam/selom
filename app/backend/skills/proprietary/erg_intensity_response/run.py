@@ -35,15 +35,17 @@ def run(data_path: str, params: dict) -> dict:
     return _stub_figure(params)
 
 
-def ir_spec(cond_series, fits, *, title: str,
-            value_label: str = "b-wave amplitude (µV)"):
+def ir_spec(cond_series, fits, *, title: str, unit: str = "µV", factor: float = 1.0):
     """Editable intensity-response spec (shared by stub + real).
 
     ``cond_series`` = ordered list of ``(condition, xs_log, ys_mean, sems)``; ``fits`` =
     ``{condition: {vmax, log_k, n, r2} | None}``. Per condition: a markers+SEM scatter of the
     means and (where a fit exists) a smooth Naka-Rushton line sampled from ``_erg.naka_rushton``.
+    ``unit``/``factor`` set the b-wave display unit (default µV, factor 1.0 → byte-identical):
+    the amplitudes, SEMs, fit line, Vmax, and y-axis title all rescale together.
     Returns ``(spec, table_rows)`` with rows ``[condition, Vmax, logK, n, R²]`` for the native table.
     """
+    value_label = f"b-wave amplitude ({unit})"
     all_x = [x for (_c, xs, _y, _s) in cond_series for x in xs]
     xlo, xhi = (min(all_x), max(all_x)) if all_x else (0.0, 1.0)
     grid = [round(xlo + (xhi - xlo) * k / 80.0, 3) for k in range(81)]
@@ -54,22 +56,23 @@ def ir_spec(cond_series, fits, *, title: str,
         label = _erg.COL_LABELS.get(cond, cond).replace("<br>", " ")
         data.append({
             "type": "scatter", "mode": "markers", "x": [round(float(x), 3) for x in xs],
-            "y": [round(float(v), 2) for v in ys],
-            "error_y": {"type": "data", "array": [round(float(s), 2) for s in sems],
+            "y": [_erg.disp_round(v, factor) for v in ys],
+            "error_y": {"type": "data", "array": [_erg.disp_round(s, factor) for s in sems],
                         "visible": True, "thickness": 1, "width": 3, "color": color},
             "marker": {"color": color, "size": 7, "line": {"color": "#ffffff", "width": 0.6}},
             "name": label, "legendgroup": cond, "hoverinfo": "x+y+name",
         })
         f = fits.get(cond)
         if f:
-            line_y = [round(_erg.naka_rushton(x, f["vmax"], f["log_k"], f["n"]), 2) for x in grid]
+            line_y = [_erg.disp_round(_erg.naka_rushton(x, f["vmax"], f["log_k"], f["n"]), factor)
+                      for x in grid]
             data.append({
                 "type": "scatter", "mode": "lines", "x": grid, "y": line_y,
                 "line": {"color": color, "width": 1.6}, "name": f"{label} (fit)",
                 "legendgroup": cond, "showlegend": False, "hoverinfo": "skip",
             })
             n_cell = f"{f['n']} (fixed)" if f.get("fixed") else f["n"]
-            tbl_rows.append([cond, f["vmax"], f["log_k"], n_cell, f["r2"]])
+            tbl_rows.append([cond, _erg.disp_round(f["vmax"], factor), f["log_k"], n_cell, f["r2"]])
         else:
             tbl_rows.append([cond, "—", "—", "—", "—"])
 

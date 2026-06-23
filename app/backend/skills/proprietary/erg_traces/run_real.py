@@ -80,6 +80,7 @@ def run(data_path: str, params: dict) -> dict:
     col_labels = [_erg.COL_LABELS.get(c, c) for c in order]
 
     panels, tbl_rows = [], []
+    peak_uv = 0.0
     for cond in order:
         cd = df[df["condition"] == cond]
         for g in groups:
@@ -90,6 +91,7 @@ def run(data_path: str, params: dict) -> dict:
             y = seg["voltage_uv"].tolist()
             fs = _fs_from(t)
             yv = _erg.clean_trace(y, fs=fs, lowpass=lowpass) if do_filter else [float(v) for v in y]
+            peak_uv = max(peak_uv, max((abs(v) for v in yv), default=0.0))
             panels.append({"row": row_of[g], "col": col_of[cond], "x": t, "y": yv,
                            "color": _erg.COLORS.get(cond), "name": f"{cond} {g}", "group": cond})
             # Measure on the RAW baseline-corrected trace (the validated metric), not the
@@ -101,16 +103,27 @@ def run(data_path: str, params: dict) -> dict:
     if not panels:
         raise ValueError("erg_traces: no panels built from input")
 
+    # Display unit (default µV → byte-identical). Rescaling the trace amplitudes keeps both the
+    # grid scale bar AND the editor's overlay-axis title true; the a/b table rescales with them.
+    unit = _erg.resolve_display_unit(params.get("display_unit", "uV"), peak_uv)
+    factor = _erg.unit_factor(unit)
+    if factor != 1.0:
+        for p in panels:
+            p["y"] = [v * factor for v in p["y"]]
+
     spec = grid_spec(
         panels, nrows=len(groups), ncols=len(order),
         scalebar={"x_len": float(params.get("scale_ms", 100.0)), "x_unit": "ms",
-                  "y_len": float(params.get("scale_uv", 200.0)), "y_unit": "µV"},
+                  "y_len": float(params.get("scale_uv", 200.0)) * factor, "y_unit": unit},
         row_labels=row_labels, col_labels=col_labels,
         title="Representative scotopic ERG",
     )
     spec["table"] = table(
-        ["condition", "intensity (log cd·s/m²)", "b-wave (µV)", "a-wave (µV)", "b-wave t (ms)"],
-        tbl_rows, title="ERG a/b-wave (representatives)")
+        ["condition", "intensity (log cd·s/m²)", f"b-wave ({unit})", f"a-wave ({unit})",
+         "b-wave t (ms)"],
+        [[c, ig, _erg.disp_round(b, factor), _erg.disp_round(a, factor), bt]
+         for c, ig, b, a, bt in tbl_rows],
+        title="ERG a/b-wave (representatives)")
     return jsonable(spec)
 
 

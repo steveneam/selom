@@ -11,7 +11,8 @@
   "param_spec": {
     "intensity_group": { "type": "str", "default": "Group4" },
     "value_col": { "type": "str", "default": "b_wave_uv" },
-    "points": { "type": "bool", "default": true }
+    "points": { "type": "bool", "default": true },
+    "display_unit": { "type": "str", "default": "uV", "options": ["auto", "nV", "uV", "mV", "V"] }
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" },

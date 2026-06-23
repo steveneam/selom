@@ -50,6 +50,11 @@ def run(data_path: str, params: dict) -> dict:
     if not cond_values:
         raise ValueError("erg_bwave_bar: no values to plot after filtering")
 
+    # Display unit (default µV → byte-identical). Peak = the largest single-eye b-wave (µV).
+    peak_uv = max((max(vals) for _c, vals in cond_values), default=0.0)
+    unit = _erg.resolve_display_unit(params.get("display_unit", "uV"), peak_uv)
+    factor = _erg.unit_factor(unit)
+
     # Intensity caption: the log cd·s/m² if the table carries it, else the group label.
     intensity_label = group
     if "intensity_log_cd_s_m2" in sub.columns:
@@ -58,7 +63,8 @@ def run(data_path: str, params: dict) -> dict:
             intensity_label = f"{float(logs.iloc[0]):g} log cd·s/m²"
 
     spec, tbl_rows = bar_spec(cond_values, intensity_label=intensity_label,
-                              title="Scotopic b-wave by condition", show_points=show_points)
-    spec["table"] = table(["condition", "n (eyes)", "mean b-wave (µV)", "SEM (µV)"],
+                              title="Scotopic b-wave by condition", unit=unit, factor=factor,
+                              show_points=show_points)
+    spec["table"] = table(["condition", "n (eyes)", f"mean b-wave ({unit})", f"SEM ({unit})"],
                           tbl_rows, title="ERG b-wave (mean ± SEM)")
     return spec

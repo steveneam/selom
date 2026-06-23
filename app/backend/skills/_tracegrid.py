@@ -98,7 +98,10 @@ def grid_spec(
             "type": "scatter",
             "mode": "lines",
             "x": [round(float(v), 4) for v in p["x"]],
-            "y": [round(float(v), 4) for v in p["y"]],
+            # 6 dp (was 4): a non-µV display unit rescales the amplitude (mV → ×0.001), and
+            # 4 dp would crush small mV/V features to zero. Golden-safe: the stub's y-values
+            # are already coarser than 6 dp, so the µV default is byte-identical.
+            "y": [round(float(v), 6) for v in p["y"]],
             "line": line,
             "xaxis": xref,
             "yaxis": yref,

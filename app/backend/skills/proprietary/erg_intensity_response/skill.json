@@ -13,7 +13,8 @@
     "stimulus_type": { "type": "str", "default": "" },
     "fit": { "type": "bool", "default": true },
     "nr_slope": { "type": "float", "default": 0.0, "min": 0.0, "max": 4.0 },
-    "min_r2": { "type": "float", "default": 0.3, "min": 0.0, "max": 1.0 }
+    "min_r2": { "type": "float", "default": 0.3, "min": 0.0, "max": 1.0 },
+    "display_unit": { "type": "str", "default": "uV", "options": ["auto", "nV", "uV", "mV", "V"] }
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" },

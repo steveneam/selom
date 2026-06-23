@@ -212,6 +212,65 @@ def naka_rushton_fit(x_log, y, *, fixed_n: float | None = None,
             "n": round(n, 3), "r2": round(r2, 3)}
 
 
+# --- Display units (voltage) -------------------------------------------------
+# The parser + device markers are canonical in µV. A display unit only RESCALES for
+# presentation (no recomputation): `factor` multiplies a µV value to reach the chosen unit.
+# "auto" picks the unit that puts the peak |amplitude| into a readable 1–1000 range. Default
+# µV (factor 1.0) leaves every figure byte-identical — the legacy path is untouched.
+_VOLT_FACTOR = {"nv": 1000.0, "uv": 1.0, "µv": 1.0, "mv": 0.001, "v": 1e-6}
+_VOLT_LABEL = {"nv": "nV", "uv": "µV", "µv": "µV", "mv": "mV", "v": "V"}
+_AUTO_ORDER = ("V", "mV", "µV", "nV")  # largest unit first → first that reads in [1, 1000)
+
+
+def unit_factor(unit: str) -> float:
+    """µV → `unit` multiplier (e.g. 'mV' → 0.001, 'nV' → 1000). Unknown → 1.0 (µV)."""
+    return _VOLT_FACTOR.get(str(unit).strip().lower(), 1.0)
+
+
+def unit_label(unit: str) -> str:
+    """Canonical display label for a unit token ('uv'/'µV' → 'µV'). Unknown → 'µV'."""
+    return _VOLT_LABEL.get(str(unit).strip().lower(), "µV")
+
+
+def resolve_display_unit(token, peak_uv: float = 0.0) -> str:
+    """Resolve a `display_unit` token to a concrete label ('nV'|'µV'|'mV'|'V').
+
+    An explicit unit is honoured verbatim. '' / 'auto' / unknown → pick the unit that puts
+    the peak |amplitude (µV)| into a readable [1, 1000) range (defaulting to µV), so tiny
+    flicker/c-wave traces can read in nV and large bright-flash b-waves in mV without the user
+    hand-picking. Default µV when the peak is unknown/zero."""
+    t = str(token or "").strip().lower()
+    if t in _VOLT_FACTOR:
+        return _VOLT_LABEL[t]
+    if t and t != "auto":
+        return "µV"
+    p = abs(float(peak_uv or 0.0))
+    if p <= 0.0:
+        return "µV"
+    for label in _AUTO_ORDER:
+        scaled = p * _VOLT_FACTOR[label.lower()]
+        if 1.0 <= scaled < 1000.0:
+            return label
+    return "µV"
+
+
+def disp_round(value, factor: float = 1.0):
+    """Rescale a µV `value` to a display unit (× `factor`) and round for presentation.
+
+    `factor` == 1.0 (µV) → legacy 2-dp rounding, so the default path is byte-identical.
+    Otherwise keep ~5 significant figures so small units (mV/V) aren't crushed to zero and
+    large units (nV) stay clean."""
+    import math
+
+    x = float(value) * float(factor)
+    if factor == 1.0:
+        return round(x, 2)
+    if x == 0.0 or not math.isfinite(x):
+        return 0.0 if x == 0.0 else x
+    decimals = min(9, max(0, 4 - math.floor(math.log10(abs(x)))))
+    return round(x, decimals)
+
+
 def summary_stats(values) -> dict:
     """Mean, SEM (sd/√n, ddof=1), and n for a list of amplitudes — the bar-graph summary.
 

@@ -44,26 +44,30 @@ def _jitter(center: int, n: int, width: float = 0.34) -> list[float]:
     return [center - width / 2.0 + k * step for k in range(n)]
 
 
-def bar_spec(cond_values, *, intensity_label: str, title: str,
-             value_label: str = "b-wave amplitude (µV)", show_points: bool = True):
+def bar_spec(cond_values, *, intensity_label: str, title: str, unit: str = "µV",
+             factor: float = 1.0, show_points: bool = True):
     """Editable bar spec (shared by stub + real). ``cond_values`` = ordered list of
-    ``(condition, [values])``. Returns ``(spec, table_rows)`` where ``spec`` is a pure
+    ``(condition, [values])``. ``unit``/``factor`` set the display unit (default µV, factor
+    1.0 → byte-identical): the bar means, SEMs, overlaid eye points, table, and y-axis title
+    all rescale together. Returns ``(spec, table_rows)`` where ``spec`` is a pure
     ``{data, layout}`` (one bar trace of means + error_y SEM, one overlaid points trace)
     and ``table_rows`` are ``[condition, n, mean, SEM]`` for the native Statistics table."""
+    value_label = f"b-wave amplitude ({unit})"
     positions = list(range(len(cond_values)))
     means, sems, colors, ticktext, tbl_rows = [], [], [], [], []
     pt_x, pt_y = [], []
     for i, (cond, vals) in enumerate(cond_values):
         st = _erg.summary_stats(vals)
-        means.append(st["mean"])
-        sems.append(st["sem"])
+        mean, sem = _erg.disp_round(st["mean"], factor), _erg.disp_round(st["sem"], factor)
+        means.append(mean)
+        sems.append(sem)
         colors.append(_erg.COLORS.get(cond, "#888888"))
         ticktext.append(_erg.COL_LABELS.get(cond, cond))
-        tbl_rows.append([cond, st["n"], st["mean"], st["sem"]])
+        tbl_rows.append([cond, st["n"], mean, sem])
         if show_points:
             for x, v in zip(_jitter(i, len(vals)), vals):
                 pt_x.append(round(x, 4))
-                pt_y.append(round(float(v), 2))
+                pt_y.append(_erg.disp_round(v, factor))
 
     data = [{
         "type": "bar", "x": positions, "y": means,
