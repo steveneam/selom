@@ -34,6 +34,17 @@ def test_profile_erg_from_iwxdata_format_is_certain():
     assert p.code == ERG and p.confidence == "certain"
 
 
+def test_profile_erg_from_diagnosys_loader_signal_is_certain():
+    # A Diagnosys .csv/.txt has no telltale suffix; engine.ingest sniffs its magic header and records
+    # `meta['erg_format']`. profile_data must then claim ERG-certain by FORMAT (R-ingest-1) — purely
+    # from the loader signal, even when the (materialized) frame has no ERG-looking columns.
+    df = pd.DataFrame({"x": [1.0, 2.0], "y": [3.0, 4.0]})
+    bundle = DataBundle(payload=df, kind=GENERIC_TABLE,
+                        source=SourceRef(filename="453_AAV.txt"), meta={"erg_format": "diagnosys_erg"})
+    p = profile_data(bundle)
+    assert p.code == ERG and p.confidence == "certain" and p.reason.startswith("recognized")
+
+
 def test_profile_generic_table_is_not_falsely_typed():
     # A plain numeric table with no ERG signature must stay a neutral "Data table" — never a guess.
     df = pd.DataFrame({"x": [1.0, 2.0], "y": [3.0, 4.0]})

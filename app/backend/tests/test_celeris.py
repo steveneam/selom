@@ -180,16 +180,25 @@ def test_reduced_csv_end_to_end(tmp_path):
 
 def test_ingest_routes_diagnosys_to_erg(tmp_path):
     """engine.ingest recognizes a Diagnosys .CSV (by magic header, before the generic csv loader),
-    materializes it to the canonical waveforms, and engine.cleaning profiles it as ERG."""
+    materializes it to the canonical waveforms, and engine.cleaning profiles it as ERG-certain by
+    FORMAT (R-ingest-1) — not the weaker content guess, and never a proteomics false-positive."""
     from engine.cleaning import ERG, profile_data
     from engine.ingest import ingest
+    from engine.models import GENERIC_TABLE
 
     path = str(tmp_path / "synthetic.CSV")
     _build_reduced_csv(path)
     bundle = ingest(path)
     cols = [str(c).lower() for c in bundle.payload.columns]
     assert "voltage_uv" in cols and "time_ms" in cols   # materialized waveforms, not the raw 2-table mess
-    assert profile_data(bundle).code == ERG
+    assert bundle.meta.get("erg_format") == "diagnosys_erg"  # the format signal the loader recorded
+    # ERG isn't an omics Kind → the neutral GENERIC_TABLE (drives the FE to a neutral questionnaire,
+    # never proteomics), with the real ERG type carried by the profile below.
+    assert bundle.kind == GENERIC_TABLE
+    prof = profile_data(bundle)
+    assert prof.code == ERG and prof.confidence == "certain" and prof.reason.startswith("recognized")
+    # No spurious proteomics runner-up — the candidate list is ERG + the neutral table only.
+    assert "proteomics" not in {c.code for c in prof.candidates}
 
 
 def test_not_a_diagnosys_export(tmp_path):

@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from engine.databundle import DataBundle, classify
-from engine.models import SourceRef
+from engine.models import GENERIC_TABLE, SourceRef
 
 
 @dataclass(frozen=True)
@@ -29,6 +29,13 @@ class _Loader:
     # original file (e.g. an .iwxdata ZIP). When True, ingest materializes the decoded DataFrame to
     # a temp CSV and points DataBundle.path at it, so the existing CSV-reading skills run unchanged.
     materialize: bool = False
+    # An electrophysiology (ERG) format. ERG is not an omics ``Kind`` (engine.cleaning carries it as
+    # a profile on top), so the materialized waveform table must NOT be force-classified into an
+    # omics modality — a Diagnosys frame's NaN shape otherwise false-positives as proteomics. When
+    # True, ingest classifies it as the neutral ``GENERIC_TABLE`` and records the format signal in
+    # ``meta['erg_format']`` so :func:`engine.cleaning.profile_data` can claim ERG-certain-by-format
+    # (a .csv/.txt Diagnosys export has no telltale suffix — the loader is the reliable signal).
+    erg: bool = False
 
 
 # --- loaders (each lazy-imports its dep so the registry stays cheap to import) -----------
@@ -115,8 +122,8 @@ REGISTRY: tuple[_Loader, ...] = (
     _Loader("h5ad", _is_h5ad, _load_h5ad),
     _Loader("10x_mtx", _is_10x, _load_10x),
     _Loader("xlsx", _is_xlsx, _load_xlsx),
-    _Loader("iwxdata", _is_iwxdata, _load_iwxdata, materialize=True),
-    _Loader("diagnosys_erg", _is_diagnosys, _load_diagnosys, materialize=True),  # before csv
+    _Loader("iwxdata", _is_iwxdata, _load_iwxdata, materialize=True, erg=True),
+    _Loader("diagnosys_erg", _is_diagnosys, _load_diagnosys, materialize=True, erg=True),  # before csv
     _Loader("csv", _is_csv, _load_csv),
 )
 
@@ -169,11 +176,15 @@ def ingest(
         tmp.close()
         payload.to_csv(tmp.name, index=False)
         run_path = tmp.name
+    # An ERG-format loader pins the modality to the neutral GENERIC_TABLE (ERG isn't an omics Kind)
+    # and records the format signal for profile_data; a caller `hint` still wins.
+    kind = classify(payload, hint=hint or (GENERIC_TABLE if loader.erg else None), source=source)
     return DataBundle(
         payload=payload,
-        kind=classify(payload, hint=hint, source=source),
+        kind=kind,
         source=source,
         path=run_path,
+        meta={"erg_format": loader.name} if loader.erg else {},
     )
 
 

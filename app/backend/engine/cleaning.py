@@ -6,7 +6,8 @@ clean before analysis?" pane the user sees on drop. Two honest, layered answers:
 * :func:`profile_data` — a friendly **data-type label** decided the layered way
   ([[layered-deterministic-extraction]]), and general across *every* modality (single-cell,
   bulk/transcriptomics, DE results, proteomics, metabolomics, ERG — not an ERG special-case).
-  Signals, strongest first: **format** (a ``.iwxdata`` is *certainly* ERG), then **content**
+  Signals, strongest first: **format** (a ``.iwxdata`` suffix, or a Diagnosys export the ingest
+  loader recognized by its magic header, is *certainly* ERG), then **content**
   (a high-precision a-/b-wave + intensity table is ERG; otherwise the modality from
   :func:`engine.classify` — counts/DE/proteomics/…), then the weakest **filename hint** (the
   file's name mentions ``scRNA``/``bulk``/``erg``/… ), then the **user override** which wins
@@ -201,11 +202,17 @@ def _detect(bundle: Any) -> tuple[list[Candidate], Candidate | None]:
     fname = getattr(getattr(bundle, "source", None), "filename", "") or ""
     cands: list[Candidate] = []
 
-    # Format — certain about the type regardless of contents.
+    # Format — certain about the type regardless of contents. Two format-grade signals: an
+    # ERG-format loader already fired (engine.ingest sniffed a Diagnosys multi-table magic header —
+    # a .csv/.txt export has no telltale suffix, so the loader is the reliable signal), or a
+    # self-describing suffix (.iwxdata).
     suffix = PurePath(fname).suffix.lower()
-    if suffix in _ERG_FORMATS:
+    erg_format = bool((getattr(bundle, "meta", None) or {}).get("erg_format"))
+    if erg_format or suffix in _ERG_FORMATS:
+        reason = (f"{suffix} is a native electrophysiology format." if suffix in _ERG_FORMATS
+                  else "recognized as a Diagnosys ERG export from its multi-table header.")
         cands.append(Candidate(code=ERG, label=_label_for(ERG), confidence="certain", source="format",
-                               reason=f"{suffix} is a native electrophysiology format."))
+                               reason=reason))
 
     # Content — high-precision ERG column signature, else the engine modality.
     payload = getattr(bundle, "payload", None)
