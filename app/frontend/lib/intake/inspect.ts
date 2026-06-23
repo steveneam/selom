@@ -12,13 +12,27 @@ import type { DataQcReport, DataRouting } from "@/lib/skills-api";
  * caller falls back to the filename heuristic — the proven flow is never broken.
  */
 
-/** The layered data-type verdict (backend engine/cleaning.py DataProfile). */
+/** One ranked data-type guess (backend engine/cleaning.py Candidate). */
+export interface DataTypeCandidate {
+  code: string; // an engine Kind or "erg"
+  label: string;
+  confidence: "certain" | "likely" | "unsure";
+  /** The signal that proposed it: user | format | content | filename. */
+  source: string;
+  reason: string;
+}
+
+/** The layered data-type verdict (backend engine/cleaning.py DataProfile). The flat fields are
+ *  the chosen (top) candidate; `candidates` is the full ranked list (drives the "or maybe Y"
+ *  alternatives); `mismatch` is the soft nudge when the filename disagrees with the content. */
 export interface DataProfile {
   code: string; // an engine Kind or "erg"
   label: string;
   confidence: "certain" | "likely" | "unsure";
   reason: string;
   overridden: boolean;
+  candidates?: DataTypeCandidate[];
+  mismatch?: string;
 }
 
 /** One proposed cleaning step (backend engine/cleaning.py CleaningStep; snake → camel here). */
@@ -138,6 +152,9 @@ export function qcFromInspect(r: InspectResult): QcReport {
     profileCode: r.profile.code,
     confidence: r.profile.confidence,
     reason: r.profile.reason,
+    overridden: r.profile.overridden,
+    candidates: r.profile.candidates ?? [],
+    mismatch: r.profile.mismatch ?? "",
     applies: plan.applies,
     obsLabel: plan.obs_label,
     varLabel: plan.var_label,

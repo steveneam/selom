@@ -150,6 +150,14 @@ export interface FigureModel {
   markerTraceIndices: number[];
   lineTraceIndices: number[];
   heatmapTraceIndices: number[];
+  /** Small-multiples grid kind from the skill hint (e.g. "trace_grid"), or null. */
+  figureKind: string | null;
+  /** Current layout view for a grid-capable figure: "grid" (default) | "overlay". */
+  layoutMode: "grid" | "overlay";
+  /** The figure can toggle grid ↔ overlay (a trace-grid small-multiples figure). */
+  overlayCapable: boolean;
+  /** Overlay-view axis visibility (true = shown). Drives the hide/show toggles. */
+  overlayAxes: { x: boolean; y: boolean };
 }
 
 // A trailing index/intensity token ("g1", "Group 3", "rep2", " 7", "#4") — stripped to find a
@@ -176,6 +184,11 @@ interface TraceInfo {
 /** Optional skill-stamped hint (render-inert; lives at layout.meta.selom). */
 interface SelomHint {
   figureKind?: string;
+  /** The active layout view for a small-multiples figure: "grid" (default) | "overlay". */
+  layoutMode?: string;
+  /** Overlay-view editor prefs: hide the time (x) / amplitude (y) axis. Default visible. */
+  overlayHideX?: boolean;
+  overlayHideY?: boolean;
   series?: { label: string; traceIndices: number[]; colorPath?: string }[];
   primitives?: { kind: PrimitiveKind; [k: string]: unknown }[];
 }
@@ -236,6 +249,12 @@ export function deriveFigureModel(spec: FigureSpec): FigureModel {
     deriveCapabilities(spec, infos);
   const scalebar = deriveScalebar(spec);
 
+  const hint = readHint(spec);
+  const figureKind = typeof hint?.figureKind === "string" ? hint.figureKind : null;
+  const layoutMode = hint?.layoutMode === "overlay" ? "overlay" : "grid";
+  const overlayCapable = figureKind === "trace_grid";
+  const overlayAxes = { x: hint?.overlayHideX !== true, y: hint?.overlayHideY !== true };
+
   return {
     traceKinds,
     series,
@@ -245,6 +264,10 @@ export function deriveFigureModel(spec: FigureSpec): FigureModel {
     markerTraceIndices,
     lineTraceIndices,
     heatmapTraceIndices,
+    figureKind,
+    layoutMode,
+    overlayCapable,
+    overlayAxes,
   };
 }
 
@@ -523,4 +546,95 @@ export function annotationVisibilityOp(index: number, visible: boolean): Operati
 
 export function annotationTextOp(index: number, text: string): Operation {
   return set(`/layout/annotations/${index}/text`, text);
+}
+
+// --- trace-grid layout mode: grid (small multiples) ↔ overlay (one line graph) ----------
+
+/** Toggle the layout view of a trace-grid figure. One tiny, undoable patch: the canonical spec
+ *  stays the grid; the overlay is a render-time projection (see `projectOverlay`). The parent
+ *  `/layout/meta/selom` always exists on a trace-grid (the skill stamps it), so `add` is safe. */
+export function layoutModeOp(mode: "grid" | "overlay"): Operation {
+  return set("/layout/meta/selom/layoutMode", mode);
+}
+
+/** Show/hide the overlay's time (x) or amplitude (y) axis. Stored as a `meta.selom` pref the
+ *  projection reads, so the canonical grid spec is untouched and the choice survives a toggle. */
+export function overlayAxisOp(axis: "x" | "y", visible: boolean): Operation {
+  return set(`/layout/meta/selom/overlayHide${axis === "x" ? "X" : "Y"}`, !visible);
+}
+
+/** The scale-bar primitive's units (for the overlay axis titles), or null. */
+function readScalebarUnits(spec: FigureSpec): { xUnit: string; yUnit: string } | null {
+  const prims = readHint(spec)?.primitives ?? [];
+  const p = prims.find((x) => x.kind === "scalebar") as Record<string, unknown> | undefined;
+  if (!p) return null;
+  return {
+    xUnit: typeof p.xUnit === "string" ? p.xUnit : "",
+    yUnit: typeof p.yUnit === "string" ? p.yUnit : "",
+  };
+}
+
+/**
+ * Project a small-multiples trace-grid spec to a single-axis OVERLAY — "all traces on one set of
+ * axes, like a normal line graph". Pure + reversible: the canonical stored spec stays the grid;
+ * this is a display-time view the canvas applies when `meta.selom.layoutMode === "overlay"`. Every
+ * trace is re-pointed to the shared x/y axis; the per-panel hidden axes, the scale bar, and the
+ * grid's row/column labels are dropped; the axes become visible with titles (units read from the
+ * scale-bar primitive); and one legend entry per condition (legendgroup) is shown. Per-trace
+ * styling (line.color, width) is preserved, so recolours done in the editor show through in either
+ * layout. Falls back to the input unchanged if there's nothing to overlay.
+ */
+export function projectOverlay(spec: FigureSpec): FigureSpec {
+  const data: PlotlyTrace[] = Array.isArray(spec?.data) ? spec.data : [];
+  if (!data.length) return spec;
+  const layout = (spec?.layout ?? {}) as Record<string, unknown>;
+  const xAxis0 = layout.xaxis as { range?: number[] } | undefined;
+  const yAxis0 = layout.yaxis as { range?: number[] } | undefined;
+  const units = readScalebarUnits(spec);
+  const xTitle = `Time${units?.xUnit ? ` (${units.xUnit})` : ""}`;
+  const yTitle = `Amplitude${units?.yUnit ? ` (${units.yUnit})` : ""}`;
+  const hint = readHint(spec);
+  const showX = hint?.overlayHideX !== true;
+  const showY = hint?.overlayHideY !== true;
+
+  // One legend entry per condition: show only the first trace of each legendgroup, named for it.
+  const seen = new Set<string>();
+  const newData: PlotlyTrace[] = data.map((t, i) => {
+    const lg = typeof t?.legendgroup === "string" && t.legendgroup ? t.legendgroup : null;
+    const key = lg ?? `__solo${i}`;
+    const first = !seen.has(key);
+    seen.add(key);
+    return {
+      ...t,
+      xaxis: "x",
+      yaxis: "y",
+      showlegend: first,
+      name: lg ?? (typeof t?.name === "string" && t.name ? t.name : `Trace ${i + 1}`),
+    };
+  });
+
+  // Drop every per-panel axis (xaxis2…/yaxis2…) + the scale-bar shapes + the grid's paper labels;
+  // rebuild a single visible axis pair. Everything else (title, theme template, meta, size) carries.
+  const newLayout: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(layout)) {
+    if (/^[xy]axis\d*$/.test(k)) continue;
+    if (k === "shapes" || k === "annotations" || k === "margin" || k === "showlegend" || k === "legend") {
+      continue;
+    }
+    newLayout[k] = v;
+  }
+  newLayout.showlegend = true;
+  newLayout.legend = { orientation: "v", x: 1.02, y: 1, xanchor: "left", yanchor: "top" };
+  newLayout.margin = { t: layout.title ? 48 : 24, r: 132, b: 52, l: 64 };
+  newLayout.xaxis = {
+    visible: showX, title: { text: xTitle }, anchor: "y", domain: [0, 1],
+    ...(Array.isArray(xAxis0?.range) ? { range: xAxis0!.range } : {}),
+  };
+  newLayout.yaxis = {
+    visible: showY, title: { text: yTitle }, anchor: "x", domain: [0, 1], zeroline: true,
+    ...(Array.isArray(yAxis0?.range) ? { range: yAxis0!.range } : {}),
+  };
+  newLayout.shapes = [];
+  newLayout.annotations = [];
+  return { ...spec, data: newData, layout: newLayout };
 }

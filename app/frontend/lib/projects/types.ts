@@ -58,6 +58,12 @@ export interface QcReport {
   confidence?: "certain" | "likely" | "unsure";
   /** The *why* (the layer that decided) — shown so the classification is transparent. */
   reason?: string;
+  /** The full ranked guess list (engine candidates) — drives the "or maybe Y" alternatives. */
+  candidates?: { code: string; label: string; confidence: "certain" | "likely" | "unsure"; source: string; reason: string }[];
+  /** Soft nudge: the filename disagrees with a positive content signal (content still wins). */
+  mismatch?: string;
+  /** The user set the type explicitly — keep it sticky across a re-inspect, offer "reset to auto". */
+  overridden?: boolean;
   /** Whether any matrix cleaning applies. False ⇒ the table is used as-is (no gene cleaning). */
   applies?: boolean;
   /** Axis labels for the detected type (cells/genes, samples/genes, rows/columns…). */

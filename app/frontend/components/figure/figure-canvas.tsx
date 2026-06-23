@@ -5,6 +5,7 @@ import { useCallback, useMemo, useRef } from "react";
 import type { Config, Data, Layout } from "plotly.js";
 import type { FigureSpec } from "@/lib/figure-spec";
 import type { FigureStore } from "@/hooks/use-figure-store";
+import { projectOverlay } from "@/lib/figure-model";
 import { relayoutToOps, restyleToOps } from "@/lib/plotly-edits";
 
 type GraphDiv = {
@@ -49,17 +50,24 @@ export function FigureCanvas({
    *  inspector can focus that series. Independent of edits — works on a read-only figure too. */
   onSelectTrace?: (traceIndex: number) => void;
 }) {
-  const fixed = typeof spec.layout.width === "number";
+  // Trace-grid OVERLAY view (meta.selom.layoutMode): render a single-axis projection of the grid.
+  // The canonical `spec` stays the grid — this is display-only, so every edit, undo, and export
+  // still operates on the real spec. Gestures are gated below (the projected axes ≠ canonical).
+  const overlay =
+    (spec?.layout?.meta as { selom?: { layoutMode?: string } } | undefined)?.selom?.layoutMode ===
+    "overlay";
+  const display = useMemo(() => (overlay ? projectOverlay(spec) : spec), [spec, overlay]);
+  const fixed = typeof display.layout.width === "number";
 
   const figure = useMemo(
-    () => structuredClone({ data: spec.data, layout: { ...spec.layout, autosize: !fixed } }),
-    [spec, fixed],
+    () => structuredClone({ data: display.data, layout: { ...display.layout, autosize: !fixed } }),
+    [display, fixed],
   );
 
   // Handlers read the latest spec/store via a ref so the directly-bound Plotly
   // listeners stay stable while always seeing live values.
-  const liveRef = useRef({ spec, store, onSelectTrace });
-  liveRef.current = { spec, store, onSelectTrace };
+  const liveRef = useRef({ spec, store, onSelectTrace, overlay });
+  liveRef.current = { spec, store, onSelectTrace, overlay };
 
   // Stable gesture handlers, created once. Each Plotly canvas gesture becomes ONE
   // undoable JSON-Patch edit (Plotly fires once on drag-release → one history entry).
@@ -70,16 +78,18 @@ export function FigureCanvas({
   if (!handlersRef.current) {
     handlersRef.current = {
       relayout: (e: unknown) => {
-        const { spec: s, store: st } = liveRef.current;
-        if (!st || !e) return;
+        const { spec: s, store: st, overlay: ov } = liveRef.current;
+        // In the overlay projection the on-screen axes/shapes don't match the canonical grid spec,
+        // so a layout gesture can't be mapped back safely — drop it (edits happen in Grid view).
+        if (!st || !e || ov) return;
         const ops = relayoutToOps(s, e as Record<string, unknown>);
         if (ops.length) st.commit(ops);
       },
       // Trace-level gestures (colour-bar move/retext, legend-label rename) arrive
       // as a `plotly_restyle` event = [update, traceIndices].
       restyle: (e: unknown) => {
-        const { spec: s, store: st } = liveRef.current;
-        if (!st || !Array.isArray(e)) return;
+        const { spec: s, store: st, overlay: ov } = liveRef.current;
+        if (!st || !Array.isArray(e) || ov) return;
         const [update, indices] = e as [Record<string, unknown>, number[]];
         const ops = restyleToOps(s, update ?? {}, indices ?? []);
         if (ops.length) st.commit(ops);
@@ -150,8 +160,8 @@ export function FigureCanvas({
       onUpdate={bindGestures as never}
       useResizeHandler
       style={{
-        width: fixed ? `${spec.layout.width}px` : "100%",
-        height: fixed ? `${spec.layout.height}px` : "100%",
+        width: fixed ? `${display.layout.width}px` : "100%",
+        height: fixed ? `${display.layout.height}px` : "100%",
       }}
     />
   );

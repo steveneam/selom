@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Grid2x2, LineChart } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Section } from "./controls";
+import { Section, SwitchField } from "./controls";
 import type { FigureStore } from "@/hooks/use-figure-store";
 import type { FigureSpec } from "@/lib/figure-spec";
 import { COLORWAYS } from "@/lib/figure-spec";
 import {
   type FigureModel,
   type Series,
+  layoutModeOp,
+  overlayAxisOp,
   seriesColorOps,
   seriesVisibilityOps,
 } from "@/lib/figure-model";
@@ -105,6 +107,64 @@ function SeriesRow({
   );
 }
 
+/**
+ * Grid ↔ overlay layout switch for a small-multiples trace grid (the ERG waveform grid), with
+ * per-axis show/hide once overlaid. Overlay is a render-time projection
+ * (lib/figure-model.projectOverlay) — each click is one undoable patch on `meta.selom`, so the
+ * canonical grid spec is never mutated and the figure can always switch back.
+ */
+function LayoutControl({ store, model }: { store: FigureStore; model: FigureModel }) {
+  const modes = [
+    { id: "grid", label: "Grid", icon: Grid2x2, hint: "Stacked small multiples" },
+    { id: "overlay", label: "Overlay", icon: LineChart, hint: "All traces on one set of axes" },
+  ] as const;
+  return (
+    <Section title="Layout">
+      <div className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-muted/40 p-1">
+        {modes.map((m) => {
+          const active = model.layoutMode === m.id;
+          const Icon = m.icon;
+          return (
+            <button
+              key={m.id}
+              type="button"
+              aria-pressed={active}
+              title={m.hint}
+              onClick={() => { if (!active) store.commit([layoutModeOp(m.id)]); }}
+              className={cn(
+                "flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-3.5",
+                active
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Icon /> {m.label}
+            </button>
+          );
+        })}
+      </div>
+      {model.layoutMode === "overlay" ? (
+        <div className="space-y-1 rounded-lg border border-border/70 bg-background/40 px-2.5 py-1.5">
+          <SwitchField
+            label="Time axis (x)"
+            checked={model.overlayAxes.x}
+            onChange={(v) => store.commit([overlayAxisOp("x", v)])}
+          />
+          <SwitchField
+            label="Amplitude axis (y)"
+            checked={model.overlayAxes.y}
+            onChange={(v) => store.commit([overlayAxisOp("y", v)])}
+          />
+        </div>
+      ) : (
+        <p className="text-[11px] leading-relaxed text-muted-foreground/80">
+          Overlay draws every trace on one set of axes, like a normal line graph.
+        </p>
+      )}
+    </Section>
+  );
+}
+
 export function DataPanel({
   store,
   model,
@@ -122,6 +182,7 @@ export function DataPanel({
 
   return (
     <div className="space-y-6">
+      {model.overlayCapable && <LayoutControl store={store} model={model} />}
       <Section title={`Series · ${series.length}`}>
         <div className="space-y-1.5">
           {series.map((s, i) => (

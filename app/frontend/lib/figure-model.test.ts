@@ -6,6 +6,9 @@ import {
   annotationVisibilityOp,
   deriveFigureModel,
   inferTraceKind,
+  layoutModeOp,
+  overlayAxisOp,
+  projectOverlay,
   scalebarResizeOps,
   scalebarVisibilityOps,
   seriesColorOps,
@@ -314,5 +317,90 @@ describe("annotations (P3 §3.5)", () => {
     expect(items[0]).toMatchObject({ index: 0, text: "200 µV", visible: true });
     expect(annotationVisibilityOp(1, false)).toEqual({ op: "add", path: "/layout/annotations/1/visible", value: false });
     expect(annotationTextOp(0, "x")).toEqual({ op: "add", path: "/layout/annotations/0/text", value: "x" });
+  });
+});
+
+// --- trace-grid layout mode: grid ↔ overlay ("all traces on one axis") -------------------
+
+/** A small trace grid (3 traces, 2 conditions) carrying the meta.selom hint, per-panel axes, the
+ *  scale-bar primitive, and shared ranges — enough to exercise the overlay projection. `extra` is
+ *  merged into meta.selom (e.g. `{ layoutMode: "overlay" }`, `{ overlayHideX: true }`). */
+function tinyGrid(extra: Record<string, unknown> = {}): SpecType {
+  return spec(
+    [
+      { type: "scatter", mode: "lines", line: { color: "#111", width: 1.2 }, x: [0, 1, 2], y: [0, 1, 0], xaxis: "x", yaxis: "y", name: "Control g1", legendgroup: "Control" },
+      { type: "scatter", mode: "lines", line: { color: "#111", width: 1.2 }, x: [0, 1, 2], y: [0, 2, 0], xaxis: "x2", yaxis: "y2", name: "Control g2", legendgroup: "Control" },
+      { type: "scatter", mode: "lines", line: { color: "#0072B2", width: 1.2 }, x: [0, 1, 2], y: [0, 1, 0], xaxis: "x3", yaxis: "y3", name: "Untreated g1", legendgroup: "Untreated" },
+    ],
+    {
+      title: { text: "ERG" },
+      xaxis: { visible: false, range: [0, 300] },
+      yaxis: { visible: false, range: [-50, 200] },
+      xaxis2: { visible: false }, yaxis2: { visible: false },
+      xaxis3: { visible: false }, yaxis3: { visible: false },
+      shapes: [
+        { type: "line", xref: "paper", yref: "paper", x0: 0.03, x1: 0.03, y0: 0.02, y1: 0.1 },
+        { type: "line", xref: "paper", yref: "paper", x0: 0.03, x1: 0.1, y0: 0.02, y1: 0.02 },
+      ],
+      annotations: [{ text: "200 µV" }, { text: "100 ms" }, { text: "Control" }],
+      meta: {
+        selom: {
+          figureKind: "trace_grid",
+          primitives: [{ kind: "scalebar", shapeIdx: [0, 1], annoIdx: [0, 1], xUnit: "ms", yUnit: "µV", xLen: 100, yLen: 200 }],
+          ...extra,
+        },
+      },
+    },
+  );
+}
+
+describe("trace-grid overlay layout", () => {
+  it("flags overlay-capable, defaults to grid with both axes shown", () => {
+    const m = deriveFigureModel(tinyGrid());
+    expect(m.overlayCapable).toBe(true);
+    expect(m.layoutMode).toBe("grid");
+    expect(m.overlayAxes).toEqual({ x: true, y: true });
+  });
+
+  it("reads layoutMode=overlay + axis-hide prefs from meta.selom", () => {
+    const m = deriveFigureModel(tinyGrid({ layoutMode: "overlay", overlayHideX: true }));
+    expect(m.layoutMode).toBe("overlay");
+    expect(m.overlayAxes).toEqual({ x: false, y: true });
+  });
+
+  it("builds undoable meta.selom patches for the toggle + axis hide", () => {
+    expect(layoutModeOp("overlay")).toEqual({ op: "add", path: "/layout/meta/selom/layoutMode", value: "overlay" });
+    expect(overlayAxisOp("x", false)).toEqual({ op: "add", path: "/layout/meta/selom/overlayHideX", value: true });
+    expect(overlayAxisOp("y", true)).toEqual({ op: "add", path: "/layout/meta/selom/overlayHideY", value: false });
+  });
+
+  it("projectOverlay collapses every trace onto one titled axis with a per-condition legend", () => {
+    const p = projectOverlay(tinyGrid());
+    // every trace re-pointed to the single shared x/y axis
+    expect(p.data.every((t) => t.xaxis === "x" && t.yaxis === "y")).toBe(true);
+    // one legend entry per condition (first trace of each legendgroup), named for the condition
+    expect(p.data.map((t) => t.showlegend)).toEqual([true, false, true]);
+    expect(p.data[0].name).toBe("Control");
+    expect(p.data[2].name).toBe("Untreated");
+    // per-trace styling preserved (recolours show through in either layout)
+    expect(p.data[0].line.color).toBe("#111");
+    // visible, titled axes (units from the scale-bar primitive); shared range carried over
+    expect(p.layout.xaxis.visible).toBe(true);
+    expect(p.layout.xaxis.title.text).toBe("Time (ms)");
+    expect(p.layout.yaxis.title.text).toBe("Amplitude (µV)");
+    expect(p.layout.xaxis.range).toEqual([0, 300]);
+    expect(p.layout.showlegend).toBe(true);
+    // the scale bar + grid row/col labels are dropped, and no orphaned per-panel axes remain
+    expect(p.layout.shapes).toEqual([]);
+    expect(p.layout.annotations).toEqual([]);
+    expect(Object.keys(p.layout).some((k) => /^[xy]axis\d+$/.test(k))).toBe(false);
+    // the title carries through
+    expect(p.layout.title).toEqual({ text: "ERG" });
+  });
+
+  it("honours the per-axis hide pref in the projection", () => {
+    const p = projectOverlay(tinyGrid({ overlayHideX: true }));
+    expect(p.layout.xaxis.visible).toBe(false);
+    expect(p.layout.yaxis.visible).toBe(true);
   });
 });

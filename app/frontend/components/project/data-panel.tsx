@@ -87,10 +87,17 @@ export function DataPanel({
     void runInspect(dataset, file);
   }
 
-  // The user corrects the detected data type (L3 override). Needs the real bytes to re-classify.
+  // The user corrects the detected data type (the user-input layer). Needs the real bytes to
+  // re-classify.
   function setDataType(code: DataTypeOverride) {
     if (!active?.real) return;
     void runInspect(active.dataset, active.file, code);
+  }
+
+  // Clear an explicit override → re-inspect with no hint, falling back to the auto-detected type.
+  function resetDataType() {
+    if (!active?.real) return;
+    void runInspect(active.dataset, active.file);
   }
 
   // Consume a file handed over from the Overview drop. Guard with a ref so a given
@@ -238,6 +245,7 @@ export function DataPanel({
               inspecting={inspecting}
               canOverride={active.real}
               onSetDataType={setDataType}
+              onResetDataType={resetDataType}
             />
             {active.dataset.qc && (
               <CleaningReport

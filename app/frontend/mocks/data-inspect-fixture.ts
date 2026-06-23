@@ -44,6 +44,28 @@ function classify(cols: string[], filename: string): string {
   return "generic_table";
 }
 
+// The weakest layer — a light mirror of engine/cleaning.py _FILENAME_HINTS (whole-token match for
+// short keys). Returns the hinted code, or null. dev:mock parity only; verify on the live engine.
+const FILENAME_HINTS: [string[], string][] = [
+  [["erg", "electroretin", "scotopic", "photopic", "iwx"], "erg"],
+  [["scrna", "scrnaseq", "singlecell", "cellranger", "scanpy", "10x"], "sc_counts"],
+  [["bulk", "rnaseq", "featurecounts", "salmon"], "bulk_counts"],
+  [["deg", "degs", "deseq", "edger", "limma", "volcano", "differential"], "de_results"],
+  [["proteom", "maxquant", "diann", "tmt", "lfq"], "proteomics"],
+];
+
+function filenameHint(filename: string): string | null {
+  const stem = filename.toLowerCase().replace(/\.[^.]+$/, "");
+  const tokens = new Set(stem.split(/[^a-z0-9]+/).filter(Boolean));
+  const norm = stem.replace(/[^a-z0-9]+/g, "");
+  for (const [keywords, code] of FILENAME_HINTS) {
+    for (const kw of keywords) {
+      if (kw.length < 5 ? tokens.has(kw) : norm.includes(kw)) return code;
+    }
+  }
+  return null;
+}
+
 function cleaningSteps(code: string): MockStep[] {
   switch (code) {
     case "sc_counts":
@@ -84,19 +106,40 @@ const NOTE: Record<string, string> = {
  *  query `profile` (erg) or `hint` (a Kind). */
 export function mockInspect(filename: string, header: string, override?: string): Record<string, unknown> {
   const cols = header.split(/[,\t]/).map((c) => c.trim().toLowerCase());
-  const code = override || classify(cols, filename);
+  const contentCode = classify(cols, filename);
+  const hintCode = override ? null : filenameHint(filename);
+  // Content wins; a filename hint only fills the neutral gap (content couldn't type it).
+  const code = override
+    || (contentCode !== "generic_table" ? contentCode : (hintCode ?? "generic_table"));
   const kind = code === "erg" ? "generic_table" : code;
   const steps = cleaningSteps(code);
   const applies = steps.length > 0;
   const [obsLabel, varLabel] = AXES[code] ?? ["rows", "columns"];
-  const confidence = override ? "certain" : code === "erg" ? "likely" : code === "generic_table" ? "unsure" : "likely";
+  const fromFilename = !override && contentCode === "generic_table" && hintCode != null;
+  const isFormat = !override && code === "erg" && filename.toLowerCase().endsWith(".iwxdata");
+  const source = override ? "user" : isFormat ? "format" : fromFilename ? "filename" : "content";
+  const confidence = override ? "certain"
+    : fromFilename ? "unsure"
+      : code === "erg" ? (isFormat ? "certain" : "likely")
+        : code === "generic_table" ? "unsure" : "likely";
   const reason = override
     ? "You set the data type."
-    : code === "erg"
-      ? "a-/b-wave amplitude and flash-intensity columns recognized."
-      : code === "generic_table"
-        ? "Modality not recognized — usable as a plain table."
-        : "Recognized from the data's columns/shape.";
+    : fromFilename
+      ? `The filename mentions “${hintCode}”.`
+      : code === "erg"
+        ? (isFormat ? ".iwxdata is a native electrophysiology format." : "a-/b-wave amplitude and flash-intensity columns recognized.")
+        : code === "generic_table"
+          ? "Modality not recognized — usable as a plain table."
+          : "Recognized from the data's columns/shape.";
+  // Ranked candidates + the mismatch nudge (content typed it, but the name says otherwise).
+  const candidates: Record<string, unknown>[] = [{ code, label: LABEL[code] ?? code, confidence, source, reason }];
+  if (!override && hintCode && hintCode !== code) {
+    candidates.push({ code: hintCode, label: LABEL[hintCode] ?? hintCode, confidence: "unsure",
+      source: "filename", reason: `The filename mentions “${hintCode}”.` });
+  }
+  const mismatch = (!override && hintCode && hintCode !== code && contentCode !== "generic_table")
+    ? `The filename suggests ${LABEL[hintCode] ?? hintCode}, but the data looks like ${LABEL[code] ?? code}. The data content wins — override if the name is right.`
+    : "";
 
   const erg = code === "erg";
   const ergSteps = ["erg_traces", "erg_bwave_bar", "erg_intensity_response"];
@@ -111,7 +154,7 @@ export function mockInspect(filename: string, header: string, override?: string)
   return {
     filename,
     kind,
-    profile: { code, label: LABEL[code] ?? code, confidence, reason, overridden: !!override },
+    profile: { code, label: LABEL[code] ?? code, confidence, reason, overridden: !!override, candidates, mismatch },
     cleaning_plan: {
       kind,
       profile: code,

@@ -58,6 +58,24 @@ describe("qcFromInspect", () => {
     expect(qc.cleaningSteps?.[0].varDelta).toBe(-22);
   });
 
+  it("carries the ranked candidates, mismatch nudge, and overridden flag through to the QC report", () => {
+    const qc = qcFromInspect(result({
+      kind: "bulk_counts",
+      profile: {
+        code: "bulk_counts", label: "Bulk RNA-seq counts", confidence: "likely",
+        reason: "Recognized from the data's columns/shape.", overridden: false,
+        candidates: [
+          { code: "bulk_counts", label: "Bulk RNA-seq counts", confidence: "likely", source: "content", reason: "…" },
+          { code: "sc_counts", label: "Single-cell RNA-seq", confidence: "unsure", source: "filename", reason: "filename mentions scrna" },
+        ],
+        mismatch: "The filename suggests Single-cell RNA-seq, but the data looks like Bulk RNA-seq counts.",
+      },
+    }));
+    expect(qc.candidates?.map((c) => c.code)).toEqual(["bulk_counts", "sc_counts"]);
+    expect(qc.mismatch).toContain("Single-cell");
+    expect(qc.overridden).toBe(false);
+  });
+
   it("drops the redundant `unclassified` info flag, keeps real warnings", () => {
     const qc = qcFromInspect(result({
       qc: { ran: true, ok: false, blocked: false, stats: {},
