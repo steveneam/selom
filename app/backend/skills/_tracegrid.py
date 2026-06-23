@@ -115,9 +115,11 @@ def grid_spec(
 
     data: list[dict] = []
     panel_main_idx: list[int] = []  # data index of each panel's primary line (overlays shift indices)
-    layout: dict = {"showlegend": False, "margin": {"t": 10, "r": 10, "b": 10, "l": 10}}
+    # A titled grid needs top headroom or the title clips the figure edge (above the column labels).
+    layout: dict = {"showlegend": False,
+                    "margin": {"t": 48 if title else 10, "r": 10, "b": 10, "l": 10}}
     if title:
-        layout["title"] = {"text": title}
+        layout["title"] = {"text": title, "y": 0.985, "yanchor": "top"}
 
     for p in panels:
         k = p["row"] * ncols + p["col"] + 1

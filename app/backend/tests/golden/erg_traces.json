@@ -3322,13 +3322,15 @@
   "layout": {
     "showlegend": false,
     "margin": {
-      "t": 10,
+      "t": 48,
       "r": 10,
       "b": 10,
       "l": 10
     },
     "title": {
       "text": "ERG representative traces (stub)",
+      "y": 0.985,
+      "yanchor": "top",
       "font": {
         "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
         "size": 16,

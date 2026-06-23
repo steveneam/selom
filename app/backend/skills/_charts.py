@@ -127,14 +127,17 @@ def _pattern_for(key, i, patterns):
 
 def _bar_marker(bar_fill, colors, keys, patterns):
     """The bar ``marker`` for the chosen fill: ``filled`` (solid colour — byte-identical default),
-    ``pattern`` (per-category hatch: solid where the pattern is empty, else a white bar with a
-    coloured hatch), or ``open`` (white fill + coloured outline)."""
+    ``pattern`` (per-category hatch — every bar visibly filled: a solid colour where the pattern is
+    empty, else a light tint of the colour behind a dense same-colour hatch), or ``open`` (white
+    fill + coloured outline)."""
     if bar_fill == "pattern":
         shapes = [_pattern_for(k, i, patterns) for i, k in enumerate(keys)]
-        fills = [colors[i] if shapes[i] == "" else "#ffffff" for i in range(len(keys))]
-        return {"color": fills, "line": {"color": colors, "width": 1.2},
-                "pattern": {"shape": shapes, "fgcolor": colors, "bgcolor": "#ffffff",
-                            "size": 6, "solidity": 0.35}}
+        # Hatched bars get a light tint background (never an empty white bar — owner caught this);
+        # un-hatched (shape "") bars stay the full solid colour.
+        tints = [colors[i] if shapes[i] == "" else rgba(colors[i], 0.22) for i in range(len(keys))]
+        return {"color": tints, "line": {"color": colors, "width": 1.3},
+                "pattern": {"shape": shapes, "fgcolor": colors, "bgcolor": tints,
+                            "size": 8, "solidity": 0.5}}
     if bar_fill == "open":
         return {"color": "#ffffff", "line": {"color": colors, "width": 1.6}}
     return {"color": colors, "line": {"color": "#333333", "width": 1}}  # filled (default)
