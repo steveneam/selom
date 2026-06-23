@@ -114,6 +114,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // block-severity QC problem. Holds the verdict + the step so "Review & run anyway" can re-run
   // with override. Cleared at the start of every run.
   const [blocked, setBlocked] = React.useState<{ check: DataCheck; step: ProposedStep } | null>(null);
+  // A run was attempted on a dataset whose bytes aren't in this session (re-opened after reload),
+  // against a real backend — so there's nothing real to send. Instead of POSTing a placeholder
+  // file that the skill can't read (a confusing failure), we halt and prompt a re-upload.
+  const [needData, setNeedData] = React.useState<{ datasetId?: string } | null>(null);
   // Active journal style for the current figure (journal-styles v1) — DERIVED from the
   // spec's stamp (layout.meta.selomStyle), not held separately, so undo/redo and "New
   // figure" rewind the picker label for free. Runs come out in the Selom default.
@@ -146,6 +150,14 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // Re-run needs the dataset bytes: present this session (lastFile) or fabricated in
   // mock mode; with neither (e.g. after reload against a real backend) it's disabled.
   const canRerun = !!activeFigure?.skillId && !!activeFigure?.provenance && (lastFile != null || mockMode);
+  // Resolve the bytes a run will send: this session's real upload, or a placeholder ONLY in mock
+  // mode (the MSW stub ignores bytes). Against a real backend with no session bytes → null, so the
+  // caller prompts a re-upload rather than POSTing an unreadable placeholder.
+  const resolveRunFile = React.useCallback(
+    (dataset?: { filename?: string }): File | null =>
+      lastFile ?? (mockMode ? new File(["mock"], dataset?.filename ?? "data.csv") : null),
+    [lastFile, mockMode],
+  );
   // The Statistics table for the focused figure (stats view) — its stored table or a
   // fallback derived from its spec (D3).
   const activeStatsTable = activeFigure ? figureTable(activeFigure) : undefined;
@@ -231,15 +243,20 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 
   const runFlow = React.useCallback(
     async (step: ProposedStep, opts: { override?: boolean } = {}) => {
-      setRunning(step.skillId);
       setError(null);
       setBlocked(null);
+      setNeedData(null);
+      // Attach the project's dataset even on the demo deep-link (no explicit pick),
+      // so produced figures have a dataset to compute staleness against.
+      const dsId = datasetId ?? datasets[0]?.id;
+      const dataset = dsId ? datasets.find((d) => d.id === dsId) : undefined;
+      const file = resolveRunFile(dataset);
+      if (!file) {
+        setNeedData({ datasetId: dsId });   // re-opened dataset, real backend → prompt re-upload
+        return;
+      }
+      setRunning(step.skillId);
       try {
-        // Attach the project's dataset even on the demo deep-link (no explicit pick),
-        // so produced figures have a dataset to compute staleness against.
-        const dsId = datasetId ?? datasets[0]?.id;
-        const dataset = dsId ? datasets.find((d) => d.id === dsId) : undefined;
-        const file = lastFile ?? new File(["mock"], dataset?.filename ?? "data.csv");
         const res = await runSkill(runtimeSkillId(step.skillId), file, step.params, designFile, opts);
         const name = getSkill(step.skillId)?.name ?? step.skillId;
         // Persist the figure durably — full spec + the provenance bundle (the staleness
@@ -270,7 +287,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         setRunning(null);
       }
     },
-    [datasetId, datasets, figure, lastFile, designFile, projectId],
+    [datasetId, datasets, figure, resolveRunFile, designFile, projectId],
   );
 
   // Re-run a (stale) figure: replay its skill with the SAME params against the
@@ -280,11 +297,16 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const rerunFigure = React.useCallback(
     async (fig: Figure) => {
       if (!fig.skillId || !fig.provenance) return;
-      setRunning(fig.skillId);
       setError(null);
+      setNeedData(null);
+      const dataset = fig.datasetId ? datasets.find((d) => d.id === fig.datasetId) : undefined;
+      const file = resolveRunFile(dataset);
+      if (!file) {
+        setNeedData({ datasetId: fig.datasetId });
+        return;
+      }
+      setRunning(fig.skillId);
       try {
-        const dataset = fig.datasetId ? datasets.find((d) => d.id === fig.datasetId) : undefined;
-        const file = lastFile ?? new File(["mock"], dataset?.filename ?? "data.csv");
         const res = await runSkill(runtimeSkillId(fig.skillId), file, fig.provenance.params, designFile);
         const saved = projectStore.addFigure(projectId, {
           title: fig.title,
@@ -309,7 +331,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         setRunning(null);
       }
     },
-    [datasets, lastFile, designFile, figure, projectId],
+    [datasets, resolveRunFile, designFile, figure, projectId],
   );
 
   // Parameter sweep (S3.1): run the open figure's skill once per value of a chosen
@@ -319,9 +341,15 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     async (param: string, values: ParamValue[]) => {
       const origin = activeFigure;
       if (!origin?.skillId) return;
-      setRunning(origin.skillId);
       setError(null);
+      setNeedData(null);
       const dataset = origin.datasetId ? datasets.find((d) => d.id === origin.datasetId) : undefined;
+      const file = resolveRunFile(dataset);
+      if (!file) {
+        setNeedData({ datasetId: origin.datasetId });
+        return;
+      }
+      setRunning(origin.skillId);
       // The non-swept params hold at the figure's recorded config; the backend fills any
       // gap with the skill defaults, so a provenance-less origin sweeps from {} safely.
       const base = origin.provenance?.params ?? {};
@@ -329,7 +357,6 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       try {
         for (const value of values) {
           const params = { ...base, [param]: value };
-          const file = lastFile ?? new File(["mock"], dataset?.filename ?? "data.csv");
           const res = await runSkill(runtimeSkillId(origin.skillId), file, params, designFile);
           saved.push(
             projectStore.addFigure(projectId, {
@@ -364,7 +391,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         setRunning(null);
       }
     },
-    [activeFigure, datasets, lastFile, designFile, figure, projectId],
+    [activeFigure, datasets, resolveRunFile, designFile, figure, projectId],
   );
 
   // Re-run the open figure from the Figure-data stage with EDITED inputs (P2): replay its
@@ -374,12 +401,17 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     async (params: SkillParams) => {
       const origin = activeFigure;
       if (!origin?.skillId) return;
-      setRunning(origin.skillId);
       setError(null);
       setBlocked(null);
+      setNeedData(null);
+      const dataset = origin.datasetId ? datasets.find((d) => d.id === origin.datasetId) : undefined;
+      const file = resolveRunFile(dataset);
+      if (!file) {
+        setNeedData({ datasetId: origin.datasetId });
+        return;
+      }
+      setRunning(origin.skillId);
       try {
-        const dataset = origin.datasetId ? datasets.find((d) => d.id === origin.datasetId) : undefined;
-        const file = lastFile ?? new File(["mock"], dataset?.filename ?? "data.csv");
         const res = await runSkill(runtimeSkillId(origin.skillId), file, params, designFile);
         const saved = projectStore.addFigure(projectId, {
           title: origin.title,
@@ -409,7 +441,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         setRunning(null);
       }
     },
-    [activeFigure, datasets, lastFile, designFile, figure, projectId],
+    [activeFigure, datasets, resolveRunFile, designFile, figure, projectId],
   );
 
   // Freeze / unfreeze the open figure (S3.3, Decision D6) — tag it as the "paper"
@@ -623,6 +655,27 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       {error && (
         <div role="alert" className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
+        </div>
+      )}
+
+      {needData && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn">
+          <span className="leading-relaxed">
+            This dataset isn&apos;t loaded in this session — its file was cleared on reload. Re-upload it
+            to run the analysis on your real data.
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="shrink-0"
+            onClick={() => {
+              if (needData.datasetId) setActiveDatasetId(needData.datasetId);
+              setNeedData(null);
+              setView("data");
+            }}
+          >
+            Re-upload in Data
+          </Button>
         </div>
       )}
 
