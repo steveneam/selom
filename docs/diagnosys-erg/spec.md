@@ -1,6 +1,7 @@
 # Spec — Diagnosys / Celeris ERG skill (tri-modal: scotopic · photopic · flicker)
 
-Status: **DRAFT — awaiting owner approval** (no code until approved). Author: Claude (Opus 4.8), 2026-06-23.
+Status: **APPROVED · Phases 1–4 BUILT + validated on real data** (2026-06-23 → 24). Author: Claude (Opus 4.8).
+Phase 1 (parser + scotopic reuse) · Phase 2 (photopic `adaptation` hint) · Phase 3 (`erg_flicker` skill — waveform grid + N1→P1-vs-frequency summary) · Phase 4 (`methods._erg_flicker` + three-mode ISCEV wording + FE seed/overlay) all shipped.
 Sibling of `docs/erg-module/spec.md` (the iWorx `.iwxdata` ERG module). Extends it; does not replace it.
 
 ## What
