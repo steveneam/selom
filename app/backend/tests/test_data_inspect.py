@@ -78,6 +78,18 @@ def test_inspect_profile_override_to_erg():
     assert body["cleaning_plan"]["applies"] is False
 
 
+def test_inspect_kind_override_wins_in_profile_over_content_signal():
+    # A Kind override (hint) is the scientist's explicit choice and must win in the *profile*, not
+    # just force the modality — even when a positive content signal (ERG a-/b-wave columns) would
+    # otherwise out-rank it. Mirrors the FE override path (engine Kinds ride `hint`, "erg" rides
+    # `profile`); without this the label would stay "ERG" after the user picked single-cell.
+    csv = b"condition,intensity_log_cd_s_m2,b_wave_uv,a_wave_uv\nControl,1.0,200,80\nControl,-0.8,150,60\n"
+    r = client.post("/data/inspect?hint=sc_counts", files={"matrix": ("erg_named.csv", csv, "text/csv")})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["profile"]["code"] == "sc_counts" and body["profile"]["overridden"] is True
+
+
 def test_inspect_hint_forces_kind_and_qc_blocks_non_integer_counts():
     # A normalized (fractional) matrix declared as counts -> QC blocks it with a fix hint.
     csv = b"gene,s0,s1\n" + b"".join(f"g{i},{i+0.5},{i+1.5}\n".encode() for i in range(10))

@@ -378,7 +378,12 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
         bundle = ingest(path, hint=hint, sheet=sheet)
         bundle.source.filename = pathlib.Path(matrix.filename or "").name  # honest name (drives L1)
         bundle.qc = run_qc(bundle)
-        prof = profile_data(bundle, override=profile)   # the friendly, layered data-type label
+        # The user's data-type override arrives as `profile` (the "erg" profile) OR `hint` (an engine
+        # Kind — "erg" isn't a Kind, so it can't ride `hint`). Either is the scientist's explicit
+        # choice, so both must win in the profile, not just force the modality — otherwise a Kind
+        # override (e.g. sc_counts) leaves a positively-detected content signal (ERG columns) still
+        # out-ranking it in the label.
+        prof = profile_data(bundle, override=profile or hint)   # the friendly, layered data-type label
         plan = plan_cleaning(bundle, profile=prof)      # the dynamic cleaning pane (kind-aware)
         routing = route_profile(bundle, prof.code)      # which analyses fit this data (P3 guidance)
         # Data-fit (Slice 2, product-agnostic): score THIS file against the analyses it routes to —

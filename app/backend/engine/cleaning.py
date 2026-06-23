@@ -4,12 +4,18 @@ This is the source of truth for the "what kind of data is this, and what (if any
 clean before analysis?" pane the user sees on drop. Two honest, layered answers:
 
 * :func:`profile_data` — a friendly **data-type label** decided the layered way
-  ([[layered-deterministic-extraction]]): **L1 file format** (a ``.iwxdata`` is *certainly* ERG),
-  then **L2 high-precision column keywords** (an a-/b-wave + intensity table is ERG — a signature a
-  transcriptomics table never carries), then the **L3 modality** from :func:`engine.classify`. The
-  user can always override (the third layer is *user input*; ``main.py`` passes ``hint``/``profile``).
-  Honesty rule (mirrors :mod:`engine.compat`): only assign a *specific* type on a positively-
-  determined signal — anything we can't type stays a neutral "Data table", never a false claim.
+  ([[layered-deterministic-extraction]]), and general across *every* modality (single-cell,
+  bulk/transcriptomics, DE results, proteomics, metabolomics, ERG — not an ERG special-case).
+  Signals, strongest first: **format** (a ``.iwxdata`` is *certainly* ERG), then **content**
+  (a high-precision a-/b-wave + intensity table is ERG; otherwise the modality from
+  :func:`engine.classify` — counts/DE/proteomics/…), then the weakest **filename hint** (the
+  file's name mentions ``scRNA``/``bulk``/``erg``/… ), then the **user override** which wins
+  outright. Best practice (Unix ``file`` / Tika / Galaxy): **content always outranks the
+  filename** — a name that disagrees with a positive content signal raises a ``mismatch`` nudge,
+  it never overrules. Returns a ranked ``candidates`` list (so the FE can say "we think X — or
+  maybe Y"). Honesty rule (mirrors :mod:`engine.compat`): only assign a *specific* type on a
+  positively-determined signal — an untypable table stays a neutral "Data table" unless a
+  filename hint fills the gap (still at ``unsure``), never a false claim.
 
 * :func:`plan_cleaning` — the **cleaning plan** keyed off the modality: a count matrix (single-cell /
   bulk / proteomics) gets the *real* proposed steps (with cheap, honest before/after deltas where the
@@ -23,6 +29,7 @@ never a crash), because they are surfaced on the best-effort inspect path.
 
 from __future__ import annotations
 
+import re
 from pathlib import PurePath
 from typing import Any
 
@@ -74,17 +81,54 @@ _KIND_CONFIDENCE: dict[str, str] = {
 }
 
 
+# Filename keywords (the weakest layer). Per modality, the tokens whose presence in the file's
+# NAME *hint at* a type — never decisive (content wins), only a gap-filler + a mismatch nudge.
+# Short keys (<5 chars: erg/deg/10x/tmt) match a whole filename token to avoid substring false
+# positives ("merge" ⇏ erg, "degradation" ⇏ deg); longer keys match as a substring of the
+# punctuation-stripped name ("single-cell" ⇒ "singlecell"). New modality? add one row.
+_FILENAME_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("erg", "electroretin", "scotopic", "photopic", "iwx"), ERG),
+    (("scrna", "scrnaseq", "singlecell", "single-cell", "single_cell", "cellranger", "scanpy", "10x"),
+     SC_COUNTS),
+    (("bulk", "rnaseq", "rna-seq", "rna_seq", "featurecounts", "salmon"), BULK_COUNTS),
+    (("deg", "degs", "deseq", "edger", "limma", "volcano", "differential"), DE_RESULTS),
+    (("proteom", "maxquant", "diann", "dia-nn", "tmt", "lfq"), PROTEOMICS),
+    (("metabolom", "metabolite", "lcms", "lc-ms", "gc-ms"), METABOLOMICS),
+)
+
+# Confidence + signal-source ordering (for ranking the candidate list). A neutral verdict
+# (generic/unknown) is demoted below any informative candidate, even a weak filename hint.
+_CONF_RANK = {"certain": 3, "likely": 2, "unsure": 1}
+_SOURCE_RANK = {"user": 4, "format": 3, "content": 2, "filename": 1}
+_NEUTRAL = (GENERIC_TABLE, UNKNOWN)
+
+
+class Candidate(BaseModel):
+    """One ranked data-type guess: ``code`` (engine ``Kind`` or ``erg``), human ``label``,
+    ``confidence`` (``certain | likely | unsure``), the ``source`` signal that proposed it
+    (``user | format | content | filename``), and the ``reason`` (the *why*)."""
+
+    code: str = UNKNOWN
+    label: str = "Unrecognized data"
+    confidence: str = "unsure"
+    source: str = "content"
+    reason: str = ""
+
+
 class DataProfile(BaseModel):
-    """The friendly data-type verdict surfaced on drop. ``code`` is the machine key (an engine
-    ``Kind`` or the ``erg`` profile); ``label`` is the human name; ``confidence`` is one of
-    ``certain | likely | unsure``; ``reason`` is the *why* (the layer that decided), shown so the
-    classification is transparent and the user can correct it."""
+    """The friendly data-type verdict surfaced on drop. ``code``/``label``/``confidence``/``reason``
+    describe the **chosen** (top-ranked) candidate, kept flat for the FE; ``candidates`` is the full
+    ranked list (so the UI can offer "we think X — or maybe Y"); ``mismatch`` is a soft nudge when
+    the filename disagrees with a positive content signal (content still wins). ``overridden`` =
+    the user set the type explicitly — never second-guess them."""
 
     code: str = UNKNOWN
     label: str = "Unrecognized data"
     confidence: str = "unsure"
     reason: str = ""
-    overridden: bool = False  # the user set the type explicitly (L3) — never second-guess them.
+    overridden: bool = False
+    candidates: list[Candidate] = Field(default_factory=list)
+    mismatch: str = ""
 
 
 def _columns_lower(df: Any) -> list[str]:
@@ -98,37 +142,107 @@ def _looks_erg(df: Any) -> bool:
     return has_wave and has_intensity
 
 
-def profile_data(bundle: Any, *, override: str | None = None) -> DataProfile:
-    """Layered, honest data-type label for an ingested ``DataBundle``. ``override`` (the user's
-    L3 choice — an engine ``Kind`` or ``erg``) wins outright. Otherwise: L1 format → L2 ERG
-    columns → L3 modality. Never raises."""
-    if override:
-        code = override.strip().lower()
-        if code == ERG:
-            return DataProfile(code=ERG, label="ERG / electrophysiology", confidence="certain",
-                               reason="You set the data type.", overridden=True)
-        return DataProfile(code=code, label=_KIND_LABEL.get(code, code), confidence="certain",
-                           reason="You set the data type.", overridden=True)
+def _label_for(code: str) -> str:
+    return "ERG / electrophysiology" if code == ERG else _KIND_LABEL.get(code, code)
 
-    # L1 — file format is certain about the type.
+
+def _filename_hint(filename: str) -> tuple[str, str] | None:
+    """The (code, matched-keyword) a filename hints at, or None. Whole-token match for short keys,
+    substring of the punctuation-stripped name for longer ones (see ``_FILENAME_HINTS``)."""
+    stem = PurePath(filename).stem.lower()
+    tokens = {t for t in re.split(r"[^a-z0-9]+", stem) if t}
+    norm = re.sub(r"[^a-z0-9]+", "", stem)
+    for keywords, code in _FILENAME_HINTS:
+        for kw in keywords:
+            kwn = re.sub(r"[^a-z0-9]+", "", kw)
+            if not kwn:
+                continue
+            hit = (kwn in tokens) if len(kwn) < 5 else (kwn in norm)
+            if hit:
+                return code, kw
+    return None
+
+
+def _modality_candidate(kind: str) -> Candidate:
+    """The content-modality guess from :func:`engine.classify` (covers every non-ERG type, and the
+    neutral generic/unknown fallback)."""
+    reason = ("Modality not recognized — usable as a plain table."
+              if kind in _NEUTRAL else "Recognized from the data's columns/shape.")
+    return Candidate(code=kind, label=_KIND_LABEL.get(kind, _KIND_LABEL[UNKNOWN]),
+                     confidence=_KIND_CONFIDENCE.get(kind, "unsure"), source="content", reason=reason)
+
+
+def _rank_key(c: Candidate) -> tuple[int, int, int]:
+    informative = 0 if c.code in _NEUTRAL else 1
+    return (informative, _CONF_RANK.get(c.confidence, 0), _SOURCE_RANK.get(c.source, 0))
+
+
+def _rank_dedupe(cands: list[Candidate]) -> list[Candidate]:
+    """Keep the strongest candidate per code, ranked best-first (a neutral verdict sinks below any
+    informative one, so a weak filename hint can still surface above a bare "Data table")."""
+    best: dict[str, Candidate] = {}
+    for c in cands:
+        cur = best.get(c.code)
+        if cur is None or _rank_key(c) > _rank_key(cur):
+            best[c.code] = c
+    return sorted(best.values(), key=_rank_key, reverse=True)
+
+
+def _detect(bundle: Any) -> tuple[list[Candidate], Candidate | None]:
+    """Auto-detect (no override): the ranked candidate list + the filename-hint candidate (if any),
+    so the caller can build the mismatch nudge. Always returns at least the modality candidate."""
     fname = getattr(getattr(bundle, "source", None), "filename", "") or ""
-    if PurePath(fname).suffix.lower() in _ERG_FORMATS:
-        return DataProfile(code=ERG, label="ERG / electrophysiology", confidence="certain",
-                           reason=f"{PurePath(fname).suffix} is a native electrophysiology format.")
+    cands: list[Candidate] = []
 
-    # L2 — high-precision ERG column signature on a tabular payload.
+    # Format — certain about the type regardless of contents.
+    suffix = PurePath(fname).suffix.lower()
+    if suffix in _ERG_FORMATS:
+        cands.append(Candidate(code=ERG, label=_label_for(ERG), confidence="certain", source="format",
+                               reason=f"{suffix} is a native electrophysiology format."))
+
+    # Content — high-precision ERG column signature, else the engine modality.
     payload = getattr(bundle, "payload", None)
     if _is_dataframe(payload) and _looks_erg(payload):
-        return DataProfile(code=ERG, label="ERG / electrophysiology", confidence="likely",
-                           reason="a-/b-wave amplitude and flash-intensity columns recognized.")
+        cands.append(Candidate(code=ERG, label=_label_for(ERG), confidence="likely", source="content",
+                               reason="a-/b-wave amplitude and flash-intensity columns recognized."))
+    cands.append(_modality_candidate(getattr(bundle, "kind", UNKNOWN)))
 
-    # L3 — the engine modality, as a friendly label.
-    kind = getattr(bundle, "kind", UNKNOWN)
-    label = _KIND_LABEL.get(kind, _KIND_LABEL[UNKNOWN])
-    conf = _KIND_CONFIDENCE.get(kind, "unsure")
-    reason = ("Modality not recognized — usable as a plain table."
-              if kind in (GENERIC_TABLE, UNKNOWN) else "Recognized from the data's columns/shape.")
-    return DataProfile(code=kind, label=label, confidence=conf, reason=reason)
+    # Filename hint — the weakest signal; fills a neutral gap, never overrules content.
+    hint_cand: Candidate | None = None
+    hit = _filename_hint(fname)
+    if hit:
+        code, kw = hit
+        hint_cand = Candidate(code=code, label=_label_for(code), confidence="unsure", source="filename",
+                              reason=f"The filename mentions “{kw}”.")
+        cands.append(hint_cand)
+
+    return _rank_dedupe(cands), hint_cand
+
+
+def profile_data(bundle: Any, *, override: str | None = None) -> DataProfile:
+    """Layered, honest, *general* data-type profile for an ingested ``DataBundle``. ``override``
+    (the user's choice — an engine ``Kind`` or ``erg``) wins outright. Otherwise rank the signals
+    (format → content → filename) and choose the top, surfacing the rest as ``candidates`` and a
+    ``mismatch`` nudge when the filename disagrees with positive content. Never raises."""
+    ranked, hint_cand = _detect(bundle)
+
+    if override:
+        code = override.strip().lower()
+        chosen = Candidate(code=code, label=_label_for(code), confidence="certain", source="user",
+                           reason="You set the data type.")
+        candidates = _rank_dedupe([chosen, *ranked])
+        return DataProfile(code=chosen.code, label=chosen.label, confidence=chosen.confidence,
+                           reason=chosen.reason, overridden=True, candidates=candidates)
+
+    chosen = ranked[0]
+    mismatch = ""
+    # The filename disagrees with a *positive* content/format verdict → nudge, don't overrule.
+    if (hint_cand and hint_cand.code != chosen.code
+            and chosen.source in ("format", "content") and chosen.code not in _NEUTRAL):
+        mismatch = (f"The filename suggests {hint_cand.label}, but the data looks like "
+                    f"{chosen.label}. The data content wins — override if the name is right.")
+    return DataProfile(code=chosen.code, label=chosen.label, confidence=chosen.confidence,
+                       reason=chosen.reason, overridden=False, candidates=ranked, mismatch=mismatch)
 
 
 # --- cleaning plan (the dynamic pane) ---------------------------------------------------

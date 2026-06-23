@@ -52,6 +52,54 @@ def test_profile_user_override_wins():
     assert p.code == ERG and p.confidence == "certain" and p.overridden is True
 
 
+# --- profile: general candidates + filename layer (all modalities, not ERG-only) --------
+
+def test_profile_returns_ranked_candidates_with_source_and_reason():
+    # Every profile carries a ranked candidate list; the top equals the flat verdict, and each
+    # candidate is self-describing (source signal + why) so the FE can offer alternatives.
+    p = profile_data(_bundle(pd.DataFrame({"gene": ["A"], "logFC": [1.0], "padj": [0.01]}), DE_RESULTS))
+    assert p.candidates and p.candidates[0].code == p.code == DE_RESULTS
+    assert all(c.source and c.reason for c in p.candidates)
+
+
+def test_profile_filename_hint_fills_neutral_gap():
+    # Content can't type it (generic), but the NAME says single-cell → propose sc_counts at low
+    # confidence (general across modalities, not an ERG special-case), never a false "certain".
+    df = pd.DataFrame({"x": [1.0, 2.0], "y": [3.0, 4.0]})
+    p = profile_data(_bundle(df, GENERIC_TABLE, filename="GSE123_scRNA_counts.csv"))
+    assert p.code == SC_COUNTS and p.confidence == "unsure"
+    chosen = p.candidates[0]
+    assert chosen.source == "filename" and "scrna" in chosen.reason.lower()
+    # the neutral "Data table" stays available as a lower-ranked alternative
+    assert any(c.code == GENERIC_TABLE for c in p.candidates)
+
+
+def test_profile_content_outranks_filename_with_mismatch_nudge():
+    # The name says scRNA but the content is a bulk count matrix → content wins; a mismatch nudge
+    # is raised (not an overrule). This is the "metrics CSV misread by its name" guard, generalized.
+    df = pd.DataFrame({"gene": [f"g{i}" for i in range(20)],
+                       **{f"s{j}": [(i + j) % 5 for i in range(20)] for j in range(3)}})
+    p = profile_data(_bundle(df, BULK_COUNTS, filename="scRNA_experiment.csv"))
+    assert p.code == BULK_COUNTS
+    assert p.mismatch and "single-cell" in p.mismatch.lower()
+
+
+def test_profile_filename_short_token_no_false_positive():
+    # Short keys (erg/deg) match whole tokens only — "merge"/"degradation" must NOT trip them.
+    df = pd.DataFrame({"x": [1.0], "y": [2.0]})
+    p = profile_data(_bundle(df, GENERIC_TABLE, filename="merge_degradation.csv"))
+    assert p.code == GENERIC_TABLE and not p.mismatch
+
+
+def test_profile_override_keeps_auto_detected_candidate():
+    # Override wins, but the auto verdict survives in candidates so the FE can offer "reset to auto".
+    df = pd.DataFrame({"gene": [f"g{i}" for i in range(10)],
+                       **{f"s{j}": [(i + j) % 4 for i in range(10)] for j in range(2)}})
+    p = profile_data(_bundle(df, BULK_COUNTS), override="erg")
+    assert p.code == ERG and p.overridden is True
+    assert any(c.code == BULK_COUNTS for c in p.candidates)
+
+
 # --- cleaning plan: dynamic --------------------------------------------------------------
 
 def test_plan_erg_is_empty_no_gene_cleaning():
