@@ -81,6 +81,21 @@ _NOTES: dict[str, tuple[str, bool]] = {
 _DEFAULT_NOTE = "No routing available for this input."
 
 
+# Profile pipelines — for data-type *profiles* that ride atop a Kind (engine.cleaning), e.g. an
+# ERG table is a `generic_table` modality but, once recognized, routes to the electrophysiology
+# figure skills rather than the generic pca/corr_heatmap options.
+_PROFILE_PIPELINES: dict[str, list[tuple[str, str, str]]] = {
+    "erg": [
+        ("erg_traces", "visualize", "ERG waveform small-multiples grid"),
+        ("erg_bwave_bar", "analyze", "peak b-wave per condition (mean ± SEM, every eye plotted)"),
+        ("erg_intensity_response", "analyze", "b-wave vs flash intensity + Naka-Rushton fit"),
+    ],
+}
+_PROFILE_NOTES: dict[str, str] = {
+    "erg": "ERG / electrophysiology data — the electrophysiology figure skills.",
+}
+
+
 def route_data(bundle: Any) -> DataRouting:
     """Suggest a skill pipeline for a classified ``DataBundle``. Skills are filtered to the
     live registry, so the suggestion reflects what is actually runnable; an empty pipeline is
@@ -99,3 +114,24 @@ def route_data(bundle: Any) -> DataRouting:
         note = "Suggested analyses for this modality are not installed yet."
         confident = False
     return DataRouting(kind=kind, steps=steps, confident=confident and bool(steps), note=note)
+
+
+def route_profile(bundle: Any, profile_code: str | None = None) -> DataRouting:
+    """Routing that honours a recognized data-type *profile* (engine.cleaning). For a profile with
+    its own pipeline (e.g. ``erg``) suggest those skills; otherwise fall back to modality routing.
+    Same registry-validation + honest-empty contract as :func:`route_data`."""
+    if profile_code and profile_code in _PROFILE_PIPELINES:
+        from skills.registry import list_skill_ids
+
+        installed = set(list_skill_ids())
+        steps = [
+            SuggestedStep(skill_id=sid, role=role, reason=reason)
+            for sid, role, reason in _PROFILE_PIPELINES[profile_code]
+            if sid in installed
+        ]
+        note = _PROFILE_NOTES.get(profile_code, _DEFAULT_NOTE)
+        if not steps:
+            note = "The skills for this data type are not installed yet."
+        return DataRouting(kind=getattr(bundle, "kind", ""), steps=steps,
+                           confident=bool(steps), note=note)
+    return route_data(bundle)

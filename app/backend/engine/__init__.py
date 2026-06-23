@@ -11,9 +11,10 @@ Ingest registry (``engine.ingest``) and QC (``engine.qc``) follow.
 from __future__ import annotations
 
 from engine.databundle import DataBundle, classify
+from engine.cleaning import CleaningPlan, DataProfile, plan_cleaning, profile_data
 from engine.ingest import ingest
 from engine.qc import run_qc
-from engine.route import route_data
+from engine.route import route_data, route_profile
 from engine.models import (
     ALL_KINDS,
     BULK_COUNTS,
@@ -34,6 +35,11 @@ __all__ = [
     "ingest",
     "run_qc",
     "route_data",
+    "route_profile",
+    "plan_cleaning",
+    "profile_data",
+    "CleaningPlan",
+    "DataProfile",
     "ALL_KINDS",
     "SC_COUNTS",
     "BULK_COUNTS",

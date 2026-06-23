@@ -361,13 +361,14 @@ def _inspect_for_run(path: str, filename: str | None):
 
 
 @app.post("/data/inspect")
-async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str | None = None):
-    # Engine spine front door (P1, docs/engine-spine/spec.md): drop a data file -> its modality
-    # (Kind) + an "is-my-data-clean?" QC report. Product A's entry point; library-only, runs no
-    # analysis. ingest() classifies the loaded payload; run_qc() emits honest, modality-aware flags
-    # the user reads and can override. The cheap routing inventory in extract.ingest is the
-    # paper-side complement. `sheet` selects an xlsx sheet; `hint` forces the modality.
-    from engine import ALL_KINDS, ingest, route_data, run_qc
+async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str | None = None,
+                       profile: str | None = None):
+    # Engine spine front door (P1, docs/engine-spine/spec.md): drop a data file -> its layered
+    # data-type (format -> keywords -> modality), an "is-my-data-clean?" QC report, AND the dynamic
+    # cleaning plan for that type. Product A's entry point; library-only, runs no analysis. The cheap
+    # routing inventory in extract.ingest is the paper-side complement. `sheet` selects an xlsx sheet;
+    # `hint` forces the modality (Kind); `profile` is the user's L3 data-type override (e.g. "erg").
+    from engine import ALL_KINDS, ingest, plan_cleaning, profile_data, route_profile, run_qc
     from engine import compat
 
     if hint is not None and hint not in ALL_KINDS:
@@ -375,9 +376,11 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
     path = _save_upload(matrix)
     try:
         bundle = ingest(path, hint=hint, sheet=sheet)
+        bundle.source.filename = pathlib.Path(matrix.filename or "").name  # honest name (drives L1)
         bundle.qc = run_qc(bundle)
-        routing = route_data(bundle)               # which analyses fit this modality (P3 guidance)
-        bundle.source.filename = pathlib.Path(matrix.filename or "").name  # honest name
+        prof = profile_data(bundle, override=profile)   # the friendly, layered data-type label
+        plan = plan_cleaning(bundle, profile=prof)      # the dynamic cleaning pane (kind-aware)
+        routing = route_profile(bundle, prof.code)      # which analyses fit this data (P3 guidance)
         # Data-fit (Slice 2, product-agnostic): score THIS file against the analyses it routes to —
         # the same confidence band ("Confident / Not a fit / …") Product B shows, now for own data.
         fa = compat.assess_bundle(bundle)
@@ -395,6 +398,8 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
     return {
         "filename": matrix.filename or "",
         "kind": bundle.kind,
+        "profile": prof.model_dump(),              # layered data-type label (format/keywords/modality)
+        "cleaning_plan": plan.model_dump(),        # the dynamic "before & after cleaning" pane
         "source": bundle.source.model_dump(),
         "qc": bundle.qc.model_dump(),
         "routing": routing.model_dump(),           # suggested skill pipeline + honest note
@@ -425,6 +430,16 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
         # run from the same DataBundle. Fail-soft — an uninspectable upload yields no bundle and runs
         # the path-based way (byte-identical), so the guardrail never breaks a previously-valid run.
         bundle, qc, routing = _inspect_for_run(path, matrix.filename)
+        # The layered data-type label + dynamic cleaning plan ride the run too (cheap — the bundle
+        # is already in memory), and upgrade the modality routing to be profile-aware (e.g. an ERG
+        # table suggests the electrophysiology skills, not the generic table options).
+        prof = plan = None
+        if bundle is not None:
+            from engine import plan_cleaning, profile_data, route_profile
+
+            prof = profile_data(bundle)
+            plan = plan_cleaning(bundle, profile=prof)
+            routing = route_profile(bundle, prof.code)
         if qc is not None and qc.blocked and not override:
             raise HTTPException(status_code=422, detail={
                 "error": "data_check_failed",
@@ -433,9 +448,17 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
                 "kind": bundle.kind,
                 "qc": qc.model_dump(),
                 "routing": routing.model_dump() if routing is not None else None,
+                "profile": prof.model_dump() if prof is not None else None,
+                "cleaning_plan": plan.model_dump() if plan is not None else None,
             })
-        figure, table = (run_bundle_with_table(skill_id, bundle, params) if bundle is not None
-                         else run_skill_with_table(skill_id, path, params))
+        try:
+            figure, table = (run_bundle_with_table(skill_id, bundle, params) if bundle is not None
+                             else run_skill_with_table(skill_id, path, params))
+        except ValueError as e:
+            # A runner raises ValueError for a DATA problem (missing columns, no groups, an empty
+            # result) — a 4xx the user can fix, NOT a 5xx outage. Surface the real cause so the FE
+            # shows "missing required columns […]" instead of "the service is unavailable".
+            raise HTTPException(status_code=400, detail=str(e))
         # L3 table synthesis (docs/table-synthesis/spec.md §4 / §8 step 4): a tableless skill that
         # has a deterministic synthesizer gets a canonical Statistics table re-shaped from its OWN
         # figure (S1 read-not-recompute -> tagged synthesized:True, S3), so the FE Statistics node
@@ -464,11 +487,16 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
             "figure_legend": legends.build(spec, params, figure=figure, table=table),
             "guardrails": guardrails.build(spec, path, params),
             "table": table,                              # Statistics node (Pillar 1) | None
-            # The surfaced is-my-data-clean verdict + suggested next steps for THIS run (P1c/P3a).
-            # `kind`=unknown / `qc`=null when the upload couldn't be inspected (fail-soft).
+            # The surfaced is-my-data-clean verdict + suggested next steps for THIS run (P1c/P3a),
+            # plus the layered data-type label + dynamic cleaning plan. `kind`=unknown / nulls when
+            # the upload couldn't be inspected (fail-soft).
             "data_check": ({"kind": bundle.kind, "qc": qc.model_dump(),
-                            "routing": routing.model_dump() if routing is not None else None}
-                           if bundle is not None else {"kind": "unknown", "qc": None, "routing": None}),
+                            "routing": routing.model_dump() if routing is not None else None,
+                            "profile": prof.model_dump() if prof is not None else None,
+                            "cleaning_plan": plan.model_dump() if plan is not None else None}
+                           if bundle is not None
+                           else {"kind": "unknown", "qc": None, "routing": None,
+                                 "profile": None, "cleaning_plan": None}),
             "data_fit": data_fit,                        # is-my-data-good-for-this-skill (Slice 2)
         }
     finally:

@@ -73,5 +73,6 @@ def test_uninspectable_upload_is_fail_soft():
     assert r.status_code == 200
     body = r.json()
     assert body["figure"]["data"]
-    assert body["data_check"] == {"kind": "unknown", "qc": None, "routing": None}
+    assert body["data_check"] == {"kind": "unknown", "qc": None, "routing": None,
+                                  "profile": None, "cleaning_plan": None}
     assert body["data_fit"] is None            # no bundle to score → honest null (Slice 2)
