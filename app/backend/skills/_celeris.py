@@ -529,15 +529,65 @@ def waveforms_long(exp: CelerisExport) -> list[dict]:
     return exp.waveforms
 
 
+def _primary_channel_per_eye(exp: CelerisExport) -> dict[str, int]:
+    """The primary recording channel (device ``C``) per eye = the lowest channel index mapping to
+    that eye (same rule as :func:`_parse_waveforms`); later channels are OP-filtered/secondary."""
+    primary: dict[str, int] = {}
+    for ch in sorted(exp.channel_eye):
+        if exp.channel_eye[ch]:
+            primary.setdefault(exp.channel_eye[ch], ch)
+    return primary
+
+
+def flicker_device_metrics(exp: CelerisExport) -> dict[tuple[str, int], dict]:
+    """Device N1→P1 per ``(eye, step)`` for the flicker steps, read from the Marker Table (D2 /
+    R-flicker-3). For each flicker step × eye the device places an N1 (cornea-negative trough) and a
+    P1 (cornea-positive peak) on the primary recording channel → ``n1p1_uv = P1 − N1`` (peak-to-
+    trough, the ISCEV flicker measure), with the P1/N1 implicit times. The ingest materialize path
+    (:func:`read_celeris`) joins these onto the waveform feed so ``erg_flicker`` prefers the device
+    value over its own folded-cycle re-derivation; ``{}`` when the export has no flicker markers."""
+    primary = _primary_channel_per_eye(exp)
+    by_key: dict[tuple[str, int], dict] = {}
+    for m in exp.markers:
+        if exp.stimulus.get(m["step"], {}).get("stimulus_type") != "flicker":
+            continue
+        eye = m["eye"]
+        if eye and primary.get(eye) is not None and m["channel"] != primary[eye]:
+            continue  # keep the primary ERG channel only (skip OP/secondary)
+        name = m["marker_canon"]
+        if name in ("n1", "p1"):
+            by_key.setdefault((eye, m["step"]), {})[name] = (m["amplitude_uv"], m["implicit_ms"])
+    out: dict[tuple[str, int], dict] = {}
+    for key, rec in by_key.items():
+        if "n1" in rec and "p1" in rec and rec["n1"][0] is not None and rec["p1"][0] is not None:
+            out[key] = {
+                "n1p1_uv": round(float(rec["p1"][0]) - float(rec["n1"][0]), 3),
+                "p1_implicit_ms": rec["p1"][1],
+                "n1_implicit_ms": rec["n1"][1],
+            }
+    return out
+
+
 def read_celeris(path: str, *, condition: str | None = None, primary_only: bool = True):
     """Parse a Diagnosys export → the canonical ``erg_waveforms_long`` DataFrame (the ingest
     materialize path, mirroring ``_iwx.read_iwxdata``). By default keeps only the **primary ERG
     channel per eye** (one trace per eye per step — what the trace grid wants); pass
     ``primary_only=False`` to keep secondary/OP + aux channels too. Use :func:`load_export` for all
-    tables (markers, metrics, waveforms)."""
+    tables (markers, metrics, waveforms).
+
+    When the export carries flicker steps, the device N1→P1 markers
+    (:func:`flicker_device_metrics`) ride along as ``device_n1p1_uv`` + ``device_p1_implicit_ms``
+    columns (joined on ``(eye, step)``), so ``erg_flicker`` prefers the device metric (D2). The
+    columns are absent on scotopic/photopic-only feeds (no flicker markers → unchanged output)."""
     import pandas as pd
 
-    df = pd.DataFrame(waveforms_long(load_export(path, condition=condition)))
+    exp = load_export(path, condition=condition)
+    df = pd.DataFrame(waveforms_long(exp))
     if primary_only and not df.empty and "channel_role" in df.columns:
         df = df[df["channel_role"] == "primary"].reset_index(drop=True)
+    dev = flicker_device_metrics(exp)
+    if dev and not df.empty:
+        keys = list(zip(df["eye"], df["step"]))
+        df["device_n1p1_uv"] = [dev.get(k, {}).get("n1p1_uv") for k in keys]
+        df["device_p1_implicit_ms"] = [dev.get(k, {}).get("p1_implicit_ms") for k in keys]
     return df

@@ -3,9 +3,13 @@ steady-state waveform grid (or the N1→P1-vs-frequency summary) + the per-condi
 
 Input CSV (canonical ``erg_waveforms_long``): ``condition``, ``time_ms``, ``voltage_uv``
 (required); ``flicker_hz``, ``stimulus_type``, ``eye``, ``condition_order`` (optional but used).
-The N1→P1 metric is re-derived from the phase-averaged steady-state cycle (``_erg.flicker_landmarks``)
-— the device markers stay authoritative when a fed table carries them, but the materialized waveform
-feed does not, so Selom measures it honestly (caption notes this; R-flicker-3).
+
+The N1→P1 metric prefers the **device markers** when the feed carries them: a Diagnosys export's
+materialize path joins the device N1→P1 on as ``device_n1p1_uv`` + ``device_p1_implicit_ms``
+(``_celeris.flicker_device_metrics``), so the dropped recording drives the device value at each
+frequency (D2 / R-flicker-3, ``source="device"``). With no device column (the iWorx feed, or a
+plain waveform CSV) Selom re-derives N1→P1 from the phase-averaged steady-state cycle
+(``_erg.flicker_landmarks``, ``source="Selom"``). Either way the caption names the source.
 """
 from skills import _erg
 from skills._engine import to_bool
@@ -52,6 +56,8 @@ def run(data_path: str, params: dict) -> dict:
     do_filter = to_bool(params.get("filter", True))
     lowpass = float(params.get("lowpass_hz", 120.0))
     has_hz = "flicker_hz" in df.columns
+    # Device N1→P1 ride-along (Diagnosys materialize path) → prefer it over Selom re-derivation (D2).
+    has_device = "device_n1p1_uv" in df.columns and df["device_n1p1_uv"].notna().any()
 
     # Frequency key per row: the real Hz when present, else the step/group label (no metric then).
     if has_hz:
@@ -78,6 +84,7 @@ def run(data_path: str, params: dict) -> dict:
 
     panels, tbl_rows = [], []
     metric = {}  # (condition, freq) -> n1p1 µV (for the summary view)
+    used_device = False
     peak_uv = 0.0
     for cond in order:
         cd = df[df["condition"] == cond]
@@ -101,13 +108,24 @@ def run(data_path: str, params: dict) -> dict:
             panels.append({"row": row_of[f], "col": col_of[cond], "x": t, "y": y_disp,
                            "color": _erg.COLORS.get(cond), "name": f"{cond} {row_labels[row_of[f]]}",
                            "group": cond})
-            # N1→P1 from the phase-averaged steady-state cycle (raw baseline trace, not the
-            # display-cleaned copy). Needs a real frequency to fold; the step-label fallback can't.
-            lm = _erg.flicker_landmarks(t, y_raw, float(f)) if has_hz else None
-            n1p1 = lm["n1p1_uv"] if lm else None
+            # N1→P1: prefer the device markers riding on the feed (one value per eye → mean across
+            # eyes), else re-derive from the phase-averaged steady-state cycle (raw baseline trace,
+            # not the display-cleaned copy; needs a real frequency to fold).
+            n1p1 = p1_ms = None
+            if has_device and "device_n1p1_uv" in seg_rows.columns:
+                gcol = "eye" if "eye" in seg_rows.columns else "condition"
+                dn = seg_rows.groupby(gcol)["device_n1p1_uv"].first().dropna()
+                dp = seg_rows.groupby(gcol)["device_p1_implicit_ms"].first().dropna()
+                if not dn.empty:
+                    n1p1 = round(float(dn.mean()), 3)
+                    p1_ms = round(float(dp.mean()), 1) if not dp.empty else None
+                    used_device = True
+            if n1p1 is None:
+                lm = _erg.flicker_landmarks(t, y_raw, float(f)) if has_hz else None
+                if lm:
+                    n1p1, p1_ms = lm["n1p1_uv"], lm["p1_implicit_ms"]
             metric[(cond, f)] = n1p1
-            tbl_rows.append([cond, (float(f) if has_hz else f),
-                             n1p1, (lm["p1_implicit_ms"] if lm else None), n_eyes])
+            tbl_rows.append([cond, (float(f) if has_hz else f), n1p1, p1_ms, n_eyes])
 
     if not panels:
         raise ValueError("erg_flicker: no flicker panels built from input")
@@ -121,6 +139,7 @@ def run(data_path: str, params: dict) -> dict:
     table_rows = [[c, hz, _erg.disp_round(v, factor) if v is not None else "—",
                    (p1 if p1 is not None else "—"), n]
                   for c, hz, v, p1, n in tbl_rows]
+    source = "device" if used_device else "Selom"  # honest provenance (R-honesty-1 / R-flicker-3)
 
     if view == "summary":
         if not has_hz:
@@ -136,12 +155,12 @@ def run(data_path: str, params: dict) -> dict:
             raise ValueError("erg_flicker: no N1→P1 amplitudes to plot for the summary view.")
         spec = freq_spec(cond_series, unit=unit, factor=factor,
                          title="Flicker N1–P1 vs frequency")
-        spec["table"] = flicker_table(table_rows, unit)
+        spec["table"] = flicker_table(table_rows, unit, source=source)
         return jsonable(spec)
 
     title = "Flicker ERG (" + ", ".join(row_labels) + ")" if has_hz else "Flicker ERG"
     spec = flicker_grid(panels, nrows=len(freqs), ncols=len(order),
                         row_labels=row_labels, col_labels=col_labels,
                         params=params, unit=unit, factor=factor, title=title)
-    spec["table"] = flicker_table(table_rows, unit)
+    spec["table"] = flicker_table(table_rows, unit, source=source)
     return jsonable(spec)
