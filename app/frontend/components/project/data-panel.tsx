@@ -5,12 +5,14 @@ import { Database, FileSpreadsheet, Plus, ShieldAlert, X } from "lucide-react";
 import { IntakeQuestionnaire } from "@/components/intake/intake-questionnaire";
 import { Dropzone } from "./dropzone";
 import { CleaningReport } from "./cleaning-report";
+import { DataTypeStrip } from "./data-type-strip";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
 import { modalityColor } from "@/lib/catalog/modality";
 import { datasetDisplayName } from "@/lib/lineage/family";
 import { detectModality, proposeForModality, type IntakeProposal } from "@/lib/intake/mock";
+import { inspectData, modalityFromKind, qcFromInspect, type DataTypeOverride } from "@/lib/intake/inspect";
 import { projectStore } from "@/lib/projects/store";
 import type { Dataset } from "@/lib/projects/types";
 
@@ -26,6 +28,9 @@ export interface AnalyzeArgs {
 interface Active {
   dataset: Dataset;
   file: File;
+  /** True when `file` holds the real dropped bytes (so we can (re)classify it live); false for a
+   *  re-opened dataset whose bytes were lost — its persisted profile is shown read-only. */
+  real: boolean;
 }
 
 export function DataPanel({
@@ -46,15 +51,46 @@ export function DataPanel({
   const [designFile, setDesignFile] = React.useState<File | null>(null);
   // Cleaning steps the user has switched off for the active dataset (before/after editor).
   const [disabledSteps, setDisabledSteps] = React.useState<Set<string>>(new Set());
+  // The live engine inspect is in flight for the active dataset (drop or data-type override).
+  const [inspecting, setInspecting] = React.useState(false);
 
   React.useEffect(() => {
     setDisabledSteps(new Set());
   }, [active?.dataset.id]);
 
+  // Classify the dropped bytes against the live engine and apply the real modality + cleaning/QC
+  // verdict, replacing the optimistic filename-only guess. Fail-soft: a null result (offline /
+  // dev:mock / uninspectable) keeps the guess so the flow is never broken. `override` is the user's
+  // explicit data-type choice (the L3 layer). Tagged by dataset id so a late response from a
+  // previous file can't clobber a newer active dataset.
+  const runInspect = React.useCallback(
+    async (dataset: Dataset, file: File, override?: DataTypeOverride) => {
+      setInspecting(true);
+      const result = await inspectData(file, override);
+      setInspecting(false);
+      if (!result) return;
+      const modality = modalityFromKind(result.kind);
+      const qc = qcFromInspect(result);
+      projectStore.updateDatasetProfile(dataset.id, { modality, qc });
+      setActive((a) => (a && a.dataset.id === dataset.id
+        ? { ...a, dataset: { ...a.dataset, modality, qc } }
+        : a));
+    },
+    [],
+  );
+
   function ingest(file: File) {
     const modality = detectModality(file.name);
     const dataset = projectStore.addDataset(projectId, file.name, modality);
-    setActive({ dataset, file });
+    setActive({ dataset, file, real: true });
+    setDisabledSteps(new Set());
+    void runInspect(dataset, file);
+  }
+
+  // The user corrects the detected data type (L3 override). Needs the real bytes to re-classify.
+  function setDataType(code: DataTypeOverride) {
+    if (!active?.real) return;
+    void runInspect(active.dataset, active.file, code);
   }
 
   // Consume a file handed over from the Overview drop. Guard with a ref so a given
@@ -70,8 +106,9 @@ export function DataPanel({
   }, [incomingFile]);
 
   function analyzeExisting(dataset: Dataset) {
-    // Seeded datasets have no File object — synthesize one (the mock ignores bytes).
-    setActive({ dataset, file: new File(["mock"], dataset.filename) });
+    // A re-opened dataset's real bytes are gone (only metadata persists) — synthesize a placeholder
+    // and mark it not-real, so its persisted profile shows read-only (no bogus re-classify of "mock").
+    setActive({ dataset, file: new File(["mock"], dataset.filename), real: false });
   }
 
   return (
@@ -168,9 +205,11 @@ export function DataPanel({
                     <p className="truncate text-sm font-medium text-foreground">{datasetDisplayName(d)}</p>
                     <p className="tabular text-xs text-muted-foreground">
                       {d.label ? `${d.filename} · ` : ""}
-                      {d.modality}
+                      {d.qc?.profileLabel ?? d.modality}
                       {d.qc ? ` · ${d.qc.nObs.toLocaleString()} × ${d.qc.nVar.toLocaleString()}` : ""}
-                      {d.qc?.cleaning.length ? ` · ${d.qc.cleaning.length} cleaning steps` : ""}
+                      {d.qc?.applies && d.qc.cleaningSteps?.length
+                        ? ` · ${d.qc.cleaningSteps.length} cleaning steps`
+                        : ""}
                     </p>
                   </div>
                   {warns > 0 && (
@@ -193,6 +232,13 @@ export function DataPanel({
       <div>
         {active ? (
           <Card className="space-y-5 p-5">
+            <DataTypeStrip
+              qc={active.dataset.qc}
+              modality={active.dataset.modality}
+              inspecting={inspecting}
+              canOverride={active.real}
+              onSetDataType={setDataType}
+            />
             {active.dataset.qc && (
               <CleaningReport
                 qc={active.dataset.qc}

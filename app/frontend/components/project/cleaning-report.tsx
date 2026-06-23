@@ -40,9 +40,36 @@ export function CleaningReport({
   onToggleStep: (id: string) => void;
 }) {
   const steps = qc.cleaningSteps ?? [];
-  const L = labelsFor(modality);
+  // Axis labels come from the engine (cells/genes, samples/genes, rows/columns…) when classified
+  // live; fall back to the modality default for the offline/mock path.
+  const eng = labelsFor(modality);
+  const L = { obs: qc.obsLabel ?? eng.obs, var: qc.varLabel ?? eng.var };
   const rawObs = qc.nObsRaw ?? qc.nObs;
   const rawVar = qc.nVarRaw ?? qc.nVar;
+  // Dynamic: only a count matrix gets the before/after cleaning editor. A results / generic / ERG
+  // table is used as-is — an honest empty state, never the gene-subset cleaning forced on every file.
+  const applies = qc.applies ?? steps.length > 0;
+
+  if (!applies) {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm font-semibold text-foreground">Cleaning</p>
+        <div className="rounded-lg border border-border bg-background/40 p-3">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Your data</p>
+          <p className="tabular mt-1.5 text-lg font-semibold leading-none text-foreground">
+            {rawObs.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{L.obs}</span>
+            <span className="px-1.5 text-xs font-normal text-muted-foreground">×</span>
+            {rawVar.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{L.var}</span>
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            {qc.cleaning?.[0] ?? "Used as-is — no cleaning needed for this data type."}
+          </p>
+        </div>
+        {qc.guardrails.length > 0 && <Guardrails guardrails={qc.guardrails} />}
+      </div>
+    );
+  }
+
   const obsAfter = rawObs + steps.filter((s) => !disabledSteps.has(s.id)).reduce((a, s) => a + (s.obsDelta ?? 0), 0);
   const varAfter = rawVar + steps.filter((s) => !disabledSteps.has(s.id)).reduce((a, s) => a + (s.varDelta ?? 0), 0);
 
@@ -100,26 +127,31 @@ export function CleaningReport({
       )}
 
       {/* guardrails ride alongside — the WHY behind the steps */}
-      {qc.guardrails.length > 0 && (
-        <div className="space-y-1.5">
-          {qc.guardrails.map((g, i) => (
-            <div
-              key={i}
-              className={cn(
-                "flex items-start gap-2 rounded-md border px-3 py-2 text-xs",
-                g.level === "error"
-                  ? "border-destructive/40 bg-destructive/10 text-destructive"
-                  : g.level === "warn"
-                    ? "border-warn/40 bg-warn/10 text-warn"
-                    : "border-border bg-background/40 text-muted-foreground",
-              )}
-            >
-              <ShieldAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-              <span className="leading-relaxed">{g.msg}</span>
-            </div>
-          ))}
+      {qc.guardrails.length > 0 && <Guardrails guardrails={qc.guardrails} />}
+    </div>
+  );
+}
+
+/** Honest data-quality flags — the WHY behind (or instead of) the cleaning steps. */
+function Guardrails({ guardrails }: { guardrails: QcReport["guardrails"] }) {
+  return (
+    <div className="space-y-1.5">
+      {guardrails.map((g, i) => (
+        <div
+          key={i}
+          className={cn(
+            "flex items-start gap-2 rounded-md border px-3 py-2 text-xs",
+            g.level === "error"
+              ? "border-destructive/40 bg-destructive/10 text-destructive"
+              : g.level === "warn"
+                ? "border-warn/40 bg-warn/10 text-warn"
+                : "border-border bg-background/40 text-muted-foreground",
+          )}
+        >
+          <ShieldAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          <span className="leading-relaxed">{g.msg}</span>
         </div>
-      )}
+      ))}
     </div>
   );
 }

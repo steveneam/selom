@@ -33,7 +33,8 @@ export interface CleaningStep {
   varDelta?: number;
 }
 
-/** Ingest + QC report produced on upload (mock now → `POST /upload`, phase B2). */
+/** Ingest + QC report produced on upload. Now sourced from the real engine `/data/inspect`
+ *  (lib/intake/inspect.ts → qcFromInspect); the filename-only mock is the fail-soft fallback. */
 export interface QcReport {
   detectedModality: Modality;
   /** Post-cleaning shape (analysis-ready baseline). */
@@ -47,6 +48,21 @@ export interface QcReport {
   /** Structured, toggleable cleaning steps (before/after + edit-before-proceed). */
   cleaningSteps?: CleaningStep[];
   guardrails: Guardrail[];
+  // --- engine data-type profile (lib/intake/inspect.ts), when classified live -------------
+  /** Friendly data-type label from the layered detector ("ERG / electrophysiology",
+   *  "Data table", "Bulk RNA-seq counts"…). Falls back to `detectedModality` when absent. */
+  profileLabel?: string;
+  /** Machine code for the profile (an engine Kind or "erg") — drives the override selector. */
+  profileCode?: string;
+  /** How sure the detector is: certain | likely | unsure. */
+  confidence?: "certain" | "likely" | "unsure";
+  /** The *why* (the layer that decided) — shown so the classification is transparent. */
+  reason?: string;
+  /** Whether any matrix cleaning applies. False ⇒ the table is used as-is (no gene cleaning). */
+  applies?: boolean;
+  /** Axis labels for the detected type (cells/genes, samples/genes, rows/columns…). */
+  obsLabel?: string;
+  varLabel?: string;
 }
 
 /** One uploaded file. Maps to `datasets`. */

@@ -7,6 +7,7 @@ import { compileFixture, getFixtureSet, searchFixture } from "./gene-sets-fixtur
 import { EXPORT_PRESETS, mockExportFile } from "./export-fixture";
 import { FIGURE_STYLES, mockApplyStyle } from "./styles-fixture";
 import { mockExtractChart } from "./extract-fixture";
+import { mockInspect } from "./data-inspect-fixture";
 import { SKILL_PARAM_SPECS } from "./skill-spec-fixture";
 import { REPRO_LEDGERS, REPRO_PAPERS } from "@/lib/reproduction/fixture";
 
@@ -93,6 +94,26 @@ export const handlers = [
       return HttpResponse.json({ detail: "missing calibration param 'x_px0'" }, { status: 400 });
     }
     return HttpResponse.json(mockExtractChart(url.searchParams.get("form") ?? "bar", url.searchParams));
+  }),
+  // Engine front door (P1): the layered data-type profile + dynamic cleaning plan. The mock reads
+  // only the CSV header, so it matches the live engine's CLASSIFICATION (esp. ERG → no gene
+  // cleaning) offline; matrix deltas are omitted (verify real content against the live backend).
+  http.post("/api/data/inspect", async ({ request }) => {
+    const url = new URL(request.url);
+    const override = url.searchParams.get("profile") || url.searchParams.get("hint") || undefined;
+    let filename = "data.csv";
+    let header = "";
+    try {
+      const fd = await request.formData();
+      const f = fd.get("matrix");
+      if (f instanceof File) {
+        filename = f.name;
+        header = (await f.text()).split(/\r?\n/)[0] ?? "";
+      }
+    } catch {
+      /* no body / unreadable — fall through to the generic-table default */
+    }
+    return HttpResponse.json(mockInspect(filename, header, override));
   }),
   http.post("/api/skills/:skillId/run", async ({ params, request }) => {
     // A real upload would parse `matrix`; the stub is input-independent by design,

@@ -195,6 +195,19 @@ export const projectStore = {
     setState({ ...state, datasets: [...state.datasets, d] });
     return d;
   },
+  /** Apply the live engine inspect result to a dataset (lib/intake/inspect.ts): the real
+   *  modality + cleaning/QC report, replacing the optimistic filename-only guess. Persisted, so
+   *  re-opening the dataset shows the real verdict without re-uploading the bytes. */
+  updateDatasetProfile(id: string, patch: { modality?: Modality; qc?: import("./types").QcReport }) {
+    setState({
+      ...state,
+      datasets: state.datasets.map((d) =>
+        d.id === id
+          ? { ...d, modality: patch.modality ?? d.modality, qc: patch.qc ?? d.qc }
+          : d,
+      ),
+    });
+  },
   /** Rename a dataset (Pillar 1 family). An empty label clears the override (back to
    *  the filename); the change propagates to every figure/stat chip built on it. */
   renameDataset(id: string, label: string) {

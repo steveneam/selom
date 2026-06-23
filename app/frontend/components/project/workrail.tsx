@@ -734,8 +734,11 @@ function DatasetRow({
 }) {
   const [editing, setEditing] = React.useState(false);
   const name = datasetDisplayName(dataset);
+  // Prefer the engine's precise data-type label (e.g. "ERG / electrophysiology") over the coarse
+  // modality bucket, so the rail matches the data panel rather than showing a bare "unknown".
+  const typeLabel = dataset.qc?.profileLabel ?? dataset.modality;
   const sub = dataset.qc
-    ? `${dataset.modality} · ${dataset.qc.nObs.toLocaleString()} × ${dataset.qc.nVar.toLocaleString()}`
+    ? `${typeLabel} · ${dataset.qc.nObs.toLocaleString()} × ${dataset.qc.nVar.toLocaleString()}`
     : dataset.modality;
 
   function commit(value: string) {
