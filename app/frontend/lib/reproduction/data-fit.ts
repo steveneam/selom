@@ -11,6 +11,7 @@
 import * as React from "react";
 
 import { paperFiles, usePaperFiles } from "@/lib/paper/run-files";
+import { TONE_COLOR, type ConfidenceTone } from "@/lib/ui/confidence";
 
 export type ConfidenceBand =
   | "confident"
@@ -49,16 +50,29 @@ export interface FileFitReport {
   confidence_label: string;
 }
 
-/** Per-band display metadata — one source for the chip color/tone across both stages. */
+/** Each data-fit band → the shared confidence tone (its colour + icon semantics, app-wide). */
+export const BAND_TONE: Record<ConfidenceBand, ConfidenceTone> = {
+  confident: "positive",
+  usable: "caution",
+  uncertain: "neutral",
+  not_a_fit: "negative",
+  unreadable: "muted",
+};
+
+/**
+ * Per-band display metadata — the band's label + one-line gloss + its colour (drawn from the shared
+ * tone palette, so the chip, the score-bar fill, and the picker dot all read the same green/amber/
+ * slate/red as every other confidence surface).
+ */
 export const CONFIDENCE_META: Record<
   ConfidenceBand,
   { label: string; color: string; short: string }
 > = {
-  confident: { label: "Confident", short: "good data for this analysis", color: "#10b981" },
-  usable: { label: "Usable", short: "fits, with minor data caveats", color: "#f59e0b" },
-  uncertain: { label: "Uncertain", short: "can't confirm this fits — check it", color: "#64748b" },
-  not_a_fit: { label: "Not a fit", short: "wrong data for this analysis", color: "#ef4444" },
-  unreadable: { label: "Unreadable", short: "couldn't open this file", color: "#6b7280" },
+  confident: { label: "Confident", short: "good data for this analysis", color: TONE_COLOR.positive },
+  usable: { label: "Usable", short: "fits, with minor data caveats", color: TONE_COLOR.caution },
+  uncertain: { label: "Uncertain", short: "can't confirm this fits — check it", color: TONE_COLOR.neutral },
+  not_a_fit: { label: "Not a fit", short: "wrong data for this analysis", color: TONE_COLOR.negative },
+  unreadable: { label: "Unreadable", short: "couldn't open this file", color: TONE_COLOR.muted },
 };
 
 /** POST the paper PDF + supplements → the per-file fit ranking (no skills run; cheap). */

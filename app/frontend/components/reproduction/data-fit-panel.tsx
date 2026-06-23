@@ -1,15 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, Loader2, ShieldCheck, ShieldQuestion, ShieldX, TriangleAlert } from "lucide-react";
+import { ChevronDown, Loader2, TriangleAlert } from "lucide-react";
 
 import {
+  BAND_TONE,
   CONFIDENCE_META,
-  type ConfidenceBand,
   type DataFit,
   type FileFitReport,
 } from "@/lib/reproduction/data-fit";
 import { Card } from "@/components/ui/card";
+import { ConfidenceChip } from "@/components/ui/confidence-chip";
 
 /**
  * The dropped-data fit panel (Slice 2). Renders the engine's verdict on each supplement the user
@@ -59,14 +60,6 @@ export function DataFitPanel({
   );
 }
 
-const BAND_ICON: Record<ConfidenceBand, typeof ShieldCheck> = {
-  confident: ShieldCheck,
-  usable: ShieldCheck,
-  uncertain: ShieldQuestion,
-  not_a_fit: ShieldX,
-  unreadable: ShieldQuestion,
-};
-
 function FitCard({ ff }: { ff: FileFitReport }) {
   const [open, setOpen] = React.useState(false);
   const meta = CONFIDENCE_META[ff.confidence];
@@ -75,7 +68,7 @@ function FitCard({ ff }: { ff: FileFitReport }) {
   return (
     <Card className="overflow-hidden p-0">
       <div className="flex items-start gap-3 p-3.5">
-        <BandChip band={ff.confidence} />
+        <ConfidenceChip tone={BAND_TONE[ff.confidence]} label={meta.label} size="md" title={meta.short} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <p className="truncate text-sm font-medium text-foreground" title={ff.filename}>
@@ -134,7 +127,7 @@ export function DataFitVerdict({ fit, skillName }: { fit?: DataFit | null; skill
   return (
     <div className="rounded-xl border border-border bg-card/60 p-4" data-testid="data-fit-verdict">
       <div className="flex items-start gap-3">
-        <BandChip band={fit.confidence} />
+        <ConfidenceChip tone={BAND_TONE[fit.confidence]} label={meta.label} size="md" title={meta.short} />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-foreground">
             Data fit{skillName ? <span className="text-muted-foreground"> · {skillName}</span> : null}
@@ -150,25 +143,6 @@ export function DataFitVerdict({ fit, skillName }: { fit?: DataFit | null; skill
         </div>
       </div>
     </div>
-  );
-}
-
-function BandChip({ band }: { band: ConfidenceBand }) {
-  const meta = CONFIDENCE_META[band];
-  const Icon = BAND_ICON[band];
-  return (
-    <span
-      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold [&_svg]:size-3.5"
-      style={{
-        backgroundColor: `color-mix(in oklab, ${meta.color} 12%, transparent)`,
-        borderColor: `color-mix(in oklab, ${meta.color} 40%, transparent)`,
-        color: `color-mix(in oklab, ${meta.color} 80%, var(--foreground))`,
-      }}
-      title={meta.short}
-    >
-      <Icon />
-      {meta.label}
-    </span>
   );
 }
 

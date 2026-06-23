@@ -10,6 +10,7 @@ import { skillColor, skillIcon } from "@/lib/catalog/modality";
 import type { SkillCatalogEntry } from "@/lib/catalog/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { TintChip } from "@/components/ui/confidence-chip";
 import { SkillDetail } from "@/components/store/skill-detail";
 import {
   ATTRIBUTION_LABEL,
@@ -631,9 +632,7 @@ function FigureRow({
           </p>
         )}
       </div>
-      <span className={cn(chip, "justify-self-start")} style={tint(tm.color)} title={tm.hint}>
-        {tm.label}
-      </span>
+      <TintChip color={tm.color} label={tm.label} size="sm" title={tm.hint} className="justify-self-start" />
       <div className="flex items-center justify-end gap-2" title={`routing confidence ${pct}%`}>
         <div className="h-1.5 w-12 overflow-hidden rounded-full bg-muted">
           <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: heat }} />

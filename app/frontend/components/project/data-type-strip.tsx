@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Microscope, Loader2, Check, AlertTriangle, RotateCcw } from "lucide-react";
+import { Microscope, Loader2, AlertTriangle, RotateCcw } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -9,7 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/cn";
+import { ConfidenceChip } from "@/components/ui/confidence-chip";
+import type { ConfidenceTone } from "@/lib/ui/confidence";
 import type { Modality, QcReport } from "@/lib/projects/types";
 import type { DataTypeOverride } from "@/lib/intake/inspect";
 
@@ -35,10 +36,13 @@ const OVERRIDE_OPTIONS: { code: DataTypeOverride; label: string }[] = [
 ];
 const OVERRIDE_CODES = new Set<string>(OVERRIDE_OPTIONS.map((o) => o.code));
 
-const CONFIDENCE_STYLE: Record<string, string> = {
-  certain: "border-stage-publish/40 bg-[color-mix(in_oklab,var(--stage-publish)_12%,transparent)] text-stage-publish",
-  likely: "border-border bg-muted/60 text-muted-foreground",
-  unsure: "border-warn/40 bg-warn/10 text-warn",
+// The detector's three levels → the shared confidence tones. `likely` maps to the quiet slate
+// `neutral` (deliberately recessive, so a middling guess doesn't shout); `certain` reads strong-green
+// and `unsure` amber, matching every other confidence surface.
+const CONFIDENCE_TONE: Record<"certain" | "likely" | "unsure", ConfidenceTone> = {
+  certain: "positive",
+  likely: "neutral",
+  unsure: "caution",
 };
 
 export function DataTypeStrip({
@@ -86,15 +90,12 @@ export function DataTypeStrip({
               Detected data type
             </span>
             {confidence && !inspecting && (
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-md border px-1.5 py-px text-[10px] font-medium capitalize",
-                  CONFIDENCE_STYLE[confidence] ?? CONFIDENCE_STYLE.unsure,
-                )}
-              >
-                {confidence === "certain" && <Check className="size-3" />}
-                {confidence}
-              </span>
+              <ConfidenceChip
+                tone={CONFIDENCE_TONE[confidence]}
+                label={confidence}
+                size="xs"
+                className="capitalize"
+              />
             )}
           </div>
           <p className="mt-0.5 truncate text-sm font-semibold text-foreground">
