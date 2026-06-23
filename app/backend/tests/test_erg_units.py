@@ -253,6 +253,65 @@ def test_erg_intensity_response_runs_off_waveforms(tmp_path):
     assert ys == sorted(ys), "b-wave should rise with intensity"
 
 
+def test_erg_bwave_bar_patterns_and_legend(tmp_path):
+    """`bar_fill=pattern` gives each condition its own hatch (Fig 1E look); `legend=True` adds a
+    per-condition legend entry. The default (filled, no legend) stays the original look."""
+    from skills.proprietary.erg_bwave_bar.run_real import run as run_bar
+
+    p = tmp_path / "m.csv"
+    _write_metrics(p)
+    fig = run_bar(str(p), {"intensity_group": "Group4", "legend": True})  # real path defaults to pattern
+    pattern = fig["data"][0]["marker"]["pattern"]["shape"]
+    assert pattern == ["", "."]                       # Control solid, Untreated dotted
+    assert fig["layout"]["showlegend"] is True
+    assert sum(1 for t in fig["data"] if t.get("showlegend")) == 2   # one proxy per condition
+    # Explicit filled fill has no pattern key (the byte-identical look the golden stub uses).
+    plain = run_bar(str(p), {"intensity_group": "Group4", "bar_fill": "filled"})
+    assert "pattern" not in plain["data"][0]["marker"]
+    assert plain["layout"]["showlegend"] is False
+
+
+def test_erg_bwave_bar_error_metric(tmp_path):
+    """`error` switches the spread (SEM default → SD/CI95/minmax); the table header + error bars
+    follow. Two eyes/group at base±3 → SD = √18 ≈ 4.24, SEM = SD/√2 ≈ 3.0."""
+    from skills.proprietary.erg_bwave_bar.run_real import run as run_bar
+
+    p = tmp_path / "m.csv"
+    _write_metrics(p)
+    sem = run_bar(str(p), {"intensity_group": "Group4", "error": "sem"})
+    sd = run_bar(str(p), {"intensity_group": "Group4", "error": "sd"})
+    assert any("SEM" in c for c in sem["table"]["columns"])
+    assert any("SD" in c for c in sd["table"]["columns"])
+    assert sd["data"][0]["error_y"]["array"][0] > sem["data"][0]["error_y"]["array"][0]
+    mm = run_bar(str(p), {"intensity_group": "Group4", "error": "minmax"})
+    assert mm["data"][0]["error_y"]["symmetric"] is False  # asymmetric range arms
+    # Error bars are toggleable (owner ask): off → no error_y key at all.
+    off = run_bar(str(p), {"intensity_group": "Group4", "show_error": False})
+    assert "error_y" not in off["data"][0]
+    # Points are toggleable too: off → no eye-points scatter trace.
+    no_pts = run_bar(str(p), {"intensity_group": "Group4", "points": False})
+    assert not any(t.get("name") == "eyes" for t in no_pts["data"])
+
+
+def test_erg_bwave_bar_significance_and_refline(tmp_path):
+    """Significance brackets (computed or overridden) render as bracket shapes + star annotations;
+    `hline` adds a dashed reference line. Control(~saturating) vs Untreated is strongly significant."""
+    from skills.proprietary.erg_bwave_bar.run_real import run as run_bar
+
+    p = tmp_path / "m.csv"
+    _write_metrics(p)
+    fig = run_bar(str(p), {"intensity_group": "Group4", "comparisons": "Control~Untreated",
+                           "hline": "100", "hline_label": "ref"})
+    stars = [a["text"] for a in fig["layout"]["annotations"] if a.get("text") in ("*", "**", "***", "ns")]
+    assert stars and stars[0] in ("*", "**", "***")          # a real difference → significant
+    dashed = [s for s in fig["layout"]["shapes"] if s.get("line", {}).get("dash") == "dash"]
+    assert dashed and dashed[0]["y0"] == 100                  # the reference line at y=100
+    # Manual override wins over the computed value.
+    ov = run_bar(str(p), {"intensity_group": "Group4", "comparisons": "Control~Untreated:ns"})
+    ov_stars = [a["text"] for a in ov["layout"]["annotations"] if a.get("text") in ("*", "**", "***", "ns")]
+    assert ov_stars == ["ns"]
+
+
 def _approx(v, rel=1e-3):
     import pytest
 

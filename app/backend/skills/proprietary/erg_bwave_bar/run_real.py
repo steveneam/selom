@@ -33,6 +33,15 @@ def run(data_path: str, params: dict) -> dict:
     wave_label = "a-wave" if value_col == "a_wave_uv" else (
         "b-wave" if value_col == "b_wave_uv" else value_col)
     show_points = to_bool(params.get("points", True))
+    show_error = to_bool(params.get("show_error", True))
+    # Styling knobs (mean-spread-styling-spec): spread metric, bar look, significance, reference line.
+    error = str(params.get("error", "sem")).strip().lower()
+    bar_fill = str(params.get("bar_fill", "pattern")).strip().lower()
+    sig_test = str(params.get("sig_test", "welch")).strip().lower()
+    legend = to_bool(params.get("legend", False))
+    comparisons = _parse_comparisons(params.get("comparisons", ""))
+    hline = _to_float_or_none(params.get("hline"))
+    vline = _to_float_or_none(params.get("vline"))
 
     # Fan-out path: handed the waveform table (no marker column) → measure the a/b peak from the
     # traces, the owner's "max b-wave peak from the traces at a chosen intensity". Device markers
@@ -99,9 +108,36 @@ def run(data_path: str, params: dict) -> dict:
     spec, tbl_rows = bar_spec(cond_values, intensity_label=intensity_label,
                               title=f"{adapt or 'scotopic'} {wave_label} by condition".capitalize(),
                               unit=unit, factor=factor, show_points=show_points,
-                              wave_label=wave_label)
+                              wave_label=wave_label, error=error, show_error=show_error,
+                              bar_fill=bar_fill,
+                              comparisons=comparisons, sig_test=sig_test,
+                              hline=hline, hline_label=str(params.get("hline_label", "")),
+                              vline=vline, vline_label=str(params.get("vline_label", "")),
+                              legend=legend)
     # Honest provenance (R-honesty-1): device markers vs Selom-measured-from-traces.
     source = "measured from traces" if measured_from_traces else "device markers"
-    spec["table"] = table(["condition", "n (eyes)", f"mean {wave_label} ({unit})", f"SEM ({unit})"],
-                          tbl_rows, title=f"ERG {wave_label} (mean ± SEM, {source})")
+    err_label = _erg.ERR_LABEL.get(error, "SEM")
+    spec["table"] = table(["condition", "n (eyes)", f"mean {wave_label} ({unit})", f"{err_label} ({unit})"],
+                          tbl_rows, title=f"ERG {wave_label} (mean ± {err_label}, {source})")
     return spec
+
+
+def _parse_comparisons(raw):
+    """``"A~B, C~D"`` (or ``;``-separated) → ``[(condA, condB, override), …]`` for the significance
+    brackets. An optional ``:`` suffix overrides the stars — ``"A~B:**"`` (literal stars) or
+    ``"A~B:0.003"`` (a p-value) — else Selom computes them (the Both-available choice). Empty /
+    malformed pairs are skipped (no brackets, not an error)."""
+    out = []
+    for chunk in str(raw or "").replace(";", ",").split(","):
+        pair, _, override = chunk.partition(":")
+        parts = [p.strip() for p in pair.split("~")]
+        if len(parts) == 2 and parts[0] and parts[1]:
+            out.append((parts[0], parts[1], override.strip() or None))
+    return out
+
+
+def _to_float_or_none(v):
+    try:
+        return float(v) if v is not None and str(v).strip() != "" else None
+    except (ValueError, TypeError):
+        return None

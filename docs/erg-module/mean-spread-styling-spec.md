@@ -1,10 +1,36 @@
 # Spec — Mean ± spread, individual points, and trace styling (bar + traces)
 
-Status: **SCOPED — build next session.** Author: Claude (Opus 4.8), 2026-06-24.
+Status: **BAR HALF BUILT (2026-06-24, session T12); TRACE HALF pending C6 for real-n.** Author: Claude (Opus 4.8), 2026-06-24.
 Owner ask (2026-06-24): bar AND traces should show the **mean** with an **optional individual-data-point**
 overlay (n = whatever), and the spread should be selectable as **SEM or SD**. The bar style is
 "straightforward"; the **traces** need several selectable styles (7 reference figures attached, mapped
 below). "Scope this out and plan… build it next session." This is the durable plan.
+
+## Owner decisions (2026-06-24, on the Fig 1E "Scotopic B wave" GraphPad target)
+- **D7 — Spread default = SEM** (SD/CI95/minmax one click away). *Built.*
+- **D8 — Bar fills = replicate the GraphPad hatch patterns** per condition (solid Control + 3'UTR,
+  hatched rest); colour = the Selom condition palette as the hatch foreground; also `filled`/`open`.
+  Real-path default is `pattern`; the golden **stub** stays `filled` (byte-identical). *Built.*
+- **D9 — Significance brackets = "both available":** Selom **computes** the p-value
+  (Welch/Student/Mann–Whitney) and places the stars, AND every star is **overridable** (`A~B:**`
+  or `A~B:0.003` in the `comparisons` string). *Built.*
+- **D10 — Reference line is a GENERAL feature**, not a fixed 50%-WT threshold: the dashed line in
+  the owner's figure is just a manual grouping cue. Expose an "add a line across the axis" knob
+  (`hline`/`vline` + label, dashed). *Built (hline surfaced; vline available in `bar_spec`).*
+- The bar's **values** come from the dropped data + chosen intensity — the owner's GraphPad numbers
+  (~330 µV Control) reflect their own measurement/cohort, not a styling concern; the Selom extraction
+  `D:\selom-data\erg-fig1e\erg_metrics_long.csv` reads ~208 µV at Group4. The styling LOOK is the deliverable.
+
+## Built this session (bar half)
+- `_erg.spread_stats(values, kind)` (sem|sd|ci95|minmax, n<2 guard, asymmetric minmax) · `_erg.rgba` ·
+  `_erg.sig_stars` · `_erg.compare_groups(test=welch|student|mannwhitney)` · `_erg.ERR_LABEL`.
+- `erg_bwave_bar.bar_spec` extended: `error`, `bar_fill` (pattern/filled/open via `marker.pattern.shape`),
+  `comparisons` → significance brackets (shapes + star annotations, computed or overridden), `hline`/`vline`
+  reference lines, optional per-condition pattern `legend` (proxy traces). Default (sem·filled·none) byte-identical.
+- `run_real` param wiring + dynamic table header (`mean ± {SEM|SD|…}`); skill.json + FE `params.ts` controls.
+- Tests: `test_erg_units.py` (patterns/legend · error metric · significance + override · reference line); golden unchanged.
+- **TRACE half still pending** (`central=mean`, band/error/individual reps on the grid) — gated on C6 for real n
+  (one .iwxdata = one eye); the `_tracegrid` overlay hook (M3) is ready to consume.
 
 Sibling of `docs/erg-module/spec.md` + `docs/diagnosys-erg/spec.md`. Applies to `erg_traces` (the grid)
 and `erg_bwave_bar` (the amplitude bar); the primitives are generic (reusable by any future line/bar skill).

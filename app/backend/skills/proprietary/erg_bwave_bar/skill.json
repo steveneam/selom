@@ -15,6 +15,14 @@
     "adaptation": { "type": "str", "default": "auto", "options": ["auto", "scotopic", "photopic"] },
     "stimulus_type": { "type": "str", "default": "" },
     "points": { "type": "bool", "default": true },
+    "show_error": { "type": "bool", "default": true },
+    "error": { "type": "str", "default": "sem", "options": ["sem", "sd", "ci95", "minmax"] },
+    "bar_fill": { "type": "str", "default": "pattern", "options": ["pattern", "filled", "open"] },
+    "legend": { "type": "bool", "default": false },
+    "comparisons": { "type": "str", "default": "" },
+    "sig_test": { "type": "str", "default": "welch", "options": ["welch", "student", "mannwhitney"] },
+    "hline": { "type": "str", "default": "" },
+    "hline_label": { "type": "str", "default": "" },
     "display_unit": { "type": "str", "default": "uV", "options": ["auto", "nV", "uV", "mV", "V"] }
   },
   "outputs": [

@@ -246,6 +246,42 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       help: "Which flash the per-condition a/b-wave bar is taken at — the intensity you set yourself.",
     },
     { key: "points", label: "Show individual eyes", type: "switch", help: "Overlay each eye as a data point (reviewer ask for quantitative graphs)." },
+    { key: "show_error", label: "Show error bars", type: "switch", help: "Show or hide the error bars on each bar." },
+    {
+      key: "error", label: "Error metric", type: "select",
+      options: [
+        { value: "sem", label: "SEM (standard error)" },
+        { value: "sd", label: "SD (standard deviation)" },
+        { value: "ci95", label: "95% CI" },
+        { value: "minmax", label: "Range (min–max)" },
+      ],
+      help: "What the error bars show. SEM is the default; SD shows biological spread; 95% CI is the most defensible for 'is the difference real'.",
+    },
+    {
+      key: "bar_fill", label: "Bar style", type: "select",
+      options: [
+        { value: "pattern", label: "Hatch patterns (per condition)" },
+        { value: "filled", label: "Solid colour" },
+        { value: "open", label: "Open (outline)" },
+      ],
+      help: "Per-condition hatch patterns match the GraphPad Fig 1E look (good for B&W print); solid uses the condition colours; open is white-fill outlined bars.",
+    },
+    { key: "legend", label: "Show legend", type: "switch", help: "A per-condition legend with the pattern/colour swatches (the bars are also labelled on the x-axis)." },
+    {
+      key: "comparisons", label: "Significance brackets", type: "text",
+      help: "Pairs to bracket, e.g. 'Untreated~AAV8-RK-PDE6B, AAV8-RK-GFP-polyA-stuffer~AAV8-RK-PDE6B-3UTR'. Selom computes the stars; override per pair with ':**' or a p-value (':0.003').",
+    },
+    {
+      key: "sig_test", label: "Significance test", type: "select",
+      options: [
+        { value: "welch", label: "Welch t-test (unequal variance)" },
+        { value: "student", label: "Student t-test (equal variance)" },
+        { value: "mannwhitney", label: "Mann–Whitney U (rank)" },
+      ],
+      help: "The test used to compute bracket p-values (when you don't override the stars).",
+    },
+    { key: "hline", label: "Reference line (µV)", type: "text", help: "Draw a dashed horizontal line at this amplitude (leave blank for none) — e.g. a threshold or a group reference." },
+    { key: "hline_label", label: "Reference line label", type: "text", help: "Optional caption for the reference line." },
     {
       key: "display_unit", label: "Display unit", type: "select",
       options: [
