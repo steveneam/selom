@@ -15,6 +15,27 @@ from skills._tracegrid import grid_spec
 _REQUIRED = {"condition", "intensity_group", "time_ms", "voltage_uv"}
 
 
+def _filter_stimulus(df, requested):
+    """Multi-mode exports (Diagnosys) carry scotopic + photopic + flicker steps, each with its own
+    per-mode intensity groups — so a single trace grid must render ONE mode or the intensity rows
+    collide. Filter to ``requested`` if given, else default to scotopic (the canonical dark-adapted
+    ERG), else photopic. A no-op when there is no ``stimulus_type`` column (the iWorx path) — so
+    that path is unchanged."""
+    if "stimulus_type" not in df.columns:
+        return df
+    present = [s for s in df["stimulus_type"].dropna().astype(str).unique() if s]
+    if not present:
+        return df
+    pick = str(requested) if requested else ""
+    if not pick:
+        pick = next((p for p in ("scotopic_flash", "photopic_flash") if p in present), "")
+    if pick:
+        sub = df[df["stimulus_type"].astype(str) == pick]
+        if not sub.empty:
+            return sub
+    return df
+
+
 def run(data_path: str, params: dict) -> dict:
     import pandas as pd
 
@@ -23,6 +44,7 @@ def run(data_path: str, params: dict) -> dict:
     if missing:
         raise ValueError(f"erg_traces: input missing required columns {sorted(missing)}")
 
+    df = _filter_stimulus(df, params.get("stimulus_type", ""))
     role = params.get("role", "representative")
     if "role" in df.columns and role:
         df = df[df["role"].astype(str) == str(role)]

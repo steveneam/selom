@@ -15,6 +15,23 @@ _TRUTHY = {"y", "yes", "true", "1", "t"}
 _REQUIRED = {"condition", "intensity_log_cd_s_m2"}
 
 
+def _filter_stimulus(df, requested):
+    """Keep one stimulus mode for the intensity-response curve. Default = scotopic (the canonical
+    intensity series); a no-op without a ``stimulus_type`` column (iWorx path unchanged)."""
+    if "stimulus_type" not in df.columns:
+        return df
+    present = [s for s in df["stimulus_type"].dropna().astype(str).unique() if s]
+    if not present:
+        return df
+    pick = str(requested) if requested else next(
+        (p for p in ("scotopic_flash", "photopic_flash") if p in present), "")
+    if pick:
+        sub = df[df["stimulus_type"].astype(str) == pick]
+        if not sub.empty:
+            return sub
+    return df
+
+
 def _fit_condition(xs, ys, do_fit, nr_slope, min_r2):
     """Per-condition Naka-Rushton fit.
 
@@ -52,6 +69,8 @@ def run(data_path: str, params: dict) -> dict:
     missing = (_REQUIRED | {value_col}) - set(df.columns)
     if missing:
         raise ValueError(f"erg_intensity_response: input missing required columns {sorted(missing)}")
+
+    df = _filter_stimulus(df, params.get("stimulus_type", ""))
 
     if "qc_excluded" in df.columns:
         df = df[~df["qc_excluded"].astype(str).str.strip().str.lower().isin(_TRUTHY)]

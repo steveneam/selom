@@ -58,6 +58,10 @@ _ERG_FORMATS = (".iwxdata",)
 # a-/b-wave AND an intensity column is a near-zero-false-positive signal (the honesty rule).
 _ERG_WAVE_TOKENS = ("a_wave", "b_wave", "a-wave", "b-wave", "awave", "bwave", "a wave", "b wave")
 _ERG_INTENSITY_TOKENS = ("intensity", "cd_s_m2", "cd.s.m", "cd·s")
+# A raw waveform table (decoded native ERG: a time axis + a voltage column in µV) is just as
+# unambiguously electrophysiology — this catches the materialized .iwxdata / Diagnosys output.
+_ERG_TIME_TOKENS = ("time_ms", "time (ms)", "time_s", "time(ms)")
+_ERG_VOLTAGE_TOKENS = ("voltage_uv", "voltage", "_uv", " uv", "µv")
 
 # Friendly labels per modality Kind (the L3 fallback). Kept human; the FE shows these verbatim.
 _KIND_LABEL: dict[str, str] = {
@@ -139,7 +143,10 @@ def _looks_erg(df: Any) -> bool:
     cols = _columns_lower(df)
     has_wave = any(any(tok in c for tok in _ERG_WAVE_TOKENS) for c in cols)
     has_intensity = any(any(tok in c for tok in _ERG_INTENSITY_TOKENS) for c in cols)
-    return has_wave and has_intensity
+    # Metrics shape: a/b-wave + flash intensity. Waveform shape: a time axis + a voltage column.
+    has_time = any(any(tok in c for tok in _ERG_TIME_TOKENS) for c in cols)
+    has_voltage = any(any(tok in c for tok in _ERG_VOLTAGE_TOKENS) for c in cols)
+    return (has_wave and has_intensity) or (has_time and has_voltage)
 
 
 def _label_for(code: str) -> str:

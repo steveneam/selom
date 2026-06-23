@@ -67,6 +67,15 @@ def _load_iwxdata(path: Path, **_: Any) -> Any:
     return read_iwxdata(str(path))
 
 
+def _load_diagnosys(path: Path, **_: Any) -> Any:
+    # Diagnosys Espion/Celeris export (.txt full multi-table / .csv reduced) → the canonical
+    # erg_waveforms_long DataFrame (all modes, primary channel per eye). Pure-stdlib parse
+    # (skills._celeris); pandas assembled inside read_celeris.
+    from skills._celeris import read_celeris
+
+    return read_celeris(str(path))
+
+
 # --- recognizers ------------------------------------------------------------------------
 
 def _is_h5ad(p: Path) -> bool:
@@ -89,11 +98,25 @@ def _is_iwxdata(p: Path) -> bool:
     return p.suffix.lower() == ".iwxdata"
 
 
+def _is_diagnosys(p: Path) -> bool:
+    # A Diagnosys export wears a .csv/.txt/.tsv extension, so it must be detected by its
+    # magic header (cheap — reads the first line) and recognized BEFORE the generic csv loader.
+    if p.suffix.lower() not in (".csv", ".txt", ".tsv"):
+        return False
+    try:
+        from skills._celeris import is_diagnosys_export
+
+        return is_diagnosys_export(str(p))
+    except Exception:  # noqa: BLE001 — recognition must never raise; fall through to csv
+        return False
+
+
 REGISTRY: tuple[_Loader, ...] = (
     _Loader("h5ad", _is_h5ad, _load_h5ad),
     _Loader("10x_mtx", _is_10x, _load_10x),
     _Loader("xlsx", _is_xlsx, _load_xlsx),
     _Loader("iwxdata", _is_iwxdata, _load_iwxdata, materialize=True),
+    _Loader("diagnosys_erg", _is_diagnosys, _load_diagnosys, materialize=True),  # before csv
     _Loader("csv", _is_csv, _load_csv),
 )
 
