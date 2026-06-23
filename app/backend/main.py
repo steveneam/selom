@@ -335,11 +335,17 @@ async def extract_paper(file: UploadFile):
 
 
 def _save_upload(matrix: UploadFile) -> str:
-    # Preserve the upload's extension so skills can tell .h5ad (scRNA) from .csv (bulk).
-    suffix = pathlib.Path(matrix.filename or "").suffix or ".h5ad"
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
+    # Save into a unique temp subdir under the upload's ORIGINAL name (mirrors _save_capped): the
+    # extension is preserved so skills can tell .h5ad (scRNA) from .csv (bulk), AND the name the
+    # engine derives back from the path matches what the user dropped — so an ERG figure's condition
+    # label / sample id reads as the file stem, not a "tmpXXXX" temp name.
+    name = pathlib.Path(matrix.filename or "").name or "data"
+    if not pathlib.Path(name).suffix:
+        name += ".h5ad"  # default extension so suffix-based kind inference still works
+    path = pathlib.Path(tempfile.mkdtemp()) / name
+    with open(path, "wb") as f:
         shutil.copyfileobj(matrix.file, f)
-        return f.name
+    return str(path)
 
 
 def _inspect_for_run(path: str, filename: str | None):

@@ -581,8 +581,13 @@ def _cepo(p: dict):
     return text, [CEPO, SCANPY]
 
 
+def _erg_adaptation(p: dict) -> str:
+    """Resolve the recording adaptation for the methods wording — ``auto`` reads as scotopic
+    (the default dark-adapted ERG). Mirrors ``_erg.resolve_flash_mode``'s hint."""
+    return "photopic" if str(p.get("adaptation", "auto")).strip().lower() == "photopic" else "scotopic"
+
+
 def _erg_traces(p: dict):
-    ladder = ", ".join(f"{v:g}" for v in _erg.INTENSITIES_LOG)
     filtered = str(p.get("filter", True)).lower() not in ("false", "0", "no")
     lp = float(p.get("lowpass_hz", 120.0) or 120.0)
     display = (
@@ -590,33 +595,48 @@ def _erg_traces(p: dict):
         f"low-pass filtered at {lp:g} Hz while preserving the oscillatory potentials; "
         if filtered else ""
     )
+    representative = (
+        "For each condition a single representative eye is shown, selected as the eye whose full "
+        "amplitude-versus-intensity series lay closest (minimum sum-of-squared deviations) to its "
+        "group mean; cataractous or failed-acquisition eyes were excluded, and representatives are "
+        "labelled as such rather than shown as group means."
+    )
+    if _erg_adaptation(p) == "photopic":
+        text = (
+            "Full-field photopic (cone-driven) electroretinograms were recorded after light "
+            "adaptation against a rod-suppressing background. Responses were elicited by "
+            "light-adapted flashes; sweeps were averaged within each step and baseline-corrected to "
+            f"the pre-stimulus mean. {display}the b-wave was measured from the cornea-negative "
+            "trough to the following cornea-positive peak (the cone a-wave is small or absent under "
+            f"photopic conditions). {representative}"
+        )
+        return text, [ISCEV]
+    ladder = ", ".join(f"{v:g}" for v in _erg.INTENSITIES_LOG)
     text = (
         "Full-field scotopic (rod-driven) electroretinograms were recorded from overnight "
-        "dark-adapted mice with an iWorx/LabScribe data-acquisition system. Responses were elicited "
-        f"by a series of seven flashes of increasing energy ({ladder} log cd·s/m²); sweeps were "
-        "averaged within each intensity and baseline-corrected to the pre-stimulus mean. "
-        f"{display}the a-wave was measured from baseline to the initial cornea-negative trough and "
-        "the b-wave from that trough to the following cornea-positive peak. For each condition a "
-        "single representative eye is shown, selected as the eye whose full b-wave-versus-intensity "
-        "series lay closest (minimum sum-of-squared deviations) to its group mean; cataractous or "
-        "failed-acquisition eyes were excluded, and representatives are labelled as such rather than "
-        "shown as group means."
+        "dark-adapted mice. Responses were elicited by a series of flashes of increasing energy "
+        f"(e.g. {ladder} log cd·s/m²); sweeps were averaged within each intensity and "
+        f"baseline-corrected to the pre-stimulus mean. {display}the a-wave was measured from "
+        "baseline to the initial cornea-negative trough and the b-wave from that trough to the "
+        f"following cornea-positive peak. {representative}"
     )
     return text, [ISCEV]
 
 
 def _erg_bwave_bar(p: dict):
+    mode = _erg_adaptation(p)
     text = (
-        "Peak scotopic b-wave amplitudes at a single flash intensity were compared across conditions. "
+        f"Peak {mode} b-wave amplitudes at a single flash intensity were compared across conditions. "
         "Each bar shows the group mean with the standard error of the mean, and every eye is overlaid "
         "as an individual data point. Amplitudes were measured as the trough-to-peak b-wave on "
-        "baseline-corrected, intensity-averaged traces (iWorx/LabScribe); cataractous or "
-        "failed-acquisition eyes were excluded."
+        "baseline-corrected, intensity-averaged traces; cataractous or failed-acquisition eyes were "
+        "excluded."
     )
     return text, [ISCEV]
 
 
 def _erg_intensity_response(p: dict):
+    mode = _erg_adaptation(p)
     slope = float(p.get("nr_slope", 0.0) or 0.0)
     if slope > 0:
         slope_txt = (f"the slope n was fixed at {slope:g} and Vmax and K were estimated")
@@ -626,14 +646,35 @@ def _erg_intensity_response(p: dict):
             "responder whose slope was under-constrained, n was fixed at a physiological value (1.0)"
         )
     text = (
-        "b-wave amplitude was plotted against flash intensity for each condition (mean ± standard "
-        "error across eyes). The intensity-response relationship was fit per condition with the "
-        "Naka-Rushton function V = Vmax·Iⁿ/(Iⁿ + Kⁿ), where I is flash energy, Vmax the saturated "
-        f"amplitude, K the semi-saturation intensity and n the slope; {slope_txt} by bounded "
-        "non-linear least-squares regression (SciPy). Conditions whose response did not support a "
-        "saturating fit were left unfit."
+        f"{mode.capitalize()} b-wave amplitude was plotted against flash intensity for each condition "
+        "(mean ± standard error across eyes). The intensity-response relationship was fit per "
+        "condition with the Naka-Rushton function V = Vmax·Iⁿ/(Iⁿ + Kⁿ), where I is flash energy, "
+        f"Vmax the saturated amplitude, K the semi-saturation intensity and n the slope; {slope_txt} "
+        "by bounded non-linear least-squares regression (SciPy). Conditions whose response did not "
+        "support a saturating fit were left unfit."
     )
     return text, [ISCEV, NAKA_RUSHTON, SCIPY]
+
+
+def _erg_flicker(p: dict):
+    filtered = str(p.get("filter", True)).lower() not in ("false", "0", "no")
+    lp = float(p.get("lowpass_hz", 120.0) or 120.0)
+    display = (
+        f" For display, traces were notch-filtered for mains/instrument line noise and low-pass "
+        f"filtered at {lp:g} Hz."
+        if filtered else ""
+    )
+    text = (
+        "Light-adapted flicker electroretinograms were recorded under a rod-suppressing background. "
+        "For each flicker frequency the steady-state response was phase-averaged into a single "
+        "representative cycle, and the N1–P1 amplitude — the cornea-negative trough to the following "
+        "cornea-positive peak — together with the P1 implicit time were measured from that averaged "
+        "cycle. The steady-state waveform is shown per condition; where more than one flicker "
+        "frequency was recorded, N1–P1 amplitude is also plotted against frequency. No a-/b-wave or "
+        "saturating intensity-response model is applied, as the flicker response is a periodic "
+        f"steady-state measure rather than a flash transient.{display}"
+    )
+    return text, [ISCEV]
 
 
 _TEMPLATES = {
@@ -641,6 +682,7 @@ _TEMPLATES = {
     "erg_traces": _erg_traces,
     "erg_bwave_bar": _erg_bwave_bar,
     "erg_intensity_response": _erg_intensity_response,
+    "erg_flicker": _erg_flicker,
     "integration": _integration,
     "boxplot": _boxplot,
     "pvca": _pvca,

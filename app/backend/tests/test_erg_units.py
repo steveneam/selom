@@ -39,6 +39,36 @@ def test_resolve_display_unit_explicit_and_auto():
     assert _erg.resolve_display_unit("auto", 0.0) == "µV"
 
 
+def test_resolve_flash_mode():
+    present = ["scotopic_flash", "photopic_flash", "flicker"]
+    # auto → scotopic (the canonical dark-adapted ERG) when present.
+    assert _erg.resolve_flash_mode(present, "auto", "") == ("scotopic_flash", "scotopic")
+    # the friendly adaptation hint maps to the stimulus_type.
+    assert _erg.resolve_flash_mode(present, "photopic", "") == ("photopic_flash", "photopic")
+    assert _erg.resolve_flash_mode(present, "scotopic", "") == ("scotopic_flash", "scotopic")
+    # explicit stimulus_type wins over the hint.
+    assert _erg.resolve_flash_mode(present, "scotopic", "photopic_flash") == ("photopic_flash", "photopic")
+    # no stimulus column (iWorx path): nothing present → no pick, no filter, no label.
+    assert _erg.resolve_flash_mode([], "auto", "") == ("", "")
+    # auto falls back to photopic when only photopic is present.
+    assert _erg.resolve_flash_mode(["photopic_flash"], "auto", "") == ("photopic_flash", "photopic")
+
+
+def test_flicker_landmarks_on_a_synthetic_cycle():
+    # A clean 10 Hz sinusoid (corneal-negative first): N1→P1 = peak-to-trough = 2×amplitude.
+    hz, amp = 10.0, 8.0
+    t = [i * 0.5 for i in range(0, 601)]  # 0..300 ms @ 0.5 ms (3 cycles)
+    y = [-amp * math.sin(2.0 * math.pi * hz * tm / 1000.0) for tm in t]
+    lm = _erg.flicker_landmarks(t, y, hz)
+    assert lm is not None
+    assert lm["n1p1_uv"] == _approx(2.0 * amp, rel=2e-2)
+    assert lm["n1_uv"] < 0 < lm["p1_uv"]
+    # P1 (the positive peak) follows N1 within one ~100 ms cycle.
+    assert 0.0 < lm["p1_implicit_ms"] <= 100.0
+    # Too few points to fold → None (honest, not a fabricated metric).
+    assert _erg.flicker_landmarks([0.0, 1.0], [0.0, 1.0], hz) is None
+
+
 def test_disp_round_legacy_and_rescale():
     # factor 1.0 → legacy 2-dp rounding (keeps the default byte-identical).
     assert _erg.disp_round(210.34, 1.0) == 210.34

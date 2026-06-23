@@ -271,6 +271,93 @@ def disp_round(value, factor: float = 1.0):
     return round(x, decimals)
 
 
+# --- Adaptation mode (scotopic vs photopic flash) ----------------------------
+# A multi-mode Diagnosys export carries scotopic + photopic flash steps (each with its own
+# per-mode intensity groups) and flicker steps in one file. A flash skill renders ONE mode or
+# the intensity rows collide, so it resolves which `stimulus_type` to keep. The friendly knob is
+# `adaptation` (scotopic|photopic|auto); the low-level `stimulus_type` wins when set explicitly.
+_ADAPT_STIM = {"scotopic": "scotopic_flash", "photopic": "photopic_flash"}
+_STIM_ADAPT = {"scotopic_flash": "scotopic", "photopic_flash": "photopic"}
+
+
+def resolve_flash_mode(present, adaptation: str = "auto", stimulus_type: str = "") -> tuple[str, str]:
+    """Resolve ``(pick_stimulus_type, adaptation_label)`` for a flash skill.
+
+    Explicit ``stimulus_type`` wins; else map the ``adaptation`` hint
+    (``scotopic``/``photopic``); else ``auto`` = the first of scotopic→photopic present in the
+    data. ``present`` = the ``stimulus_type`` values present (may be empty — the iWorx path has no
+    such column, so ``pick`` is "" and the caller does not filter, leaving that path unchanged)."""
+    present = [str(p) for p in present if p]
+    pick = str(stimulus_type or "").strip()
+    if not pick:
+        a = str(adaptation or "auto").strip().lower()
+        if a in _ADAPT_STIM:
+            pick = _ADAPT_STIM[a]
+        else:
+            pick = next((p for p in ("scotopic_flash", "photopic_flash") if p in present), "")
+    return pick, _STIM_ADAPT.get(pick, "")
+
+
+# --- Flicker (steady-state periodic response) --------------------------------
+# Flicker ERG is a periodic response, not a flash transient — measured as N1→P1 (the first
+# cornea-negative trough to the following cornea-positive peak). The robust, noise-rejecting
+# measure phase-folds the whole steady-state sweep into ONE representative cycle (averaging every
+# cycle at each phase), then takes the trough-to-peak amplitude + the P1 implicit time. This
+# matches the device's own N1/P1 markers well at 10 Hz and tracks them at the noisier 30 Hz; the
+# device markers stay authoritative when the fed table carries them (R-flicker-3).
+
+def flicker_cycle(time_ms, voltage, hz: float, *, n_bins: int = 120, start_ms: float = 0.0):
+    """Phase-fold the steady-state flicker response (samples at ``time_ms >= start_ms``) into one
+    averaged cycle of period ``1000/hz`` ms. Returns ``(phase_ms, mean_uv)`` plain-float lists
+    (empty if there is no usable post-onset signal)."""
+    import numpy as np
+
+    t = np.asarray(time_ms, dtype=float)
+    y = np.asarray(voltage, dtype=float)
+    if hz <= 0 or t.size == 0:
+        return [], []
+    period = 1000.0 / float(hz)
+    m = (t >= start_ms) & np.isfinite(t) & np.isfinite(y)
+    t, y = t[m], y[m]
+    if t.size == 0:
+        return [], []
+    phase = np.mod(t, period)
+    edges = np.linspace(0.0, period, n_bins + 1)
+    idx = np.clip(np.digitize(phase, edges) - 1, 0, n_bins - 1)
+    centers, means = [], []
+    for b in range(n_bins):
+        sel = idx == b
+        if sel.any():
+            centers.append(round(float((edges[b] + edges[b + 1]) / 2.0), 3))
+            means.append(round(float(y[sel].mean()), 4))
+    return centers, means
+
+
+def flicker_landmarks(time_ms, voltage, hz: float, *, n_bins: int = 120,
+                      start_ms: float = 0.0) -> dict | None:
+    """N1→P1 on the phase-folded steady-state cycle: N1 = the trough, P1 = the following peak.
+
+    Returns ``{n1p1_uv, p1_implicit_ms, n1_implicit_ms, n1_uv, p1_uv}`` (µV / ms), or None when no
+    cycle could be formed. ``n1p1_uv`` is the peak-to-trough amplitude (the ISCEV flicker measure);
+    ``p1_implicit_ms`` is the P1 phase within the cycle."""
+    import numpy as np
+
+    ph, cyc = flicker_cycle(time_ms, voltage, hz, n_bins=n_bins, start_ms=start_ms)
+    if len(cyc) < 3:
+        return None
+    cyc_a = np.asarray(cyc, dtype=float)
+    ni = int(np.argmin(cyc_a))
+    after = np.arange(ni, cyc_a.size)
+    pi = int(after[int(np.argmax(cyc_a[after]))])
+    return {
+        "n1p1_uv": round(float(cyc_a[pi] - cyc_a[ni]), 3),
+        "p1_implicit_ms": round(float(ph[pi]), 1),
+        "n1_implicit_ms": round(float(ph[ni]), 1),
+        "n1_uv": round(float(cyc_a[ni]), 3),
+        "p1_uv": round(float(cyc_a[pi]), 3),
+    }
+
+
 def summary_stats(values) -> dict:
     """Mean, SEM (sd/√n, ddof=1), and n for a list of amplitudes — the bar-graph summary.
 

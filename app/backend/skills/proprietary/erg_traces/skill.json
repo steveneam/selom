@@ -10,6 +10,7 @@
   "inputs": [{ "name": "table", "kind": "csv", "required": true }],
   "param_spec": {
     "role": { "type": "str", "default": "representative" },
+    "adaptation": { "type": "str", "default": "auto", "options": ["auto", "scotopic", "photopic"] },
     "stimulus_type": { "type": "str", "default": "" },
     "filter": { "type": "bool", "default": true },
     "lowpass_hz": { "type": "float", "default": 120.0, "min": 30.0, "max": 1000.0 },

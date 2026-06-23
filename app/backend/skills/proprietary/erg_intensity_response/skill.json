@@ -10,6 +10,7 @@
   "inputs": [{ "name": "table", "kind": "csv", "required": true }],
   "param_spec": {
     "value_col": { "type": "str", "default": "b_wave_uv" },
+    "adaptation": { "type": "str", "default": "auto", "options": ["auto", "scotopic", "photopic"] },
     "stimulus_type": { "type": "str", "default": "" },
     "fit": { "type": "bool", "default": true },
     "nr_slope": { "type": "float", "default": 0.0, "min": 0.0, "max": 4.0 },

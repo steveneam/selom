@@ -1,0 +1,34 @@
+{
+  "id": "erg_flicker",
+  "version": "0.1.0",
+  "title": "ERG flicker (steady-state N1/P1)",
+  "engine": "python",
+  "omics": "electrophysiology",
+  "omics_type": ["general"],
+  "entrypoint": "skills.proprietary.erg_flicker.run:run",
+  "origin": "proprietary",
+  "inputs": [{ "name": "table", "kind": "csv", "required": true }],
+  "param_spec": {
+    "view": { "type": "str", "default": "waveform", "options": ["waveform", "summary"] },
+    "filter": { "type": "bool", "default": true },
+    "lowpass_hz": { "type": "float", "default": 120.0, "min": 30.0, "max": 1000.0 },
+    "display_unit": { "type": "str", "default": "uV", "options": ["auto", "nV", "uV", "mV", "V"] },
+    "scale_uv": { "type": "float", "default": 20.0, "min": 1.0, "max": 500.0 },
+    "scale_ms": { "type": "float", "default": 50.0, "min": 5.0, "max": 300.0 }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table", "kind": "csv" }
+  ],
+  "catalog": {
+    "name": "Selom ERG Flicker",
+    "summary": "Light-adapted flicker ERG as a publication figure — steady-state waveform small-multiples (flicker frequency down the rows, conditions across the columns, one shared scale bar) or the N1→P1 amplitude-versus-frequency summary. The periodic-response figure the flash trace grid can't make: the N1→P1 amplitude (trough-to-peak) + P1 implicit time are measured from the phase-averaged steady-state cycle, with no a-/b-wave or Naka-Rushton language. Reads the long ERG waveform table; condition colours + order match the trace grid; attaches a per-condition N1/P1 table.",
+    "category": "electrophysiology",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".csv", ".txt", ".iwxdata"],
+    "chains_with": ["erg_traces", "erg_intensity_response", "erg_bwave_bar"],
+    "license": "proprietary",
+    "popularity": 1
+  }
+}

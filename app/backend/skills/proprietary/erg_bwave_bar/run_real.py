@@ -25,6 +25,19 @@ def run(data_path: str, params: dict) -> dict:
         if col not in df.columns:
             raise ValueError(f"erg_bwave_bar: input missing required column {col!r}")
 
+    # Multi-mode exports (Diagnosys) carry scotopic + photopic flash steps whose per-mode intensity
+    # groups share Group labels — keep ONE mode (the friendly `adaptation` hint, or explicit
+    # `stimulus_type`; auto = scotopic) so Group4 means one thing. No-op without the column.
+    adapt = ""
+    if "stimulus_type" in df.columns:
+        present = [s for s in df["stimulus_type"].dropna().astype(str).unique() if s]
+        pick, adapt = _erg.resolve_flash_mode(
+            present, params.get("adaptation", "auto"), params.get("stimulus_type", ""))
+        if pick:
+            sub = df[df["stimulus_type"].astype(str) == pick]
+            if not sub.empty:
+                df = sub
+
     # Honour an optional QC column (drop flagged eyes from both the bar and the points).
     if "qc_excluded" in df.columns:
         df = df[~df["qc_excluded"].astype(str).str.strip().str.lower().isin(_TRUTHY)]
@@ -63,8 +76,8 @@ def run(data_path: str, params: dict) -> dict:
             intensity_label = f"{float(logs.iloc[0]):g} log cd·s/m²"
 
     spec, tbl_rows = bar_spec(cond_values, intensity_label=intensity_label,
-                              title="Scotopic b-wave by condition", unit=unit, factor=factor,
-                              show_points=show_points)
+                              title=f"{adapt or 'scotopic'} b-wave by condition".capitalize(),
+                              unit=unit, factor=factor, show_points=show_points)
     spec["table"] = table(["condition", "n (eyes)", f"mean b-wave ({unit})", f"SEM ({unit})"],
                           tbl_rows, title="ERG b-wave (mean ± SEM)")
     return spec

@@ -15,21 +15,20 @@ _TRUTHY = {"y", "yes", "true", "1", "t"}
 _REQUIRED = {"condition", "intensity_log_cd_s_m2"}
 
 
-def _filter_stimulus(df, requested):
-    """Keep one stimulus mode for the intensity-response curve. Default = scotopic (the canonical
-    intensity series); a no-op without a ``stimulus_type`` column (iWorx path unchanged)."""
+def _filter_mode(df, params):
+    """Keep one stimulus mode for the intensity-response curve, resolved from the friendly
+    ``adaptation`` hint (or explicit ``stimulus_type``); auto = scotopic, then photopic. Returns
+    ``(df, adaptation_label)``. A no-op without a ``stimulus_type`` column (iWorx path unchanged)."""
     if "stimulus_type" not in df.columns:
-        return df
+        return df, ""
     present = [s for s in df["stimulus_type"].dropna().astype(str).unique() if s]
-    if not present:
-        return df
-    pick = str(requested) if requested else next(
-        (p for p in ("scotopic_flash", "photopic_flash") if p in present), "")
+    pick, adapt = _erg.resolve_flash_mode(
+        present, params.get("adaptation", "auto"), params.get("stimulus_type", ""))
     if pick:
         sub = df[df["stimulus_type"].astype(str) == pick]
         if not sub.empty:
-            return sub
-    return df
+            return sub, adapt
+    return df, adapt
 
 
 def _fit_condition(xs, ys, do_fit, nr_slope, min_r2):
@@ -70,7 +69,7 @@ def run(data_path: str, params: dict) -> dict:
     if missing:
         raise ValueError(f"erg_intensity_response: input missing required columns {sorted(missing)}")
 
-    df = _filter_stimulus(df, params.get("stimulus_type", ""))
+    df, adapt = _filter_mode(df, params)
 
     if "qc_excluded" in df.columns:
         df = df[~df["qc_excluded"].astype(str).str.strip().str.lower().isin(_TRUTHY)]
@@ -110,7 +109,8 @@ def run(data_path: str, params: dict) -> dict:
     peak_uv = max((max(ys) for (_c, _xs, ys, _s) in cond_series), default=0.0)
     unit = _erg.resolve_display_unit(params.get("display_unit", "uV"), peak_uv)
     factor = _erg.unit_factor(unit)
-    spec, tbl_rows = ir_spec(cond_series, fits, title="b-wave intensity-response",
+    spec, tbl_rows = ir_spec(cond_series, fits,
+                             title=f"{adapt or 'scotopic'} b-wave intensity-response".capitalize(),
                              unit=unit, factor=factor)
     spec["table"] = table(
         ["condition", f"Vmax ({unit})", "log K (cd·s/m²)", "n", "R²"], tbl_rows,

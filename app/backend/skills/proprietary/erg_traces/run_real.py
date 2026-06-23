@@ -15,25 +15,22 @@ from skills._tracegrid import grid_spec
 _REQUIRED = {"condition", "intensity_group", "time_ms", "voltage_uv"}
 
 
-def _filter_stimulus(df, requested):
+def _filter_mode(df, params):
     """Multi-mode exports (Diagnosys) carry scotopic + photopic + flicker steps, each with its own
     per-mode intensity groups — so a single trace grid must render ONE mode or the intensity rows
-    collide. Filter to ``requested`` if given, else default to scotopic (the canonical dark-adapted
-    ERG), else photopic. A no-op when there is no ``stimulus_type`` column (the iWorx path) — so
-    that path is unchanged."""
+    collide. Resolve the flash mode from the friendly ``adaptation`` hint (or explicit
+    ``stimulus_type``) and keep those rows. Returns ``(df, adaptation_label)``. A no-op when there
+    is no ``stimulus_type`` column (the iWorx path) — so that path is unchanged."""
     if "stimulus_type" not in df.columns:
-        return df
+        return df, ""
     present = [s for s in df["stimulus_type"].dropna().astype(str).unique() if s]
-    if not present:
-        return df
-    pick = str(requested) if requested else ""
-    if not pick:
-        pick = next((p for p in ("scotopic_flash", "photopic_flash") if p in present), "")
+    pick, adapt = _erg.resolve_flash_mode(
+        present, params.get("adaptation", "auto"), params.get("stimulus_type", ""))
     if pick:
         sub = df[df["stimulus_type"].astype(str) == pick]
         if not sub.empty:
-            return sub
-    return df
+            return sub, adapt
+    return df, adapt
 
 
 def run(data_path: str, params: dict) -> dict:
@@ -44,7 +41,7 @@ def run(data_path: str, params: dict) -> dict:
     if missing:
         raise ValueError(f"erg_traces: input missing required columns {sorted(missing)}")
 
-    df = _filter_stimulus(df, params.get("stimulus_type", ""))
+    df, adapt = _filter_mode(df, params)
     role = params.get("role", "representative")
     if "role" in df.columns and role:
         df = df[df["role"].astype(str) == str(role)]
@@ -116,7 +113,7 @@ def run(data_path: str, params: dict) -> dict:
         scalebar={"x_len": float(params.get("scale_ms", 100.0)), "x_unit": "ms",
                   "y_len": float(params.get("scale_uv", 200.0)) * factor, "y_unit": unit},
         row_labels=row_labels, col_labels=col_labels,
-        title="Representative scotopic ERG",
+        title=f"Representative {adapt or 'scotopic'} ERG",
     )
     spec["table"] = table(
         ["condition", "intensity (log cd·s/m²)", f"b-wave ({unit})", f"a-wave ({unit})",

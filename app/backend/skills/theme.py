@@ -27,6 +27,21 @@ _KIND = {
     "erg_traces": "trace_grid",
 }
 
+# Render-inert figure tag (``layout.meta.selom.figureKind``, set by primitives like
+# ``_tracegrid.grid_spec``) → theme kind. Preferred over ``_KIND`` so a skill that emits DIFFERENT
+# figure kinds per view (e.g. ``erg_flicker``: a trace grid for the waveform view, a plain
+# axes-bearing line for the summary view) is themed by what it actually produced, not by its id.
+# Backward-compatible: ``erg_traces`` is already tagged ``trace_grid`` and also maps there in
+# ``_KIND``, so existing goldens are unchanged.
+_FIGUREKIND_TO_KIND = {"trace_grid": "trace_grid"}
+
+
+def _tagged_kind(spec):
+    try:
+        return _FIGUREKIND_TO_KIND.get(spec["layout"]["meta"]["selom"]["figureKind"])
+    except (KeyError, TypeError):
+        return None
+
 
 # ---- axis / base -------------------------------------------------------------
 def _axis(st, grid=True):
@@ -192,7 +207,7 @@ def apply(spec, skill_id, style=DEFAULT_STYLE):
         return spec
     st = get_style(style)
     spec = copy.deepcopy(spec)
-    kind = _KIND.get(skill_id, "base")
+    kind = _tagged_kind(spec) or _KIND.get(skill_id, "base")
     if kind == "volcano":
         grid = True if st.force_grid is None else st.force_grid
         return _style_volcano(st, spec, grid=grid)
