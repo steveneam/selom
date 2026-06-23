@@ -298,6 +298,7 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       help: "The steady-state flicker waveforms as floating small-multiples, or the N1→P1 amplitude plotted against flicker frequency (needs ≥2 frequencies to read as a curve).",
     },
     { key: "filter", label: "Clean traces", type: "switch", help: "Notch line-noise + low-pass; the flicker fundamental (10–30 Hz) is well below the cutoff, so it is preserved." },
+    { key: "marks", label: "Mark N1 / P1", type: "switch", help: "Dot the N1 (trough) and P1 (peak) on each waveform panel — a visual locator on the first cycle. The reported N1→P1 amplitude itself comes from the device markers when present (else the phase-folded cycle)." },
     { key: "lowpass_hz", label: "Low-pass cutoff (Hz)", type: "range", step: 10, help: "Lower = smoother. The 10–30 Hz flicker response sits well below the default 120 Hz." },
     {
       key: "display_unit", label: "Display unit", type: "select",

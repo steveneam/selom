@@ -11,6 +11,7 @@
   "param_spec": {
     "view": { "type": "str", "default": "waveform", "options": ["waveform", "summary"] },
     "filter": { "type": "bool", "default": true },
+    "marks": { "type": "bool", "default": true },
     "lowpass_hz": { "type": "float", "default": 120.0, "min": 30.0, "max": 1000.0 },
     "display_unit": { "type": "str", "default": "uV", "options": ["auto", "nV", "uV", "mV", "V"] },
     "scale_uv": { "type": "float", "default": 20.0, "min": 1.0, "max": 500.0 },

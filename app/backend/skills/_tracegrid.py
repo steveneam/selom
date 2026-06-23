@@ -23,12 +23,42 @@ DEFAULT_SCALEBAR = {"x_len": 100.0, "x_unit": "ms", "y_len": 200.0, "y_unit": "�
 _M_LEFT, _M_RIGHT, _M_TOP, _M_BOTTOM = 0.07, 0.07, 0.055, 0.06
 
 
-def _span(panels: list[dict], key: str) -> tuple[float, float]:
-    lo = min(min(p[key]) for p in panels)
-    hi = max(max(p[key]) for p in panels)
+def _bounds(vals) -> tuple[float, float]:
+    nums = [float(v) for v in vals if v is not None]
+    lo, hi = min(nums), max(nums)
     if lo == hi:  # degenerate (flat / single point) — give the axis a unit of room
         hi = lo + 1.0
     return float(lo), float(hi)
+
+
+def _extent(panels: list[dict]) -> tuple[list, list]:
+    """All x and all y across the panels INCLUDING optional overlays (``band``/``error``/``markers``/
+    ``extra_lines``), so the shared axis range never clips an overlay. A panel with no overlay keys
+    contributes only its line ``x``/``y`` — identical to the pre-overlay behaviour."""
+    xs: list = []
+    ys: list = []
+    for p in panels:
+        xs.extend(p["x"])
+        ys.extend(p["y"])
+        b = p.get("band")
+        if b:
+            xs.extend(b["x"])
+            ys.extend(b.get("lower", []))
+            ys.extend(b.get("upper", []))
+        e = p.get("error")
+        if e:
+            xs.extend(e["x"])
+            for yy, ee in zip(e["y"], e.get("err", [])):
+                ys.append(yy)
+                if ee is not None:
+                    ys.extend([yy - ee, yy + ee])
+        for m in p.get("markers", []):
+            xs.append(m["x"])
+            ys.append(m["y"])
+        for ln in p.get("extra_lines", []):
+            xs.extend(ln["x"])
+            ys.extend(ln["y"])
+    return xs, ys
 
 
 def grid_spec(
@@ -65,8 +95,9 @@ def grid_spec(
             raise ValueError(f"panel (row={p['row']},col={p['col']}) outside {nrows}x{ncols} grid")
 
     sb = {**DEFAULT_SCALEBAR, **(scalebar or {})}
-    xlo, xhi = _span(panels, "x")
-    ylo, yhi = _span(panels, "y")
+    all_x, all_y = _extent(panels)
+    xlo, xhi = _bounds(all_x)
+    ylo, yhi = _bounds(all_y)
     xspan, yspan = xhi - xlo, yhi - ylo
 
     gx0, gx1 = _M_LEFT, 1.0 - _M_RIGHT
@@ -83,6 +114,7 @@ def grid_spec(
         return [round(y_top - row_h, 5), round(y_top, 5)]
 
     data: list[dict] = []
+    panel_main_idx: list[int] = []  # data index of each panel's primary line (overlays shift indices)
     layout: dict = {"showlegend": False, "margin": {"t": 10, "r": 10, "b": 10, "l": 10}}
     if title:
         layout["title"] = {"text": title}
@@ -91,6 +123,9 @@ def grid_spec(
         k = p["row"] * ncols + p["col"] + 1
         sfx = "" if k == 1 else str(k)
         xref, yref = f"x{sfx}", f"y{sfx}"
+        # Overlays drawn BEHIND the mean line (shaded band, faint replicate lines) go first so the
+        # line sits on top; a panel with no overlay keys contributes nothing here (byte-identical).
+        data.extend(_overlay_behind(p, xref, yref))
         line = {"width": line_width}
         if p.get("color"):
             line["color"] = p["color"]
@@ -113,7 +148,10 @@ def grid_spec(
         # series. No legend is shown (showlegend=False), so this only tags identity.
         if p.get("group") is not None:
             trace["legendgroup"] = str(p["group"])
+        panel_main_idx.append(len(data))
         data.append(trace)
+        # Overlays drawn ON TOP of the mean line (per-point error bars, marker dots) go last.
+        data.extend(_overlay_front(p, xref, yref))
         ax = {"domain": x_domain(p["col"]), "anchor": yref, "visible": False}
         ay = {"domain": y_domain(p["row"]), "anchor": xref, "visible": False}
         if share_x:
@@ -201,7 +239,7 @@ def grid_spec(
         if g not in grouped:
             grouped[g] = []
             order.append(g)
-        grouped[g].append(i)
+        grouped[g].append(panel_main_idx[i])  # the line's real data index (overlays shift it)
     if order:
         selom["series"] = [
             {"label": g, "traceIndices": grouped[g], "colorPath": f"/data/{grouped[g][0]}/line/color"}
@@ -220,3 +258,107 @@ def _num(v) -> str:
     """Render a scale-bar length without a trailing ``.0`` (200 not 200.0)."""
     f = float(v)
     return str(int(f)) if f.is_integer() else str(f)
+
+
+# --- per-panel overlays -----------------------------------------------------------------
+# A panel dict may carry optional overlays drawn against its own hidden axis (the SAME
+# xaxis{N}/yaxis{N} as the line). One shared hook serves two features (docs/erg-module/
+# mean-spread-styling-spec.md §3, D6): the N1/P1 marker dots on the flicker grid (M3), and
+# the mean ± spread band / per-point error bars / faint replicate lines for the styling
+# feature. A panel with none of these keys emits no extra traces (byte-identical output).
+#
+#   band:        {x, lower, upper, color?, alpha?=0.25, boundary?=none|solid|dashed, group?}
+#   error:       {x, y, err[], every?=1, color?, width?=1.0, cap?=3.0, size?=4}
+#   markers:     [{x, y, label?, color?, size?=7}, …]
+#   extra_lines: [{x, y, color?, width?=0.6, alpha?=0.18}, …]
+
+def _rgba(hexcolor, alpha) -> str:
+    """``'#rrggbb'`` (or 3-digit shorthand) → ``'rgba(r,g,b,a)'``. Plotly won't derive a
+    translucent fill from a hex line colour, so band fills are emitted as rgba server-side."""
+    h = str(hexcolor or "#888888").lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    try:
+        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    except (ValueError, IndexError):
+        r = g = b = 136
+    return f"rgba({r},{g},{b},{round(float(alpha), 3)})"
+
+
+def _overlay_behind(p: dict, xref: str, yref: str) -> list[dict]:
+    """Overlay traces drawn behind the panel's mean line: the shaded ± band (2-trace ``tonexty``
+    fill) and faint replicate lines. Returns ``[]`` for a panel with neither key."""
+    out: list[dict] = []
+    b = p.get("band")
+    if b:
+        x = [round(float(v), 4) for v in b["x"]]
+        lo = [round(float(v), 6) for v in b["lower"]]
+        hi = [round(float(v), 6) for v in b["upper"]]
+        color = b.get("color") or "#888888"
+        boundary = str(b.get("boundary", "none")).lower()
+        bline = ({"width": 0.8, "color": color, "dash": "dash"} if boundary == "dashed"
+                 else {"width": 0.8, "color": color} if boundary == "solid"
+                 else {"width": 0})
+        base = {"type": "scatter", "mode": "lines", "xaxis": xref, "yaxis": yref,
+                "hoverinfo": "skip", "showlegend": False}
+        t_lo = {**base, "x": x, "y": lo, "line": dict(bline)}
+        t_hi = {**base, "x": x, "y": hi, "line": dict(bline), "fill": "tonexty",
+                "fillcolor": _rgba(color, b.get("alpha", 0.25))}
+        if b.get("group") is not None:
+            t_lo["legendgroup"] = t_hi["legendgroup"] = str(b["group"])
+        out += [t_lo, t_hi]
+    for ln in p.get("extra_lines", []):
+        out.append({
+            "type": "scatter", "mode": "lines",
+            "x": [round(float(v), 4) for v in ln["x"]],
+            "y": [round(float(v), 6) for v in ln["y"]],
+            "line": {"width": float(ln.get("width", 0.6)), "color": ln.get("color") or "#999999"},
+            "opacity": float(ln.get("alpha", 0.18)),
+            "xaxis": xref, "yaxis": yref, "hoverinfo": "skip", "showlegend": False,
+        })
+    return out
+
+
+def _overlay_front(p: dict, xref: str, yref: str) -> list[dict]:
+    """Overlay traces drawn on top of the panel's mean line: per-point error bars and marker
+    dots. Returns ``[]`` for a panel with neither key."""
+    out: list[dict] = []
+    e = p.get("error")
+    if e:
+        every = max(1, int(e.get("every", 1) or 1))  # draw-every-Nth (de-clutter dense series)
+        arr = [float(ev) if (i % every == 0 and ev is not None) else None
+               for i, ev in enumerate(e.get("err", []))]
+        color = e.get("color") or "#444444"
+        out.append({
+            "type": "scatter", "mode": "markers",
+            "x": [round(float(v), 4) for v in e["x"]],
+            "y": [round(float(v), 6) for v in e["y"]],
+            "marker": {"color": color, "size": float(e.get("size", 4))},
+            "error_y": {"type": "data", "array": arr, "visible": True,
+                        "thickness": float(e.get("width", 1.0)), "width": float(e.get("cap", 3.0)),
+                        "color": color},
+            "xaxis": xref, "yaxis": yref, "hoverinfo": "x+y", "showlegend": False,
+        })
+    markers = p.get("markers")
+    if markers:
+        tr = {
+            "type": "scatter",
+            "x": [round(float(m["x"]), 4) for m in markers],
+            "y": [round(float(m["y"]), 6) for m in markers],
+            "marker": {"color": [m.get("color") or "#333333" for m in markers],
+                       "size": float(markers[0].get("size", 7)),
+                       "line": {"color": "#ffffff", "width": 0.8}, "symbol": "circle"},
+            "xaxis": xref, "yaxis": yref, "showlegend": False,
+        }
+        labels = [str(m.get("label", "")) for m in markers]
+        if any(labels):
+            tr["mode"] = "markers+text"
+            tr["text"] = labels
+            tr["textposition"] = "top center"
+            tr["textfont"] = {"size": 9}
+            tr["hoverinfo"] = "x+y+text"
+        else:
+            tr["mode"] = "markers"
+            tr["hoverinfo"] = "x+y"
+        out.append(tr)
+    return out

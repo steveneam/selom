@@ -55,6 +55,7 @@ def run(data_path: str, params: dict) -> dict:
     view = str(params.get("view", "waveform")).strip().lower()
     do_filter = to_bool(params.get("filter", True))
     lowpass = float(params.get("lowpass_hz", 120.0))
+    show_marks = to_bool(params.get("marks", True))  # N1/P1 dots on each waveform panel (M3)
     has_hz = "flicker_hz" in df.columns
     # Device N1→P1 ride-along (Diagnosys materialize path) → prefer it over Selom re-derivation (D2).
     has_device = "device_n1p1_uv" in df.columns and df["device_n1p1_uv"].notna().any()
@@ -105,9 +106,18 @@ def run(data_path: str, params: dict) -> dict:
             y_disp = _erg.clean_trace(y_raw, fs=fs, lowpass=lowpass) if do_filter \
                 else [float(v) for v in y_raw]
             peak_uv = max(peak_uv, max((abs(v) for v in y_disp), default=0.0))
-            panels.append({"row": row_of[f], "col": col_of[cond], "x": t, "y": y_disp,
-                           "color": _erg.COLORS.get(cond), "name": f"{cond} {row_labels[row_of[f]]}",
-                           "group": cond})
+            panel = {"row": row_of[f], "col": col_of[cond], "x": t, "y": y_disp,
+                     "color": _erg.COLORS.get(cond), "name": f"{cond} {row_labels[row_of[f]]}",
+                     "group": cond}
+            # N1/P1 marker dots on the first visible cycle of the drawn trace (M3, visual locator —
+            # the table's N1→P1 amplitude is the device/folded-cycle value, not these coordinates).
+            marks = _erg.flicker_first_cycle_marks(t, y_disp, float(f)) if (show_marks and has_hz) else None
+            if marks:
+                panel["markers"] = [
+                    {"x": marks["n1"][0], "y": marks["n1"][1], "label": "N1", "color": "#333333"},
+                    {"x": marks["p1"][0], "y": marks["p1"][1], "label": "P1", "color": "#333333"},
+                ]
+            panels.append(panel)
             # N1→P1: prefer the device markers riding on the feed (one value per eye → mean across
             # eyes), else re-derive from the phase-averaged steady-state cycle (raw baseline trace,
             # not the display-cleaned copy; needs a real frequency to fold).
@@ -135,6 +145,8 @@ def run(data_path: str, params: dict) -> dict:
     if factor != 1.0:
         for p in panels:
             p["y"] = [v * factor for v in p["y"]]
+            for m in p.get("markers", []):
+                m["y"] = m["y"] * factor
 
     table_rows = [[c, hz, _erg.disp_round(v, factor) if v is not None else "—",
                    (p1 if p1 is not None else "—"), n]

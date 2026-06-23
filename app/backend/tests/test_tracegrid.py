@@ -6,7 +6,7 @@ and the right label counts. See docs/erg-module/spec.md (R1–R7).
 """
 import pytest
 
-from skills._tracegrid import grid_spec
+from skills._tracegrid import _rgba, grid_spec
 
 
 def _panels(nrows, ncols):
@@ -75,3 +75,74 @@ def test_panel_out_of_bounds_raises():
 def test_empty_panels_raises():
     with pytest.raises(ValueError):
         grid_spec([], nrows=2, ncols=2)
+
+
+# ---- per-panel overlays (shared hook: M3 markers + the styling band/error/replicates) --
+
+def test_no_overlay_keys_is_byte_identical():
+    """A panel with no band/error/markers/extra_lines keys emits exactly one trace per panel —
+    the overlay hook must not perturb the existing output."""
+    plain = grid_spec(_panels(2, 3), nrows=2, ncols=3)
+    assert len(plain["data"]) == 6
+    assert all(t["mode"] == "lines" for t in plain["data"])
+
+
+def test_marker_overlay_adds_a_dot_trace_on_the_panel_axis():
+    panels = _panels(1, 1)
+    panels[0]["markers"] = [{"x": 1, "y": 0.5, "label": "N1"}, {"x": 2, "y": -0.5, "label": "P1"}]
+    spec = grid_spec(panels, nrows=1, ncols=1)
+    line = next(t for t in spec["data"] if t["mode"] == "lines")
+    dots = next(t for t in spec["data"] if str(t["mode"]).startswith("markers"))
+    assert dots["text"] == ["N1", "P1"]
+    assert dots["xaxis"] == line["xaxis"] and dots["yaxis"] == line["yaxis"]  # same panel axis
+    assert dots["x"] == [1, 2] and dots["y"] == [0.5, -0.5]
+
+
+def test_band_overlay_is_two_fill_traces_behind_the_line():
+    panels = _panels(1, 1)
+    panels[0]["band"] = {"x": [0, 1, 2, 3], "lower": [-1, -1, -1, -1], "upper": [1, 1, 1, 1],
+                         "color": "#0072B2", "alpha": 0.3, "group": "cond"}
+    spec = grid_spec(panels, nrows=1, ncols=1)
+    fills = [t for t in spec["data"] if t.get("fill") == "tonexty"]
+    assert len(fills) == 1
+    assert fills[0]["fillcolor"] == "rgba(0,114,178,0.3)"
+    # the two band traces (hoverinfo "skip") come BEFORE the mean line (hoverinfo "x+y") in draw
+    # order, so the line sits on top of the fill.
+    assert len(spec["data"]) == 3
+    assert [t["hoverinfo"] for t in spec["data"]] == ["skip", "skip", "x+y"]
+
+
+def test_band_overlay_extends_shared_range():
+    panels = _panels(1, 1)  # base y in [-1, 1]
+    panels[0]["band"] = {"x": [0, 1, 2, 3], "lower": [-5, -5, -5, -5], "upper": [5, 5, 5, 5]}
+    spec = grid_spec(panels, nrows=1, ncols=1)
+    yr = next(spec["layout"][k]["range"] for k in spec["layout"] if k.startswith("yaxis"))
+    assert yr[0] <= -5 and yr[1] >= 5  # the band is not clipped by the shared range
+
+
+def test_error_overlay_draws_every_nth():
+    panels = _panels(1, 1)
+    panels[0]["error"] = {"x": [0, 1, 2, 3], "y": [0, 0, 0, 0], "err": [1, 1, 1, 1], "every": 2}
+    spec = grid_spec(panels, nrows=1, ncols=1)
+    err = next(t for t in spec["data"] if t.get("error_y"))
+    assert err["error_y"]["array"] == [1.0, None, 1.0, None]  # null (not 0) on skipped points
+
+
+def test_series_grouping_points_at_the_line_under_overlays():
+    """With overlays shifting trace indices, the editor series must still address the mean LINE."""
+    panels = _panels(1, 2)
+    for p in panels:
+        p["group"] = "cond"
+        p["band"] = {"x": [0, 1, 2, 3], "lower": [-1] * 4, "upper": [1] * 4}
+        p["markers"] = [{"x": 1, "y": 0.0}]
+    spec = grid_spec(panels, nrows=1, ncols=2)
+    series = spec["layout"]["meta"]["selom"]["series"]
+    assert len(series) == 1
+    for idx in series[0]["traceIndices"]:
+        assert spec["data"][idx]["mode"] == "lines"  # never a band/marker helper trace
+
+
+def test_rgba_helper():
+    assert _rgba("#0072B2", 0.25) == "rgba(0,114,178,0.25)"
+    assert _rgba("abc", 0.5) == "rgba(170,187,204,0.5)"  # 3-digit shorthand expands
+    assert _rgba(None, 0.1) == "rgba(136,136,136,0.1)"   # fallback grey

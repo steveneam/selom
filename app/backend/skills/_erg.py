@@ -399,6 +399,30 @@ def flicker_landmarks(time_ms, voltage, hz: float, *, n_bins: int = 120,
     }
 
 
+def flicker_first_cycle_marks(time_ms, voltage, hz: float) -> dict | None:
+    """N1 (trough) and the following P1 (peak) located ON the first visible cycle of a flicker
+    sweep → ``{"n1": (t_ms, uv), "p1": (t_ms, uv)}``. These are marker-dot coordinates that sit on
+    the *drawn* trace (a visual locator); the reported N1→P1 amplitude itself comes from the device
+    markers (preferred) or the phase-folded cycle (:func:`flicker_landmarks`), not from here. None
+    when no usable first cycle exists."""
+    import numpy as np
+
+    t = np.asarray(time_ms, dtype=float)
+    y = np.asarray(voltage, dtype=float)
+    if hz <= 0 or t.size < 3:
+        return None
+    period = 1000.0 / float(hz)
+    m = (t >= 0.0) & (t <= period * 1.05)
+    if int(m.sum()) < 3:
+        m = np.ones(t.shape, dtype=bool)
+    ti, yi = t[m], y[m]
+    ni = int(np.argmin(yi))
+    after = np.arange(ni, yi.size)
+    pi = int(after[int(np.argmax(yi[after]))])
+    return {"n1": (round(float(ti[ni]), 2), round(float(yi[ni]), 4)),
+            "p1": (round(float(ti[pi]), 2), round(float(yi[pi]), 4))}
+
+
 def summary_stats(values) -> dict:
     """Mean, SEM (sd/√n, ddof=1), and n for a list of amplitudes — the bar-graph summary.
 

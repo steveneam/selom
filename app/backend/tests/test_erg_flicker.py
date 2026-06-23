@@ -66,6 +66,12 @@ def test_real_flicker_folded_cycle(monkeypatch):
     fig = run_real(tmp.name, {"view": "waveform"})
     table = fig.pop("table")
     assert fig["layout"]["meta"]["selom"]["figureKind"] == "trace_grid"
+    # M3: N1/P1 marker dots sit on each waveform panel (one dot-trace per panel, labelled N1/P1),
+    # and `marks=False` suppresses them.
+    dots = [t for t in fig["data"] if str(t.get("mode", "")).startswith("markers")]
+    assert dots and all(t["text"] == ["N1", "P1"] for t in dots)
+    no_dots = run_real(tmp.name, {"view": "waveform", "marks": False})
+    assert not [t for t in no_dots["data"] if str(t.get("mode", "")).startswith("markers")]
     amp_i = next(i for i, c in enumerate(table["columns"]) if "N1" in c)
     hz_i = table["columns"].index("frequency (Hz)")
     by_hz = {float(r[hz_i]): float(r[amp_i]) for r in table["rows"]}
