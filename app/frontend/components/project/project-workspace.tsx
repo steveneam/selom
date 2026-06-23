@@ -977,7 +977,7 @@ function Overview({
             </div>
             <Dropzone
               onFile={onDrop}
-              accept=".h5ad,.csv,.tsv,.mzML"
+              accept=".h5ad,.csv,.tsv,.mzML,.iwxdata"
               title="Drop your data here"
               hint="or click to browse — this is step one"
               formats=".h5ad · .csv · .tsv · .mzML"
