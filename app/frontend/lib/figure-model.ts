@@ -113,10 +113,31 @@ export interface FigurePrimitive {
   label: string;
 }
 
+/**
+ * An editable scale-bar primitive, resolved from the skill's render-inert
+ * `meta.selom.primitives` hint (deterministic shape/annotation indices — far safer than
+ * guessing among `layout.shapes`). The editor can show/hide and resize it (change the
+ * denoted length); the bar stays accurate because it is one paper-referenced pair sized to
+ * the shared data→paper mapping. Present only when the skill stamps the hint (the trace-grid
+ * does); a figure without the hint still flags `capabilities.scalebar` but isn't index-editable.
+ */
+export interface Scalebar {
+  metaIdx: number; // index in layout.meta.selom.primitives (kept in sync on resize)
+  shapeIdx: [number, number]; // [vertical (amplitude), horizontal (time)]
+  annoIdx: [number, number]; // [vertical label, horizontal label]
+  xLen: number;
+  xUnit: string;
+  yLen: number;
+  yUnit: string;
+  visible: boolean;
+}
+
 export interface FigureModel {
   traceKinds: TraceKind[];
   series: Series[];
   primitives: FigurePrimitive[];
+  /** The index-editable scale bar (from the meta.selom hint), or null. Drives the Marks panel. */
+  scalebar: Scalebar | null;
   capabilities: {
     markers: boolean;
     lines: boolean;
@@ -213,15 +234,41 @@ export function deriveFigureModel(spec: FigureSpec): FigureModel {
   const series = groupSeries(spec, infos);
   const { capabilities, primitives, markerTraceIndices, lineTraceIndices, heatmapTraceIndices } =
     deriveCapabilities(spec, infos);
+  const scalebar = deriveScalebar(spec);
 
   return {
     traceKinds,
     series,
     primitives,
+    scalebar,
     capabilities,
     markerTraceIndices,
     lineTraceIndices,
     heatmapTraceIndices,
+  };
+}
+
+/** Resolve the index-editable scale bar from the meta.selom hint (+ its live visibility). */
+function deriveScalebar(spec: FigureSpec): Scalebar | null {
+  const hint = readHint(spec);
+  const prims = hint?.primitives ?? [];
+  const idx = prims.findIndex((p) => p.kind === "scalebar");
+  if (idx < 0) return null;
+  const p = prims[idx] as Record<string, unknown>;
+  const shapeIdx = p.shapeIdx as number[] | undefined;
+  const annoIdx = p.annoIdx as number[] | undefined;
+  if (!Array.isArray(shapeIdx) || shapeIdx.length < 2) return null;
+  const shapes = (spec?.layout?.shapes as { visible?: boolean }[]) ?? [];
+  const visible = shapes[shapeIdx[0]]?.visible !== false;
+  return {
+    metaIdx: idx,
+    shapeIdx: [shapeIdx[0], shapeIdx[1]],
+    annoIdx: Array.isArray(annoIdx) && annoIdx.length >= 2 ? [annoIdx[0], annoIdx[1]] : [-1, -1],
+    xLen: typeof p.xLen === "number" ? p.xLen : 0,
+    xUnit: typeof p.xUnit === "string" ? p.xUnit : "",
+    yLen: typeof p.yLen === "number" ? p.yLen : 0,
+    yUnit: typeof p.yUnit === "string" ? p.yUnit : "",
+    visible,
   };
 }
 
@@ -387,4 +434,93 @@ export function seriesVisibilityOps(series: Series, visible: boolean): Operation
 /** Resolve which series a clicked Plotly curve belongs to (click-to-select, P3). */
 export function seriesForTrace(model: FigureModel, traceIndex: number): Series | null {
   return model.series.find((s) => s.traceIndices.includes(traceIndex)) ?? null;
+}
+
+// --- scale-bar primitive ops (P3 §3.5) -------------------------------------------------
+
+/** Show/hide the scale bar — toggles `visible` on both line shapes + both unit labels. */
+export function scalebarVisibilityOps(sb: Scalebar, visible: boolean): Operation[] {
+  const ops: Operation[] = [];
+  for (const i of sb.shapeIdx) ops.push(set(`/layout/shapes/${i}/visible`, visible));
+  for (const i of sb.annoIdx) if (i >= 0) ops.push(set(`/layout/annotations/${i}/visible`, visible));
+  return ops;
+}
+
+/** Format a denoted length for the unit label. JS numbers already drop a trailing `.0`. */
+function fmtNum(n: number): string {
+  return String(n);
+}
+
+/**
+ * Resize the scale bar = change the *denoted* length (e.g. a 200 µV bar → 100 µV). The drawn
+ * paper length scales proportionally from the current geometry, the unit label is rewritten,
+ * and the label is recentred. `meta.selom` is kept in sync (render-inert) so repeated resizes
+ * stay proportional. Returns [] if the geometry can't be read. `axis` selects which arm.
+ */
+export function scalebarResizeOps(
+  spec: FigureSpec,
+  sb: Scalebar,
+  axis: "x" | "y",
+  newLen: number,
+): Operation[] {
+  if (!(newLen > 0)) return [];
+  const shapes = (spec?.layout?.shapes as Record<string, number>[]) ?? [];
+  const annos = (spec?.layout?.annotations as Record<string, unknown>[]) ?? [];
+  const ops: Operation[] = [];
+  if (axis === "y") {
+    const s = shapes[sb.shapeIdx[0]];
+    if (!s || sb.yLen <= 0) return [];
+    const y0 = Number(s.y0);
+    const curLen = Number(s.y1) - y0;
+    const newPaper = curLen * (newLen / sb.yLen);
+    ops.push(set(`/layout/shapes/${sb.shapeIdx[0]}/y1`, round5(y0 + newPaper)));
+    if (sb.annoIdx[0] >= 0 && annos[sb.annoIdx[0]]) {
+      ops.push(set(`/layout/annotations/${sb.annoIdx[0]}/text`, `${fmtNum(newLen)} ${sb.yUnit}`));
+      ops.push(set(`/layout/annotations/${sb.annoIdx[0]}/y`, round5(y0 + newPaper / 2)));
+    }
+    ops.push(set(`/layout/meta/selom/primitives/${sb.metaIdx}/yLen`, newLen));
+  } else {
+    const s = shapes[sb.shapeIdx[1]];
+    if (!s || sb.xLen <= 0) return [];
+    const x0 = Number(s.x0);
+    const curLen = Number(s.x1) - x0;
+    const newPaper = curLen * (newLen / sb.xLen);
+    ops.push(set(`/layout/shapes/${sb.shapeIdx[1]}/x1`, round5(x0 + newPaper)));
+    if (sb.annoIdx[1] >= 0 && annos[sb.annoIdx[1]]) {
+      ops.push(set(`/layout/annotations/${sb.annoIdx[1]}/text`, `${fmtNum(newLen)} ${sb.xUnit}`));
+      ops.push(set(`/layout/annotations/${sb.annoIdx[1]}/x`, round5(x0 + newPaper / 2)));
+    }
+    ops.push(set(`/layout/meta/selom/primitives/${sb.metaIdx}/xLen`, newLen));
+  }
+  return ops;
+}
+
+function round5(n: number): number {
+  return Math.round(n * 1e5) / 1e5;
+}
+
+// --- annotations (threshold lines / labels) — list + show/hide/edit (P3 §3.5) -----------
+
+export interface AnnotationItem {
+  index: number;
+  text: string;
+  visible: boolean;
+}
+
+/** Every layout annotation as an editable item (text + visibility). */
+export function annotationItems(spec: FigureSpec): AnnotationItem[] {
+  const annos = (spec?.layout?.annotations as { text?: unknown; visible?: boolean }[]) ?? [];
+  return annos.map((a, index) => ({
+    index,
+    text: typeof a?.text === "string" ? a.text : "",
+    visible: a?.visible !== false,
+  }));
+}
+
+export function annotationVisibilityOp(index: number, visible: boolean): Operation {
+  return set(`/layout/annotations/${index}/visible`, visible);
+}
+
+export function annotationTextOp(index: number, text: string): Operation {
+  return set(`/layout/annotations/${index}/text`, text);
 }

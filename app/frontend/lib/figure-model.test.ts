@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { deriveFigureModel, inferTraceKind, seriesColorOps, seriesForTrace } from "./figure-model";
+import {
+  annotationItems,
+  annotationTextOp,
+  annotationVisibilityOp,
+  deriveFigureModel,
+  inferTraceKind,
+  scalebarResizeOps,
+  scalebarVisibilityOps,
+  seriesColorOps,
+  seriesForTrace,
+} from "./figure-model";
 import type { FigureSpec as SpecType } from "./figure-spec";
 
 /**
@@ -224,5 +234,85 @@ describe("layout.meta.selom hints override inference", () => {
     const m = deriveFigureModel(s);
     expect(m.series).toHaveLength(2);
     expect(m.series[0].traceIndices).toEqual([0, 1]);
+  });
+});
+
+// --- P3 primitives: scale bar + annotations --------------------------------------------
+
+/** A spec carrying the trace-grid scale bar: vertical (amplitude) shape, horizontal (time)
+ *  shape, two unit-label annotations, and the meta.selom hint pointing at their indices. */
+function scalebarSpec(): SpecType {
+  return spec(
+    [{ type: "scatter", mode: "lines", line: { color: "#111" }, name: "t" }],
+    {
+      shapes: [
+        { type: "line", xref: "paper", yref: "paper", x0: 0.05, x1: 0.05, y0: 0.02, y1: 0.12 }, // vertical
+        { type: "line", xref: "paper", yref: "paper", x0: 0.05, x1: 0.15, y0: 0.02, y1: 0.02 }, // horizontal
+      ],
+      annotations: [
+        { xref: "paper", yref: "paper", text: "200 µV", x: 0.044, y: 0.07 },
+        { xref: "paper", yref: "paper", text: "100 ms", x: 0.1, y: 0.006 },
+      ],
+      meta: {
+        selom: {
+          figureKind: "trace_grid",
+          primitives: [
+            { kind: "scalebar", shapeIdx: [0, 1], annoIdx: [0, 1], xLen: 100, xUnit: "ms", yLen: 200, yUnit: "µV" },
+          ],
+        },
+      },
+    },
+  );
+}
+
+describe("scale-bar primitive (P3 §3.5)", () => {
+  it("derives an editable scale bar from the meta.selom hint", () => {
+    const m = deriveFigureModel(scalebarSpec());
+    expect(m.scalebar).not.toBeNull();
+    expect(m.scalebar!.shapeIdx).toEqual([0, 1]);
+    expect(m.scalebar!.yLen).toBe(200);
+    expect(m.scalebar!.yUnit).toBe("µV");
+    expect(m.scalebar!.visible).toBe(true);
+    expect(m.capabilities.scalebar).toBe(true);
+  });
+
+  it("no scale bar without the hint (not index-editable)", () => {
+    const m = deriveFigureModel(spec([{ type: "scatter", mode: "lines", line: { color: "#111" } }]));
+    expect(m.scalebar).toBeNull();
+  });
+
+  it("show/hide toggles both shapes and both labels", () => {
+    const m = deriveFigureModel(scalebarSpec());
+    const ops = scalebarVisibilityOps(m.scalebar!, false);
+    expect(ops).toContainEqual({ op: "add", path: "/layout/shapes/0/visible", value: false });
+    expect(ops).toContainEqual({ op: "add", path: "/layout/shapes/1/visible", value: false });
+    expect(ops).toContainEqual({ op: "add", path: "/layout/annotations/0/visible", value: false });
+    expect(ops).toContainEqual({ op: "add", path: "/layout/annotations/1/visible", value: false });
+  });
+
+  it("resize rescales the bar proportionally, relabels it, and syncs meta", () => {
+    const s = scalebarSpec();
+    const m = deriveFigureModel(s);
+    // Halve the amplitude: 200 → 100 µV. The vertical bar (paper length 0.10) halves to 0.05.
+    const ops = scalebarResizeOps(s, m.scalebar!, "y", 100);
+    expect(ops).toContainEqual({ op: "add", path: "/layout/shapes/0/y1", value: 0.07 }); // 0.02 + 0.05
+    expect(ops).toContainEqual({ op: "add", path: "/layout/annotations/0/text", value: "100 µV" });
+    expect(ops).toContainEqual({ op: "add", path: "/layout/meta/selom/primitives/0/yLen", value: 100 });
+  });
+
+  it("ignores a non-positive resize", () => {
+    const s = scalebarSpec();
+    const m = deriveFigureModel(s);
+    expect(scalebarResizeOps(s, m.scalebar!, "y", 0)).toEqual([]);
+  });
+});
+
+describe("annotations (P3 §3.5)", () => {
+  it("lists annotations with text + visibility, and builds edit ops", () => {
+    const items = annotationItems(scalebarSpec());
+    expect(items).toHaveLength(2);
+    expect(items[0]).toMatchObject({ index: 0, text: "200 µV", visible: true });
+    expect(annotationVisibilityOp(1, false)).toEqual({ op: "add", path: "/layout/annotations/1/visible", value: false });
+    expect(annotationTextOp(0, "x")).toEqual({ op: "add", path: "/layout/annotations/0/text", value: "x" });
   });
 });

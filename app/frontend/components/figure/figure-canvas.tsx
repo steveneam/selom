@@ -38,12 +38,16 @@ export function FigureCanvas({
   spec,
   store,
   displayModeBar,
+  onSelectTrace,
 }: {
   spec: FigureSpec;
   store?: FigureStore;
   /** Force the Plotly modebar on/off. Default (undefined) = Plotly's on-hover behaviour.
    *  Read-only previews (the compare panes) pass `false` for a clean, chrome-free figure. */
   displayModeBar?: boolean;
+  /** Click-to-select (P3 §3.4): a click on a point/line reports its trace (curveNumber) so the
+   *  inspector can focus that series. Independent of edits — works on a read-only figure too. */
+  onSelectTrace?: (traceIndex: number) => void;
 }) {
   const fixed = typeof spec.layout.width === "number";
 
@@ -54,13 +58,14 @@ export function FigureCanvas({
 
   // Handlers read the latest spec/store via a ref so the directly-bound Plotly
   // listeners stay stable while always seeing live values.
-  const liveRef = useRef({ spec, store });
-  liveRef.current = { spec, store };
+  const liveRef = useRef({ spec, store, onSelectTrace });
+  liveRef.current = { spec, store, onSelectTrace };
 
   // Stable gesture handlers, created once. Each Plotly canvas gesture becomes ONE
   // undoable JSON-Patch edit (Plotly fires once on drag-release → one history entry).
   const handlersRef = useRef<
-    { relayout: (e: unknown) => void; restyle: (e: unknown) => void } | undefined
+    { relayout: (e: unknown) => void; restyle: (e: unknown) => void; click: (e: unknown) => void }
+    | undefined
   >(undefined);
   if (!handlersRef.current) {
     handlersRef.current = {
@@ -79,6 +84,13 @@ export function FigureCanvas({
         const ops = restyleToOps(s, update ?? {}, indices ?? []);
         if (ops.length) st.commit(ops);
       },
+      // Click-to-select (P3 §3.4): report the clicked curve's trace index so the inspector can
+      // focus its series. Pure selection — no edit, so it's bound even on a read-only figure.
+      click: (e: unknown) => {
+        const points = (e as { points?: { curveNumber?: number }[] } | undefined)?.points;
+        const ci = points?.[0]?.curveNumber;
+        if (typeof ci === "number") liveRef.current.onSelectTrace?.(ci);
+      },
     };
   }
 
@@ -95,8 +107,10 @@ export function FigureCanvas({
     if (!el || typeof el.on !== "function" || !h) return;
     el.removeListener?.("plotly_relayout", h.relayout);
     el.removeListener?.("plotly_restyle", h.restyle);
+    el.removeListener?.("plotly_click", h.click);
     el.on("plotly_relayout", h.relayout);
     el.on("plotly_restyle", h.restyle);
+    el.on("plotly_click", h.click);
   }, []);
 
   const config = useMemo(

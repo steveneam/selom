@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Section } from "./controls";
@@ -26,18 +27,32 @@ function SeriesRow({
   store,
   series,
   index,
+  focused,
 }: {
   store: FigureStore;
   series: Series;
   index: number;
+  /** Click-to-select (P3 §3.4): this series was picked on the canvas — highlight + scroll to it. */
+  focused?: boolean;
 }) {
   const colorway = COLORWAYS.okabeito.colors;
   const swatch = series.color ?? colorway[index % colorway.length] ?? "#475569";
   const editableColor = series.colorChannels.length > 0 && !series.perPoint;
   const grouped = series.traceIndices.length > 1;
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (focused) rowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [focused]);
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-background/40 p-1.5">
+    <div
+      ref={rowRef}
+      className={cn(
+        "flex items-center gap-2 rounded-lg border bg-background/40 p-1.5 transition-colors",
+        focused ? "border-primary/60 ring-1 ring-ring/40" : "border-border/70",
+      )}
+    >
       <label
         className="relative shrink-0"
         title={series.perPoint ? "Per-point colours" : editableColor ? swatch : "No editable colour"}
@@ -93,10 +108,13 @@ function SeriesRow({
 export function DataPanel({
   store,
   model,
+  focusedSeriesKey,
 }: {
   store: FigureStore;
   spec: FigureSpec;
   model: FigureModel;
+  /** The series picked by clicking a line on the canvas (P3 §3.4) — highlighted + scrolled to. */
+  focusedSeriesKey?: string | null;
 }) {
   const { series } = model;
   const traceCount = model.traceKinds.length;
@@ -107,15 +125,15 @@ export function DataPanel({
       <Section title={`Series · ${series.length}`}>
         <div className="space-y-1.5">
           {series.map((s, i) => (
-            <SeriesRow key={s.key} store={store} series={s} index={i} />
+            <SeriesRow key={s.key} store={store} series={s} index={i} focused={s.key === focusedSeriesKey} />
           ))}
         </div>
         <p className="text-[11px] leading-relaxed text-muted-foreground/80">
           {grouped
             ? `${traceCount} traces grouped into ${series.length} series. `
             : ""}
-          Rename, recolour, or hide a series. Changing the underlying data (x / y values,
-          clustering) re-runs the analysis — coming with the live backend.
+          Click a line on the figure to focus its series here. Rename, recolour, or hide a series.
+          Changing the underlying data (x / y values, clustering) re-runs the analysis in Figure data.
         </p>
       </Section>
     </div>

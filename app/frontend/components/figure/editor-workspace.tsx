@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Lock } from "lucide-react";
 import { FigureCanvas } from "./figure-canvas";
 import { PropertyPanel } from "./property-panel";
@@ -32,6 +33,10 @@ export function EditorWorkspace({
   /** Skill-specific pane shown atop the cosmetic inspector (owner layout 2026-06-23). */
   skill?: EditorSkill;
 }) {
+  // Click-to-select (P3 §3.4): the canvas reports a clicked trace; the inspector focuses its
+  // series. A monotonic nonce makes re-clicking the SAME trace re-trigger the focus effect.
+  const [selection, setSelection] = useState<{ trace: number; nonce: number } | null>(null);
+
   const spec = store.spec;
   if (!spec) return null;
   const fixed = typeof spec.layout.width === "number";
@@ -62,8 +67,15 @@ export function EditorWorkspace({
           }
         >
           <div className="min-h-0 min-w-0 flex-1">
-            {/* Read-only: no `store` → no edit gestures, no `edits` config, pure view. */}
-            <FigureCanvas spec={spec} store={readOnly ? undefined : store} />
+            {/* Read-only: no `store` → no edit gestures, no `edits` config, pure view. Click-to-
+                select still works (selection isn't an edit) so the inspector can focus a series. */}
+            <FigureCanvas
+              spec={spec}
+              store={readOnly ? undefined : store}
+              onSelectTrace={
+                readOnly ? undefined : (trace) => setSelection((s) => ({ trace, nonce: (s?.nonce ?? 0) + 1 }))
+              }
+            />
           </div>
         </div>
       </div>
@@ -78,7 +90,7 @@ export function EditorWorkspace({
           <>
             {skill && <SkillCard {...skill} />}
             <div className="flex min-h-0 flex-1 flex-col">
-              <PropertyPanel store={store} />
+              <PropertyPanel store={store} selection={selection} />
             </div>
           </>
         )}
