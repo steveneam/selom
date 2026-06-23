@@ -87,6 +87,8 @@ export const SKILL_PARAM_SPECS: Record<string, BackendParamSpec> = {
   },
   erg_traces: {
     role: { type: "str", default: "representative" },
+    adaptation: { type: "str", default: "auto", options: ["auto", "scotopic", "photopic"] },
+    stimulus_type: { type: "str", default: "" },
     filter: { type: "bool", default: true },
     lowpass_hz: { type: "float", default: 120.0, min: 30.0, max: 1000.0 },
     display_unit: { type: "str", default: "uV", options: ["auto", "nV", "uV", "mV", "V"] },
@@ -96,15 +98,27 @@ export const SKILL_PARAM_SPECS: Record<string, BackendParamSpec> = {
   erg_bwave_bar: {
     intensity_group: { type: "str", default: "Group4" },
     value_col: { type: "str", default: "b_wave_uv" },
+    adaptation: { type: "str", default: "auto", options: ["auto", "scotopic", "photopic"] },
+    stimulus_type: { type: "str", default: "" },
     points: { type: "bool", default: true },
     display_unit: { type: "str", default: "uV", options: ["auto", "nV", "uV", "mV", "V"] },
   },
   erg_intensity_response: {
     value_col: { type: "str", default: "b_wave_uv" },
+    adaptation: { type: "str", default: "auto", options: ["auto", "scotopic", "photopic"] },
+    stimulus_type: { type: "str", default: "" },
     fit: { type: "bool", default: true },
     nr_slope: { type: "float", default: 0.0, min: 0.0, max: 4.0 },
     min_r2: { type: "float", default: 0.3, min: 0.0, max: 1.0 },
     display_unit: { type: "str", default: "uV", options: ["auto", "nV", "uV", "mV", "V"] },
+  },
+  erg_flicker: {
+    view: { type: "str", default: "waveform", options: ["waveform", "summary"] },
+    filter: { type: "bool", default: true },
+    lowpass_hz: { type: "float", default: 120.0, min: 30.0, max: 1000.0 },
+    display_unit: { type: "str", default: "uV", options: ["auto", "nV", "uV", "mV", "V"] },
+    scale_uv: { type: "float", default: 20.0, min: 1.0, max: 500.0 },
+    scale_ms: { type: "float", default: 50.0, min: 5.0, max: 300.0 },
   },
   annotate: {
     marker_set: { type: "str", default: "retinal", options: ["retinal", "retinal_cepo"] },

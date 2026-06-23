@@ -188,6 +188,15 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   // smoothing (filter + low-pass cutoff) and the shared scale-bar size. Colours/labels are then
   // edited directly on the figure (JSON-Patch). The `role` knob is pipeline-level, not surfaced.
   erg_traces: [
+    {
+      key: "adaptation", label: "Adaptation", type: "select",
+      options: [
+        { value: "auto", label: "Auto (scotopic first)" },
+        { value: "scotopic", label: "Scotopic (dark-adapted)" },
+        { value: "photopic", label: "Photopic (light-adapted)" },
+      ],
+      help: "Which flash family to render from a multi-mode export. Auto shows the dark-adapted (scotopic) series; switch to photopic for the light-adapted flashes. No-op for a single-mode recording.",
+    },
     { key: "filter", label: "Clean traces", type: "switch", help: "Notch line-noise + low-pass, keeping oscillatory potentials (“clean flats, keep OPs”)." },
     { key: "lowpass_hz", label: "Low-pass cutoff (Hz)", type: "range", step: 10, help: "Lower = smoother. Default 120 Hz cuts mains/instrument hum while keeping the partial-rescue b-wave; raise toward 300 Hz to retain all oscillatory potentials." },
     {
@@ -206,6 +215,15 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   ],
   // ERG b-wave bar — one flash intensity, mean ± SEM + every eye as a point (reviewer ask).
   erg_bwave_bar: [
+    {
+      key: "adaptation", label: "Adaptation", type: "select",
+      options: [
+        { value: "auto", label: "Auto (scotopic first)" },
+        { value: "scotopic", label: "Scotopic (dark-adapted)" },
+        { value: "photopic", label: "Photopic (light-adapted)" },
+      ],
+      help: "Which flash family the bar is taken from in a multi-mode export. No-op for a single-mode recording.",
+    },
     {
       key: "intensity_group", label: "Flash intensity", type: "select",
       options: [
@@ -234,6 +252,15 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   ],
   // ERG intensity-response — b-wave vs flash energy with the adjustable Naka-Rushton fit.
   erg_intensity_response: [
+    {
+      key: "adaptation", label: "Adaptation", type: "select",
+      options: [
+        { value: "auto", label: "Auto (scotopic first)" },
+        { value: "scotopic", label: "Scotopic (dark-adapted)" },
+        { value: "photopic", label: "Photopic (light-adapted)" },
+      ],
+      help: "Which flash family the intensity series uses in a multi-mode export. No-op for a single-mode recording.",
+    },
     { key: "fit", label: "Naka-Rushton fit", type: "switch", help: "Overlay the saturating V = Vmax·Iⁿ/(Iⁿ+Kⁿ) curve per condition." },
     {
       key: "nr_slope", label: "Fit slope (n)", type: "range", step: 0.1,
@@ -251,6 +278,32 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       ],
       help: "Amplitude unit for the y-axis, fit, and Vmax table — a pure rescale (nothing re-measured). Auto picks the unit that reads cleanest.",
     },
+  ],
+  // ERG flicker — steady-state waveform grid OR N1→P1-vs-frequency summary.
+  erg_flicker: [
+    {
+      key: "view", label: "View", type: "select",
+      options: [
+        { value: "waveform", label: "Waveform grid (frequency × condition)" },
+        { value: "summary", label: "N1→P1 vs frequency" },
+      ],
+      help: "The steady-state flicker waveforms as floating small-multiples, or the N1→P1 amplitude plotted against flicker frequency (needs ≥2 frequencies to read as a curve).",
+    },
+    { key: "filter", label: "Clean traces", type: "switch", help: "Notch line-noise + low-pass; the flicker fundamental (10–30 Hz) is well below the cutoff, so it is preserved." },
+    { key: "lowpass_hz", label: "Low-pass cutoff (Hz)", type: "range", step: 10, help: "Lower = smoother. The 10–30 Hz flicker response sits well below the default 120 Hz." },
+    {
+      key: "display_unit", label: "Display unit", type: "select",
+      options: [
+        { value: "auto", label: "Auto (suggest)" },
+        { value: "nV", label: "nV" },
+        { value: "uV", label: "µV" },
+        { value: "mV", label: "mV" },
+        { value: "V", label: "V" },
+      ],
+      help: "Amplitude unit for the waveforms, scale bar, and N1/P1 table — a pure rescale (nothing re-measured). Auto picks the unit that reads cleanest for the (small) flicker signal.",
+    },
+    { key: "scale_uv", label: "Scale bar — amplitude (µV)", type: "number", step: 5, help: "Vertical scale-bar length, set in µV (flicker amplitudes are small — ~20 µV is a good default)." },
+    { key: "scale_ms", label: "Scale bar — time (ms)", type: "number", step: 10, help: "Horizontal scale-bar length (a 10 Hz cycle is 100 ms, a 30 Hz cycle ~33 ms)." },
   ],
   annotate: [
     {

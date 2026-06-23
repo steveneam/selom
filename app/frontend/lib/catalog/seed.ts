@@ -268,6 +268,17 @@ export const CATALOG: SkillCatalogEntry[] = [
     outputs: ["figure", "tables"], license: "proprietary",
     provenance: { repo: "selom/skills", path: "erg_intensity_response" }, version: "0.1.0", popularity: 1,
   }),
+  e({
+    id: "selom.erg_flicker",
+    name: "Selom ERG Flicker",
+    summary:
+      "Light-adapted flicker ERG as a publication figure — steady-state waveform small-multiples (flicker frequency down the rows, conditions across the columns, one shared scale bar) or the N1→P1 amplitude-versus-frequency summary. The periodic-response figure the flash trace grid can't make: N1→P1 amplitude + P1 implicit time are measured from the phase-averaged steady-state cycle, with no a-/b-wave or Naka-Rushton language. Reads the long ERG waveform table; colours + order match the trace grid; attaches a per-condition N1/P1 table.",
+    source: "selom", category: "electrophysiology", omics: ["electrophysiology"],
+    tier: "verified", status: "beta", engine: "python",
+    inputFormats: [".csv", ".txt", ".iwxdata"], chainsWith: ["selom.erg_traces", "selom.erg_intensity_response", "selom.erg_bwave_bar"],
+    outputs: ["figure", "tables"], license: "proprietary",
+    provenance: { repo: "selom/skills", path: "erg_flicker" }, version: "0.1.0", popularity: 1,
+  }),
 
   // ── ClawBio runnable (Verified — wrap the ~29 production pipelines) ────────
   e({
