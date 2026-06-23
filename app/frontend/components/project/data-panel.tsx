@@ -128,15 +128,15 @@ export function DataPanel({
         {datasets.length === 0 ? (
           <Dropzone
             onFile={ingest}
-            accept=".h5ad,.csv,.tsv,.mzML,.iwxdata"
+            accept=".h5ad,.csv,.tsv,.txt,.mzML,.iwxdata"
             title="Drop your data here"
             hint="or click to browse — Selom detects the type, cleans it, and asks a few questions"
-            formats=".h5ad · .csv · .tsv · .mzML · .iwxdata"
+            formats=".h5ad · .csv · .tsv · .txt · .mzML · .iwxdata"
           />
         ) : (
           <Dropzone
             onFile={ingest}
-            accept=".h5ad,.csv,.tsv,.mzML,.iwxdata"
+            accept=".h5ad,.csv,.tsv,.txt,.mzML,.iwxdata"
             title="Add another dataset"
             hint="Drop a file or click to browse"
             icon={Plus}
