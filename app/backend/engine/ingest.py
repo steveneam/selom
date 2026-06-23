@@ -25,6 +25,10 @@ class _Loader:
     name: str
     recognize: Callable[[Path], bool]
     load: Callable[..., Any]
+    # A binary/proprietary format whose decoded payload a path-based skill can't re-read from the
+    # original file (e.g. an .iwxdata ZIP). When True, ingest materializes the decoded DataFrame to
+    # a temp CSV and points DataBundle.path at it, so the existing CSV-reading skills run unchanged.
+    materialize: bool = False
 
 
 # --- loaders (each lazy-imports its dep so the registry stays cheap to import) -----------
@@ -55,6 +59,14 @@ def _load_csv(path: Path, *, sep: str | None = None, **_: Any) -> Any:
     return pd.read_csv(path, sep=sep) if sep else pd.read_csv(path)
 
 
+def _load_iwxdata(path: Path, **_: Any) -> Any:
+    # Native iWorx/LabScribe ERG export → the canonical erg_waveforms_long DataFrame. The decoder
+    # is pure-stdlib (skills._iwx); pandas is assembled inside read_iwxdata.
+    from skills._iwx import read_iwxdata
+
+    return read_iwxdata(str(path))
+
+
 # --- recognizers ------------------------------------------------------------------------
 
 def _is_h5ad(p: Path) -> bool:
@@ -73,10 +85,15 @@ def _is_csv(p: Path) -> bool:
     return p.suffix.lower() in (".csv", ".tsv", ".txt")
 
 
+def _is_iwxdata(p: Path) -> bool:
+    return p.suffix.lower() == ".iwxdata"
+
+
 REGISTRY: tuple[_Loader, ...] = (
     _Loader("h5ad", _is_h5ad, _load_h5ad),
     _Loader("10x_mtx", _is_10x, _load_10x),
     _Loader("xlsx", _is_xlsx, _load_xlsx),
+    _Loader("iwxdata", _is_iwxdata, _load_iwxdata, materialize=True),
     _Loader("csv", _is_csv, _load_csv),
 )
 
@@ -117,10 +134,25 @@ def ingest(
             f"no ingest loader for {path.name!r}; supported: .h5ad, 10x-mtx dir, .xlsx/.xls, .csv/.tsv"
         )
     payload = loader.load(path, sheet=sheet, sep=sep)
-    source = _source_ref(path, sheet=sheet)
+    source = _source_ref(path, sheet=sheet)  # provenance keys on the ORIGINAL file (the .iwxdata)
+    # The runner handle (E4): a path-based skill runs from here. For a directly-readable file it IS
+    # the source; for a decoded binary format (materialize) we write the decoded table to a temp CSV
+    # so the CSV-reading skills run unchanged. `source` (provenance) still points at the original.
+    run_path = str(path)
+    if loader.materialize and _is_dataframe(payload):
+        import tempfile
+
+        tmp = tempfile.NamedTemporaryFile(suffix=".csv", delete=False)
+        tmp.close()
+        payload.to_csv(tmp.name, index=False)
+        run_path = tmp.name
     return DataBundle(
         payload=payload,
         kind=classify(payload, hint=hint, source=source),
         source=source,
-        path=str(path),  # the runner handle (E4): skills are still path-based, so the ANALYZE
-    )                    # entry runs from here while the rest of the spine keys on the payload.
+        path=run_path,
+    )
+
+
+def _is_dataframe(obj: Any) -> bool:
+    return any(t.__name__ == "DataFrame" for t in type(obj).__mro__)
