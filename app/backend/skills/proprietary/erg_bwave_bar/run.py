@@ -45,14 +45,15 @@ def _jitter(center: int, n: int, width: float = 0.34) -> list[float]:
 
 
 def bar_spec(cond_values, *, intensity_label: str, title: str, unit: str = "µV",
-             factor: float = 1.0, show_points: bool = True):
+             factor: float = 1.0, show_points: bool = True, wave_label: str = "b-wave"):
     """Editable bar spec (shared by stub + real). ``cond_values`` = ordered list of
     ``(condition, [values])``. ``unit``/``factor`` set the display unit (default µV, factor
     1.0 → byte-identical): the bar means, SEMs, overlaid eye points, table, and y-axis title
-    all rescale together. Returns ``(spec, table_rows)`` where ``spec`` is a pure
+    all rescale together. ``wave_label`` titles the y-axis (``b-wave`` default → byte-identical;
+    ``a-wave`` for the a-wave bar). Returns ``(spec, table_rows)`` where ``spec`` is a pure
     ``{data, layout}`` (one bar trace of means + error_y SEM, one overlaid points trace)
     and ``table_rows`` are ``[condition, n, mean, SEM]`` for the native Statistics table."""
-    value_label = f"b-wave amplitude ({unit})"
+    value_label = f"{wave_label} amplitude ({unit})"
     positions = list(range(len(cond_values)))
     means, sems, colors, ticktext, tbl_rows = [], [], [], [], []
     pt_x, pt_y = [], []

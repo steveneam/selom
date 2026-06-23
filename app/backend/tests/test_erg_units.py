@@ -195,6 +195,27 @@ def test_erg_bwave_bar_rescales_bar_and_table(tmp_path):
     assert any(str(c).startswith("mean b-wave (mV)") for c in mv["table"]["columns"])
 
 
+def test_erg_bwave_bar_measures_a_and_b_from_waveforms(tmp_path):
+    """Fan-out path: handed the trace table (no marker column), the bar measures the a/b peak
+    from the same waveforms the grid draws (the owner's 'b-wave peak from the traces at a chosen
+    intensity'). `wave` selects which peak; the provenance is captioned honestly."""
+    from skills.proprietary.erg_bwave_bar.run_real import run as run_bar
+
+    p = tmp_path / "wave.csv"
+    _write_waveforms(p)  # Control 300 µV vs Untreated 80 µV, one Group4 trace each
+
+    b = run_bar(str(p), {"intensity_group": "Group4", "wave": "b"})
+    assert b["layout"]["yaxis"]["title"]["text"] == "b-wave amplitude (µV)"
+    assert "measured from traces" in b["table"]["title"]  # not device markers — honest
+    b_means = b["data"][0]["y"]
+    assert len(b_means) == 2 and b_means[0] > b_means[1] > 0  # Control > Untreated
+
+    a = run_bar(str(p), {"intensity_group": "Group4", "wave": "a"})
+    assert a["layout"]["yaxis"]["title"]["text"] == "a-wave amplitude (µV)"
+    a_means = a["data"][0]["y"]
+    assert len(a_means) == 2 and a_means[0] > a_means[1] > 0
+
+
 def _approx(v, rel=1e-3):
     import pytest
 
