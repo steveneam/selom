@@ -216,6 +216,43 @@ def test_erg_bwave_bar_measures_a_and_b_from_waveforms(tmp_path):
     assert len(a_means) == 2 and a_means[0] > a_means[1] > 0
 
 
+def _waveform_rows_g(condition, group, amp_uv, log):
+    rows = []
+    for t in range(0, 121):  # 0..120 ms @ 1 ms
+        a = math.exp(-((t - 30.0) / 6.0) ** 2)
+        b = math.exp(-((t - 70.0) / 14.0) ** 2)
+        v = amp_uv * (1.0 * b - 0.35 * a)
+        rows.append((condition, group, log, t, round(v, 3)))
+    return rows
+
+
+def _write_waveform_series(path):
+    """erg_waveforms_long across 3 intensities × 2 conditions (b-wave grows with flash energy)."""
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["condition", "intensity_group", "intensity_log_cd_s_m2", "time_ms", "voltage_uv"])
+        for cond, base in (("Control", 300.0), ("Untreated", 90.0)):
+            for g, log, frac in (("Group2", -0.8, 0.3), ("Group3", 0.1, 0.6), ("Group4", 1.0, 1.0)):
+                w.writerows(_waveform_rows_g(cond, g, base * frac, log))
+
+
+def test_erg_intensity_response_runs_off_waveforms(tmp_path):
+    """Fan-out: the intensity-response runs straight off the dropped waveform table (no metrics CSV) —
+    it measures the b-wave per (condition × intensity) from the same traces the grid draws. This is
+    the other half of the materialize-gap fix (mirrors erg_bwave_bar)."""
+    from skills.proprietary.erg_intensity_response.run_real import run as run_ir
+
+    p = tmp_path / "wave_series.csv"
+    _write_waveform_series(p)
+    fig = run_ir(str(p), {"display_unit": "uV"})
+    assert fig["layout"]["yaxis"]["title"]["text"] == "b-wave amplitude (µV)"
+    # The 3-intensity data series per condition: b-wave rises monotonically with flash energy.
+    data3 = [tr for tr in fig["data"] if tr.get("y") and len(tr["y"]) == 3]
+    assert data3, "expected a 3-intensity data series per condition"
+    ys = [float(v) for v in data3[0]["y"]]
+    assert ys == sorted(ys), "b-wave should rise with intensity"
+
+
 def _approx(v, rel=1e-3):
     import pytest
 

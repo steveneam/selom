@@ -65,6 +65,13 @@ def run(data_path: str, params: dict) -> dict:
     nr_slope = float(params.get("nr_slope", 0.0) or 0.0)   # 0 = auto (free + fixed fallback)
     min_r2 = float(params.get("min_r2", 0.3))
 
+    # Fan-out off the dropped recording: handed the waveform table (no a/b column) → measure the
+    # a/b peak per (condition × intensity × eye) from the same traces the grid draws, so the
+    # intensity-response runs without a separate device-metrics CSV (closes the other half of the
+    # materialize gap, mirroring erg_bwave_bar). Device markers win when a metrics table is supplied.
+    if value_col not in df.columns and {"time_ms", "voltage_uv"}.issubset(df.columns):
+        df = _erg.metrics_from_waveforms(df)
+
     missing = (_REQUIRED | {value_col}) - set(df.columns)
     if missing:
         raise ValueError(f"erg_intensity_response: input missing required columns {sorted(missing)}")

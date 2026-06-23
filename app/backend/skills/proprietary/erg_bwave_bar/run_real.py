@@ -39,7 +39,7 @@ def run(data_path: str, params: dict) -> dict:
     # win when present (above) per D2; this is the measure-from-traces fallback + the own-recording path.
     measured_from_traces = False
     if value_col not in df.columns and {"time_ms", "voltage_uv"}.issubset(df.columns):
-        df = _metrics_from_waveforms(df)
+        df = _erg.metrics_from_waveforms(df)
         measured_from_traces = True
 
     for col in ("condition", "intensity_group", value_col):
@@ -105,42 +105,3 @@ def run(data_path: str, params: dict) -> dict:
     spec["table"] = table(["condition", "n (eyes)", f"mean {wave_label} ({unit})", f"SEM ({unit})"],
                           tbl_rows, title=f"ERG {wave_label} (mean ± SEM, {source})")
     return spec
-
-
-def _fs_from(time_ms) -> float:
-    """Sampling rate (Hz) from the time axis (ms)."""
-    if len(time_ms) < 2:
-        return 5000.0
-    dt = float(time_ms[1]) - float(time_ms[0])
-    return 1000.0 / dt if dt else 5000.0
-
-
-def _metrics_from_waveforms(df):
-    """``erg_waveforms_long`` → a per-eye a/b metrics frame measured from the traces.
-
-    One trace per (sample × condition × intensity × eye) → one ``_erg.landmarks`` measurement →
-    one bar point. Both a- and b-wave are measured (cheap) so either ``wave`` works. Carries the
-    intensity / stimulus columns through so the downstream filters behave as on a metrics table.
-    """
-    import pandas as pd
-
-    keys = [k for k in ("sample_id", "condition", "intensity_group", "eye") if k in df.columns]
-    if "condition" not in keys or "intensity_group" not in keys:
-        return df  # not a recognizable waveform grouping → let the required-column check fail honestly
-    carry = [c for c in ("intensity_log_cd_s_m2", "stimulus_type", "condition_order") if c in df.columns]
-    rows = []
-    for kv, seg in df.groupby(keys, dropna=False):
-        seg = seg.sort_values("time_ms")
-        t = seg["time_ms"].astype(float).tolist()
-        y = seg["voltage_uv"].astype(float).tolist()
-        if len(t) < 4:
-            continue
-        lm = _erg.landmarks(t, y, fs=_fs_from(t))
-        rec = dict(zip(keys, kv if isinstance(kv, tuple) else (kv,)))
-        rec["a_wave_uv"] = lm["a_wave_uv"]
-        rec["b_wave_uv"] = lm["b_wave_uv"]
-        for c in carry:
-            vals = seg[c].dropna()
-            rec[c] = vals.iloc[0] if not vals.empty else None
-        rows.append(rec)
-    return pd.DataFrame(rows)

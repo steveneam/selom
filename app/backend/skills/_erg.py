@@ -128,6 +128,47 @@ def landmarks(time_ms, y, fs: float = 5000.0) -> dict:
     }
 
 
+def fs_from(time_ms) -> float:
+    """Sampling rate (Hz) inferred from a time axis (ms). 5000 Hz default for a degenerate axis."""
+    if len(time_ms) < 2:
+        return 5000.0
+    dt = float(time_ms[1]) - float(time_ms[0])
+    return 1000.0 / dt if dt else 5000.0
+
+
+def metrics_from_waveforms(df):
+    """``erg_waveforms_long`` → a per-eye a/b metrics frame measured FROM the traces.
+
+    One trace per (sample × condition × intensity × eye) → one :func:`landmarks` measurement →
+    one row carrying ``a_wave_uv`` + ``b_wave_uv`` (and the intensity/stimulus columns passed
+    through). This is the fan-out path the owner asked for — the bar and intensity-response run
+    straight off the dropped recording at the chosen intensity, using the same a/b metric the
+    trace grid reports, instead of needing a separate device-metrics CSV. Device markers stay
+    preferred when a metrics table IS supplied (the caller checks for the marker column first)."""
+    import pandas as pd
+
+    keys = [k for k in ("sample_id", "condition", "intensity_group", "eye") if k in df.columns]
+    if "condition" not in keys or "intensity_group" not in keys:
+        return df  # not a recognizable waveform grouping → let the caller's column check fail honestly
+    carry = [c for c in ("intensity_log_cd_s_m2", "stimulus_type", "condition_order") if c in df.columns]
+    rows = []
+    for kv, seg in df.groupby(keys, dropna=False):
+        seg = seg.sort_values("time_ms")
+        t = seg["time_ms"].astype(float).tolist()
+        y = seg["voltage_uv"].astype(float).tolist()
+        if len(t) < 4:
+            continue
+        lm = landmarks(t, y, fs=fs_from(t))
+        rec = dict(zip(keys, kv if isinstance(kv, tuple) else (kv,)))
+        rec["a_wave_uv"] = lm["a_wave_uv"]
+        rec["b_wave_uv"] = lm["b_wave_uv"]
+        for c in carry:
+            vals = seg[c].dropna()
+            rec[c] = vals.iloc[0] if not vals.empty else None
+        rows.append(rec)
+    return pd.DataFrame(rows)
+
+
 # --- Intensity-response (Naka-Rushton) ---------------------------------------
 # The scotopic b-wave saturates with flash energy. Naka-Rushton (1966) models that
 # saturating rise: V/Vmax = I^n / (I^n + K^n), with I the linear flash energy. We fit
