@@ -190,7 +190,18 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   erg_traces: [
     { key: "filter", label: "Clean traces", type: "switch", help: "Notch line-noise + low-pass, keeping oscillatory potentials (“clean flats, keep OPs”)." },
     { key: "lowpass_hz", label: "Low-pass cutoff (Hz)", type: "range", step: 10, help: "Lower = smoother. Default 120 Hz cuts mains/instrument hum while keeping the partial-rescue b-wave; raise toward 300 Hz to retain all oscillatory potentials." },
-    { key: "scale_uv", label: "Scale bar — amplitude (µV)", type: "number", step: 10, help: "Vertical scale-bar length." },
+    {
+      key: "display_unit", label: "Display unit", type: "select",
+      options: [
+        { value: "auto", label: "Auto (suggest)" },
+        { value: "nV", label: "nV" },
+        { value: "uV", label: "µV" },
+        { value: "mV", label: "mV" },
+        { value: "V", label: "V" },
+      ],
+      help: "Amplitude unit for the traces, scale bar, and a/b table — a pure rescale (nothing re-measured). Auto picks the unit that reads cleanest for the signal size.",
+    },
+    { key: "scale_uv", label: "Scale bar — amplitude (µV)", type: "number", step: 10, help: "Vertical scale-bar length, set in µV (shown in the chosen display unit)." },
     { key: "scale_ms", label: "Scale bar — time (ms)", type: "number", step: 10, help: "Horizontal scale-bar length." },
   ],
   // ERG b-wave bar — one flash intensity, mean ± SEM + every eye as a point (reviewer ask).
@@ -209,6 +220,17 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       help: "Which scotopic flash the per-condition b-wave bar is taken at.",
     },
     { key: "points", label: "Show individual eyes", type: "switch", help: "Overlay each eye as a data point (reviewer ask for quantitative graphs)." },
+    {
+      key: "display_unit", label: "Display unit", type: "select",
+      options: [
+        { value: "auto", label: "Auto (suggest)" },
+        { value: "nV", label: "nV" },
+        { value: "uV", label: "µV" },
+        { value: "mV", label: "mV" },
+        { value: "V", label: "V" },
+      ],
+      help: "Amplitude unit for the y-axis and table — a pure rescale (nothing re-measured). Auto picks the unit that reads cleanest.",
+    },
   ],
   // ERG intensity-response — b-wave vs flash energy with the adjustable Naka-Rushton fit.
   erg_intensity_response: [
@@ -218,6 +240,17 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       help: "0 = auto-fit each condition's slope (falling back to n=1 where under-constrained). Set a value to fix the slope and compare all conditions at one slope.",
     },
     { key: "min_r2", label: "Fit-quality gate (R²)", type: "range", step: 0.05, help: "Minimum R² to report a fit; lower keeps more marginal fits, higher only the cleanest." },
+    {
+      key: "display_unit", label: "Display unit", type: "select",
+      options: [
+        { value: "auto", label: "Auto (suggest)" },
+        { value: "nV", label: "nV" },
+        { value: "uV", label: "µV" },
+        { value: "mV", label: "mV" },
+        { value: "V", label: "V" },
+      ],
+      help: "Amplitude unit for the y-axis, fit, and Vmax table — a pure rescale (nothing re-measured). Auto picks the unit that reads cleanest.",
+    },
   ],
   annotate: [
     {
