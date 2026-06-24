@@ -358,3 +358,34 @@ auto-suggest seed (the auto text-trace labels); the amber `highlight` gene-set p
 - `app/backend/skills/volcano/run.py::_assemble` — the trace/shape shape the transform reads (§D).
 - `docs/figure-data-capabilities/spec.md` (v1, §11) · memory `selom-figure-edit-ux-pattern`
   (the canonical UX model) · `selom-erg-manual-marks` · `full-app-smoke-test-before-handoff`.
+
+## Extending to a new chart kind (the reusable recipe — copy this for heatmap / UMAP / bar-box)
+The volcano + ERG are the two worked examples; a new chart's editing surface is a **fill-in-the-blanks**
+of the same spine. The generic code (`resolveContract`, the lifted `fdParams` + pending-changes banner,
+the figure store, `theme.apply`'s stamp seam) is **reused unchanged** — never branch on skill id.
+
+1. **Declare the capability.** Add `tools.<cap>?: boolean` to `SelomCapabilities` + `FigureModel.
+   capabilities.<cap>` in `lib/figure-model.ts`; resolve it in `resolveContract` (declared-only). Stamp
+   the skill's profile in `app/backend/skills/_capabilities.py` (`_PROFILES[<skill>]`) — it injects via
+   `theme.apply`, render-inert, never clobbering a richer stamp. Regen that skill's golden (capabilities
+   block is render-inert). Add a BE stamp assertion + an FE resolver test.
+2. **Backend substrate (only if the interaction needs per-point identity the figure doesn't already
+   carry).** Stamp `customdata` + a `hovertemplate` on the relevant traces (mirror `volcano/_assemble`);
+   keep new fields OPTIONAL so any co-consumer of a shared assembler stays byte-identical (the
+   proteomics_de lesson). Regen the golden.
+3. **Pure transform module** `lib/<chart>/<verb>.ts` (sibling of `thresholds.ts`/`labels.ts`): read the
+   figure's current state from the spec (by trace NAME / shape ORIENTATION, never index order), apply a
+   pure edit, return `{spec, readout}` or JSON-Patch ops. Idempotent. Unit-test in node-env vitest.
+   Carry per-point auxiliary arrays (customdata) through any re-partition so they stay point-aligned.
+4. **Classify each control INSTANT vs STAGED** (`selom-figure-edit-ux-pattern`): INSTANT-cosmetic
+   (annotation / colour / show-hide) → commit JSON-Patch to the **figure store** (undoable, no re-run,
+   like gene labels); STAGED-recompute (a cut / threshold / input that changes the numbers) → lift into
+   `fdParams` (the pending-changes banner + one re-run, like the FC/p threshold).
+5. **Wire the surfaces.** Canvas plug-in = a sibling of `threshold-drag.ts`/`mark-drag.ts`, gated in
+   `figure-canvas` on `capabilities.<cap>` + its handler, threaded via `EditorWorkspace`; and/or a
+   Figure-data panel (sibling of `threshold-editor.tsx`/`marks-editor.tsx`) gated in `figure-data-panel`.
+   The handler lives in `project-workspace` (commit to the store, or `setFdParams`).
+6. **Verify live + ratchet.** Real data, full-app smoke (WebGL behind `dynamic(ssr:false)`). Note: you
+   can't click a WebGL (`scattergl`) point by DOM uid — to test the click handler, emit a real
+   `plotly_click` payload (`gd.emit('plotly_click', {points:[{x,y,customdata,curveNumber}]})`) and read
+   the resulting store/spec change. Then update `CURRENT.md` + `memory selom-figure-edit-ux-pattern`.
