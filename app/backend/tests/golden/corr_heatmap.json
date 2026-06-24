@@ -109,6 +109,7 @@
       "gridcolor": "#eef1f5",
       "gridwidth": 1,
       "type": "category",
+      "automargin": true,
       "title": {
         "text": "",
         "font": {
@@ -137,6 +138,7 @@
       "type": "category",
       "scaleanchor": "x",
       "scaleratio": 1,
+      "automargin": true,
       "title": {
         "text": "",
         "font": {

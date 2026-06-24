@@ -20,6 +20,13 @@ def test_stamp_adds_the_volcano_block():
     assert caps["gesture"] == {"default": "none", "zoomTools": True, "scrollZoom": False}
 
 
+def test_stamp_adds_the_heatmap_block():
+    spec = _capabilities.stamp(_spec(), "heatmap")
+    caps = spec["layout"]["meta"]["selom"]["capabilities"]
+    assert caps["tools"]["heatmapTones"] is True
+    assert caps["gesture"] == {"default": "none", "zoomTools": True, "scrollZoom": False}
+
+
 def test_stamp_is_a_noop_for_an_unprofiled_skill():
     out = _capabilities.stamp(_spec(), "umap_scrna")
     assert "meta" not in out["layout"]

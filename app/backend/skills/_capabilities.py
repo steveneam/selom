@@ -20,6 +20,14 @@ _PROFILES: dict[str, dict] = {
         "gesture": {"default": "none", "zoomTools": True, "scrollZoom": False},
         "tools": {"thresholds": True, "geneLabels": True},
     },
+    # Heatmap: the diverging colour scale is directly re-tonable — drag the colour bar (top → zmax,
+    # bottom → zmin, middle → zmid) or the Style midpoint/saturation sliders re-tone the existing
+    # z-matrix LIVE (an instant figure-store edit, undoable, NO re-run; the genes/clustering change
+    # stays a staged re-run). heatmap-spec.md.
+    "heatmap": {
+        "gesture": {"default": "none", "zoomTools": True, "scrollZoom": False},
+        "tools": {"heatmapTones": True},
+    },
 }
 
 

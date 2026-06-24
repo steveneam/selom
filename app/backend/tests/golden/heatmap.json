@@ -257,6 +257,7 @@
       "showgrid": true,
       "gridcolor": "#eef1f5",
       "gridwidth": 1,
+      "automargin": true,
       "title": {
         "text": "gene",
         "font": {
@@ -302,6 +303,20 @@
       },
       "bgcolor": "rgba(0,0,0,0)",
       "bordercolor": "rgba(0,0,0,0)"
+    },
+    "meta": {
+      "selom": {
+        "capabilities": {
+          "gesture": {
+            "default": "none",
+            "zoomTools": true,
+            "scrollZoom": false
+          },
+          "tools": {
+            "heatmapTones": true
+          }
+        }
+      }
     }
   }
 }

@@ -78,6 +78,29 @@ def map_ensembl_to_symbol(names) -> list[str]:
     ]
 
 
+# Gene names sometimes arrive as "<ID>~<SYMBOL>" (a featureCounts / GTF `gene_id~gene_name` convention,
+# e.g. "ENSG00000128578~STRIP2") — on a figure we want the readable SYMBOL, not the whole pair.
+_ID_SYMBOL_RE = re.compile(r"^[^~]+~(.*)$")
+
+
+def display_symbol(name) -> str:
+    """The readable display label for a gene name: the SYMBOL half of an ``<ID>~<SYMBOL>`` pair (a
+    common featureCounts/GTF convention), else the name unchanged. An empty symbol half (``ENSG…~``)
+    falls back to the ID. Robust to plain symbols (``GAPDH``) and plain IDs (no ``~``) — both pass through.
+    """
+    s = str(name)
+    m = _ID_SYMBOL_RE.match(s)
+    if m:
+        sym = m.group(1).strip()
+        return sym or s.split("~", 1)[0]  # empty symbol → keep the ID half
+    return s
+
+
+def display_symbols(names) -> list[str]:
+    """``display_symbol`` over an iterable → a plain ``list[str]`` (figure axis labels)."""
+    return [display_symbol(n) for n in names]
+
+
 def read_anndata(path):
     """``sc.read_h5ad`` with genome-prefix-cleaned, Ensembl-ID-relabelled, de-duplicated
     ``var_names`` — the shared scRNA read so every skill matches gene symbols consistently.

@@ -129,6 +129,7 @@
       "showgrid": true,
       "gridcolor": "#eef1f5",
       "gridwidth": 1,
+      "automargin": true,
       "title": {
         "text": "pathway",
         "font": {

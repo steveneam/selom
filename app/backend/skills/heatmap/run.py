@@ -9,6 +9,7 @@ z-matrix in the same shape.
 import math
 
 from skills._engine import use_real_engine
+from skills._genes import display_symbols
 
 
 def run(data_path: str, params: dict) -> dict:
@@ -35,6 +36,9 @@ def heatmap_spec(z, x_labels, y_labels, title, x_title, dendro=None) -> dict:
     the standard clustermap look. Row labels move to the right so the tree owns the left.
     When ``dendro`` is None the spec is exactly the single-trace heatmap as before.
     """
+    # Show readable gene SYMBOLS on the axis (``ENSG…~STRIP2`` → ``STRIP2``); plain symbols / IDs and
+    # the stub's ``GENE1…`` labels pass through unchanged (so the stub golden is byte-identical).
+    y_labels = display_symbols(y_labels)
     heat = {
         "type": "heatmap",
         "z": z,

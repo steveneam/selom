@@ -124,6 +124,7 @@
       "showgrid": true,
       "gridcolor": "#eef1f5",
       "gridwidth": 1,
+      "automargin": true,
       "title": {
         "text": "sample",
         "font": {
@@ -149,6 +150,7 @@
       "showgrid": true,
       "gridcolor": "#eef1f5",
       "gridwidth": 1,
+      "automargin": true,
       "title": {
         "text": "gene set",
         "font": {
