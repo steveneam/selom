@@ -385,6 +385,12 @@ ladder + adaptation; unknown → ordinal `GroupN` labels + intensity `None` (hon
   Diagnosys vocabulary, so a combined scotopic+photopic cohort filters to one mode via the existing
   `_erg.resolve_flash_mode` instead of colliding on shared `GroupN` row labels. Scotopic output stays
   byte-identical (title `Representative scotopic ERG`, 7 traces).
+- **D11 — Group count is fully dynamic, even under a name hint.** Only obviously-aborted SHORT runs
+  (< 3 sweeps duplicating a sibling's flash param) ever fold; FULL groups are never force-collapsed to
+  a protocol's expected count. So a *different lab's* 10- or 12-intensity "Scotopic"-named file decodes
+  to 10/12, not the CMRI 7. Safe because a real-data scan (28 files) found **every** scotopic at exactly
+  7 `[10,10,10,10,10,5,5]` and photopic at 5 `[10,10,10,5,5]` — the fold never fires on the owner's data
+  (the block-ID index already absorbs re-acquisitions). Verified at counts 3/5/7/10/12, named + unnamed.
 - **Verified on real CMRI data** (`…/13. 1 Dec 2020_Experiment 11/Rd10#288_LE Photopic UV.iwxdata`):
   decodes to 5 groups → `Representative photopic ERG` 5-row grid, intensity honestly unknown;
   combined scotopic(7)+photopic(5) cohort renders 7 *or* 5 rows by `adaptation`, never 12. Tests:

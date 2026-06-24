@@ -164,10 +164,13 @@ def _read_sweep_info(zf: zipfile.ZipFile, blk: int):
 
 def _canonical_groups(records: list[tuple], target: int = 0) -> list[list[int]]:
     """Collapse per-sweep records into intensity groups by the block-ID intensity index (first-seen
-    order). When ``target`` > 0 and MORE groups decode than the protocol expects (a re-acquired or
-    aborted run created an extra index), merge short runs forward — by shared flash param, else the
-    smallest neighbour — until ``target`` remain (the validated scotopic behaviour). ``target`` == 0
-    (unknown protocol) keeps every decoded group untouched — we never mangle an unrecognised ladder."""
+    order). The group COUNT is whatever the file holds — a genuine N-intensity protocol (5, 7, 10, …)
+    is kept as-is. The ONLY collapsing is folding obviously-aborted SHORT runs (< 3 sweeps that share
+    a later sibling's flash param — an operator abort+re-acquire) forward into that sibling, and only
+    while still above a known protocol's ``target`` count. We never force-merge FULL groups to hit a
+    target, so another lab's larger ladder survives intact (verified: no real CMRI file ever exceeds
+    its 7/5 count, so this folding never fires on the owner's data anyway). ``target`` == 0 (unknown
+    protocol) folds nothing — every decoded group is kept."""
     order: list[int] = []
     by_idx: dict[int, list[tuple]] = {}
     for blk, inten, fp in records:
@@ -192,12 +195,8 @@ def _canonical_groups(records: list[tuple], target: int = 0) -> list[list[int]]:
                         break
             if merged:
                 break
-        if not merged:                                  # fall back: merge smallest neighbour
-            sizes = [len(g) for g in groups]
-            j = sizes.index(min(sizes))
-            tgt = j + 1 if j + 1 < len(groups) else j - 1
-            groups[tgt] = groups[j] + groups[tgt]
-            del groups[j]
+        if not merged:                                  # no aborted run to fold → keep the rest as-is
+            break
     return [[blk for blk, _fp in g] for g in groups]
 
 

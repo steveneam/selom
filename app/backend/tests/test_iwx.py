@@ -107,6 +107,19 @@ def test_scotopic_calibration_and_stimulus_tag(tmp_path):
     assert df[df["intensity_group"] == "Group1"]["intensity_log_cd_s_m2"].iloc[0] == pytest.approx(-1.7)
 
 
+def test_larger_named_protocol_not_force_merged(tmp_path):
+    """Another lab's larger ladder survives: a file NAMED 'Scotopic' but with 10 distinct intensity
+    groups (each its own flash param — no aborted-run signature) decodes to 10, NOT force-collapsed
+    to the CMRI 7. Only short runs that duplicate a sibling's flash param ever fold; genuine extra
+    intensities are kept. This is the owner's 'a different lab might use 10 groups' guarantee."""
+    p = tmp_path / "OtherLab #1_LE Scotopic Green.iwxdata"
+    _make_iwxdata(str(p), group_uv=tuple(range(20, 220, 20)), n_groups=10)
+    eye = _iwx.load_eye(str(p))
+    assert len(eye.groups) == 10                         # all 10 kept, despite the scotopic name hint
+    df = _iwx.read_iwxdata(str(p))
+    assert sorted(df["intensity_group"].unique(), key=lambda g: int(g[5:])) == [f"Group{i}" for i in range(1, 11)]
+
+
 def test_unknown_count_decodes_generically(tmp_path):
     """An unrecognised group count with no scotopic/photopic filename hint still decodes — ordinal
     labels, no calibration, no stimulus tag — rather than being rejected on its group number."""
