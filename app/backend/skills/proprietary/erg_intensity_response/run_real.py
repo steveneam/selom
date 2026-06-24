@@ -64,6 +64,15 @@ def run(data_path: str, params: dict) -> dict:
     do_fit = to_bool(params.get("fit", True))
     nr_slope = float(params.get("nr_slope", 0.0) or 0.0)   # 0 = auto (free + fixed fallback)
     min_r2 = float(params.get("min_r2", 0.3))
+    # Shared styling vocabulary (skills._charts, mean-spread-styling-spec) — same knobs as the bar +
+    # trace grid: spread metric, spread style, and individual eye points (the reviewer's "individual
+    # data points in all quantitative graphs", now on this curve too).
+    error = str(params.get("error", "sem")).strip().lower()
+    spread = str(params.get("spread", "error_bars")).strip().lower()
+    points = to_bool(params.get("points", True))
+    band_alpha = float(params.get("band_alpha", 0.25))
+    boundary = str(params.get("boundary_lines", "none")).strip().lower()
+    band_color = str(params.get("band_color", "")).strip() or None
 
     # Fan-out off the dropped recording: handed the waveform table (no a/b column) → measure the
     # a/b peak per (condition × intensity × eye) from the same traces the grid draws, so the
@@ -92,33 +101,43 @@ def run(data_path: str, params: dict) -> dict:
     cond_series, fits = [], {}
     for cond in order:
         cd = df[df["condition"] == cond]
-        # Mean ± SEM b-wave at each flash intensity (across eyes), ordered by log intensity.
-        xs, ys, sems = [], [], []
+        # Mean b-wave + spread at each flash intensity (across eyes), ordered by log intensity, plus
+        # every eye's individual amplitude for the points overlay. `spread_stats` is the shared metric
+        # (sem|sd|ci95|minmax), so the error metric is the same one the bar and trace grid use.
+        xs, ys, lowers, uppers, errs, pts = [], [], [], [], [], []
         for log_val, grp in cd.groupby("intensity_log_cd_s_m2"):
-            st = _erg.summary_stats(grp[value_col].dropna().astype(float).tolist())
+            vals = grp[value_col].dropna().astype(float).tolist()
+            st = _erg.spread_stats(vals, error)
             if st["n"]:
-                xs.append(float(log_val))
+                x = float(log_val)
+                xs.append(x)
                 ys.append(st["mean"])
-                sems.append(st["sem"])
+                lowers.append(st["mean"] - st["lo"])
+                uppers.append(st["mean"] + st["hi"])
+                errs.append(st["err"])
+                pts.extend((x, v) for v in vals)
         if not xs:
             continue
         order_idx = sorted(range(len(xs)), key=lambda i: xs[i])
         xs = [xs[i] for i in order_idx]
         ys = [ys[i] for i in order_idx]
-        sems = [sems[i] for i in order_idx]
-        cond_series.append((cond, xs, ys, sems))
+        lowers = [lowers[i] for i in order_idx]
+        uppers = [uppers[i] for i in order_idx]
+        errs = [errs[i] for i in order_idx]
+        cond_series.append((cond, xs, ys, lowers, uppers, errs, pts))
         fits[cond] = _fit_condition(xs, ys, do_fit, nr_slope, min_r2)
 
     if not cond_series:
         raise ValueError("erg_intensity_response: no series to plot after filtering")
 
     # Display unit (default µV → byte-identical). Peak = the largest mean b-wave (µV).
-    peak_uv = max((max(ys) for (_c, _xs, ys, _s) in cond_series), default=0.0)
+    peak_uv = max((max(ys) for (_c, _xs, ys, *_r) in cond_series), default=0.0)
     unit = _erg.resolve_display_unit(params.get("display_unit", "uV"), peak_uv)
     factor = _erg.unit_factor(unit)
     spec, tbl_rows = ir_spec(cond_series, fits,
                              title=f"{adapt or 'scotopic'} b-wave intensity-response".capitalize(),
-                             unit=unit, factor=factor)
+                             unit=unit, factor=factor, spread=spread, points=points,
+                             band_alpha=band_alpha, boundary=boundary, band_color=band_color)
     spec["table"] = table(
         ["condition", f"Vmax ({unit})", "log K (cd·s/m²)", "n", "R²"], tbl_rows,
         title="Naka-Rushton fit")

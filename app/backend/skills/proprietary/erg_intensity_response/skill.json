@@ -15,6 +15,12 @@
     "fit": { "type": "bool", "default": true },
     "nr_slope": { "type": "float", "default": 0.0, "min": 0.0, "max": 4.0 },
     "min_r2": { "type": "float", "default": 0.3, "min": 0.0, "max": 1.0 },
+    "error": { "type": "str", "default": "sem", "options": ["sem", "sd", "ci95", "minmax"] },
+    "spread": { "type": "str", "default": "error_bars", "options": ["error_bars", "band", "both", "none"] },
+    "points": { "type": "bool", "default": true },
+    "band_alpha": { "type": "float", "default": 0.25, "min": 0.0, "max": 1.0 },
+    "boundary_lines": { "type": "str", "default": "none", "options": ["none", "solid", "dashed"] },
+    "band_color": { "type": "str", "default": "" },
     "display_unit": { "type": "str", "default": "uV", "options": ["auto", "nV", "uV", "mV", "V"] }
   },
   "outputs": [
