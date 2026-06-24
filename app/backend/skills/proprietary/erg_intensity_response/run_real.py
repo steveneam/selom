@@ -79,7 +79,10 @@ def run(data_path: str, params: dict) -> dict:
     # intensity-response runs without a separate device-metrics CSV (closes the other half of the
     # materialize gap, mirroring erg_bwave_bar). Device markers win when a metrics table is supplied.
     if value_col not in df.columns and {"time_ms", "voltage_uv"}.issubset(df.columns):
-        df = _erg.metrics_from_waveforms(df)
+        # Cone-aware a/b (per-row stimulus_type wins; this default = the user's adaptation hint for a
+        # plain waveform CSV) — photopic responses are faster, so they need the cone landmark windows.
+        default_mode = _erg.adaptation_mode(params.get("adaptation", "auto"), params.get("stimulus_type", ""))
+        df = _erg.metrics_from_waveforms(df, default_mode=default_mode)
 
     missing = (_REQUIRED | {value_col}) - set(df.columns)
     if missing:

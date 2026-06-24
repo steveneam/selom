@@ -42,6 +42,10 @@ def run(data_path: str, params: dict) -> dict:
         raise ValueError(f"erg_traces: input missing required columns {sorted(missing)}")
 
     df, adapt = _filter_mode(df, params)
+    # Landmark mode for the a/b table: cone (photopic) windows when the data/param says photopic,
+    # else scotopic. `adapt` reflects the stimulus_type filter when that column is present; else fall
+    # back to the user's adaptation/stimulus_type hint (a plain waveform CSV with no such column).
+    metric_mode = adapt or _erg.adaptation_mode(params.get("adaptation", "auto"), params.get("stimulus_type", ""))
     # Central tendency: `representative` (one exemplar trace per condition×intensity — the
     # back-compatible default), `mean` (average the n eye/animal recordings at each time), or `none`
     # (no averaged trace — draw every replicate at equal weight: "individual traces only").
@@ -127,7 +131,7 @@ def run(data_path: str, params: dict) -> dict:
                               color, band_color, band_alpha, boundary, error_every, n)
                 n_seen.append(n)
                 # Measure the a/b table on the AVERAGED RAW trace (matches the mean line drawn).
-                lm = _erg.landmarks(ref_t, mean_raw, fs=_fs_from(ref_t))
+                lm = _erg.landmarks(ref_t, mean_raw, fs=_fs_from(ref_t), mode=metric_mode)
             elif central == "none":
                 # No averaged trace — draw every replicate at equal weight (individual traces only).
                 ref_t, _, mean_raw, _, _, _, n = _aggregate(reps, error)
@@ -137,7 +141,7 @@ def run(data_path: str, params: dict) -> dict:
                                         for r in reps[1:]]
                 panel["name"] = f"{cond} {g} (n={n}, individual)"
                 n_seen.append(n)
-                lm = _erg.landmarks(ref_t, mean_raw, fs=_fs_from(ref_t))  # table = cohort mean
+                lm = _erg.landmarks(ref_t, mean_raw, fs=_fs_from(ref_t), mode=metric_mode)  # table = cohort mean
             else:  # representative — the first replicate (single-eye → byte-identical to before)
                 t, raw_y, clean_y = reps[0]
                 panel["x"], panel["y"] = t, clean_y
@@ -145,7 +149,7 @@ def run(data_path: str, params: dict) -> dict:
                 n_seen.append(1)
                 # Measure on the RAW baseline-corrected trace (the validated metric), not the
                 # display-cleaned copy — the dual smooth is internal to landmarks().
-                lm = _erg.landmarks(t, raw_y, fs=_fs_from(t))
+                lm = _erg.landmarks(t, raw_y, fs=_fs_from(t), mode=metric_mode)
             peak_uv = max(peak_uv, max((abs(v) for v in panel["y"]), default=0.0))
             panels.append(panel)
             tbl_rows.append([cond, ig_log.get(g, str(g)), lm["b_wave_uv"],

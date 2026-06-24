@@ -436,6 +436,79 @@ def test_erg_bwave_bar_significance_and_refline(tmp_path):
     assert ov_stars == ["ns"]
 
 
+# --- photopic / cone landmark windows (goal-① T15) ---------------------------
+
+def _cone_waveform_rows(condition, amp_uv, group="Group3"):
+    """A CONE (photopic) waveform: an early sharp a-wave trough ~12 ms + an early cone b-wave peak
+    ~35 ms — fast enough that the SCOTOPIC b-window (40–120 ms) mis-times it (caps it at the 40 ms
+    edge) and the cone window (12–90 ms) catches the true earlier/larger peak. Returns
+    (condition, group, time_ms, voltage_uv) tuples @ 1 ms (fs = 1000 Hz)."""
+    rows = []
+    for t in range(0, 121):
+        a = math.exp(-((t - 12.0) / 4.0) ** 2)   # early sharp cone a-wave trough
+        b = math.exp(-((t - 35.0) / 10.0) ** 2)  # early narrow cone b-wave peak
+        v = amp_uv * (1.0 * b - 0.25 * a)
+        rows.append((condition, group, t, round(v, 3)))
+    return rows
+
+
+def test_landmarks_photopic_windows_catch_the_early_cone_peak():
+    """Cone b-wave at ~35 ms: the photopic windows time it correctly and recover a larger amplitude;
+    the scotopic windows (b starts at 40 ms) miss it. Default/unknown mode → scotopic (legacy path)."""
+    t = [float(x) for x in range(0, 121)]
+    y = [200.0 * (math.exp(-((tm - 35.0) / 10.0) ** 2) - 0.25 * math.exp(-((tm - 12.0) / 4.0) ** 2))
+         for tm in t]
+    photopic = _erg.landmarks(t, y, fs=1000.0, mode="photopic")
+    scotopic = _erg.landmarks(t, y, fs=1000.0, mode="scotopic")
+    assert 25.0 <= photopic["b_t_ms"] <= 45.0       # cone b-wave timed near its true 35 ms peak
+    assert scotopic["b_t_ms"] >= 40.0               # scotopic window can't see before 40 ms
+    assert photopic["b_wave_uv"] > scotopic["b_wave_uv"] > 0
+    # Default + unknown mode fall back to scotopic → byte-identical to the legacy single-arg call.
+    assert _erg.landmarks(t, y, fs=1000.0) == scotopic
+    assert _erg.landmarks(t, y, fs=1000.0, mode="nonsense") == scotopic
+
+
+def test_adaptation_mode():
+    assert _erg.adaptation_mode("auto", "") == "scotopic"          # default / dark-adapted
+    assert _erg.adaptation_mode("photopic", "") == "photopic"
+    assert _erg.adaptation_mode("scotopic", "") == "scotopic"
+    assert _erg.adaptation_mode("auto", "photopic_flash") == "photopic"  # explicit stim wins
+    assert _erg.adaptation_mode("nonsense", "") == "scotopic"      # unknown → scotopic
+
+
+def test_metrics_from_waveforms_mode_per_segment_stimulus_type():
+    """The cone windows are picked per segment from `stimulus_type`, so a photopic_flash table is
+    measured with cone timing even when the default mode is scotopic (no adaptation param)."""
+    import pandas as pd
+
+    cols = ["condition", "intensity_group", "time_ms", "voltage_uv"]
+    df_photo = pd.DataFrame(_cone_waveform_rows("Control", 200.0), columns=cols)
+    df_photo["stimulus_type"] = "photopic_flash"     # per-row signal forces cone windows
+    df_scoto = pd.DataFrame(_cone_waveform_rows("Control", 200.0), columns=cols)  # no signal → default
+
+    photo = _erg.metrics_from_waveforms(df_photo, default_mode="scotopic")
+    scoto = _erg.metrics_from_waveforms(df_scoto, default_mode="scotopic")
+    assert float(photo["b_wave_uv"].iloc[0]) > float(scoto["b_wave_uv"].iloc[0]) > 0
+    # The explicit default also reaches the cone windows when there is no stimulus_type column.
+    photo_default = _erg.metrics_from_waveforms(df_scoto, default_mode="photopic")
+    assert float(photo_default["b_wave_uv"].iloc[0]) == _approx(float(photo["b_wave_uv"].iloc[0]))
+
+
+def test_erg_bwave_bar_photopic_adaptation_uses_cone_windows(tmp_path):
+    """End-to-end: a cone waveform table measured via adaptation='photopic' recovers a larger
+    b-wave than the scotopic default, because the cone b-window sees the fast ~35 ms peak."""
+    from skills.proprietary.erg_bwave_bar.run_real import run as run_bar
+
+    p = tmp_path / "cone.csv"
+    with open(p, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["condition", "intensity_group", "time_ms", "voltage_uv"])
+        w.writerows(_cone_waveform_rows("Control", 200.0, "Group3"))
+    photo = run_bar(str(p), {"intensity_group": "Group3", "wave": "b", "adaptation": "photopic"})
+    scoto = run_bar(str(p), {"intensity_group": "Group3", "wave": "b", "adaptation": "scotopic"})
+    assert photo["data"][0]["y"][0] > scoto["data"][0]["y"][0] > 0
+
+
 def _approx(v, rel=1e-3):
     import pytest
 

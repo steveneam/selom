@@ -48,7 +48,12 @@ def run(data_path: str, params: dict) -> dict:
     # win when present (above) per D2; this is the measure-from-traces fallback + the own-recording path.
     measured_from_traces = False
     if value_col not in df.columns and {"time_ms", "voltage_uv"}.issubset(df.columns):
-        df = _erg.metrics_from_waveforms(df)
+        # Cone-aware a/b: photopic (light-adapted) responses are faster, so the cone landmark
+        # windows must measure them (the scotopic b-window would miss an early cone b-wave). The
+        # per-row stimulus_type wins inside metrics_from_waveforms; this default covers a plain
+        # waveform CSV with no stimulus_type column (the user's adaptation/stimulus_type hint).
+        default_mode = _erg.adaptation_mode(params.get("adaptation", "auto"), params.get("stimulus_type", ""))
+        df = _erg.metrics_from_waveforms(df, default_mode=default_mode)
         measured_from_traces = True
 
     for col in ("condition", "intensity_group", value_col):

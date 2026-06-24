@@ -102,24 +102,55 @@ _BWAVE_WIN_MS = (40.0, 120.0)
 _AWAVE_SMOOTH_MS = 3.0   # light: preserves the sharp a-wave trough
 _BWAVE_SMOOTH_MS = 16.0  # heavy: real broad b-wave survives, high-freq noise averages out
 
+# Photopic / cone-driven (light-adapted) landmark windows — TUNED on the real CMRI mouse UV-photopic
+# .iwxdata (Experiment 11), not assumed. Two cone-specific facts drove the windows:
+#   • the cone a-wave is small and EARLY (~5–20 ms) — so a TIGHT early a-window (0–25 ms) isolates
+#     it; the scotopic a-window (0–40 ms) under heavy smoothing wrongly latched a ~27 ms noise dip
+#     as the "a-wave" on these recordings.
+#   • the mouse cone b-wave is NOT faster than rod here — it actually peaks LATE (measured 57 ms in
+#     rd10, ~104 ms in C57) — so the b-window must START earlier (to catch a fast cone b-wave in a
+#     cleaner protocol) yet stay WIDE (15–130 ms) so a late mouse cone b-wave is never truncated.
+# Smoothing stays HEAVY (same as scotopic): these recordings carry strong ~50 Hz mains hum (20 ms
+# period) and the 16 ms b-smooth nulls it — a lighter kernel rides the hum and over-reads the b-wave.
+# Selected by the `mode` argument to landmarks() — driven off `stimulus_type`/`adaptation` upstream.
+_PHOTOPIC_AWAVE_WIN_MS = (0.0, 25.0)
+_PHOTOPIC_BWAVE_WIN_MS = (15.0, 130.0)
+_PHOTOPIC_AWAVE_SMOOTH_MS = 3.0    # same light a-smooth as scotopic (sharp trough preserved)
+_PHOTOPIC_BWAVE_SMOOTH_MS = 16.0   # heavy: rejects the ~50 Hz hum on the raw photopic recordings
 
-def landmarks(time_ms, y, fs: float = 5000.0) -> dict:
+# mode → (a-window, b-window, a-smooth ms, b-smooth ms). Unknown/"" → scotopic (back-compatible
+# default; the µV figures stay byte-identical when no adaptation signal is present).
+_LANDMARK_MODES = {
+    "scotopic": (_AWAVE_WIN_MS, _BWAVE_WIN_MS, _AWAVE_SMOOTH_MS, _BWAVE_SMOOTH_MS),
+    "photopic": (_PHOTOPIC_AWAVE_WIN_MS, _PHOTOPIC_BWAVE_WIN_MS,
+                 _PHOTOPIC_AWAVE_SMOOTH_MS, _PHOTOPIC_BWAVE_SMOOTH_MS),
+}
+
+
+def landmarks(time_ms, y, fs: float = 5000.0, *, mode: str = "scotopic") -> dict:
     """a/b-wave amplitudes (µV) + implicit times (ms), noise-rejecting dual smooth.
 
-    a-wave = baseline − min(0–40 ms) on a LIGHT ~3 ms trace (sharp trough preserved).
-    b-wave = max(40–120 ms) − min(0–40 ms), BOTH on a HEAVY ~16 ms trace — peak-to-trough,
-    so a flat (noise-only) eye reads near the noise floor instead of mistaking a noise
-    excursion for a b-wave. baseline = mean of the pre-stimulus window. This mirrors the
-    validated ``iwx_parse.Eye.landmarks`` that reproduced the Fig 1E ordering."""
+    a-wave = baseline − min(a-window) on a LIGHT trace (sharp trough preserved).
+    b-wave = max(b-window) − min(a-window), BOTH on a HEAVIER trace — peak-to-trough, so a flat
+    (noise-only) eye reads near the noise floor instead of mistaking a noise excursion for a
+    b-wave. baseline = mean of the pre-stimulus window.
+
+    ``mode`` selects the timing preset (``scotopic`` default — the validated rod windows that
+    reproduced the Fig 1E ordering; ``photopic`` = the cone windows tuned on real UV-photopic data).
+    The cone a-wave is EARLY, so the photopic a-window is tight (0–25 ms) to isolate it; the cone
+    b-window starts earlier (15 ms) yet stays wide (to 130 ms) so a fast cone b-wave is caught and a
+    late mouse cone b-wave is not truncated (see the ``_PHOTOPIC_*`` constants for the data behind
+    the windows). Unknown mode → scotopic (byte-identical legacy path)."""
     import numpy as np
 
+    awin, bwin, a_sm, b_sm = _LANDMARK_MODES.get(str(mode or "scotopic").lower(), _LANDMARK_MODES["scotopic"])
     t = np.asarray(time_ms, dtype=float)
     arr = np.asarray(y, dtype=float)
     base = float(arr[t < _PRESTIM_MS].mean()) if (t < _PRESTIM_MS).any() else 0.0
-    sm_a = _movavg(arr, max(1, int(round(_AWAVE_SMOOTH_MS / 1000.0 * fs))))
-    sm_b = _movavg(arr, max(1, int(round(_BWAVE_SMOOTH_MS / 1000.0 * fs))))
+    sm_a = _movavg(arr, max(1, int(round(a_sm / 1000.0 * fs))))
+    sm_b = _movavg(arr, max(1, int(round(b_sm / 1000.0 * fs))))
 
-    am = (t >= _AWAVE_WIN_MS[0]) & (t <= _AWAVE_WIN_MS[1])
+    am = (t >= awin[0]) & (t <= awin[1])
     if not am.any():
         am = t >= 0
     ai = int(np.argmin(sm_a[am]))
@@ -127,9 +158,9 @@ def landmarks(time_ms, y, fs: float = 5000.0) -> dict:
     a_wave = base - float(sm_a[am][ai])
 
     b_trough = float(np.min(sm_b[am]))
-    bm = (t >= _BWAVE_WIN_MS[0]) & (t <= _BWAVE_WIN_MS[1])
+    bm = (t >= bwin[0]) & (t <= bwin[1])
     if not bm.any():
-        bm = t >= _BWAVE_WIN_MS[0]
+        bm = t >= bwin[0]
     bi = int(np.argmax(sm_b[bm]))
     b_t = float(t[bm][bi])
     b_wave = float(sm_b[bm][bi]) - b_trough
@@ -150,21 +181,29 @@ def fs_from(time_ms) -> float:
     return 1000.0 / dt if dt else 5000.0
 
 
-def metrics_from_waveforms(df):
+def metrics_from_waveforms(df, *, default_mode: str = "scotopic"):
     """``erg_waveforms_long`` → a per-eye a/b metrics frame measured FROM the traces.
 
-    One trace per (sample × condition × intensity × eye) → one :func:`landmarks` measurement →
-    one row carrying ``a_wave_uv`` + ``b_wave_uv`` (and the intensity/stimulus columns passed
-    through). This is the fan-out path the owner asked for — the bar and intensity-response run
-    straight off the dropped recording at the chosen intensity, using the same a/b metric the
+    One trace per (sample × condition × stimulus × intensity × eye) → one :func:`landmarks`
+    measurement → one row carrying ``a_wave_uv`` + ``b_wave_uv`` (and the intensity/stimulus columns
+    passed through). This is the fan-out path the owner asked for — the bar and intensity-response
+    run straight off the dropped recording at the chosen intensity, using the same a/b metric the
     trace grid reports, instead of needing a separate device-metrics CSV. Device markers stay
-    preferred when a metrics table IS supplied (the caller checks for the marker column first)."""
+    preferred when a metrics table IS supplied (the caller checks for the marker column first).
+
+    The landmark MODE (scotopic vs photopic/cone windows) is chosen per segment from its own
+    ``stimulus_type`` (``photopic_flash`` → cone windows), so a mixed scotopic+photopic cohort
+    measures each mode with the right timing; ``default_mode`` applies when there is no
+    ``stimulus_type`` column (a plain waveform CSV — the caller passes the user's ``adaptation``)."""
     import pandas as pd
 
-    keys = [k for k in ("sample_id", "condition", "intensity_group", "eye") if k in df.columns]
+    # stimulus_type is a grouping key when present so the two modes' shared GroupN labels never merge.
+    keys = [k for k in ("sample_id", "condition", "stimulus_type", "intensity_group", "eye")
+            if k in df.columns]
     if "condition" not in keys or "intensity_group" not in keys:
         return df  # not a recognizable waveform grouping → let the caller's column check fail honestly
-    carry = [c for c in ("intensity_log_cd_s_m2", "stimulus_type", "condition_order") if c in df.columns]
+    carry = [c for c in ("intensity_log_cd_s_m2", "stimulus_type", "condition_order")
+             if c in df.columns and c not in keys]
     rows = []
     for kv, seg in df.groupby(keys, dropna=False):
         seg = seg.sort_values("time_ms")
@@ -172,7 +211,12 @@ def metrics_from_waveforms(df):
         y = seg["voltage_uv"].astype(float).tolist()
         if len(t) < 4:
             continue
-        lm = landmarks(t, y, fs=fs_from(t))
+        mode = default_mode
+        if "stimulus_type" in seg.columns:
+            svals = seg["stimulus_type"].dropna().astype(str)
+            if not svals.empty:
+                mode = _STIM_ADAPT.get(svals.iloc[0], default_mode)
+        lm = landmarks(t, y, fs=fs_from(t), mode=mode)
         rec = dict(zip(keys, kv if isinstance(kv, tuple) else (kv,)))
         rec["a_wave_uv"] = lm["a_wave_uv"]
         rec["b_wave_uv"] = lm["b_wave_uv"]
@@ -351,6 +395,18 @@ def resolve_flash_mode(present, adaptation: str = "auto", stimulus_type: str = "
         else:
             pick = next((p for p in ("scotopic_flash", "photopic_flash") if p in present), "")
     return pick, _STIM_ADAPT.get(pick, "")
+
+
+def adaptation_mode(adaptation: str = "auto", stimulus_type: str = "") -> str:
+    """Map the friendly ``adaptation`` hint (or an explicit ``stimulus_type``) to a landmark MODE
+    (``scotopic``/``photopic``) for :func:`landmarks` / :func:`metrics_from_waveforms`.
+
+    This is the *default* mode used when the waveform table carries no per-row ``stimulus_type``
+    column (a plain CSV); auto/unknown → ``scotopic`` (the back-compatible default). When the data
+    DOES carry ``stimulus_type``, :func:`metrics_from_waveforms` reads it per segment and overrides
+    this default, so a real photopic iWorx/Diagnosys feed measures with cone windows automatically."""
+    _, adapt = resolve_flash_mode([], adaptation, stimulus_type)
+    return adapt or "scotopic"
 
 
 # --- Flicker (steady-state periodic response) --------------------------------
