@@ -23,7 +23,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useFigureStore } from "@/hooks/use-figure-store";
 import { getSkill } from "@/lib/catalog/seed";
-import { readSeededMarks } from "@/lib/erg/marks";
+import {
+  parseManualMarks,
+  readSeededMarks,
+  serializeManualMarks,
+  setManualMark,
+  type MarkRole,
+} from "@/lib/erg/marks";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 import { projectStore, select, useProjects } from "@/lib/projects/store";
 import { useWorkspace, workspaceStore, wselect } from "@/lib/workspace/store";
@@ -448,6 +454,18 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     [activeFigure, datasets, resolveRunFile, designFile, figure, projectId],
   );
 
+  // Drag an ERG landmark dot on the canvas (erg-manual-marks R5) → merge the new time into the
+  // figure's manual_marks, keep the dots shown, and re-run (the same edit a typed time makes in the
+  // Marks panel; the amplitude re-measures server-side). Shares rerunFigureWithParams with the panel.
+  const onMarkMove = React.useCallback(
+    (segment: string, role: MarkRole, tMs: number) => {
+      const base = (activeFigure?.provenance?.params ?? {}) as SkillParams;
+      const manual = setManualMark(parseManualMarks(base.manual_marks), segment, role, tMs);
+      void rerunFigureWithParams({ ...base, marks: true, manual_marks: serializeManualMarks(manual) });
+    },
+    [activeFigure, rerunFigureWithParams],
+  );
+
   // Freeze / unfreeze the open figure (S3.3, Decision D6) — tag it as the "paper"
   // version. Frozen figures are read-only; editing one forks a copy (see `editCopy`).
   const toggleFreeze = React.useCallback(() => {
@@ -840,6 +858,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     elevated={exportOpen}
                     readOnly={frozen}
                     onEditCopy={editCopy}
+                    onMarkMove={onMarkMove}
                     skill={
                       activeFigure?.skillId
                         ? {

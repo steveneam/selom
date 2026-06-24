@@ -8,6 +8,7 @@ import { SkillCard } from "./skill-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import type { FigureStore } from "@/hooks/use-figure-store";
+import type { MarkRole } from "@/lib/erg/marks";
 
 /** The editor's slim skill-identity pane (metadata + hand-off to Figure data for inputs). */
 export interface EditorSkill {
@@ -23,6 +24,7 @@ export function EditorWorkspace({
   readOnly = false,
   onEditCopy,
   skill,
+  onMarkMove,
 }: {
   store: FigureStore;
   elevated?: boolean;
@@ -32,6 +34,8 @@ export function EditorWorkspace({
   onEditCopy?: () => void;
   /** Skill-specific pane shown atop the cosmetic inspector (owner layout 2026-06-23). */
   skill?: EditorSkill;
+  /** Drag an ERG landmark dot → commit its new time (erg-manual-marks R5). */
+  onMarkMove?: (segment: string, role: MarkRole, tMs: number) => void;
 }) {
   // Click-to-select (P3 §3.4): the canvas reports a clicked trace; the inspector focuses its
   // series. A monotonic nonce makes re-clicking the SAME trace re-trigger the focus effect.
@@ -75,6 +79,7 @@ export function EditorWorkspace({
               onSelectTrace={
                 readOnly ? undefined : (trace) => setSelection((s) => ({ trace, nonce: (s?.nonce ?? 0) + 1 }))
               }
+              onMarkMove={readOnly ? undefined : onMarkMove}
             />
           </div>
         </div>
