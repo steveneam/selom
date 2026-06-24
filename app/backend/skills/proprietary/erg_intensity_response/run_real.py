@@ -81,8 +81,10 @@ def run(data_path: str, params: dict) -> dict:
     if value_col not in df.columns and {"time_ms", "voltage_uv"}.issubset(df.columns):
         # Cone-aware a/b (per-row stimulus_type wins; this default = the user's adaptation hint for a
         # plain waveform CSV) — photopic responses are faster, so they need the cone landmark windows.
+        # Operator-set marks (erg-manual-marks) re-measure the matched segments at the chosen times.
         default_mode = _erg.adaptation_mode(params.get("adaptation", "auto"), params.get("stimulus_type", ""))
-        df = _erg.metrics_from_waveforms(df, default_mode=default_mode)
+        marks = _erg.parse_manual_marks(params.get("manual_marks", ""))
+        df = _erg.metrics_from_waveforms(df, default_mode=default_mode, marks=marks)
 
     missing = (_REQUIRED | {value_col}) - set(df.columns)
     if missing:

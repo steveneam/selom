@@ -80,10 +80,12 @@ def freq_spec(cond_series, *, unit="µV", factor=1.0, title="Flicker N1→P1 vs 
     return {"data": data, "layout": layout}
 
 
-def flicker_table(rows, unit="µV", *, source="Selom"):
+def flicker_table(rows, unit="µV", *, source="Selom", provenance=""):
     """Per (condition × frequency) N1/P1 table. ``rows`` = ``[cond, hz, n1p1, p1_ms, n]``.
-    ``source`` notes whether the metric came from the device markers or Selom's re-derivation."""
-    title = f"Flicker N1→P1 ({source}-measured)"
+    ``source`` notes whether the metric came from the device markers or Selom's re-derivation;
+    ``provenance`` (erg-manual-marks R6) optionally appends an operator-adjusted count to the
+    caption (empty → byte-identical title)."""
+    title = f"Flicker N1→P1 ({source}-measured{provenance})"
     return table([
         "condition", "frequency (Hz)", f"N1→P1 ({unit})", "P1 implicit (ms)", "n (eyes)",
     ], rows, title=title)

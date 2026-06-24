@@ -509,6 +509,121 @@ def test_erg_bwave_bar_photopic_adaptation_uses_cone_windows(tmp_path):
     assert photo["data"][0]["y"][0] > scoto["data"][0]["y"][0] > 0
 
 
+# --- manual landmark marks (erg-manual-marks v1) -----------------------------
+
+def test_landmarks_manual_override_measures_at_the_set_time():
+    """A supplied a_ms/b_ms re-measures the amplitude AT that time (ISCEV) and tags it manual; a
+    partial override leaves the other auto; no manual → byte-identical to the auto call."""
+    t = [float(x) for x in range(0, 121)]
+    amp = 300.0
+    y = [amp * (math.exp(-((tm - 70.0) / 14.0) ** 2) - 0.35 * math.exp(-((tm - 30.0) / 6.0) ** 2))
+         for tm in t]
+    auto = _erg.landmarks(t, y, fs=1000.0)
+    assert auto["a_source"] == "auto" and auto["b_source"] == "auto"
+    # Move the b-mark onto the rising edge (50 ms, below the true 70 ms peak) → a smaller b, tagged
+    # manual at ~50 ms; the a-wave stays auto.
+    moved = _erg.landmarks(t, y, fs=1000.0, manual={"b_ms": 50.0})
+    assert moved["b_source"] == "manual" and moved["a_source"] == "auto"
+    assert abs(moved["b_t_ms"] - 50.0) <= 1.0
+    assert 0.0 < moved["b_wave_uv"] < auto["b_wave_uv"]
+    # Partial override of only the a-wave.
+    a_moved = _erg.landmarks(t, y, fs=1000.0, manual={"a_ms": 20.0})
+    assert a_moved["a_source"] == "manual" and a_moved["b_source"] == "auto"
+    assert abs(a_moved["a_t_ms"] - 20.0) <= 1.0
+    # No manual (None or {}) → byte-identical to the auto path.
+    assert _erg.landmarks(t, y, fs=1000.0, manual=None) == auto
+    assert _erg.landmarks(t, y, fs=1000.0, manual={}) == auto
+
+
+def test_parse_manual_marks_tolerant():
+    assert _erg.parse_manual_marks("") == {}
+    assert _erg.parse_manual_marks(None) == {}
+    assert _erg.parse_manual_marks("not json at all") == {}
+    parsed = _erg.parse_manual_marks(
+        '{"Control||Group4|": {"a_ms": 12.4, "b_ms": 58, "junk": 9}, '
+        '"bad": 5, "empty": {"x": 1}}')
+    assert parsed == {"Control||Group4|": {"a_ms": 12.4, "b_ms": 58.0}}  # junk/bad/empty dropped
+    # An already-parsed dict passes through (canonicalized).
+    assert _erg.parse_manual_marks({"A|B|C|D": {"n1_ms": 10.0}}) == {"A|B|C|D": {"n1_ms": 10.0}}
+
+
+def test_marks_for_exact_and_wildcard_match():
+    marks = {"Control||Group4|": {"a_ms": 12.0}}  # empty stimulus + eye
+    assert _erg.marks_for(marks, "Control", "", "Group4", "") == {"a_ms": 12.0}      # exact
+    # A grid mark (empty stim/eye) applies to a per-eye bar segment via the wildcard.
+    assert _erg.marks_for(marks, "Control", "scotopic_flash", "Group4", "RE") == {"a_ms": 12.0}
+    assert _erg.marks_for(marks, "Untreated", "", "Group4", "") is None             # other condition
+    assert _erg.marks_for(None, "Control", "", "Group4", "") is None                # no marks
+
+
+def test_flicker_landmarks_manual_override():
+    """Override N1/P1 by phase on the folded cycle; tagged manual; no manual → byte-identical."""
+    hz, amp = 10.0, 8.0
+    t = [i * 0.5 for i in range(0, 601)]
+    y = [-amp * math.sin(2.0 * math.pi * hz * tm / 1000.0) for tm in t]  # trough@25 ms, peak@75 ms
+    auto = _erg.flicker_landmarks(t, y, hz)
+    assert auto["n1_source"] == "auto" and auto["p1_source"] == "auto"
+    moved = _erg.flicker_landmarks(t, y, hz, manual={"n1_ms": 25.0, "p1_ms": 75.0})
+    assert moved["n1_source"] == "manual" and moved["p1_source"] == "manual"
+    assert moved["n1p1_uv"] == _approx(2.0 * amp, rel=5e-2)
+    assert _erg.flicker_landmarks(t, y, hz, manual=None) == auto
+
+
+def test_metrics_from_waveforms_applies_marks(tmp_path):
+    import pandas as pd
+
+    cols = ["condition", "intensity_group", "time_ms", "voltage_uv", "intensity_log_cd_s_m2"]
+    df = pd.DataFrame(_waveform_rows("Control", 300.0), columns=cols)
+    base = _erg.metrics_from_waveforms(df, default_mode="scotopic")
+    assert base["a_source"].iloc[0] == "auto" and base["b_source"].iloc[0] == "auto"
+    marks = {"Control||Group4|": {"b_ms": 50.0}}
+    moved = _erg.metrics_from_waveforms(df, default_mode="scotopic", marks=marks)
+    assert moved["b_source"].iloc[0] == "manual"
+    assert float(moved["b_wave_uv"].iloc[0]) != float(base["b_wave_uv"].iloc[0])
+    # No marks → the source stays auto and the value matches the default measurement.
+    again = _erg.metrics_from_waveforms(df, default_mode="scotopic", marks=None)
+    assert float(again["b_wave_uv"].iloc[0]) == float(base["b_wave_uv"].iloc[0])
+
+
+def test_erg_bwave_bar_manual_marks_move_value_and_caption(tmp_path):
+    """End-to-end: a manual_marks JSON moves the measured bar value off the auto seed and the table
+    caption flags the operator adjustment; no manual_marks → byte-identical to today."""
+    from skills.proprietary.erg_bwave_bar.run_real import run as run_bar
+
+    p = tmp_path / "wave.csv"
+    _write_waveforms(p)  # Control + Untreated, one Group4 trace each
+    base = run_bar(str(p), {"intensity_group": "Group4", "wave": "b"})
+    moved = run_bar(str(p), {"intensity_group": "Group4", "wave": "b",
+                             "manual_marks": '{"Control||Group4|": {"b_ms": 50.0}}'})
+    assert moved["data"][0]["y"][0] != base["data"][0]["y"][0]       # Control's bar followed the mark
+    assert "operator-adjusted" in moved["table"]["title"]            # provenance caption (R6)
+    assert "operator-adjusted" not in base["table"]["title"]
+    # No manual_marks → byte-identical to the bare run (default-off invariant, R8).
+    assert run_bar(str(p), {"intensity_group": "Group4", "wave": "b"}) == base
+
+
+def test_erg_traces_emits_mark_meta_and_optional_dots(tmp_path):
+    """erg_traces emits meta.selom.marks (seeded a/b times + source) always — for the Marks panel —
+    and draws the visual dots only when `marks` is on (default off → figure visually unchanged)."""
+    from skills.proprietary.erg_traces.run_real import run as run_traces
+
+    p = tmp_path / "wave.csv"
+    _write_waveforms(p)
+    off = run_traces(str(p), {})
+    marks_meta = off["layout"]["meta"]["selom"]["marks"]
+    assert len(marks_meta) == 4                                      # 2 cells × (a, b)
+    assert {m["role"] for m in marks_meta} == {"a", "b"}
+    assert all(m["source"] == "auto" for m in marks_meta)
+    assert all("uv" in m for m in marks_meta)                        # measured amplitude for the panel
+    assert not any("trace" in m for m in marks_meta)                 # no dots → no drag binding
+    assert not any(t.get("mode") == "markers+text" for t in off["data"])  # no visual dots
+    # marks on → the a/b dot overlay appears and the meta carries trace/point for the editor drag.
+    on = run_traces(str(p), {"marks": True})
+    on_meta = on["layout"]["meta"]["selom"]["marks"]
+    assert all("trace" in m and "point" in m for m in on_meta)
+    assert any(t.get("mode") == "markers+text" for t in on["data"])
+
+
 def _approx(v, rel=1e-3):
     import pytest
 

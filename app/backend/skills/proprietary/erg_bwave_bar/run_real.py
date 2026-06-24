@@ -46,6 +46,9 @@ def run(data_path: str, params: dict) -> dict:
     # Fan-out path: handed the waveform table (no marker column) → measure the a/b peak from the
     # traces, the owner's "max b-wave peak from the traces at a chosen intensity". Device markers
     # win when present (above) per D2; this is the measure-from-traces fallback + the own-recording path.
+    # Operator-set landmark marks (docs/erg-manual-marks/spec.md) — applied only on the
+    # measure-from-traces path (device markers stay authoritative when a metrics table is supplied).
+    manual_marks = _erg.parse_manual_marks(params.get("manual_marks", ""))
     measured_from_traces = False
     if value_col not in df.columns and {"time_ms", "voltage_uv"}.issubset(df.columns):
         # Cone-aware a/b: photopic (light-adapted) responses are faster, so the cone landmark
@@ -53,7 +56,7 @@ def run(data_path: str, params: dict) -> dict:
         # per-row stimulus_type wins inside metrics_from_waveforms; this default covers a plain
         # waveform CSV with no stimulus_type column (the user's adaptation/stimulus_type hint).
         default_mode = _erg.adaptation_mode(params.get("adaptation", "auto"), params.get("stimulus_type", ""))
-        df = _erg.metrics_from_waveforms(df, default_mode=default_mode)
+        df = _erg.metrics_from_waveforms(df, default_mode=default_mode, marks=manual_marks)
         measured_from_traces = True
 
     for col in ("condition", "intensity_group", value_col):
@@ -122,8 +125,17 @@ def run(data_path: str, params: dict) -> dict:
     # Honest provenance (R-honesty-1): device markers vs Selom-measured-from-traces.
     source = "measured from traces" if measured_from_traces else "device markers"
     err_label = _erg.ERR_LABEL.get(error, "SEM")
+    # Manual-marks provenance (erg-manual-marks R6, caption-level): how many plotted eyes were
+    # measured at an operator-set landmark vs the auto window. Only on the from-traces path.
+    prov = ""
+    src_col = {"a_wave_uv": "a_source", "b_wave_uv": "b_source"}.get(value_col)
+    if measured_from_traces and src_col and src_col in sub.columns:
+        plotted = sub[sub["condition"].isin(order) & sub[value_col].notna()]
+        n_manual = int((plotted[src_col].astype(str) == "manual").sum())
+        if n_manual:
+            prov = f", {n_manual} of {len(plotted)} operator-adjusted"
     spec["table"] = table(["condition", "n (eyes)", f"mean {wave_label} ({unit})", f"{err_label} ({unit})"],
-                          tbl_rows, title=f"ERG {wave_label} (mean ± {err_label}, {source})")
+                          tbl_rows, title=f"ERG {wave_label} (mean ± {err_label}, {source}{prov})")
     return spec
 
 

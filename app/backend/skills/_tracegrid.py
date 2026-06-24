@@ -115,6 +115,7 @@ def grid_spec(
 
     data: list[dict] = []
     panel_main_idx: list[int] = []  # data index of each panel's primary line (overlays shift indices)
+    panel_marker_idx: list[int | None] = []  # data index of each panel's marker-dot overlay (or None)
     # A titled grid needs top headroom or the title clips the figure edge (above the column labels).
     layout: dict = {"showlegend": False,
                     "margin": {"t": 48 if title else 10, "r": 10, "b": 10, "l": 10}}
@@ -155,7 +156,10 @@ def grid_spec(
         panel_main_idx.append(len(data))
         data.append(trace)
         # Overlays drawn ON TOP of the mean line (per-point error bars, marker dots) go last.
+        # The marker-dot trace (when present) is appended LAST by _overlay_front, so its data
+        # index is len(data)-1 — recorded so the editor can bind a dragged dot to its segment.
         data.extend(_overlay_front(p, xref, yref))
+        panel_marker_idx.append(len(data) - 1 if p.get("markers") else None)
         ax = {"domain": x_domain(p["col"]), "anchor": yref, "visible": False}
         ay = {"domain": y_domain(p["row"]), "anchor": xref, "visible": False}
         if share_x:
@@ -253,6 +257,29 @@ def grid_spec(
         "kind": "scalebar", "shapeIdx": sb_shape_idx, "annoIdx": sb_anno_idx,
         "xLen": sb["x_len"], "xUnit": sb["x_unit"], "yLen": sb["y_len"], "yUnit": sb["y_unit"],
     }]
+
+    # Editable landmark marks (docs/erg-manual-marks/spec.md R4): each panel may carry a
+    # `mark_meta` list [{segment, role, t_ms, source, label}, …] describing its a/b (or N1/P1)
+    # landmark points (seeded from the auto-detection / supplied manual marks). We surface them as
+    # `meta.selom.marks` so the Marks panel can list/edit them and the canvas can bind a drag back
+    # to the right `manual_marks` entry. `trace`/`point` (the marker-dot's data index + point index)
+    # are attached only when the visual dot is actually drawn (so a dragged dot is resolvable).
+    marks_meta: list[dict] = []
+    for i, p in enumerate(panels):
+        mm = p.get("mark_meta")
+        if not mm:
+            continue
+        tr = panel_marker_idx[i]
+        n_dots = len(p.get("markers", []))
+        for j, m in enumerate(mm):
+            entry = dict(m)
+            if tr is not None and j < n_dots:
+                entry["trace"] = tr
+                entry["point"] = j
+            marks_meta.append(entry)
+    if marks_meta:
+        selom["marks"] = marks_meta
+
     layout.setdefault("meta", {})["selom"] = selom
 
     return {"data": data, "layout": layout}

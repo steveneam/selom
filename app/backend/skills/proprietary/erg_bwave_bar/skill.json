@@ -23,7 +23,8 @@
     "sig_test": { "type": "str", "default": "welch", "options": ["welch", "student", "mannwhitney"] },
     "hline": { "type": "str", "default": "" },
     "hline_label": { "type": "str", "default": "" },
-    "display_unit": { "type": "str", "default": "uV", "options": ["auto", "nV", "uV", "mV", "V"] }
+    "display_unit": { "type": "str", "default": "uV", "options": ["auto", "nV", "uV", "mV", "V"] },
+    "manual_marks": { "type": "str", "default": "" }
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" },

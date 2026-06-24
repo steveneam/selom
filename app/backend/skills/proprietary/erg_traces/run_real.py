@@ -46,6 +46,14 @@ def run(data_path: str, params: dict) -> dict:
     # else scotopic. `adapt` reflects the stimulus_type filter when that column is present; else fall
     # back to the user's adaptation/stimulus_type hint (a plain waveform CSV with no such column).
     metric_mode = adapt or _erg.adaptation_mode(params.get("adaptation", "auto"), params.get("stimulus_type", ""))
+    # Operator-set landmark marks (docs/erg-manual-marks/spec.md). The trace grid is the primary
+    # authoring surface: a per-panel mark is keyed by (condition, "", intensity_group, "") — empty
+    # stimulus/eye, so it also drives the per-eye bar + intensity-response via the wildcard match.
+    manual_marks = _erg.parse_manual_marks(params.get("manual_marks", ""))
+    # Show the a/b landmark dots on each panel (R4). Default off → the real figure is visually
+    # unchanged; the editor flips this on to drag/confirm marks. The `mark_meta` (render-inert) is
+    # emitted regardless so the Marks panel can list segments + auto times without the dots showing.
+    show_marks = to_bool(params.get("marks", False))
     # Central tendency: `representative` (one exemplar trace per condition×intensity — the
     # back-compatible default), `mean` (average the n eye/animal recordings at each time), or `none`
     # (no averaged trace — draw every replicate at equal weight: "individual traces only").
@@ -123,6 +131,7 @@ def run(data_path: str, params: dict) -> dict:
             if not reps:
                 continue
             panel = {"row": row_of[g], "col": col_of[cond], "color": color, "group": cond}
+            manual = _erg.marks_for(manual_marks, cond, "", g, "")
             if central == "mean":
                 ref_t, mean_clean, mean_raw, lo, hi, errs, n = _aggregate(reps, error)
                 panel["x"], panel["y"] = ref_t, mean_clean
@@ -131,7 +140,7 @@ def run(data_path: str, params: dict) -> dict:
                               color, band_color, band_alpha, boundary, error_every, n)
                 n_seen.append(n)
                 # Measure the a/b table on the AVERAGED RAW trace (matches the mean line drawn).
-                lm = _erg.landmarks(ref_t, mean_raw, fs=_fs_from(ref_t), mode=metric_mode)
+                lm = _erg.landmarks(ref_t, mean_raw, fs=_fs_from(ref_t), mode=metric_mode, manual=manual)
             elif central == "none":
                 # No averaged trace — draw every replicate at equal weight (individual traces only).
                 ref_t, _, mean_raw, _, _, _, n = _aggregate(reps, error)
@@ -141,7 +150,7 @@ def run(data_path: str, params: dict) -> dict:
                                         for r in reps[1:]]
                 panel["name"] = f"{cond} {g} (n={n}, individual)"
                 n_seen.append(n)
-                lm = _erg.landmarks(ref_t, mean_raw, fs=_fs_from(ref_t), mode=metric_mode)  # table = cohort mean
+                lm = _erg.landmarks(ref_t, mean_raw, fs=_fs_from(ref_t), mode=metric_mode, manual=manual)  # table = cohort mean
             else:  # representative — the first replicate (single-eye → byte-identical to before)
                 t, raw_y, clean_y = reps[0]
                 panel["x"], panel["y"] = t, clean_y
@@ -149,7 +158,25 @@ def run(data_path: str, params: dict) -> dict:
                 n_seen.append(1)
                 # Measure on the RAW baseline-corrected trace (the validated metric), not the
                 # display-cleaned copy — the dual smooth is internal to landmarks().
-                lm = _erg.landmarks(t, raw_y, fs=_fs_from(t), mode=metric_mode)
+                lm = _erg.landmarks(t, raw_y, fs=_fs_from(t), mode=metric_mode, manual=manual)
+            # Seed the a/b landmark marks for this cell (R4): `mark_meta` (always) carries the
+            # segment identity + the auto/manual time + source for the Marks panel; the visual dots
+            # (gated by `marks`) sit on the DRAWN trace at the landmark times.
+            seg = _erg.segment_key(cond, "", g, "")
+            row_lab = str(ig_log.get(g, g))
+            panel["mark_meta"] = [
+                {"segment": seg, "role": "a", "t_ms": lm["a_t_ms"], "source": lm["a_source"],
+                 "uv": lm["a_wave_uv"], "label": f"{cond} · {row_lab}"},
+                {"segment": seg, "role": "b", "t_ms": lm["b_t_ms"], "source": lm["b_source"],
+                 "uv": lm["b_wave_uv"], "label": f"{cond} · {row_lab}"},
+            ]
+            if show_marks:
+                panel["markers"] = [
+                    {"x": lm["a_t_ms"], "y": _y_at(panel["x"], panel["y"], lm["a_t_ms"]),
+                     "label": "a", "color": "#222222"},
+                    {"x": lm["b_t_ms"], "y": _y_at(panel["x"], panel["y"], lm["b_t_ms"]),
+                     "label": "b", "color": "#c0392b"},
+                ]
             peak_uv = max(peak_uv, max((abs(v) for v in panel["y"]), default=0.0))
             panels.append(panel)
             tbl_rows.append([cond, ig_log.get(g, str(g)), lm["b_wave_uv"],
@@ -207,6 +234,14 @@ def _fs_from(time_ms) -> float:
         return 5000.0
     dt = float(time_ms[1]) - float(time_ms[0])
     return 1000.0 / dt if dt else 5000.0
+
+
+def _y_at(xs, ys, t_ms: float) -> float:
+    """Value of the drawn trace nearest time ``t_ms`` — places an a/b dot ON the line."""
+    if not xs:
+        return 0.0
+    i = min(range(len(xs)), key=lambda k: abs(float(xs[k]) - float(t_ms)))
+    return float(ys[i])
 
 
 def _replicate_traces(seg, rep_keys, do_filter, lowpass):
@@ -283,3 +318,5 @@ def _rescale_panel(p, factor):
         e["err"] = [v * factor for v in e["err"]]
     for ln in p.get("extra_lines", []):
         ln["y"] = [v * factor for v in ln["y"]]
+    for m in p.get("markers", []):  # a/b dots sit on the rescaled line
+        m["y"] = m["y"] * factor

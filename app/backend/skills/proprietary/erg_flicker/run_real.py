@@ -56,6 +56,11 @@ def run(data_path: str, params: dict) -> dict:
     do_filter = to_bool(params.get("filter", True))
     lowpass = float(params.get("lowpass_hz", 120.0))
     show_marks = to_bool(params.get("marks", True))  # N1/P1 dots on each waveform panel (M3)
+    # Operator-set N1/P1 marks (docs/erg-manual-marks/spec.md) — applied only on the Selom
+    # re-derivation path (device markers stay authoritative when the feed carries them). Keyed by
+    # (condition, flicker_hz, eye); the grid aggregates over eyes, so the seed/lookup uses empty eye.
+    manual_marks = _erg.parse_manual_marks(params.get("manual_marks", ""))
+    n_manual = n_selom = 0
     has_hz = "flicker_hz" in df.columns
     # Device N1→P1 ride-along (Diagnosys materialize path) → prefer it over Selom re-derivation (D2).
     has_device = "device_n1p1_uv" in df.columns and df["device_n1p1_uv"].notna().any()
@@ -122,6 +127,7 @@ def run(data_path: str, params: dict) -> dict:
             # eyes), else re-derive from the phase-averaged steady-state cycle (raw baseline trace,
             # not the display-cleaned copy; needs a real frequency to fold).
             n1p1 = p1_ms = None
+            n1_src = p1_src = "auto"
             if has_device and "device_n1p1_uv" in seg_rows.columns:
                 gcol = "eye" if "eye" in seg_rows.columns else "condition"
                 dn = seg_rows.groupby(gcol)["device_n1p1_uv"].first().dropna()
@@ -130,10 +136,27 @@ def run(data_path: str, params: dict) -> dict:
                     n1p1 = round(float(dn.mean()), 3)
                     p1_ms = round(float(dp.mean()), 1) if not dp.empty else None
                     used_device = True
-            if n1p1 is None:
-                lm = _erg.flicker_landmarks(t, y_raw, float(f)) if has_hz else None
+                    n1_src = p1_src = "device"  # device markers win → not operator-editable
+            if n1p1 is None and has_hz:
+                manual = _erg.marks_for(manual_marks, cond, f"{float(f):g}", "")
+                lm = _erg.flicker_landmarks(t, y_raw, float(f), manual=manual)
                 if lm:
                     n1p1, p1_ms = lm["n1p1_uv"], lm["p1_implicit_ms"]
+                    n1_src, p1_src = lm["n1_source"], lm["p1_source"]
+                    n_selom += 1
+                    if "manual" in (n1_src, p1_src):
+                        n_manual += 1
+            # Seed the N1/P1 marks (R4): mark_meta carries the segment identity + source so the Marks
+            # panel can list/edit them; device-sourced marks aren't editable (the device wins).
+            if marks and has_hz:
+                seg = _erg.segment_key(cond, f"{float(f):g}", "")
+                lab = f"{cond} · {row_labels[row_of[f]]}"
+                panel["mark_meta"] = [
+                    {"segment": seg, "role": "n1", "t_ms": marks["n1"][0], "source": n1_src,
+                     "uv": n1p1, "label": lab},
+                    {"segment": seg, "role": "p1", "t_ms": marks["p1"][0], "source": p1_src,
+                     "uv": n1p1, "label": lab},
+                ]
             metric[(cond, f)] = n1p1
             tbl_rows.append([cond, (float(f) if has_hz else f), n1p1, p1_ms, n_eyes])
 
@@ -152,6 +175,8 @@ def run(data_path: str, params: dict) -> dict:
                    (p1 if p1 is not None else "—"), n]
                   for c, hz, v, p1, n in tbl_rows]
     source = "device" if used_device else "Selom"  # honest provenance (R-honesty-1 / R-flicker-3)
+    # Manual-marks provenance (erg-manual-marks R6) — caption-level operator-adjusted count.
+    provenance = f", {n_manual} of {n_selom} operator-adjusted" if n_manual else ""
 
     if view == "summary":
         if not has_hz:
@@ -167,7 +192,7 @@ def run(data_path: str, params: dict) -> dict:
             raise ValueError("erg_flicker: no N1→P1 amplitudes to plot for the summary view.")
         spec = freq_spec(cond_series, unit=unit, factor=factor,
                          title="Flicker N1–P1 vs frequency")
-        spec["table"] = flicker_table(table_rows, unit, source=source)
+        spec["table"] = flicker_table(table_rows, unit, source=source, provenance=provenance)
         return jsonable(spec)
 
     title = "Flicker ERG (" + ", ".join(row_labels) + ")" if has_hz else "Flicker ERG"
