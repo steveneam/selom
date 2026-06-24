@@ -406,30 +406,48 @@ used by `erg_bwave_bar` + `erg_intensity_response` + `erg_traces` when measuring
 used the SCOTOPIC search windows. Cone responses differ, so `landmarks` gained a `mode`
 (scotopic | photopic) selecting a timing preset, chosen per segment from `stimulus_type`
 (`metrics_from_waveforms`) and per skill from `adaptation` (`_erg.adaptation_mode`).
-- **D12 — the cone windows were TUNED on the real data, not assumed.** The handoff expected a faster
-  cone b-wave (~25–55 ms); looking at the real CMRI mouse UV-photopic `.iwxdata` (Experiment 11)
-  contradicted that: the cone b-wave peaks **LATE** (rd10 57 ms, C57 **104 ms**) and the raw traces
-  carry strong **~50 Hz mains hum**. So the photopic preset is **a-window (0–25 ms)** — tight + early
-  to isolate the small early cone a-wave (the scotopic 0–40 ms window under heavy smoothing wrongly
-  latched a ~27 ms noise dip as the a-wave) — and **b-window (15–130 ms)** — starts earlier than
-  scotopic (catches a fast cone b-wave) yet stays WIDE so a late mouse cone b-wave is never truncated.
+- **D12 — the cone windows are anchored to the published mouse cone-ERG timing (not just the raw data).**
+  The cone a-wave is small and EARLY, so **a-window (0–25 ms)** isolates it (the scotopic 0–40 ms
+  window under heavy smoothing wrongly latched a ~27 ms noise dip as the a-wave); literature anchor =
+  Lyubarsky 1999 (~14 ms). The cone b-wave peaks ~40–45 ms (range ~40–75 ms; Bush 2019 IOVS, WT
+  ~44 ms), FASTER than the rod b-wave, so **b-window (12–80 ms)**, centred on the cone range.
   **Smoothing stays heavy (3/16 ms = scotopic)**: the cone-is-narrow intuition was false here, and the
-  16 ms b-smooth nulls the 20 ms-period hum (a lighter kernel over-reads the b-wave). Default/unknown
-  mode → scotopic, so every existing µV figure stays **byte-identical** (goldens not regenerated).
+  16 ms b-smooth nulls the 20 ms-period ~50 Hz mains hum these recordings carry (a lighter kernel
+  over-reads the b-wave). Default/unknown mode → scotopic, so every existing µV figure stays
+  **byte-identical** (goldens not regenerated).
 - **D13 — per-segment, not per-figure.** `metrics_from_waveforms` reads each segment's own
   `stimulus_type` (and adds it to the grouping keys so the two modes' shared `GroupN` labels never
   merge), so a mixed scotopic+photopic cohort measures each mode with the right windows; the skill's
   `adaptation` hint is only the *default* for a plain waveform CSV with no `stimulus_type` column.
+- **D14 — look-at-data was necessary but NOT sufficient; the literature corrected it.** An early
+  data-only tuning saw a dominant peak at rd10 57 ms / C57 **104 ms** in the real `.iwxdata` and
+  widened the b-window to 15–130 ms to "not truncate the late cone b-wave." A web/literature backfill
+  (owner-requested) then showed that is the WRONG read: a mouse *photopic* b-wave near 100 ms is the
+  signature of the dim-flash **rod** b-wave (Saszik 2002, ~110 ms) / incomplete light-adaptation / the
+  ~50 Hz hum — **not** a cone b-wave (which is ~44 ms). A 130 ms window CHASES that artifact. So the
+  window was narrowed back to the cone range (12–80 ms): the metric now reports a cone-range value
+  (C57 brightest 43.8 µV, hitting the 80 ms edge = an honest "no clear cone b-wave here, review this"
+  signal) instead of the 156 µV / 104 ms artifact the wide window had reported. **Lesson: tune on the
+  data AND check the value against the domain's published norms — the dominant peak is not always the
+  feature you're measuring.** ([[figure-repro-match-numbers-exactly]], [[compound-capability-each-task]].)
+- **The honest conclusion → the manual override is the real fix.** On hum-heavy single-eye iWorx
+  photopic recordings the auto-windowed metric is only a SEED; the rigorous path (field-standard:
+  Espion auto-peak + "manually adjusted if necessary"; ISCEV a=baseline→trough, b=a-trough→b-peak;
+  ERGAssist hybrid auto-seed+manual-adjust) is to let the scientist place/adjust the a/b/N1-P1 markers
+  and measure at those points, with a provenance log of auto-vs-moved. **Owner-requested; build next**
+  (see CURRENT.md NEXT) — extends the M3 `_tracegrid` overlay to draggable marker dots consumed by the
+  bar + intensity-response.
 - **Flicker needs no window change** — 30 Hz flicker intrinsically isolates cones and is measured as
   N1→P1 (device markers preferred; phase-folded fallback), never the flash a/b windows. Re-confirmed
   on real `453_AAV.TXT`: 10 Hz 19.96 µV / 30 Hz 7.08 µV (device).
 - **Verified on REAL data:** Rd10#288 photopic a-wave now timed at **7 ms** (the early cone a-wave)
-  vs scotopic's wrong 27 ms; C57 late b-wave at **103.6 ms not truncated**; the real photopic feed
+  vs scotopic's wrong 27 ms; the cone b-window reports cone-range b-waves (rd10 49.8 µV @ 56.8 ms; C57
+  43.8 µV at the 80 ms edge) instead of the 100+ ms rod/hum artifact; the real photopic feed
   (`stimulus_type=photopic_flash`) auto-selects cone windows even at the scotopic default. Diagnosys
   `453_AAV.TXT` photopic-flash from-traces path runs end-to-end (`Photopic b-wave by condition`).
   Tests: `tests/test_erg_units.py` (+4: cone-window timing, `adaptation_mode`, per-segment mode,
   end-to-end bar); 165 ERG-family green; ruff clean; goldens unchanged.
 - **Still pending / honest limits:** these iWorx photopic recordings are hum-heavy and single-eye, so
-  the from-traces cone metric is necessarily approximate; the **device markers stay authoritative**
-  when a metrics table is supplied (D2). The calibrated photopic energy ladder (T14 blank) is still
-  unregistered, so photopic intensity-response x-labels read `Group1…5`.
+  the from-traces cone metric is necessarily approximate (→ the manual override above). The **device
+  markers stay authoritative** when a metrics table is supplied (D2). The calibrated photopic energy
+  ladder (T14 blank) is still unregistered, so photopic intensity-response x-labels read `Group1…5`.
