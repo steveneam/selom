@@ -353,9 +353,10 @@ reads `erg_waveforms_long` (a CSV `data_path`) and calls `grid_spec`. `origin="p
   and Fig 2B re-renders with the scale/label asks satisfied.
 
 ## Out of Scope
-- Photopic *cone-specific metrics* (no a-wave, OPs, flicker analysis), OCT, optomotor, IHC figures.
-  **Photopic flash *decode + trace figure* is now IN scope** (generic protocol registry, T14 below) —
-  only the cone a/b-wave *metric* and the calibrated photopic energy ladder remain pending.
+- OPs analysis, OCT, optomotor, IHC figures.
+  **Photopic flash *decode + trace figure* + the cone a/b-wave *metric* are now IN scope** (generic
+  protocol registry T14; cone landmark windows T15 below). Only the calibrated photopic energy
+  ladder (cd·s/m² per group, from the lab's calibration sheet) remains pending — see T14's blank.
 - Auto-fetching/streaming `.iwxdata` from the network share (manual paths via the manifest for now).
 - A general LabScribe-format library beyond what ERG ingest needs.
 - FE drag-to-recolor UX beyond the existing editor's layout/shape editing (Phase 3 uses what exists).
@@ -398,3 +399,37 @@ ladder + adaptation; unknown → ordinal `GroupN` labels + intensity `None` (hon
 - **THE ONE PENDING BLANK:** the **5 photopic intensities (cd·s/m² + labels)** from the lab's
   photopic calibration sheet — not in the file. Register on `PHOTOPIC.log_energies` in `_iwx.py` and
   photopic rows light up with real intensities automatically. Until then they read `Group1…5`.
+
+## T15 — photopic/cone a/b-wave metric (landmark windows) — 2026-06-24
+The photopic FLASH figure decoded + rendered (T14), but the a/b-wave *metric* (`_erg.landmarks`,
+used by `erg_bwave_bar` + `erg_intensity_response` + `erg_traces` when measuring **from** waveforms)
+used the SCOTOPIC search windows. Cone responses differ, so `landmarks` gained a `mode`
+(scotopic | photopic) selecting a timing preset, chosen per segment from `stimulus_type`
+(`metrics_from_waveforms`) and per skill from `adaptation` (`_erg.adaptation_mode`).
+- **D12 — the cone windows were TUNED on the real data, not assumed.** The handoff expected a faster
+  cone b-wave (~25–55 ms); looking at the real CMRI mouse UV-photopic `.iwxdata` (Experiment 11)
+  contradicted that: the cone b-wave peaks **LATE** (rd10 57 ms, C57 **104 ms**) and the raw traces
+  carry strong **~50 Hz mains hum**. So the photopic preset is **a-window (0–25 ms)** — tight + early
+  to isolate the small early cone a-wave (the scotopic 0–40 ms window under heavy smoothing wrongly
+  latched a ~27 ms noise dip as the a-wave) — and **b-window (15–130 ms)** — starts earlier than
+  scotopic (catches a fast cone b-wave) yet stays WIDE so a late mouse cone b-wave is never truncated.
+  **Smoothing stays heavy (3/16 ms = scotopic)**: the cone-is-narrow intuition was false here, and the
+  16 ms b-smooth nulls the 20 ms-period hum (a lighter kernel over-reads the b-wave). Default/unknown
+  mode → scotopic, so every existing µV figure stays **byte-identical** (goldens not regenerated).
+- **D13 — per-segment, not per-figure.** `metrics_from_waveforms` reads each segment's own
+  `stimulus_type` (and adds it to the grouping keys so the two modes' shared `GroupN` labels never
+  merge), so a mixed scotopic+photopic cohort measures each mode with the right windows; the skill's
+  `adaptation` hint is only the *default* for a plain waveform CSV with no `stimulus_type` column.
+- **Flicker needs no window change** — 30 Hz flicker intrinsically isolates cones and is measured as
+  N1→P1 (device markers preferred; phase-folded fallback), never the flash a/b windows. Re-confirmed
+  on real `453_AAV.TXT`: 10 Hz 19.96 µV / 30 Hz 7.08 µV (device).
+- **Verified on REAL data:** Rd10#288 photopic a-wave now timed at **7 ms** (the early cone a-wave)
+  vs scotopic's wrong 27 ms; C57 late b-wave at **103.6 ms not truncated**; the real photopic feed
+  (`stimulus_type=photopic_flash`) auto-selects cone windows even at the scotopic default. Diagnosys
+  `453_AAV.TXT` photopic-flash from-traces path runs end-to-end (`Photopic b-wave by condition`).
+  Tests: `tests/test_erg_units.py` (+4: cone-window timing, `adaptation_mode`, per-segment mode,
+  end-to-end bar); 165 ERG-family green; ruff clean; goldens unchanged.
+- **Still pending / honest limits:** these iWorx photopic recordings are hum-heavy and single-eye, so
+  the from-traces cone metric is necessarily approximate; the **device markers stay authoritative**
+  when a metrics table is supplied (D2). The calibrated photopic energy ladder (T14 blank) is still
+  unregistered, so photopic intensity-response x-labels read `Group1…5`.
