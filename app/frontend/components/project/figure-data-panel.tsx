@@ -4,11 +4,13 @@ import * as React from "react";
 import { RefreshCw, SlidersHorizontal } from "lucide-react";
 import { ParamControl } from "./param-control";
 import { MarksEditor } from "./marks-editor";
+import { ThresholdEditor } from "./threshold-editor";
 import { DataCheckPanel } from "./data-check";
 import { DataFitVerdict } from "@/components/reproduction/data-fit-panel";
 import { Button } from "@/components/ui/button";
 import { visibleParamFields } from "@/lib/catalog/params";
 import { useSkillParams } from "@/lib/catalog/use-skill-params";
+import type { FigureSpec } from "@/lib/figure-spec";
 import type { SkillParams } from "@/lib/skills-api";
 import type { SeededMark } from "@/lib/erg/marks";
 import type { Figure } from "@/lib/projects/types";
@@ -34,6 +36,8 @@ export function FigureDataPanel({
   dataFit,
   seededMarks = [],
   canEditMarks = false,
+  canEditThresholds = false,
+  figureSpec,
   markLabelsShown = true,
   onMarkLabelsShownChange,
   onRerun,
@@ -56,6 +60,11 @@ export function FigureDataPanel({
    *  §4) — the gate for the Marks editor. True for ERG trace/flicker figures even before dots are
    *  drawn, so the operator can turn the dots on and adjust a/b (N1/P1) times. */
   canEditMarks?: boolean;
+  /** Whether this figure declares the thresholds capability (generalization-spec §F) — the gate for
+   *  the volcano FC/p-value threshold editor. */
+  canEditThresholds?: boolean;
+  /** The active figure spec — supplies the volcano points for the threshold editor's live count. */
+  figureSpec?: FigureSpec | null;
   /** Live state of the "show a/b labels" toggle — drives an instant client-side restyle of the
    *  preview (the parent owns it so the preview can react without a re-run). */
   markLabelsShown?: boolean;
@@ -108,6 +117,12 @@ export function FigureDataPanel({
           markLabelsShown={markLabelsShown}
           onMarkLabelsShownChange={onMarkLabelsShownChange}
         />
+      )}
+
+      {/* Volcano FC/p-value thresholds (generalization-spec §F) — gated on the declared thresholds
+          capability. Points re-colour live (the parent preview applies them); re-run updates the table. */}
+      {canEditThresholds && (
+        <ThresholdEditor figureSpec={figureSpec} params={params} onParamsChange={setParams} />
       )}
 
       {/* Inputs → re-run. */}

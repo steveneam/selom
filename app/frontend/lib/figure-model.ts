@@ -136,17 +136,20 @@ export interface Scalebar {
 export type Dragmode = false | "select" | "pan" | "zoom";
 
 /**
- * Resolved plot-area gesture config (docs/figure-data-capabilities/spec.md §2). Comes from the
- * figure's declared `meta.selom.capabilities.gesture`; absent → leave Plotly's defaults so a figure
- * that declares nothing keeps today's box-zoom behaviour (no regression).
+ * Resolved plot-area gesture config (generalization-spec §A). Comes from the figure's declared
+ * `meta.selom.capabilities.gesture` over a GLOBAL no-op floor: a figure that declares nothing gets
+ * `dragmode:false` (a stray drag does nothing), zoom/pan as modebar buttons, and wheel-zoom off. A
+ * figure opts into a drag mode (e.g. box-zoom) by declaring `gesture.default`.
  */
 export interface GestureConfig {
-  /** Plotly `layout.dragmode` to apply; `undefined` → don't set it (keep Plotly's default). */
-  dragmode?: Dragmode;
+  /** Plotly `layout.dragmode` to apply. The GLOBAL default is `false` (no-op): a stray plot-area
+   *  drag does nothing; zoom/pan are deliberate modebar buttons. A figure may opt INTO a drag mode
+   *  via `meta.selom.capabilities.gesture.default` (generalization-spec §A). */
+  dragmode: Dragmode;
   /** Keep zoom + pan as modebar buttons (a mode the user presses). Default true. */
   zoomTools: boolean;
-  /** Plotly `config.scrollZoom` to apply; `undefined` → leave Plotly's default (off for cartesian). */
-  scrollZoom?: boolean;
+  /** Plotly `config.scrollZoom`. Default `false` (wheel-zoom off app-wide); a figure may set true. */
+  scrollZoom: boolean;
 }
 
 export interface FigureModel {
@@ -169,6 +172,15 @@ export interface FigureModel {
     /** A tunable model fit the editor can expose (Naka-Rushton on intensity-response), or null.
      *  Schema-reserved in v1 — the fit-knobs panel is a follow-on. */
     modelFit: "naka_rushton" | null;
+    /** Volcano FC/p-value threshold direct-manipulation (draggable lines + numeric editor + live
+     *  re-bucket). Declared by the skill in meta.selom.capabilities.tools.thresholds (declared-only,
+     *  no inference fallback). Gates lib/volcano/thresholds.ts + threshold-drag + threshold-editor. */
+    thresholds: boolean;
+    /** Gene labelling (generalization-spec §H): click a plotted point to pin its gene as a text
+     *  annotation, and a Label toggle in the Statistics table — one shared set, instant (rides
+     *  undo/JSON-Patch), no re-run. Declared by the skill (volcano) in
+     *  meta.selom.capabilities.tools.geneLabels (declared-only). Needs per-point gene `customdata`. */
+    geneLabels: boolean;
   };
   /** Resolved plot-area gesture config (dragmode / scrollZoom / zoom tools). */
   gesture: GestureConfig;
@@ -226,6 +238,10 @@ interface SelomCapabilities {
     landmarkMarks?: boolean;
     modelFit?: "naka_rushton" | null;
     scaleBar?: boolean;
+    /** Volcano FC/p-value threshold direct-manipulation → draggable threshold lines + numeric editor. */
+    thresholds?: boolean;
+    /** Gene labelling → click-to-label a point + a Statistics-table Label toggle (generalization-spec §H). */
+    geneLabels?: boolean;
   };
 }
 
@@ -254,25 +270,34 @@ function resolveContract(
   spec: FigureSpec,
   hint: SelomHint | null,
   inferredScalebar: boolean,
-): { landmarkMarks: boolean; modelFit: "naka_rushton" | null; scalebar: boolean; gesture: GestureConfig } {
+): {
+  landmarkMarks: boolean;
+  modelFit: "naka_rushton" | null;
+  thresholds: boolean;
+  geneLabels: boolean;
+  scalebar: boolean;
+  gesture: GestureConfig;
+} {
   const caps = hint?.capabilities;
   const landmarkMarks = caps?.tools?.landmarkMarks === true || hasSeededMarks(spec);
   const modelFit = caps?.tools?.modelFit === "naka_rushton" ? "naka_rushton" : null;
+  // Declared-only (no inference fallback): the volcano stamps these explicitly via _capabilities.py.
+  const thresholds = caps?.tools?.thresholds === true;
+  const geneLabels = caps?.tools?.geneLabels === true;
   const scalebar = inferredScalebar || caps?.tools?.scaleBar === true;
 
   const g = caps?.gesture;
-  const dragmode: Dragmode | undefined =
-    g?.default === "none"
-      ? false
-      : g?.default === "select" || g?.default === "pan" || g?.default === "zoom"
-        ? g.default
-        : undefined;
+  // The GLOBAL gesture default is no-op (generalization-spec §A): absent OR "none" → dragmode:false,
+  // so a stray plot-area drag never box-zooms; zoom/pan are deliberate modebar buttons and wheel-zoom
+  // is off app-wide. A figure opts INTO a drag mode by declaring gesture.default ∈ {zoom,pan,select}.
+  const dragmode: Dragmode =
+    g?.default === "select" || g?.default === "pan" || g?.default === "zoom" ? g.default : false;
   const gesture: GestureConfig = {
     dragmode,
     zoomTools: g?.zoomTools !== false,
-    scrollZoom: typeof g?.scrollZoom === "boolean" ? g.scrollZoom : undefined,
+    scrollZoom: g?.scrollZoom === true,
   };
-  return { landmarkMarks, modelFit, scalebar, gesture };
+  return { landmarkMarks, modelFit, thresholds, geneLabels, scalebar, gesture };
 }
 
 function readHint(spec: FigureSpec): SelomHint | null {
@@ -341,6 +366,8 @@ export function deriveFigureModel(specInput: FigureSpec | null | undefined): Fig
     scalebar: contract.scalebar,
     landmarkMarks: contract.landmarkMarks,
     modelFit: contract.modelFit,
+    thresholds: contract.thresholds,
+    geneLabels: contract.geneLabels,
   };
 
   const figureKind = typeof hint?.figureKind === "string" ? hint.figureKind : null;

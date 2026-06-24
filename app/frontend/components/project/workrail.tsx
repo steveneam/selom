@@ -8,13 +8,13 @@ import {
   GitCompare,
   LayoutGrid,
   Lock,
+  Paintbrush,
   PanelLeftClose,
   PanelLeftOpen,
   Pencil,
   Play,
   Plus,
   SlidersHorizontal,
-  Sparkles,
   Table2,
   Trash2,
   type LucideIcon,
@@ -178,7 +178,7 @@ export function Workrail({
     return (
       <Row
         key={n.figure.id}
-        icon={Sparkles}
+        icon={Paintbrush}
         color="var(--stage-figure)"
         title={nested ? versionTitle(n.figure) : n.figure.title}
         family={nested ? undefined : familyOf(n.figure)}
@@ -450,7 +450,7 @@ function CollapsedRail({
       <CollapsedDot icon={Play} label="Run a skill" active={view === "skill"} color="var(--stage-skill)" filled onClick={onRunSkill} />
       <CollapsedDot icon={Table2} label="Statistics" active={view === "stats"} color="var(--stage-publish)" filled={counts.stats > 0} onClick={onExpand} />
       <CollapsedDot icon={SlidersHorizontal} label="Figure data" active={view === "figuredata"} color="var(--stage-figuredata)" filled={counts.figure > 0} onClick={onExpand} />
-      <CollapsedDot icon={Sparkles} label="Figure styling" active={view === "figure" || view === "compare"} color="var(--stage-figure)" filled={counts.figure > 0} onClick={onExpand} />
+      <CollapsedDot icon={Paintbrush} label="Figure styling" active={view === "figure" || view === "compare"} color="var(--stage-figure)" filled={counts.figure > 0} onClick={onExpand} />
     </nav>
   );
 }

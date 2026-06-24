@@ -359,13 +359,22 @@ function tinyGrid(extra: Record<string, unknown> = {}): SpecType {
 describe("capability contract (meta.selom.capabilities)", () => {
   const bare = spec([{ type: "scatter", mode: "lines", line: { color: "#111" } }]);
 
-  it("a figure that declares nothing keeps today's behaviour (no tools, Plotly default gesture)", () => {
+  it("a figure that declares nothing gets the global no-op gesture default (generalization-spec §A)", () => {
     const m = deriveFigureModel(bare);
     expect(m.capabilities.landmarkMarks).toBe(false);
     expect(m.capabilities.modelFit).toBeNull();
-    expect(m.gesture.dragmode).toBeUndefined(); // → canvas leaves Plotly's box-zoom default
-    expect(m.gesture.zoomTools).toBe(true);
-    expect(m.gesture.scrollZoom).toBeUndefined();
+    expect(m.gesture.dragmode).toBe(false); // global flip: a stray drag is a no-op, not box-zoom
+    expect(m.gesture.zoomTools).toBe(true); // zoom/pan stay as deliberate modebar buttons
+    expect(m.gesture.scrollZoom).toBe(false); // wheel-zoom off app-wide
+  });
+
+  it("a figure may opt BACK INTO a drag mode (gesture.default 'zoom') despite the global flip", () => {
+    const m = deriveFigureModel(
+      spec([{ type: "scatter", mode: "lines", line: { color: "#111" } }], {
+        meta: { selom: { capabilities: { gesture: { default: "zoom" } } } },
+      }),
+    );
+    expect(m.gesture.dragmode).toBe("zoom");
   });
 
   it("declared landmarkMarks turns the capability on", () => {
@@ -375,6 +384,26 @@ describe("capability contract (meta.selom.capabilities)", () => {
       }),
     );
     expect(m.capabilities.landmarkMarks).toBe(true);
+  });
+
+  it("declared thresholds turns the volcano capability on (declared-only, no inference fallback)", () => {
+    const on = deriveFigureModel(
+      spec([{ type: "scattergl", mode: "markers", name: "up" }], {
+        meta: { selom: { capabilities: { tools: { thresholds: true } } } },
+      }),
+    );
+    expect(on.capabilities.thresholds).toBe(true);
+    expect(deriveFigureModel(bare).capabilities.thresholds).toBe(false);
+  });
+
+  it("declared geneLabels turns the volcano labelling capability on (declared-only)", () => {
+    const on = deriveFigureModel(
+      spec([{ type: "scattergl", mode: "markers", name: "up" }], {
+        meta: { selom: { capabilities: { tools: { geneLabels: true } } } },
+      }),
+    );
+    expect(on.capabilities.geneLabels).toBe(true);
+    expect(deriveFigureModel(bare).capabilities.geneLabels).toBe(false);
   });
 
   it("falls back to landmarkMarks=true when seeded marks are present (migration)", () => {
@@ -423,7 +452,7 @@ describe("capability contract (meta.selom.capabilities)", () => {
         meta: { selom: { capabilities: { gesture: { default: "bogus" }, tools: { modelFit: "nope" } } } },
       }),
     );
-    expect(m.gesture.dragmode).toBeUndefined();
+    expect(m.gesture.dragmode).toBe(false); // bogus default → the global no-op fallback
     expect(m.capabilities.modelFit).toBeNull();
   });
 });

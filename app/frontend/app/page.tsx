@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Boxes, FileCheck2, FolderPlus, ScrollText, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, Boxes, FileCheck2, FolderPlus, Paintbrush, ScrollText, ShieldCheck } from "lucide-react";
 import { Pipeline } from "@/components/pipeline";
 import { HoverLift, Reveal, Stagger, StaggerItem } from "@/components/ui/motion";
 import { Badge } from "@/components/ui/badge";
@@ -155,7 +155,7 @@ export default function HomePage() {
                     className="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-accent/40"
                   >
                     <span className="grid size-9 place-items-center rounded-lg border border-border bg-background/60 text-primary [&_svg]:size-4">
-                      <Sparkles />
+                      <Paintbrush />
                     </span>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-foreground">{f.title}</p>

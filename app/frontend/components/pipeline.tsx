@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Boxes, CheckCircle2, Database, ShieldCheck, Sparkles, type LucideIcon } from "lucide-react";
+import { Boxes, CheckCircle2, Database, Paintbrush, ShieldCheck, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Stagger, StaggerItem } from "@/components/ui/motion";
 
@@ -51,7 +51,7 @@ const STAGES: StageDef[] = [
     key: "figure",
     label: "Edit the figure",
     blurb: "A live, publication-ready figure on a light artboard. No code.",
-    icon: Sparkles,
+    icon: Paintbrush,
     color: "var(--stage-figure)",
   },
   {

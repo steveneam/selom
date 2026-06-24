@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Lock, Redo2, RefreshCw, SlidersHorizontal, Sparkles, Table2, Trash2, Undo2 } from "lucide-react";
+import { ArrowRight, Lock, Paintbrush, Redo2, RefreshCw, SlidersHorizontal, Sparkles, Table2, Trash2, Undo2 } from "lucide-react";
 import { DataPanel, type AnalyzeArgs } from "./data-panel";
 import { DataCheckPanel } from "./data-check";
 import { FigureDataPanel } from "./figure-data-panel";
@@ -10,7 +10,7 @@ import { Dropzone } from "./dropzone";
 import { WorkbenchPanel } from "./workbench-panel";
 import { PublishConfidence } from "./publish-confidence";
 import { StaleBadge } from "./stale-badge";
-import { StatsPanel } from "./stats-panel";
+import { StatsPanel, type StatsLabeling } from "./stats-panel";
 import { VersionBar } from "./version-bar";
 import { CompareView } from "./compare-view";
 import { Workrail, type FigureNode, type Lineage, type RailView } from "./workrail";
@@ -33,6 +33,14 @@ import {
   type MarkRole,
 } from "@/lib/erg/marks";
 import { deriveFigureModel } from "@/lib/figure-model";
+import { applyStagedThresholds, readThresholds, type VolcanoThresholds } from "@/lib/volcano/thresholds";
+import {
+  labelableGenes,
+  labeledGenes,
+  toggleGeneLabelOps,
+  toggleLabelOps,
+  type GeneLabelPoint,
+} from "@/lib/volcano/labels";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 import { projectStore, select, useProjects } from "@/lib/projects/store";
 import { useWorkspace, workspaceStore, wselect } from "@/lib/workspace/store";
@@ -50,6 +58,12 @@ import { pushUndo } from "@/lib/workspace/undo";
 /** Map a command-palette intent's tab onto the workrail's view model (Pillar 1, S2.3). */
 function viewFromTab(tab: WorkspaceTab): RailView {
   return tab === "overview" ? "home" : tab === "workbench" ? "skill" : tab;
+}
+
+/** Coerce a staged param value (number | numeric string | undefined) to a number, else the fallback. */
+function numOr(v: unknown, fallback: number): number {
+  const n = typeof v === "number" ? v : typeof v === "string" ? parseFloat(v) : NaN;
+  return Number.isFinite(n) ? n : fallback;
 }
 
 /** Resolve a catalog entry from a namespaced ("selom.erg_traces") OR bare ("erg_traces") id. */
@@ -162,15 +176,33 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     const keys = new Set([...Object.keys(fdBaseParams), ...Object.keys(fdParams)]);
     return [...keys].some((k) => fdParams[k] !== fdBaseParams[k]);
   }, [fdParams, fdBaseParams]);
-  // The preview reflects the staged marks (dots move live) + the label toggle — both pure + instant.
+  // The preview reflects the staged marks (dots move live) + the label toggle + staged volcano
+  // thresholds (points re-colour live) — all pure + instant, no re-run.
   const previewSpec = React.useMemo(() => {
     let base = figure.spec ?? activeFigure?.spec;
     if (!base) return base;
     const manual = parseManualMarks(fdParams.manual_marks);
     if (Object.keys(manual).length) base = applyStagedMarks(base, manual);
     if (!markLabelsShown) base = hideDotLabels(base);
+    // Volcano: live re-bucket to the staged FC/p cuts. Idempotent, so applying the figure's own
+    // thresholds is a no-op — only re-bucket when a staged value actually differs.
+    if (deriveFigureModel(base).capabilities.thresholds) {
+      const t = readThresholds(base);
+      if (t) {
+        const fc = numOr(fdParams.fc_threshold, t.fc);
+        const fdr = numOr(fdParams.fdr_threshold, t.fdr);
+        if (fc !== t.fc || fdr !== t.fdr) base = applyStagedThresholds(base, { fc, fdr }).spec;
+      }
+    }
     return base;
-  }, [figure.spec, activeFigure?.spec, fdParams.manual_marks, markLabelsShown]);
+  }, [
+    figure.spec,
+    activeFigure?.spec,
+    fdParams.manual_marks,
+    fdParams.fc_threshold,
+    fdParams.fdr_threshold,
+    markLabelsShown,
+  ]);
   const bundle = activeFigure
     ? {
         provenance: activeFigure.provenance,
@@ -498,6 +530,55 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     }));
   }, []);
 
+  // Drag a volcano FC/p-value threshold line (generalization-spec §E) → STAGE the new cut into the
+  // shared figure-data params (same place the numeric Threshold editor writes). The points re-colour
+  // live (the preview re-buckets); the DE table + labels recompute on the next explicit re-run.
+  const onThresholdChange = React.useCallback((t: VolcanoThresholds) => {
+    setFdParams((p) => ({ ...p, fc_threshold: t.fc, fdr_threshold: t.fdr }));
+  }, []);
+
+  // Click a plotted point on a volcano (generalization-spec §H) → toggle its gene label: an INSTANT,
+  // undoable annotation committed to the figure store (no re-run, unlike a threshold edit). The
+  // Statistics-table Label toggle (`onToggleGeneLabel`, by gene name) writes the SAME `label_genes`
+  // set — both go through the figure store, so a click and a table toggle stay in sync. Skipped on a
+  // frozen (read-only) figure.
+  const onToggleLabel = React.useCallback(
+    (point: GeneLabelPoint) => {
+      const spec = figure.spec;
+      if (!spec || frozen) return;
+      const ops = toggleLabelOps(spec, point);
+      if (ops.length) figure.commit(ops);
+    },
+    [figure, frozen],
+  );
+  const onToggleGeneLabel = React.useCallback(
+    (gene: string) => {
+      const spec = figure.spec;
+      if (!spec || frozen) return;
+      const ops = toggleGeneLabelOps(spec, gene);
+      if (ops.length) figure.commit(ops);
+    },
+    [figure, frozen],
+  );
+
+  // Gene-labelling for the Statistics table (generalization-spec §H): present only for a volcano (the
+  // geneLabels capability) open in the editor store and not frozen. The Label column reads the
+  // labelled / labellable sets from the LIVE figure spec, so a canvas click and a table toggle stay in
+  // lock-step; toggling writes the same shared annotation set via `onToggleGeneLabel`.
+  const statsLabeling = React.useMemo((): StatsLabeling | undefined => {
+    const spec = figure.spec;
+    if (!spec || frozen || !activeStatsTable) return undefined;
+    if (!deriveFigureModel(spec).capabilities.geneLabels) return undefined;
+    const geneColumn = activeStatsTable.columns.findIndex((c) => /gene|symbol/i.test(c));
+    if (geneColumn < 0) return undefined;
+    return {
+      geneColumn,
+      labeled: labeledGenes(spec),
+      labelable: labelableGenes(spec),
+      onToggle: onToggleGeneLabel,
+    };
+  }, [figure.spec, frozen, activeStatsTable, onToggleGeneLabel]);
+
   // Freeze / unfreeze the open figure (S3.3, Decision D6) — tag it as the "paper"
   // version. Frozen figures are read-only; editing one forks a copy (see `editCopy`).
   const toggleFreeze = React.useCallback(() => {
@@ -606,10 +687,12 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     setView("figure");
   }
 
-  // Select a figure's Statistics node: focus it (drives the table read-out) without
-  // disturbing the editor store.
+  // Select a figure's Statistics node: focus it (drives the table read-out). Load its spec into the
+  // editor store too, so the gene-label Label toggle in the table edits the SAME spec the canvas does
+  // (one shared, undoable label set). A legacy figure with no stored spec is left as-is.
   function openStats(f: Figure) {
     setActiveFigureId(f.id);
+    if (f.spec) figure.init(f.spec);
     setView("stats");
   }
 
@@ -891,6 +974,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     readOnly={frozen}
                     onEditCopy={editCopy}
                     onMarkMove={onMarkMove}
+                    onToggleLabel={onToggleLabel}
                     skill={
                       activeFigure?.skillId
                         ? {
@@ -971,7 +1055,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                       onClick={() => openFigure(activeFigure)}
                       title="Open this figure in the editor to style it"
                     >
-                      <Sparkles /> Style this figure
+                      <Paintbrush /> Style this figure
                     </Button>
                   </div>
                   {figure.spec ?? activeFigure.spec ? (
@@ -989,6 +1073,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                             spec={(previewSpec ?? figure.spec ?? activeFigure.spec)!}
                             displayModeBar
                             onMarkMove={onMarkMove}
+                            onThresholdChange={onThresholdChange}
                           />
                         </div>
                       </div>
@@ -1012,6 +1097,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     dataFit={activeFigure.dataFit}
                     seededMarks={readSeededMarks(figure.spec ?? activeFigure.spec)}
                     canEditMarks={deriveFigureModel(figure.spec ?? activeFigure.spec).capabilities.landmarkMarks}
+                    canEditThresholds={deriveFigureModel(figure.spec ?? activeFigure.spec).capabilities.thresholds}
+                    figureSpec={figure.spec ?? activeFigure.spec}
                     markLabelsShown={markLabelsShown}
                     onMarkLabelsShownChange={setMarkLabelsShown}
                     onRerun={rerunFigureWithParams}
@@ -1076,10 +1163,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                         </p>
                       </div>
                       <Button variant="outline" size="sm" onClick={() => openFigure(activeFigure)}>
-                        <Sparkles /> Open figure
+                        <Paintbrush /> Open figure
                       </Button>
                     </div>
-                    <StatsPanel table={activeStatsTable} defaultOpen />
+                    <StatsPanel table={activeStatsTable} defaultOpen labeling={statsLabeling} />
                   </div>
                 ) : (
                   <EmptyState
@@ -1190,7 +1277,7 @@ function Overview({
                 onClick={() => onOpenFigure(f)}
                 className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-accent/40"
               >
-                <Sparkles className="size-4 shrink-0 text-primary" />
+                <Paintbrush className="size-4 shrink-0 text-primary" />
                 <span className="truncate text-sm text-foreground">{f.title}</span>
                 <span className="tabular ml-auto text-[11px] text-muted-foreground">
                   {getSkill(f.skillId ?? "")?.name ?? "figure"}

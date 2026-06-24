@@ -8,7 +8,10 @@ import type { FigureStore } from "@/hooks/use-figure-store";
 import { deriveFigureModel, projectOverlay } from "@/lib/figure-model";
 import { relayoutToOps, restyleToOps } from "@/lib/plotly-edits";
 import { wireMarkDrag, type Crosshair } from "./mark-drag";
+import { wireThresholdDrag } from "./threshold-drag";
 import type { MarkRole } from "@/lib/erg/marks";
+import type { VolcanoThresholds } from "@/lib/volcano/thresholds";
+import { pointFromClick, type GeneLabelPoint } from "@/lib/volcano/labels";
 
 type GraphDiv = {
   on?: (ev: string, cb: (e: unknown) => void) => void;
@@ -43,6 +46,8 @@ export function FigureCanvas({
   displayModeBar,
   onSelectTrace,
   onMarkMove,
+  onThresholdChange,
+  onToggleLabel,
 }: {
   spec: FigureSpec;
   store?: FigureStore;
@@ -55,6 +60,14 @@ export function FigureCanvas({
   /** Drag an ERG landmark dot → commit its new time (erg-manual-marks R5). Absent → dots aren't
    *  draggable (the numeric Marks panel is the fallback). Disabled in the overlay projection. */
   onMarkMove?: (segment: string, role: MarkRole, tMs: number) => void;
+  /** Drag a volcano FC/p-value threshold line → stage the new cut (generalization-spec §E). Absent →
+   *  the lines aren't draggable (the numeric Threshold editor is the fallback). Gated on the
+   *  thresholds capability; disabled in the overlay projection. */
+  onThresholdChange?: (t: VolcanoThresholds) => void;
+  /** Click a plotted point to toggle its gene label (generalization-spec §H). Absent → clicks just
+   *  select the series. Gated on the geneLabels capability; the click toggles a label instead of
+   *  selecting when the point carries a gene. */
+  onToggleLabel?: (point: GeneLabelPoint) => void;
 }) {
   // Trace-grid OVERLAY view (meta.selom.layoutMode): render a single-axis projection of the grid.
   // The canonical `spec` stays the grid — this is display-only, so every edit, undo, and export
@@ -65,13 +78,15 @@ export function FigureCanvas({
   const display = useMemo(() => (overlay ? projectOverlay(spec) : spec), [spec, overlay]);
   const fixed = typeof display.layout.width === "number";
 
-  // Capability-driven gesture model (docs/figure-data-capabilities/spec.md §3). Derived from the
-  // canonical spec so it's consistent across grid/overlay. ERG figures declare a no-op default
-  // (dragmode:false) so a stray drag never box-zooms; a figure that declares nothing → undefined,
-  // and we leave Plotly's defaults (box-zoom) untouched. Dot-drag is gated on landmarkMarks below.
+  // Capability-driven gesture model (generalization-spec §A). Derived from the canonical spec so it's
+  // consistent across grid/overlay. The GLOBAL default is a no-op drag (dragmode:false) so a stray
+  // drag never box-zooms anywhere; zoom/pan are deliberate modebar buttons. A figure may opt into a
+  // drag mode via meta.selom.capabilities.gesture. Dot-drag is gated on landmarkMarks below.
   const model = useMemo(() => deriveFigureModel(spec), [spec]);
   const gesture = model.gesture;
   const landmarkMarks = model.capabilities.landmarkMarks;
+  const thresholds = model.capabilities.thresholds;
+  const geneLabels = model.capabilities.geneLabels;
 
   const figure = useMemo(
     () =>
@@ -80,7 +95,7 @@ export function FigureCanvas({
         layout: {
           ...display.layout,
           autosize: !fixed,
-          ...(gesture.dragmode !== undefined ? { dragmode: gesture.dragmode } : {}),
+          dragmode: gesture.dragmode,
         },
       }),
     [display, fixed, gesture.dragmode],
@@ -88,8 +103,8 @@ export function FigureCanvas({
 
   // Handlers read the latest spec/store via a ref so the directly-bound Plotly
   // listeners stay stable while always seeing live values.
-  const liveRef = useRef({ spec, store, onSelectTrace, overlay, onMarkMove, landmarkMarks });
-  liveRef.current = { spec, store, onSelectTrace, overlay, onMarkMove, landmarkMarks };
+  const liveRef = useRef({ spec, store, onSelectTrace, overlay, onMarkMove, landmarkMarks, onThresholdChange, thresholds, onToggleLabel, geneLabels });
+  liveRef.current = { spec, store, onSelectTrace, overlay, onMarkMove, landmarkMarks, onThresholdChange, thresholds, onToggleLabel, geneLabels };
 
   // Mark-drag plumbing (erg-manual-marks R5). The crosshair + live dot are positioned IMPERATIVELY
   // via refs (never React state) so a drag never re-renders the Plot. The dot moves as an HTML
@@ -99,6 +114,7 @@ export function FigureCanvas({
   const labelRef = useRef<HTMLDivElement | null>(null);
   const dotRef = useRef<HTMLDivElement | null>(null);
   const dragDisposeRef = useRef<(() => void) | null>(null);
+  const thresholdDisposeRef = useRef<(() => void) | null>(null);
 
   const setCrosshair = useCallback((c: Crosshair | null) => {
     const line = lineRef.current;
@@ -149,11 +165,21 @@ export function FigureCanvas({
         const ops = restyleToOps(s, update ?? {}, indices ?? []);
         if (ops.length) st.commit(ops);
       },
-      // Click-to-select (P3 §3.4): report the clicked curve's trace index so the inspector can
-      // focus its series. Pure selection — no edit, so it's bound even on a read-only figure.
+      // A click is either a gene-label toggle (generalization-spec §H, volcano) or click-to-select
+      // (P3 §3.4). On a geneLabels figure, a click on a point that carries a gene toggles its label
+      // (an instant, undoable annotation) and stops there; otherwise it reports the clicked curve's
+      // trace index so the inspector can focus its series. Pure selection is bound even read-only.
       click: (e: unknown) => {
-        const points = (e as { points?: { curveNumber?: number }[] } | undefined)?.points;
-        const ci = points?.[0]?.curveNumber;
+        const point = (e as { points?: unknown[] } | undefined)?.points?.[0];
+        const { onToggleLabel: otl, geneLabels: gl } = liveRef.current;
+        if (gl && otl) {
+          const lp = pointFromClick(point);
+          if (lp) {
+            otl(lp);
+            return;
+          }
+        }
+        const ci = (point as { curveNumber?: number } | undefined)?.curveNumber;
         if (typeof ci === "number") liveRef.current.onSelectTrace?.(ci);
       },
     };
@@ -195,9 +221,25 @@ export function FigureCanvas({
         container: containerRef.current,
       });
     }
+
+    // (Re)wire threshold-line dragging — capability-gated (generalization-spec §E): only on a figure
+    // that DECLARES the volcano thresholds capability and has a stage handler, never elsewhere. Like
+    // mark-drag it needs no `store` (it stages params), so it works in the read-only Figure-data preview.
+    thresholdDisposeRef.current?.();
+    thresholdDisposeRef.current = null;
+    const { onThresholdChange: otc, thresholds: th } = liveRef.current;
+    if (!ov && otc && th) {
+      thresholdDisposeRef.current = wireThresholdDrag(gd as never, {
+        getSpec: () => liveRef.current.spec,
+        onThresholdChange: otc,
+      });
+    }
   }, [setCrosshair]);
 
-  useEffect(() => () => dragDisposeRef.current?.(), []);
+  useEffect(() => () => {
+    dragDisposeRef.current?.();
+    thresholdDisposeRef.current?.();
+  }, []);
 
   const config = useMemo(() => {
     // Zoom + pan stay as modebar buttons by default (a mode the user presses); a figure may drop
@@ -210,10 +252,11 @@ export function FigureCanvas({
     return {
       displaylogo: false,
       responsive: true,
-      // Wheel-zoom is intentionally OFF: on a multi-panel trace grid a stray scroll zooms a single
-      // panel and is fiddly to undo. Zoom stays a DELIBERATE action — the modebar Zoom button
-      // (drag a box) or Zoom in/out — and Reset axes (or a double-click) restores the default view.
-      scrollZoom: false,
+      // Wheel-zoom is OFF app-wide by default (resolved gesture.scrollZoom): a stray scroll zooms and
+      // is fiddly to undo. Zoom stays a DELIBERATE action — the modebar Zoom button (drag a box) or
+      // Zoom in/out — and Reset axes (or a double-click) restores the default view. A figure may opt
+      // back into wheel-zoom via capabilities.gesture.scrollZoom:true.
+      scrollZoom: gesture.scrollZoom,
       ...(displayModeBar === undefined ? {} : { displayModeBar }),
       // Direct manipulation: drag the legend / colour bar / annotations and
       // double-click titles in place. We DON'T enable blanket `editable` — that
@@ -236,7 +279,7 @@ export function FigureCanvas({
       modeBarButtonsToRemove,
       toImageButtonOptions: { format: "png" as const, scale: 2, filename: "selom-figure" },
     };
-  }, [store, displayModeBar, gesture.zoomTools]);
+  }, [store, displayModeBar, gesture.zoomTools, gesture.scrollZoom]);
 
   return (
     <div ref={containerRef} className="relative size-full">
