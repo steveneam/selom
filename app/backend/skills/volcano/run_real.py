@@ -41,13 +41,17 @@ def run(data_path: str, params: dict) -> dict:
     nlp = -np.log10(np.clip(padj, 1e-300, 1.0))
     keep = np.isfinite(lfc) & np.isfinite(nlp)
 
-    up, down, ns = ([], []), ([], []), ([], [])
-    for x, y, ok in zip(lfc, nlp, keep):
+    gene_vals = genes.to_numpy()
+    up, down, ns = ([], [], []), ([], [], []), ([], [], [])
+    for x, y, pj, gene, ok in zip(lfc, nlp, padj, gene_vals, keep):
         if not ok:
             continue
         bucket = up if (x >= fc_t and y >= y_cut) else down if (x <= -fc_t and y >= y_cut) else ns
         bucket[0].append(round(float(x), 4))
         bucket[1].append(round(float(y), 4))
+        # Per-point customdata = [gene symbol, adj p] (generalization-spec §H): the labelling
+        # substrate + the hover readout. padj is the raw value (not the -log10), formatted on hover.
+        bucket[2].append([str(gene), float(pj) if math.isfinite(float(pj)) else None])
 
     labels = []
     if top_n > 0:

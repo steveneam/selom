@@ -15,6 +15,11 @@ DOWN = "#f43f5e"
 NS = "#5b6b80"
 HL = "#f59e0b"  # highlighted gene-set panel (amber, drawn on top)
 
+# Per-point hover + the gene-labelling substrate (generalization-spec §H): every plotted point
+# carries its gene SYMBOL (+ adj p) as ``customdata`` so the editor can label a clicked point and
+# the Statistics-table Label toggle can find a gene's coordinates. Render-inert beyond the hover.
+HOVER = "<b>%{customdata[0]}</b><br>log2FC %{x:.3g} · adj p %{customdata[1]:.2g}<extra></extra>"
+
 
 def run(data_path: str, params: dict) -> dict:
     if use_real_engine("pandas"):
@@ -31,17 +36,20 @@ def _stub_figure(params: dict) -> dict:
     fdr_t = float(params.get("fdr_threshold", 0.05))
     y_cut = -math.log10(fdr_t) if fdr_t > 0 else 0.0
 
-    up, down, ns = ([], []), ([], []), ([], [])
+    up, down, ns = ([], [], []), ([], [], []), ([], [], [])
     genes, lfcs, padjs = [], [], []
     for i in range(80):
         lfc = round(3.0 * math.sin(i * 0.7), 3)
         nlp = round(abs(lfc) * 1.15 + 0.5 * (1 + math.cos(i * 0.9)), 3)
+        padj = 10 ** (-nlp)  # invert the synthetic -log10 padj back to padj
+        gene = f"GENE{i + 1}"
         bucket = up if (lfc >= fc_t and nlp >= y_cut) else down if (lfc <= -fc_t and nlp >= y_cut) else ns
         bucket[0].append(lfc)
         bucket[1].append(nlp)
-        genes.append(f"GENE{i + 1}")
+        bucket[2].append([gene, padj])
+        genes.append(gene)
         lfcs.append(lfc)
-        padjs.append(10 ** (-nlp))  # invert the synthetic -log10 padj back to padj
+        padjs.append(padj)
 
     spec = _assemble(up, down, ns, [], fc_t, y_cut, "Volcano (stub)")
     spec["table"] = de_table(genes, lfcs, padjs, fc_t=fc_t, fdr_t=fdr_t)
@@ -49,20 +57,36 @@ def _stub_figure(params: dict) -> dict:
 
 
 def _assemble(up, down, ns, labels, fc_t, y_cut, title, highlight=None) -> dict:
-    """Build the volcano spec from up/down/ns (x,y) pairs + optional label/highlight points.
+    """Build the volcano spec from up/down/ns ``(x, y, customdata)`` triples + optional
+    label/highlight points.
 
-    ``highlight`` is an optional list of ``(x, y, gene)`` for a gene-set panel applied
-    from the "Gene Sets" surface — drawn on top in amber, with each member labelled.
-    Left ``None`` it adds nothing, so the stub/golden output is unchanged.
+    Each bucket is ``([x…], [y…], [[gene, padj]…])`` — the per-point ``customdata`` carries the
+    gene SYMBOL (+ adj p) so the editor's gene-labelling (generalization-spec §H) can label a
+    clicked point and the Statistics-table toggle can locate a gene's coordinates. ``highlight`` is
+    an optional list of ``(x, y, gene)`` for a gene-set panel applied from the "Gene Sets" surface —
+    drawn on top in amber, with each member labelled. Left ``None`` it adds nothing.
     """
+    # Per-point customdata ([gene, padj]) is optional: the volcano passes ``(x, y, customdata)``
+    # triples, but ``proteomics_de`` reuses this assembler with bare ``(x, y)`` pairs — so a bucket
+    # without a 3rd element simply omits the labelling keys (its figure/golden stays unchanged).
+    ns_cd = ns[2] if len(ns) > 2 else None
+    up_cd = up[2] if len(up) > 2 else None
+    down_cd = down[2] if len(down) > 2 else None
     data = [
         {"type": "scattergl", "mode": "markers", "name": "n.s.", "x": ns[0], "y": ns[1],
+         "customdata": ns_cd, "hovertemplate": HOVER,
          "marker": {"color": NS, "size": 5, "opacity": 0.6}},
         {"type": "scattergl", "mode": "markers", "name": "up", "x": up[0], "y": up[1],
+         "customdata": up_cd, "hovertemplate": HOVER,
          "marker": {"color": UP, "size": 6}},
         {"type": "scattergl", "mode": "markers", "name": "down", "x": down[0], "y": down[1],
+         "customdata": down_cd, "hovertemplate": HOVER,
          "marker": {"color": DOWN, "size": 6}},
     ]
+    for tr in data:
+        if tr.get("customdata") is None:
+            tr.pop("customdata", None)
+            tr.pop("hovertemplate", None)
     if labels:
         data.append({
             "type": "scatter", "mode": "text", "name": "labels", "showlegend": False,

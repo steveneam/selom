@@ -208,6 +208,16 @@ def apply(spec, skill_id, style=DEFAULT_STYLE):
     st = get_style(style)
     spec = copy.deepcopy(spec)
     kind = _tagged_kind(spec) or _KIND.get(skill_id, "base")
+    themed = _theme_for_kind(st, spec, kind)
+    # Central per-skill editing-capability stamp (generalization-spec §C): render-inert; fills only
+    # skills with a profile (e.g. volcano), never clobbers a richer existing stamp (ERG trace grids).
+    from skills import _capabilities
+
+    return _capabilities.stamp(themed, skill_id)
+
+
+def _theme_for_kind(st, spec, kind):
+    """Dispatch a deep-copied spec to its figure-type styler (one return surface for ``apply``)."""
     if kind == "volcano":
         grid = True if st.force_grid is None else st.force_grid
         return _style_volcano(st, spec, grid=grid)
