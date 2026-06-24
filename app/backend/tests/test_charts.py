@@ -18,6 +18,92 @@ def test_spread_stats_metrics():
     assert _charts.spread_stats([5.0], "sem")["err"] == 0.0  # n<2 guard, no NaN
 
 
+def test_band_traces_for_a_standard_line_plot():
+    """The flat-line band builder (non-grid line skills): 2 tonexty fill traces, the upper bound
+    filled down to the lower; boundary off by default; rgba fill from the hex colour."""
+    tr = _charts.band_traces([0, 1, 2], [-1, -1, -1], [1, 1, 1], color="#0072B2",
+                             alpha=0.3, legendgroup="A")
+    assert len(tr) == 2
+    lo, hi = tr
+    assert hi["fill"] == "tonexty" and "fill" not in lo
+    assert hi["fillcolor"] == "rgba(0,114,178,0.3)"
+    assert lo["line"]["width"] == 0 and hi["line"]["width"] == 0  # no boundary by default
+    assert lo["legendgroup"] == hi["legendgroup"] == "A"
+    # boundary=dashed draws the edges; xaxis/yaxis target a subplot
+    dashed = _charts.band_traces([0, 1], [0, 0], [2, 2], boundary="dashed", xaxis="x2", yaxis="y2")
+    assert dashed[0]["line"]["dash"] == "dash" and dashed[0]["xaxis"] == "x2"
+
+
+def test_aggregate_replicates_mean_and_band():
+    """The shared replicate-averaging math (used by the line builder AND the ERG grid)."""
+    reps = [([0, 1, 2], [10, 20, 30]), ([0, 1, 2], [12, 18, 34]), ([0, 1, 2], [8, 22, 26])]
+    x, mean, lower, upper, errs, n = _charts.aggregate_replicates(reps, "sem")
+    assert n == 3 and x == [0.0, 1.0, 2.0]
+    assert mean == [10.0, 20.0, 30.0]  # column means
+    assert all(lo < m < up for lo, m, up in zip(lower, mean, upper))  # band straddles the mean
+    # missing point in one replicate still contributes from the others (graceful)
+    x2, mean2, *_ = _charts.aggregate_replicates([([0, 1], [4, 6]), ([0], [8])], "sem")
+    assert mean2[0] == 6.0 and mean2[1] == 6.0  # t=0 averages 4&8; t=1 only the first rep
+
+
+def test_line_figure_is_generic_mean_spread_line():
+    """A non-ERG line graph (two dose-response series) → mean lines + ± bands + a numbers table."""
+    series = [
+        {"label": "Drug A", "x": [1, 2, 3],
+         "replicates": [([1, 2, 3], [10, 20, 28]), ([1, 2, 3], [12, 22, 30])]},
+        {"label": "Drug B", "x": [1, 2, 3],
+         "replicates": [([1, 2, 3], [5, 9, 14]), ([1, 2, 3], [7, 11, 16])]},
+    ]
+    spec, rows = _charts.line_figure(series, x_title="dose", y_title="response", spread="band",
+                                     error="sem", log_x=True)
+    fills = [t for t in spec["data"] if t.get("fill") == "tonexty"]
+    lines = [t for t in spec["data"] if t.get("mode") == "lines" and t.get("hoverinfo") == "x+y"]
+    assert len(fills) == 2 and len(lines) == 2  # one band + one mean line per series
+    assert spec["layout"]["xaxis"]["type"] == "log"
+    assert spec["layout"]["showlegend"] is True
+    assert len(rows) == 6  # 2 series × 3 x-points: [label, x, mean, err]
+    assert rows[0][0] == "Drug A" and rows[0][2] == 11.0  # mean of 10 & 12
+
+
+def test_spread_line_traces_modes():
+    reps = [([0, 1], [10, 20]), ([0, 1], [14, 24]), ([0, 1], [12, 22])]
+    eb = _charts.spread_line_traces([0, 1], replicates=reps, spread="error_bars", error="sd")
+    assert any(t.get("error_y") for t in eb)
+    indiv = _charts.spread_line_traces([0, 1], replicates=reps, spread="individual")
+    assert len([t for t in indiv if t.get("opacity") == 0.18]) == 3
+    rep = _charts.spread_line_traces([0, 1], replicates=reps, central="representative")
+    assert len(rep) == 1 and rep[0]["y"] == [10.0, 20.0]  # the first replicate, no spread
+
+
+def test_band_color_defaults_to_trace_else_override():
+    reps = [([0, 1], [10, 20]), ([0, 1], [14, 24])]
+    # default: the band matches the line colour
+    tr = _charts.spread_line_traces([0, 1], replicates=reps, spread="band", color="#0072B2")
+    fill = next(t["fillcolor"] for t in tr if t.get("fill") == "tonexty")
+    assert fill == "rgba(0,114,178,0.25)"
+    # override: a different band colour
+    tr2 = _charts.spread_line_traces([0, 1], replicates=reps, spread="band", color="#0072B2",
+                                     band_color="#c0392b")
+    fill2 = next(t["fillcolor"] for t in tr2 if t.get("fill") == "tonexty")
+    assert fill2.startswith("rgba(192,57,43")
+
+
+def test_individual_data_points_with_and_without_the_mean_line():
+    reps = [([1, 2], [10, 20]), ([1, 2], [14, 24]), ([1, 2], [12, 22])]
+    # points + mean line
+    withmean = _charts.spread_line_traces([1, 2], replicates=reps, central="mean", spread="none",
+                                          points=True)
+    pts = [t for t in withmean if t.get("mode") == "markers" and not t.get("error_y")]
+    lines = [t for t in withmean if t.get("mode") == "lines" and t.get("hoverinfo") == "x+y"]
+    assert len(pts) == 1 and len(pts[0]["x"]) == 6 and len(lines) == 1  # 3 reps × 2 x = 6 points
+    # points WITHOUT a mean line (central=none)
+    nomean = _charts.spread_line_traces([1, 2], replicates=reps, central="none", points=True)
+    assert not [t for t in nomean if t.get("mode") == "lines" and t.get("hoverinfo") == "x+y"]
+    assert any(t.get("mode") == "markers" for t in nomean)
+    # central=none still renders the individual replicate lines (more visible than behind a mean)
+    assert any(t.get("opacity") == 0.5 for t in nomean)
+
+
 def test_sig_stars_thresholds():
     assert _charts.sig_stars(0.0005) == "***"
     assert _charts.sig_stars(0.005) == "**"

@@ -10,6 +10,13 @@
   "inputs": [{ "name": "table", "kind": "csv", "required": true }],
   "param_spec": {
     "role": { "type": "str", "default": "representative" },
+    "central": { "type": "str", "default": "representative", "options": ["representative", "mean", "none"] },
+    "spread": { "type": "str", "default": "band", "options": ["none", "band", "error_bars", "individual", "both"] },
+    "error": { "type": "str", "default": "sem", "options": ["sem", "sd", "ci95", "minmax"] },
+    "error_every": { "type": "int", "default": 25, "min": 1, "max": 500 },
+    "band_alpha": { "type": "float", "default": 0.25, "min": 0.0, "max": 1.0 },
+    "band_color": { "type": "str", "default": "" },
+    "boundary_lines": { "type": "str", "default": "none", "options": ["none", "solid", "dashed"] },
     "adaptation": { "type": "str", "default": "auto", "options": ["auto", "scotopic", "photopic"] },
     "stimulus_type": { "type": "str", "default": "" },
     "filter": { "type": "bool", "default": true },

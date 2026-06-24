@@ -99,6 +99,21 @@ def _write_waveforms(path):
         w.writerows(_waveform_rows("Control", 300.0) + _waveform_rows("Untreated", 80.0))
 
 
+def _write_multi_eye_waveforms(path, n_per_cond=3):
+    """erg_waveforms_long with n replicate recordings per condition (sample_id/eye columns) so the
+    central=mean / spread path has a real n. 2 conditions × Group4 × n animals, amplitude jittered
+    deterministically per animal so the spread is non-zero."""
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["condition", "intensity_group", "time_ms", "voltage_uv",
+                    "intensity_log_cd_s_m2", "sample_id", "eye"])
+        for cond, amp in (("Control", 300.0), ("Untreated", 80.0)):
+            for k in range(n_per_cond):
+                scale = 1.0 + 0.1 * (k - 1)  # 0.9, 1.0, 1.1, … → non-zero spread
+                for c, grp, t, v, _ in _waveform_rows(cond, amp * scale):
+                    w.writerow([c, grp, t, v, 1.0, f"{cond}_a{k}", "RE"])
+
+
 def _write_metrics(path):
     """erg_metrics_long: a clean saturating b-wave series, 2 conditions × 5 intensities × 2 eyes."""
     with open(path, "w", newline="") as f:
@@ -146,6 +161,115 @@ def test_erg_traces_rescales_figure_scalebar_and_table(tmp_path):
     for ru, rm in zip(uv["table"]["rows"], mv["table"]["rows"]):
         if float(ru[bi_uv]):
             assert float(rm[bi_mv]) == _approx(float(ru[bi_uv]) / 1000.0)
+
+
+def _line_traces(spec):
+    """The panel mean lines (mode=='lines', hoverinfo 'x+y') — not band/replicate helper traces."""
+    return [t for t in spec["data"] if t.get("mode") == "lines" and t.get("hoverinfo") == "x+y"]
+
+
+def test_erg_traces_representative_picks_one_replicate_per_cell(tmp_path):
+    """Default (representative) on a 3-eye-per-condition table draws exactly ONE line per
+    condition×intensity cell — not the old 3-eyes-concatenated jagged trace."""
+    from skills.proprietary.erg_traces.run_real import run as run_traces
+
+    p = tmp_path / "multi.csv"
+    _write_multi_eye_waveforms(p, n_per_cond=3)
+    spec = run_traces(str(p), {})  # central defaults to representative
+    lines = _line_traces(spec)
+    assert len(lines) == 2  # 2 conditions × 1 intensity = 2 cells, one exemplar each
+    # the exemplar carries the full time grid (121 samples), not 3× concatenated
+    assert all(len(t["x"]) == 121 for t in lines)
+    assert "Representative" in spec["layout"]["title"]["text"]
+
+
+def test_erg_traces_central_mean_band(tmp_path):
+    """central=mean + spread=band: one mean line per cell + a tonexty ± band; title states n + SEM."""
+    from skills.proprietary.erg_traces.run_real import run as run_traces
+
+    p = tmp_path / "multi.csv"
+    _write_multi_eye_waveforms(p, n_per_cond=3)
+    spec = run_traces(str(p), {"central": "mean", "spread": "band", "error": "sem"})
+    fills = [t for t in spec["data"] if t.get("fill") == "tonexty"]
+    assert len(fills) == 2  # one band per cell
+    assert len(_line_traces(spec)) == 2
+    title = spec["layout"]["title"]["text"]
+    assert "Mean" in title and "SEM" in title and "n=3" in title
+
+
+def test_erg_traces_spread_individual_and_error_bars(tmp_path):
+    from skills.proprietary.erg_traces.run_real import run as run_traces
+
+    p = tmp_path / "multi.csv"
+    _write_multi_eye_waveforms(p, n_per_cond=3)
+
+    indiv = run_traces(str(p), {"central": "mean", "spread": "individual"})
+    faint = [t for t in indiv["data"] if t.get("opacity") == 0.18]
+    assert len(faint) == 2 * 3  # 3 replicate lines per cell, 2 cells
+    assert not [t for t in indiv["data"] if t.get("fill") == "tonexty"]  # no band in this mode
+
+    eb = run_traces(str(p), {"central": "mean", "spread": "error_bars", "error": "sd"})
+    err = [t for t in eb["data"] if t.get("error_y")]
+    assert len(err) == 2
+
+
+def test_erg_traces_band_matches_trace_colour_even_for_unmapped_conditions(tmp_path):
+    """The band fill is the TRACE colour, not grey — even for a condition outside the ERG palette
+    (e.g. a C57/Rd10 strain cohort gets a stable fallback colour, line + band share it)."""
+    from skills.proprietary.erg_traces.run_real import run as run_traces
+
+    p = tmp_path / "strain.csv"
+    with open(p, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["condition", "intensity_group", "time_ms", "voltage_uv",
+                    "intensity_log_cd_s_m2", "sample_id", "eye"])
+        for cond, amp in (("C57", 300.0), ("Rd10", 60.0)):
+            for k in range(3):
+                for c, grp, t, v, _ in _waveform_rows(cond, amp * (1.0 + 0.1 * (k - 1))):
+                    w.writerow([c, grp, t, v, 1.0, f"{cond}_a{k}", "RE"])
+    spec = run_traces(str(p), {"central": "mean", "spread": "band"})
+    line = next(t for t in spec["data"] if t.get("mode") == "lines" and t.get("hoverinfo") == "x+y")
+    band = next(t for t in spec["data"] if t.get("fill") == "tonexty")
+    line_hex = line["line"]["color"]
+    assert line_hex and line_hex != "#888888"  # an explicit colour, not the grey fallback
+    r, g, b = int(line_hex[1:3], 16), int(line_hex[3:5], 16), int(line_hex[5:7], 16)
+    assert band["fillcolor"] == f"rgba({r},{g},{b},0.25)"  # band == the trace colour, translucent
+
+
+def test_erg_traces_band_color_override(tmp_path):
+    from skills.proprietary.erg_traces.run_real import run as run_traces
+
+    p = tmp_path / "multi.csv"
+    _write_multi_eye_waveforms(p, n_per_cond=3)
+    spec = run_traces(str(p), {"central": "mean", "spread": "band", "band_color": "#abcdef"})
+    band = next(t for t in spec["data"] if t.get("fill") == "tonexty")
+    assert band["fillcolor"].startswith("rgba(171,205,239")  # 0xab,0xcd,0xef
+
+
+def test_erg_traces_central_none_individual_only(tmp_path):
+    """central=none draws every replicate at equal weight and NO bold mean line."""
+    from skills.proprietary.erg_traces.run_real import run as run_traces
+
+    p = tmp_path / "multi.csv"
+    _write_multi_eye_waveforms(p, n_per_cond=3)
+    spec = run_traces(str(p), {"central": "none"})
+    assert not [t for t in spec["data"] if t.get("fill") == "tonexty"]  # no band
+    # 2 cells × 3 replicates = 6 traces total (1 main + 2 extra per cell), all faint, no opaque mean
+    faint_main = [t for t in spec["data"] if t.get("opacity") == 0.55 and t.get("hoverinfo") == "x+y"]
+    faint_extra = [t for t in spec["data"] if t.get("opacity") == 0.55 and t.get("hoverinfo") == "skip"]
+    assert len(faint_main) == 2 and len(faint_extra) == 4
+    assert "Individual" in spec["layout"]["title"]["text"]
+
+
+def test_erg_traces_central_mean_single_eye_degrades(tmp_path):
+    """n<2 → no band/error artifact; the mean line is just the single recording (graceful)."""
+    from skills.proprietary.erg_traces.run_real import run as run_traces
+
+    p = tmp_path / "single.csv"
+    _write_waveforms(p)  # no sample_id/eye → one recording per cell
+    spec = run_traces(str(p), {"central": "mean", "spread": "band"})
+    assert not [t for t in spec["data"] if t.get("fill") == "tonexty"]  # no zero-width band
+    assert len(_line_traces(spec)) == 2
 
 
 def test_erg_intensity_response_rescales_axis_and_vmax(tmp_path):

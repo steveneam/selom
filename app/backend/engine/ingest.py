@@ -190,3 +190,93 @@ def ingest(
 
 def _is_dataframe(obj: Any) -> bool:
     return any(t.__name__ == "DataFrame" for t in type(obj).__mro__)
+
+
+def _load_payload(path: Path, *, sheet: str | int | None = None, sep: str | None = None):
+    """Load ``path`` to its in-memory payload via the registry WITHOUT the materialize-to-temp
+    step ``ingest`` does — for callers (``ingest_many``) that assemble their own combined frame."""
+    loader = _pick_loader(path)
+    if loader is None:
+        raise ValueError(f"no ingest loader for {path.name!r}")
+    return loader.load(path, sheet=sheet, sep=sep), loader, _source_ref(path, sheet=sheet)
+
+
+def ingest_many(
+    srcs: list[str | Path],
+    *,
+    labels: list[str] | None = None,
+    hint: str | None = None,
+) -> DataBundle:
+    """Combine several **single-condition** ERG (or any canonical-waveform) tables into ONE
+    multi-condition :class:`DataBundle` — the C6 path (one ``.iwxdata`` / Diagnosys file = one
+    eye/animal = one condition; a cohort needs them merged so the trace-mean + Fig-1E-with-reps run
+    on a real n). Each file contributes its rows under a **condition label**, precedence:
+
+    1. an explicit ``labels[i]`` (the user says "this file is condition X"),
+    2. else the file's own non-empty ``condition`` column (kept per-row — e.g. the iWorx strain
+       ``C57``/``Rd10``, so several files share one cohort label),
+    3. else the filename stem.
+
+    ``sample_id`` is namespaced with the file stem only **on cross-file collision**, so replicates
+    stay distinct without uglifying already-unique ids. ``condition_order`` follows first-seen order
+    (= the order the files are given → deterministic column order in the grid). A ``source_file``
+    column is added for provenance. The combined frame is classified + materialized to a temp CSV,
+    so the existing path-based ERG skills run on it unchanged."""
+    import pandas as pd
+
+    paths = [Path(s) for s in srcs]
+    if not paths:
+        raise ValueError("ingest_many: no inputs")
+    labels = list(labels or [])
+
+    frames: list = []
+    seen_ids: dict[str, set[str]] = {}  # sample_id -> set of file stems that used it
+    for i, p in enumerate(paths):
+        payload, _loader, source = _load_payload(p)
+        if not _is_dataframe(payload):
+            raise ValueError(f"ingest_many: {p.name!r} did not load as a table")
+        df = payload.copy()
+        stem = p.stem
+        explicit = labels[i].strip() if i < len(labels) and labels[i] and labels[i].strip() else None
+        has_cond = ("condition" in df.columns
+                    and df["condition"].astype(str).str.strip().replace("nan", "").ne("").any())
+        if explicit:
+            df["condition"] = explicit
+        elif not has_cond:
+            df["condition"] = stem
+        df["source_file"] = source.filename
+        if "sample_id" in df.columns:
+            for sid in df["sample_id"].dropna().astype(str).unique():
+                seen_ids.setdefault(sid, set()).add(stem)
+        frames.append((df, stem))
+
+    collide = {sid for sid, stems in seen_ids.items() if len(stems) > 1}
+    out: list = []
+    for df, stem in frames:
+        if collide and "sample_id" in df.columns:
+            df["sample_id"] = df["sample_id"].astype(str).map(
+                lambda s, stem=stem: f"{stem}::{s}" if s in collide else s)
+        out.append(df)
+    combined = pd.concat(out, ignore_index=True, sort=False)
+
+    # Deterministic condition_order = first-seen order across the merged frame (= file order).
+    order_map: dict[str, int] = {}
+    for c in combined["condition"].astype(str):
+        order_map.setdefault(c, len(order_map))
+    combined["condition_order"] = combined["condition"].astype(str).map(order_map)
+
+    import tempfile
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".csv", delete=False)
+    tmp.close()
+    combined.to_csv(tmp.name, index=False)
+    source = SourceRef(filename=f"combined_{len(paths)}_files.csv", n_bytes=0, sha256="")
+    kind = classify(combined, hint=hint or GENERIC_TABLE, source=source)
+    return DataBundle(
+        payload=combined,
+        kind=kind,
+        source=source,
+        path=tmp.name,
+        meta={"erg_format": "combined", "n_files": len(paths),
+              "conditions": list(order_map.keys())},
+    )

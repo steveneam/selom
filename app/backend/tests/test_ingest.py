@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from engine import BULK_COUNTS, DE_RESULTS, SC_COUNTS, ingest
+from engine import BULK_COUNTS, DE_RESULTS, SC_COUNTS, ingest, ingest_many
 
 RNG = np.random.default_rng(1)
 
@@ -84,3 +84,67 @@ def test_ingest_unrecognized_raises(tmp_path):
     p.write_bytes(b"\x00\x01\x02")
     with pytest.raises(ValueError, match="no ingest loader"):
         ingest(p)
+
+
+# --- ingest_many (C6 multi-file combine) ------------------------------------------------
+
+def _erg_csv(path, condition, sample_ids):
+    """A tiny single-condition ERG waveform table (its own `condition` column + sample_ids)."""
+    rows = []
+    for sid in sample_ids:
+        for t in range(3):
+            rows.append({"sample_id": sid, "condition": condition, "intensity_group": "Group1",
+                         "time_ms": float(t), "voltage_uv": float(t + len(sid)), "role": "representative"})
+    pd.DataFrame(rows).to_csv(path, index=False)
+
+
+def test_ingest_many_keeps_each_files_condition(tmp_path):
+    """Each file's own `condition` column is kept (precedence 2) → a cohort grouping (C57 vs Rd10),
+    not one-condition-per-file; condition_order follows file order; rows concatenate."""
+    a = tmp_path / "c57.csv"
+    b = tmp_path / "rd10.csv"
+    _erg_csv(a, "C57", ["643_LE", "643_RE"])
+    _erg_csv(b, "Rd10", ["247_LE", "247_RE", "254_LE"])
+    db = ingest_many([a, b])
+    df = db.payload
+    assert set(df["condition"].unique()) == {"C57", "Rd10"}
+    assert db.meta["conditions"] == ["C57", "Rd10"]  # first-seen = file order
+    assert dict(zip(df["condition"], df["condition_order"]))["C57"] == 0
+    assert df[df.condition == "Rd10"]["sample_id"].nunique() == 3
+    assert "source_file" in df.columns
+
+
+def test_ingest_many_explicit_label_overrides(tmp_path):
+    a = tmp_path / "f1.csv"
+    b = tmp_path / "f2.csv"
+    _erg_csv(a, "C57", ["m1"])
+    _erg_csv(b, "Rd10", ["m2"])
+    db = ingest_many([a, b], labels=["Wild-type", ""])  # blank → falls through to the file's own
+    conds = set(db.payload["condition"].unique())
+    assert conds == {"Wild-type", "Rd10"}
+
+
+def test_ingest_many_namespaces_colliding_sample_ids(tmp_path):
+    """Same sample_id from two files → prefixed with the file stem so replicates stay distinct;
+    a non-colliding id is left clean."""
+    a = tmp_path / "day1.csv"
+    b = tmp_path / "day2.csv"
+    _erg_csv(a, "Rd10", ["OD", "uniqueA"])
+    _erg_csv(b, "Rd10", ["OD", "uniqueB"])
+    db = ingest_many([a, b])
+    ids = set(db.payload["sample_id"].unique())
+    assert "day1::OD" in ids and "day2::OD" in ids  # collision namespaced
+    assert "uniqueA" in ids and "uniqueB" in ids     # singletons untouched
+
+
+def test_ingest_many_filename_stem_when_no_condition(tmp_path):
+    a = tmp_path / "Control.csv"
+    pd.DataFrame({"sample_id": ["s1"], "intensity_group": ["Group1"], "time_ms": [0.0],
+                  "voltage_uv": [1.0]}).to_csv(a, index=False)
+    db = ingest_many([a])
+    assert db.payload["condition"].iloc[0] == "Control"  # stem (no condition column)
+
+
+def test_ingest_many_empty_raises():
+    with pytest.raises(ValueError, match="no inputs"):
+        ingest_many([])

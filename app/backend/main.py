@@ -418,6 +418,51 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
     }
 
 
+@app.post("/data/combine")
+async def combine_data(files: list[UploadFile] = File(...), labels: str | None = Form(None)):
+    # C6 multi-file combine: merge several single-condition ERG files (one .iwxdata/Diagnosys =
+    # one eye/animal = one condition) into ONE multi-condition canonical table, so the trace-mean +
+    # Fig-1E-with-reps run on a real cohort n. Returns the merged CSV (the FE turns it into a normal
+    # dataset → the usual /data/inspect + run path takes over) plus a small JSON summary header.
+    # `labels` is an optional comma-separated list aligned to `files` (blank entries auto-fall-through
+    # to the file's own condition column, then its stem). pandas in-memory is the right tool at ERG
+    # scale (kB–MB); see memory selom-data-substrate-decision (Parquet/DuckDB held for live launch).
+    from engine import ingest_many
+
+    if not files:
+        raise HTTPException(status_code=400, detail="combine: no files")
+    label_list = labels.split(",") if labels else None
+    paths = [_save_upload(f) for f in files]
+    bundle = None
+    try:
+        bundle = ingest_many(paths, labels=label_list)
+        csv_bytes = pathlib.Path(bundle.path).read_bytes()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        for p in paths:
+            pathlib.Path(p).unlink(missing_ok=True)
+        if bundle is not None and bundle.path:
+            pathlib.Path(bundle.path).unlink(missing_ok=True)
+    df = bundle.payload
+    conds = bundle.meta.get("conditions", [])
+    summary = {
+        "filename": bundle.source.filename,
+        "n_files": bundle.meta.get("n_files"),
+        "conditions": conds,
+        "rows": int(len(df)),
+        "columns": [str(c) for c in df.columns],
+        "per_condition_n": (
+            {c: int(df[df["condition"].astype(str) == c]["sample_id"].nunique()) for c in conds}
+            if "sample_id" in df.columns else {}),
+    }
+    return Response(
+        content=csv_bytes, media_type="text/csv",
+        headers={"X-Combine-Summary": json.dumps(summary),
+                 "Access-Control-Expose-Headers": "X-Combine-Summary",
+                 "Content-Disposition": f'attachment; filename="{bundle.source.filename}"'})
+
+
 @app.post("/skills/{skill_id}/run")
 async def run(skill_id: str, request: Request, matrix: UploadFile, design: UploadFile | None = File(None)):
     # Synchronous one-shot — the proven fast path for light skills (B1). Heavy skills

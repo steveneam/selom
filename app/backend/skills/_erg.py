@@ -9,6 +9,9 @@ from __future__ import annotations
 # _erg.spread_stats / compare_groups / sig_stars / rgba / ERR_LABEL callers keep working.
 from skills._charts import (  # noqa: F401  (re-export)
     ERR_LABEL,
+    LINE_PALETTE,
+    aggregate_replicates,
+    band_traces,
     compare_groups,
     rgba,
     sig_stars,

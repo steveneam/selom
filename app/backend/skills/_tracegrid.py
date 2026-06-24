@@ -150,6 +150,8 @@ def grid_spec(
         # series. No legend is shown (showlegend=False), so this only tags identity.
         if p.get("group") is not None:
             trace["legendgroup"] = str(p["group"])
+        if p.get("opacity") is not None:  # e.g. central=none draws every replicate at equal weight
+            trace["opacity"] = float(p["opacity"])
         panel_main_idx.append(len(data))
         data.append(trace)
         # Overlays drawn ON TOP of the mean line (per-point error bars, marker dots) go last.

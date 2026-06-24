@@ -24,6 +24,10 @@ ERR_LABEL = {"sem": "SEM", "sd": "SD", "ci95": "95% CI", "minmax": "range"}
 # Deterministic hatch sequence for categories with no explicit pattern (golden-stable, no RNG).
 PATTERN_CYCLE = ["", "/", "\\", "x", "-", "|", "+", "."]
 
+# Deterministic line/series palette for keys with no explicit colour (golden-stable, no RNG) — so a
+# series always gets ONE stable colour (and its band matches), never a per-trace auto-colour.
+LINE_PALETTE = ["#1f77b4", "#d62728", "#2ca02c", "#9467bd", "#ff7f0e", "#17becf", "#8c564b"]
+
 
 # --- stats / colour primitives ----------------------------------------------------------
 def spread_stats(values, kind: str = "sem") -> dict:
@@ -176,6 +180,39 @@ def sig_brackets(cat_values, idx_of, means, his, pt_y, comparisons, sig_test):
     return shapes, annos, (data_top + step * (level + 1) if level else data_top)
 
 
+def band_traces(x, lower, upper, *, color="#888888", alpha=0.25, boundary="none",
+                name="", legendgroup=None, xaxis=None, yaxis=None):
+    """A continuous ± error band for a **standard (axised) line plot** — the 2-trace ``tonexty``
+    fill block (lower bound invisible → upper bound filled down to it). The flat-line analogue of
+    ``_tracegrid._overlay_behind``'s band (which targets a hidden panel axis): this emits against
+    the default x/y axis, so any non-grid line skill (intensity-response, dose-response, a time
+    course …) can drop a shaded band behind its mean line.
+
+    Returns ``[lower_trace, upper_trace]`` — add them to ``data`` BEFORE the mean line so the line
+    draws on top. ``boundary`` (none|solid|dashed) styles the band edges; ``legendgroup`` ties the
+    band to its series; ``xaxis``/``yaxis`` target a non-default subplot when given."""
+    x = [round(float(v), 4) for v in x]
+    lo = [round(float(v), 6) for v in lower]
+    hi = [round(float(v), 6) for v in upper]
+    b = str(boundary or "none").lower()
+    bline = ({"width": 0.8, "color": color, "dash": "dash"} if b == "dashed"
+             else {"width": 0.8, "color": color} if b == "solid"
+             else {"width": 0})
+    base = {"type": "scatter", "mode": "lines", "hoverinfo": "skip", "showlegend": False}
+    if xaxis:
+        base["xaxis"] = xaxis
+    if yaxis:
+        base["yaxis"] = yaxis
+    t_lo = {**base, "x": x, "y": lo, "line": dict(bline)}
+    t_hi = {**base, "x": x, "y": hi, "line": dict(bline), "fill": "tonexty",
+            "fillcolor": rgba(color, alpha)}
+    if name:
+        t_hi["name"] = name
+    if legendgroup is not None:
+        t_lo["legendgroup"] = t_hi["legendgroup"] = str(legendgroup)
+    return [t_lo, t_hi]
+
+
 def ref_line(value, label, *, axis: str):
     """A dashed reference line across the plot at ``value`` on ``axis`` ('y' → horizontal, 'x' →
     vertical), with an optional label, paper-referenced on the other axis so it spans the full plot."""
@@ -291,4 +328,224 @@ def bar_figure(cat_values, *, y_title="value", title="", colors=None, labels=Non
     }
     if shapes:
         layout["shapes"] = shapes
+    return {"data": data, "layout": layout}, tbl_rows
+
+
+# --- the generic mean ± spread LINE (for any single-axis line graph) --------------------
+# The line analogue of bar_figure (owner steer 2026-06-24, D12: the line/spread styling is generic,
+# not ERG-only — exactly like the bar styling). Any line skill (intensity-response, dose-response,
+# a time course, a growth curve …) gets mean ± spread with one vocabulary. The ERG trace GRID is a
+# different layout (small multiples on hidden panel axes) and keeps its own overlay emitter in
+# _tracegrid, but shares the SAME stats + replicate aggregation below, so the math is identical.
+
+def aggregate_replicates(replicates, error="sem", x_ref=None):
+    """Average n replicate ``(x, y)`` series onto a shared x grid + a per-point spread metric.
+
+    ``replicates`` = ``[(x_list, y_list), …]``; ``x_ref`` defaults to the first replicate's x. Aligns
+    by rounded x so partial missingness degrades gracefully (a point present in only some replicates
+    still contributes). Returns ``(x_ref, mean, lower, upper, err, n)`` where ``lower``/``upper`` are
+    the asymmetric band bounds (``mean − lo``, ``mean + hi``) and ``err`` the symmetric magnitude.
+    :func:`spread_stats` guards n<2 (err 0 → never a NaN band). The one replicate-averaging
+    implementation shared by every mean ± spread figure (flat line AND the ERG trace grid)."""
+    if not replicates:
+        return [], [], [], [], [], 0
+    ref = [float(v) for v in (x_ref if x_ref is not None else replicates[0][0])]
+    maps = [dict(zip([round(float(xx), 6) for xx in xs], ys)) for xs, ys in replicates]
+    mean, lower, upper, errs = [], [], [], []
+    for x in ref:
+        key = round(float(x), 6)
+        vals = [m[key] for m in maps if key in m]
+        st = spread_stats(vals, error)
+        mean.append(st["mean"])
+        lower.append(st["mean"] - st["lo"])
+        upper.append(st["mean"] + st["hi"])
+        errs.append(st["err"])
+    return ref, mean, lower, upper, errs, len(replicates)
+
+
+def error_markers(x, y, errs, *, every=1, color="#444444", width=1.0, cap=3.0, size=4,
+                  xaxis=None, yaxis=None, name="", legendgroup=None):
+    """Per-point error bars on a standard axis (the flat-line analogue of the grid's error overlay).
+    ``every`` thins a dense series (draw every Nth point; null elsewhere → nothing drawn there).
+    Returns ONE scatter trace."""
+    every = max(1, int(every or 1))
+    arr = [float(e) if (i % every == 0 and e is not None) else None for i, e in enumerate(errs)]
+    tr = {"type": "scatter", "mode": "markers",
+          "x": [round(float(v), 6) for v in x], "y": [round(float(v), 6) for v in y],
+          "marker": {"color": color, "size": float(size)},
+          "error_y": {"type": "data", "array": arr, "visible": True,
+                      "thickness": float(width), "width": float(cap), "color": color},
+          "hoverinfo": "x+y", "showlegend": False}
+    if xaxis:
+        tr["xaxis"] = xaxis
+    if yaxis:
+        tr["yaxis"] = yaxis
+    if name:
+        tr["name"] = name
+    if legendgroup is not None:
+        tr["legendgroup"] = str(legendgroup)
+    return tr
+
+
+def individual_lines(replicates, *, color="#999999", alpha=0.18, width=0.6,
+                     xaxis=None, yaxis=None, legendgroup=None):
+    """Faint replicate lines behind a mean line (the flat-line analogue of the grid's extra_lines).
+    ``replicates`` = ``[(x, y), …]``. Returns one scatter trace per replicate."""
+    out = []
+    for xs, ys in replicates:
+        tr = {"type": "scatter", "mode": "lines", "opacity": float(alpha),
+              "x": [round(float(v), 6) for v in xs], "y": [round(float(v), 6) for v in ys],
+              "line": {"width": float(width), "color": color}, "hoverinfo": "skip",
+              "showlegend": False}
+        if xaxis:
+            tr["xaxis"] = xaxis
+        if yaxis:
+            tr["yaxis"] = yaxis
+        if legendgroup is not None:
+            tr["legendgroup"] = str(legendgroup)
+        out.append(tr)
+    return out
+
+
+def point_markers(replicates, *, color="#444444", size=5, xaxis=None, yaxis=None,
+                  legendgroup=None, name=""):
+    """Each replicate's individual DATA POINTS as one markers trace (the line analogue of the bar's
+    per-eye points) — every ``(x, y)`` across all replicates, at its true x. Returns one trace (``[]``
+    if no replicates). Colour = the series colour so multi-series points stay distinguishable."""
+    px, py = [], []
+    for xs, ys in replicates:
+        for xx, yy in zip(xs, ys):
+            px.append(round(float(xx), 6))
+            py.append(round(float(yy), 6))
+    if not px:
+        return []
+    tr = {"type": "scatter", "mode": "markers", "x": px, "y": py,
+          "marker": {"color": color, "size": float(size), "line": {"color": "#ffffff", "width": 0.6},
+                     "opacity": 0.8},
+          "name": f"{name} points" if name else "points", "showlegend": False, "hoverinfo": "x+y"}
+    if xaxis:
+        tr["xaxis"] = xaxis
+    if yaxis:
+        tr["yaxis"] = yaxis
+    if legendgroup is not None:
+        tr["legendgroup"] = str(legendgroup)
+    return [tr]
+
+
+def spread_line_traces(x, *, replicates=None, mean=None, lower=None, upper=None, errs=None,
+                       central="mean", spread="band", error="sem", color="#1f77b4", name="",
+                       legendgroup=None, line_width=1.8, mode="lines", band_alpha=0.25,
+                       boundary="none", error_every=1, marker_size=4, points=False,
+                       band_color=None, show_legend=True, xaxis=None, yaxis=None, round_fn=None):
+    """Traces for ONE line series with the chosen central tendency + spread overlay, on a standard
+    axis. Pass raw ``replicates`` ``[(x, y), …]`` (aggregated here) OR pre-computed
+    ``mean``/``lower``/``upper``/``errs`` (already aligned to ``x``).
+
+    ``central``: ``representative`` (first replicate, no spread) | ``mean`` | ``none`` (NO central
+    line — show the raw replicates / points only). ``spread``: ``band|error_bars|individual|both|none``.
+    ``points``: overlay each replicate's individual DATA POINTS as markers (with or without the mean —
+    the line analogue of the bar's per-eye points). ``band_color`` overrides the band fill colour
+    (defaults to the line colour, so the band always matches the trace). Returns the traces in draw
+    order — band/individual behind, the central line, then error/points in front. n<2 degrades to the
+    bare line (no zero-width band)."""
+    rnd = round_fn or (lambda v: round(float(v), 6))
+    central = str(central or "mean").lower()
+    spread = str(spread or "band").lower()
+    reps = list(replicates or [])
+    line_y = None
+    if central == "representative" and reps:
+        x = list(reps[0][0])
+        line_y = [rnd(v) for v in reps[0][1]]
+        n = 1
+        spread = "none"
+    elif central == "none":
+        n = len(reps)
+        if reps and not list(x or []):
+            x = list(reps[0][0])
+    else:  # mean
+        if mean is None:
+            x, mean, lower, upper, errs, n = aggregate_replicates(reps, error, x_ref=x)
+        else:
+            n = len(reps) if reps else 2  # caller supplied an aggregate → assume spread is wanted
+        line_y = [rnd(v) for v in mean]
+
+    behind, front = [], []
+    if line_y is not None and n >= 2 and spread in ("band", "both") and lower is not None and upper is not None:
+        behind += band_traces(x, [rnd(v) for v in lower], [rnd(v) for v in upper],
+                              color=band_color or color, alpha=band_alpha, boundary=boundary,
+                              legendgroup=legendgroup, xaxis=xaxis, yaxis=yaxis)
+    # Individual replicate LINES: faint behind a mean; the main (more visible) content for central=none.
+    if reps and (spread == "individual" or central == "none"):
+        behind += individual_lines(reps, color=color, alpha=0.5 if central == "none" else 0.18,
+                                   xaxis=xaxis, yaxis=yaxis, legendgroup=legendgroup)
+    if line_y is not None and n >= 2 and spread in ("error_bars", "both") and errs is not None:
+        front.append(error_markers(x, line_y, [rnd(v) for v in errs], every=error_every,
+                                   color=color, xaxis=xaxis, yaxis=yaxis, legendgroup=legendgroup))
+    if points and reps:
+        front += point_markers(reps, color=color, size=marker_size + 1, xaxis=xaxis, yaxis=yaxis,
+                               legendgroup=legendgroup, name=name)
+
+    mid = []
+    if line_y is not None:
+        line = {"type": "scatter", "mode": mode,
+                "x": [round(float(v), 6) for v in x], "y": line_y,
+                "line": {"width": float(line_width), "color": color},
+                "name": name or "mean", "showlegend": bool(show_legend), "hoverinfo": "x+y"}
+        if legendgroup is not None:
+            line["legendgroup"] = str(legendgroup)
+        if xaxis:
+            line["xaxis"] = xaxis
+        if yaxis:
+            line["yaxis"] = yaxis
+        mid = [line]
+    return [*behind, *mid, *front]
+
+
+def line_figure(series, *, x_title="x", y_title="value", title="", error="sem", spread="band",
+                central="mean", colors=None, band_alpha=0.25, boundary="none", error_every=1,
+                line_width=1.8, markers=False, points=False, band_color=None, legend=True,
+                log_x=False, caption="", round_fn=None):
+    """A full multi-series mean ± spread LINE plot for any line graph (the line analogue of
+    :func:`bar_figure`) → ``(spec, table_rows)``.
+
+    ``series`` = ordered ``[{"label", "x", "replicates": [(x,y),…]} | {"label","x","mean",
+    "lower","upper","errs"}, …]`` (each may carry its own ``color``). One styling vocabulary —
+    ``central`` (representative|mean|none) · ``spread`` (band|error_bars|individual|both|none) ·
+    ``error`` (sem|sd|ci95|minmax) · ``points`` (individual data points) · ``band_alpha`` ·
+    ``boundary`` · ``band_color`` — shared with the bar + the ERG grid. ``table_rows`` =
+    ``[label, x, mean, err]`` (the numbers behind each line)."""
+    rnd = round_fn or (lambda v: round(float(v), 6))
+    data, tbl_rows = [], []
+    mode = "lines+markers" if markers else "lines"
+    for i, s in enumerate(series):
+        color = (s.get("color") or (colors or {}).get(s.get("label"))
+                 or LINE_PALETTE[i % len(LINE_PALETTE)])
+        reps = s.get("replicates")
+        x = s.get("x") or (reps[0][0] if reps else [])
+        agg = {k: s.get(k) for k in ("mean", "lower", "upper", "errs") if s.get(k) is not None}
+        if not agg and reps:
+            _, mean, lower, upper, errs, _ = aggregate_replicates(reps, error, x_ref=x)
+            agg = {"mean": mean, "lower": lower, "upper": upper, "errs": errs}
+        data += spread_line_traces(
+            x, replicates=reps, **agg, central=central, spread=spread, error=error, color=color,
+            name=str(s.get("label", f"series {i + 1}")), legendgroup=str(s.get("label", i)),
+            line_width=line_width, mode=mode, band_alpha=band_alpha, boundary=boundary,
+            error_every=error_every, points=points, band_color=band_color,
+            show_legend=bool(legend), round_fn=rnd)
+        m = agg.get("mean", [])
+        e = agg.get("errs", [None] * len(m))
+        for xi, mi, ei in zip(x, m, e):
+            tbl_rows.append([s.get("label", f"series {i + 1}"), xi, rnd(mi),
+                             rnd(ei) if ei is not None else None])
+    annotations = []
+    if caption:
+        annotations.append({"xref": "paper", "yref": "paper", "x": 0.99, "y": 0.99,
+                            "xanchor": "right", "yanchor": "top", "showarrow": False,
+                            "text": caption, "font": {"size": 11, "color": "#555555"}})
+    layout = {
+        "title": {"text": title},
+        "xaxis": {"title": {"text": x_title}, "type": "log" if log_x else "linear"},
+        "yaxis": {"title": {"text": y_title}, "zeroline": True},
+        "showlegend": bool(legend), "plot_bgcolor": "white", "annotations": annotations,
+    }
     return {"data": data, "layout": layout}, tbl_rows

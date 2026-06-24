@@ -70,6 +70,37 @@ def test_inspect_erg_table_no_gene_cleaning():
     assert "erg_intensity_response" in [s["skill_id"] for s in body["routing"]["steps"]]
 
 
+def test_combine_merges_erg_files_into_one_multi_condition_table():
+    # C6: drop several single-condition ERG files -> one combined CSV (the FE makes it a dataset).
+    import json as _json
+
+    head = b"sample_id,condition,intensity_group,time_ms,voltage_uv,role\n"
+    c57 = head + b"".join(f"643_{e},C57,Group1,{t}.0,{t+1}.0,representative\n".encode()
+                          for e in ("LE", "RE") for t in range(3))
+    rd10 = head + b"".join(f"247_{e},Rd10,Group1,{t}.0,{t}.0,representative\n".encode()
+                           for e in ("LE", "RE") for t in range(3))
+    r = client.post("/data/combine", files=[
+        ("files", ("c57.csv", c57, "text/csv")),
+        ("files", ("rd10.csv", rd10, "text/csv")),
+    ])
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/csv")
+    summary = _json.loads(r.headers["X-Combine-Summary"])
+    assert summary["n_files"] == 2
+    assert summary["conditions"] == ["C57", "Rd10"]
+    assert summary["per_condition_n"] == {"C57": 2, "Rd10": 2}  # eyes per condition
+    # the merged CSV carries both conditions + a condition_order column the grid uses
+    text = r.content.decode()
+    assert "C57" in text and "Rd10" in text and "condition_order" in text
+
+
+def test_combine_requires_loadable_inputs():
+    r = client.post("/data/combine", files=[
+        ("files", ("mystery.bin", b"\x00\x01\x02", "application/octet-stream")),
+    ])
+    assert r.status_code == 400
+
+
 def test_inspect_profile_override_to_erg():
     csv = b"a,b,c\n1,2,3\n4,5,6\n"
     r = client.post("/data/inspect?profile=erg", files={"matrix": ("x.csv", csv, "text/csv")})
