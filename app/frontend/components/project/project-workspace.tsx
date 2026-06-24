@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useFigureStore } from "@/hooks/use-figure-store";
 import { getSkill } from "@/lib/catalog/seed";
+import { readSeededMarks } from "@/lib/erg/marks";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 import { projectStore, select, useProjects } from "@/lib/projects/store";
 import { useWorkspace, workspaceStore, wselect } from "@/lib/workspace/store";
@@ -929,6 +930,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     running={running != null}
                     dataCheck={activeFigure.dataCheck}
                     dataFit={activeFigure.dataFit}
+                    seededMarks={readSeededMarks(figure.spec ?? activeFigure.spec)}
                     onRerun={rerunFigureWithParams}
                     onPickSkill={pickSuggestedSkill}
                     onPickManually={() => setView("skill")}

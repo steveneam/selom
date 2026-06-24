@@ -3,12 +3,14 @@
 import * as React from "react";
 import { RefreshCw, SlidersHorizontal } from "lucide-react";
 import { ParamControl } from "./param-control";
+import { MarksEditor } from "./marks-editor";
 import { DataCheckPanel } from "./data-check";
 import { DataFitVerdict } from "@/components/reproduction/data-fit-panel";
 import { Button } from "@/components/ui/button";
 import { visibleParamFields } from "@/lib/catalog/params";
 import { useSkillParams } from "@/lib/catalog/use-skill-params";
 import type { SkillParams } from "@/lib/skills-api";
+import type { SeededMark } from "@/lib/erg/marks";
 import type { Figure } from "@/lib/projects/types";
 
 /**
@@ -28,6 +30,7 @@ export function FigureDataPanel({
   running,
   dataCheck,
   dataFit,
+  seededMarks = [],
   onRerun,
   onPickSkill,
   onPickManually,
@@ -39,6 +42,8 @@ export function FigureDataPanel({
   running: boolean;
   dataCheck?: Figure["dataCheck"];
   dataFit?: Figure["dataFit"];
+  /** Skill-seeded ERG landmark marks (meta.selom.marks) — drives the Marks editor when present. */
+  seededMarks?: SeededMark[];
   /** Re-run the skill with the edited inputs → a new figure version. */
   onRerun: (params: SkillParams) => void;
   /** From the data-check routing card: set up a suggested skill in the workbench. */
@@ -48,11 +53,13 @@ export function FigureDataPanel({
 }) {
   const { fields: schema, loading } = useSkillParams(skillId);
   const [params, setParams] = React.useState<SkillParams>(() => ({ ...baseParams }));
-  // Did the user change anything from the figure's current inputs?
-  const dirty = React.useMemo(
-    () => schema.some((f) => params[f.key] !== baseParams[f.key]),
-    [schema, params, baseParams],
-  );
+  // Did the user change anything from the figure's current inputs? Compared over the union of keys
+  // (not just `schema`) so an edit to a non-overlay param — manual_marks / marks from the Marks
+  // editor — also enables the re-run.
+  const dirty = React.useMemo(() => {
+    const keys = new Set([...Object.keys(baseParams), ...Object.keys(params)]);
+    return [...keys].some((k) => params[k] !== baseParams[k]);
+  }, [params, baseParams]);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
@@ -72,6 +79,11 @@ export function FigureDataPanel({
         <DataCheckPanel dataCheck={dataCheck} onPickSkill={onPickSkill} onPickManually={onPickManually} />
       )}
       {dataFit && <DataFitVerdict fit={dataFit} skillName={skillName} />}
+
+      {/* ERG landmark marks (erg-manual-marks): set/confirm a/b (or N1/P1) times, then re-run. */}
+      {seededMarks.length > 0 && (
+        <MarksEditor seededMarks={seededMarks} params={params} onParamsChange={setParams} />
+      )}
 
       {/* Inputs → re-run. */}
       <div className="rounded-xl border border-border bg-card/60 p-4">
