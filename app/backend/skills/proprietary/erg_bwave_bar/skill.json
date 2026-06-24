@@ -29,6 +29,13 @@
     { "name": "figure", "kind": "plotly_spec" },
     { "name": "table", "kind": "csv" }
   ],
+  "background": "Peak a-wave or b-wave amplitude at one flash intensity per condition, measured straight from the dropped recording's traces (device markers preferred when present). The a-wave (pre-stimulus baseline → trough) and b-wave (a-trough → peak) follow the ISCEV definitions; the cone-vs-rod search windows are anchored to published mouse ERG timing.",
+  "references": [
+    { "type": "standard", "title": "ISCEV Standard for full-field clinical electroretinography (2022 update)", "authors": "Robson AG, Frishman LJ, Grigg J, et al.", "year": 2022, "doi": "10.1007/s10633-022-09872-0", "note": "Defines a-wave = baseline→trough, b-wave = a-trough→peak." },
+    { "type": "publication", "title": "UV- and midwave-sensitive cone-driven retinal responses of the mouse", "authors": "Lyubarsky AL, Falsini B, Pennesi ME, et al.", "year": 1999, "doi": "10.1523/JNEUROSCI.19-01-00442.1999", "note": "Mouse cone a-wave timing (~14 ms) — anchors the photopic a-wave window." },
+    { "type": "publication", "title": "Cone ERG changes during light adaptation in two all-cone mutant mice", "authors": "Bush RA, Tanikawa A, Zeng Y, Sieving PA", "year": 2019, "doi": "10.1167/iovs.19-27242", "note": "Mouse cone b-wave timing (~44 ms) — anchors the photopic b-wave window." },
+    { "type": "publication", "title": "The scotopic threshold response of the dark-adapted electroretinogram of the mouse", "authors": "Saszik SM, Robson JG, Frishman LJ", "year": 2002, "doi": "10.1113/jphysiol.2002.019703", "note": "Rod/dim-flash b-wave timing — distinguishes the rod late peak from the cone window." }
+  ],
   "catalog": {
     "name": "Selom ERG a/b-wave Bar",
     "summary": "Peak a-wave or b-wave at one flash intensity per condition (scotopic or photopic) — bar of the group mean ± SEM with every eye overlaid as an individual point (the reviewer ask for quantitative graphs). Runs straight off the dropped recording: reads the device markers when present, else measures the peak from the same traces the grid draws, at the intensity you pick. Condition colours + order match the trace grid; attaches a per-condition n / mean / SEM table.",

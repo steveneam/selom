@@ -10,6 +10,7 @@ the backend is down. So adding a new skill dir = the Store shows it, no FE edit.
 import pathlib
 
 from skills.contract import PROPRIETARY_DIR, SkillSpec, load_skill
+from skills.references import clean_references
 
 SKILLS_DIR = pathlib.Path(__file__).parent
 
@@ -41,7 +42,11 @@ def list_skill_ids() -> list[str]:
 def to_catalog_entry(spec: SkillSpec) -> dict:
     """Map a SkillSpec (+ its optional ``catalog`` block) to a SkillCatalogEntry."""
     cat = spec.catalog or {}
-    return {
+    # Provenance block (docs/skill-references/spec.md) — emitted only when present so the FE
+    # "Skill Information" card stays absent for un-backfilled skills (additive, backward-compatible).
+    # Malformed entries are dropped here defensively; the contract test is what fails the build on one.
+    references = clean_references(spec.references)
+    entry = {
         "id": f"selom.{spec.id}",
         "name": cat.get("name") or spec.title,
         "summary": cat.get("summary") or spec.title,
@@ -67,6 +72,11 @@ def to_catalog_entry(spec: SkillSpec) -> dict:
         "version": spec.version,
         "popularity": cat.get("popularity", 50),
     }
+    if spec.background:
+        entry["background"] = spec.background
+    if references:
+        entry["references"] = references
+    return entry
 
 
 def list_catalog() -> list[dict]:

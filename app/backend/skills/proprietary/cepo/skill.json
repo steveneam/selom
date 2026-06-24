@@ -18,6 +18,11 @@
     { "name": "figure", "kind": "plotly_spec" },
     { "name": "table",  "kind": "csv" }
   ],
+  "background": "Selom Cepo ranks cell-type markers by differential stability — genes that are highly AND stably expressed within a type versus the rest (Kim et al. 2021). A clean-room Python reimplementation, since the reference implementation (PYangLab/Cepo) is R-only; catches identity genes that mean-difference tests miss.",
+  "references": [
+    { "type": "publication", "title": "Uncovering cell identity through differential stability with Cepo", "authors": "Kim HJ, Wang K, Chen C, et al.", "year": 2021, "doi": "10.1038/s43588-021-00172-2", "note": "Clean-room Python reimplementation — algorithm from the paper; no upstream Python port." },
+    { "type": "repo", "title": "PYangLab/Cepo — reference R implementation", "url": "https://github.com/PYangLab/Cepo", "note": "MIT-licensed R package; Selom's reimplementation is validated against its output." }
+  ],
   "catalog": {
     "name": "Selom Cepo",
     "summary": "Cepo differential-stability cell-type markers — genes that are highly AND stably expressed within a type vs. the rest. Clean-room Python reimplementation (no upstream Python port); catches identity genes mean-difference tests miss.",

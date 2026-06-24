@@ -41,6 +41,13 @@ class SkillSpec(BaseModel):
     # Presentation only — the execution contract above is what the runner needs. `catalog.name`
     # carries the branded display name. The registry (skills/registry.py) reads this to serve GET /skills.
     catalog: dict | None = None
+    # Provenance block (docs/skill-references/spec.md) — peer to `origin`/`license`, surfaced as the
+    # Store "Skill Information" card. `background` = 1-3 plain sentences ("what this skill is and where
+    # it comes from"); `references` = ordered structured citations (primary basis first), each
+    # {type, title, authors?, year?, doi?, url?, note?} with type in skills.references.REFERENCE_TYPES.
+    # Additive + defaulted (existing skills omit them; zero runner change). See skills/references.py.
+    background: str = ""
+    references: list[dict] = []
 
 
 def _skill_dir(skill_id: str) -> pathlib.Path:

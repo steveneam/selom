@@ -27,6 +27,11 @@
     { "name": "figure", "kind": "plotly_spec" },
     { "name": "table", "kind": "csv" }
   ],
+  "background": "b-wave amplitude versus flash intensity per condition, fit with the Naka-Rushton saturating function — the standard ERG intensity-response model. Reports Vmax, semi-saturation log K, and slope n; the fit is honestly omitted for null conditions that can't be fit.",
+  "references": [
+    { "type": "method", "title": "S-potentials from luminosity units in the retina of fish (Cyprinidae)", "authors": "Naka KI, Rushton WAH", "year": 1966, "doi": "10.1113/jphysiol.1966.sp008003", "note": "The Naka-Rushton saturating function V = Vmax·Iⁿ/(Iⁿ+Kⁿ) used for the fit." },
+    { "type": "standard", "title": "ISCEV Standard for full-field clinical electroretinography (2022 update)", "authors": "Robson AG, Frishman LJ, Grigg J, et al.", "year": 2022, "doi": "10.1007/s10633-022-09872-0", "note": "Defines the b-wave amplitude measured at each intensity." }
+  ],
   "catalog": {
     "name": "Selom ERG Intensity-Response",
     "summary": "b-wave amplitude versus flash intensity for each condition, with a Naka-Rushton saturating fit (V = Vmax·Iⁿ/(Iⁿ+Kⁿ)) overlaid. Reports Vmax, semi-saturation log K, and slope n per condition. Reads the long ERG metrics table; condition colours + order match the trace grid; the fit is honestly omitted for null conditions that can't be fit.",

@@ -20,6 +20,12 @@
     { "name": "table",  "kind": "csv" }
   ],
   "origin": "proprietary",
+  "background": "Gene Set Enrichment Analysis — the running enrichment-score curve with leading-edge genes and NES / p / FDR (Subramanian et al. 2005). Runs against a license-clean GO library (or a pasted set) via gseapy.prerank, with blitzgsea and an in-house weighted-KS fallback selectable.",
+  "references": [
+    { "type": "publication", "title": "Gene set enrichment analysis: a knowledge-based approach for interpreting genome-wide expression profiles", "authors": "Subramanian A, Tamayo P, Mootha VK, et al.", "year": 2005, "doi": "10.1073/pnas.0506580102", "note": "The GSEA method this skill implements." },
+    { "type": "tool", "title": "GSEApy: gene set enrichment analysis in Python", "authors": "Fang Z, Liu X, Peltz G", "year": 2023, "doi": "10.1093/bioinformatics/btac757", "url": "https://github.com/zqfang/GSEApy", "note": "Default prerank engine (BSD-3-licensed)." },
+    { "type": "repo", "title": "blitzGSEA — fast prerank GSEA with Loess p-value estimation", "url": "https://github.com/MaayanLab/blitzgsea", "note": "Opt-in alternate engine for finer p-values on small libraries." }
+  ],
   "catalog": {
     "name": "Selom GSEA",
     "summary": "Gene Set Enrichment Analysis — running enrichment-score curve with leading-edge hits + NES/p/FDR. Runs against the license-clean GO library (or a pasted set) via gseapy.prerank / blitzgsea, with an in-house weighted-KS fallback.",

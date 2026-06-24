@@ -29,6 +29,12 @@
     { "name": "figure", "kind": "plotly_spec" },
     { "name": "table", "kind": "csv" }
   ],
+  "background": "Floating small-multiples of raw ERG waveforms, laid out the way retinal-electrophysiology figures are published — flash-intensity series down the rows, conditions across the columns, one shared scale bar. Decodes raw iWorx LabScribe (.iwxdata) and Diagnosys Espion exports natively; amplitude and timing conventions follow the ISCEV full-field ERG Standard.",
+  "references": [
+    { "type": "standard", "title": "ISCEV Standard for full-field clinical electroretinography (2022 update)", "authors": "Robson AG, Frishman LJ, Grigg J, et al.", "year": 2022, "doi": "10.1007/s10633-022-09872-0", "note": "Defines the a-/b-wave amplitude and implicit-time conventions this skill follows." },
+    { "type": "tool", "title": "iWorx LabScribe (.iwxdata ERG acquisition)", "url": "https://www.iworx.com/labscribe/", "note": "Native input format — decoded by a clean-room pure-stdlib reader (skills/_iwx.py)." },
+    { "type": "tool", "title": "Diagnosys Espion / Celeris (ERG export)", "url": "https://www.diagnosysllc.com/", "note": "Native input format — decoded by a clean-room pure-stdlib reader (skills/_celeris.py)." }
+  ],
   "catalog": {
     "name": "Selom ERG Trace Grid",
     "summary": "Stacked floating ERG waveforms — flash-intensity series down the rows, conditions across the columns, no per-panel axes, one shared scale bar. The publication layout GraphPad/Excel can't make. Ingests raw iWorx .iwxdata, LabScribe .txt, or a long waveform table; 'clean flats, keep OPs' filtering; attaches an a/b-wave table.",
