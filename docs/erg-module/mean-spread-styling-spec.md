@@ -49,6 +49,39 @@ individual points (`points`) and the error bars (`show_error`).
 Sibling of `docs/erg-module/spec.md` + `docs/diagnosys-erg/spec.md`. Applies to `erg_traces` (the grid)
 and `erg_bwave_bar` (the amplitude bar); the primitives are generic (reusable by any future line/bar skill).
 
+## D12 — The LINE/spread styling is GENERIC too (owner steer 2026-06-24, session T13)
+The owner confirmed the line + spread vocabulary "should also be applicable to general line graphs,
+not just ERG traces, similar to the bar graph styling." So — exactly as D11 did for bars — the line
+primitives live in **`skills/_charts.py`** and any single-axis line skill consumes them:
+- **`spread_stats`** (shared with the bar) · **`aggregate_replicates(replicates, error)`** — the ONE
+  replicate-averaging implementation (mean + asymmetric band bounds + err per x), shared by the flat
+  line AND the ERG trace grid · **`band_traces`** / **`error_markers`** / **`individual_lines`** — the
+  flat-axis overlay builders · **`spread_line_traces(...)`** — the composable per-series unit (mean
+  line + chosen spread, returned in draw order) · **`line_figure(series, …)`** — the full multi-series
+  builder, the line analogue of `bar_figure` (returns `(spec, table_rows)`).
+- **`erg_traces` (the small-multiples GRID)** is a different *layout* — hidden panel axes + a scale
+  bar — so it keeps its own overlay emitter in `_tracegrid`, but it now shares the SAME
+  `aggregate_replicates` math and the same `central`/`spread`/`error` param vocabulary. One look, one
+  set of knobs, whether the figure is a bar, a flat line, or a trace grid.
+- **Rollout into specific flat-line skills** (intensity-response band, dose-response, time courses) is
+  incremental per-skill (each owns its golden), same as the bar rollout — the generic builder + the
+  shared math is the deliverable; `test_charts.py` proves it on non-ERG series.
+
+## D13 — Band colour matches the trace; individual data points; central=none (owner asks, T13)
+Three follow-ups landed the same session, all in the generic layer:
+- **Band colour matches the trace by default** (not grey). The band always was `rgba(trace_colour,
+  alpha)`; it only went grey for a condition with NO mapped colour (C57/Rd10 aren't in the ERG
+  palette → the line auto-coloured while the band fell back to grey). Fix: every condition gets a
+  **stable explicit colour** — its ERG-palette colour, else a deterministic fallback from the shared
+  `_charts.LINE_PALETTE` — so line + band share it (and each condition is one consistent colour across
+  its rows). A **`band_color`** knob overrides it (blank = match the trace).
+- **Individual data points** on lines (`points`) — the line analogue of the bar's per-eye points
+  (`_charts.point_markers`): each replicate's data points as markers, shown **with or without** the
+  mean line. Generic (`spread_line_traces`/`line_figure`).
+- **`central=none`** — no averaged line: draw every replicate at equal weight (the grid's "individual
+  traces only" via a per-panel `opacity`; the flat line shows the replicate lines + optional points).
+  So `central ∈ {representative, mean, none}` everywhere.
+
 ## What
 
 Today `erg_bwave_bar` already draws **mean ± SEM + jittered eyes**, and `erg_intensity_response` already
