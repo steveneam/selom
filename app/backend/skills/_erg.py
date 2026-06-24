@@ -102,19 +102,25 @@ _BWAVE_WIN_MS = (40.0, 120.0)
 _AWAVE_SMOOTH_MS = 3.0   # light: preserves the sharp a-wave trough
 _BWAVE_SMOOTH_MS = 16.0  # heavy: real broad b-wave survives, high-freq noise averages out
 
-# Photopic / cone-driven (light-adapted) landmark windows — TUNED on the real CMRI mouse UV-photopic
-# .iwxdata (Experiment 11), not assumed. Two cone-specific facts drove the windows:
-#   • the cone a-wave is small and EARLY (~5–20 ms) — so a TIGHT early a-window (0–25 ms) isolates
-#     it; the scotopic a-window (0–40 ms) under heavy smoothing wrongly latched a ~27 ms noise dip
-#     as the "a-wave" on these recordings.
-#   • the mouse cone b-wave is NOT faster than rod here — it actually peaks LATE (measured 57 ms in
-#     rd10, ~104 ms in C57) — so the b-window must START earlier (to catch a fast cone b-wave in a
-#     cleaner protocol) yet stay WIDE (15–130 ms) so a late mouse cone b-wave is never truncated.
+# Photopic / cone-driven (light-adapted) landmark windows — anchored to the published mouse cone-ERG
+# timing (Bush 2019 IOVS: WT cone b-wave ~44 ms; Lyubarsky 1999: cone a-wave ~14 ms; Saszik 2002:
+# the ~110 ms peak is the dim-flash ROD b-wave, NOT cone), corroborated against the real CMRI mouse
+# UV-photopic .iwxdata. Two cone facts drive the windows:
+#   • the cone a-wave is small and EARLY (~8–20 ms) — a TIGHT early a-window (0–25 ms) isolates it;
+#     the scotopic a-window (0–40 ms) under heavy smoothing wrongly latched a ~27 ms noise dip.
+#   • the mouse cone b-wave peaks ~40–45 ms (range ~40–75 ms), FASTER than the rod b-wave — so the
+#     b-window is (12–80 ms), centred on the cone range. We deliberately do NOT extend past ~80 ms:
+#     a "photopic b-wave" near 100 ms is the literature signature of rod contamination / incomplete
+#     light-adaptation / 50 Hz hum, so a wider window would chase that artifact instead of the cone
+#     b-wave. (An early real-data tuning widened this to 130 ms to capture a 104 ms C57 peak — the
+#     timing literature then showed that peak is NOT a cone b-wave; window narrowed back to the cone
+#     range. On hum-heavy single-eye recordings the auto-metric is only a SEED — the manual a/b
+#     override is the rigorous path; see docs/erg-module/spec.md T15.)
 # Smoothing stays HEAVY (same as scotopic): these recordings carry strong ~50 Hz mains hum (20 ms
 # period) and the 16 ms b-smooth nulls it — a lighter kernel rides the hum and over-reads the b-wave.
 # Selected by the `mode` argument to landmarks() — driven off `stimulus_type`/`adaptation` upstream.
 _PHOTOPIC_AWAVE_WIN_MS = (0.0, 25.0)
-_PHOTOPIC_BWAVE_WIN_MS = (15.0, 130.0)
+_PHOTOPIC_BWAVE_WIN_MS = (12.0, 80.0)
 _PHOTOPIC_AWAVE_SMOOTH_MS = 3.0    # same light a-smooth as scotopic (sharp trough preserved)
 _PHOTOPIC_BWAVE_SMOOTH_MS = 16.0   # heavy: rejects the ~50 Hz hum on the raw photopic recordings
 
@@ -136,11 +142,11 @@ def landmarks(time_ms, y, fs: float = 5000.0, *, mode: str = "scotopic") -> dict
     b-wave. baseline = mean of the pre-stimulus window.
 
     ``mode`` selects the timing preset (``scotopic`` default — the validated rod windows that
-    reproduced the Fig 1E ordering; ``photopic`` = the cone windows tuned on real UV-photopic data).
-    The cone a-wave is EARLY, so the photopic a-window is tight (0–25 ms) to isolate it; the cone
-    b-window starts earlier (15 ms) yet stays wide (to 130 ms) so a fast cone b-wave is caught and a
-    late mouse cone b-wave is not truncated (see the ``_PHOTOPIC_*`` constants for the data behind
-    the windows). Unknown mode → scotopic (byte-identical legacy path)."""
+    reproduced the Fig 1E ordering; ``photopic`` = the cone windows anchored to the published mouse
+    cone-ERG timing). The cone a-wave is EARLY, so the photopic a-window is tight (0–25 ms); the cone
+    b-wave peaks ~40–45 ms, so the b-window is (12–80 ms), centred on the cone range and deliberately
+    NOT extended past ~80 ms (a ~100 ms "photopic b-wave" is rod/hum contamination, not cone — see
+    the ``_PHOTOPIC_*`` constants). Unknown mode → scotopic (byte-identical legacy path)."""
     import numpy as np
 
     awin, bwin, a_sm, b_sm = _LANDMARK_MODES.get(str(mode or "scotopic").lower(), _LANDMARK_MODES["scotopic"])
