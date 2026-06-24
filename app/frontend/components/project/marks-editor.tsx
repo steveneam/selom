@@ -33,11 +33,17 @@ export function MarksEditor({
 }: {
   seededMarks: SeededMark[];
   params: SkillParams;
-  onParamsChange: (next: SkillParams) => void;
+  /** The figure-data setParams — used with functional updates so a toggle + a numeric edit fired
+   *  back-to-back can't clobber each other (each reads the latest params, not a stale closure). */
+  onParamsChange: React.Dispatch<React.SetStateAction<SkillParams>>;
 }) {
   const manual = React.useMemo(() => parseManualMarks(params.manual_marks), [params.manual_marks]);
   const nManual = manualMarkCount(manual);
-  const dotsOn = seededMarks.some((m) => m.trace !== undefined);
+  // The dots-toggle reflects the PENDING `marks` param (what the next re-run will apply), not the
+  // currently-rendered figure — otherwise toggling it on would snap back to off (the dots only
+  // exist after the re-run). Fall back to the rendered figure's state when the param is unset.
+  const renderedDots = seededMarks.some((m) => m.trace !== undefined);
+  const dotsOn = params.marks === undefined ? renderedDots : String(params.marks) === "true";
 
   // Group marks by cell (segment), preserving first-seen order.
   const cells = React.useMemo(() => {
@@ -50,13 +56,18 @@ export function MarksEditor({
     return [...bySeg.values()];
   }, [seededMarks]);
 
-  const writeManual = (next: ReturnType<typeof parseManualMarks>) =>
-    onParamsChange({ ...params, manual_marks: serializeManualMarks(next) });
-
+  // All writes are functional updates that re-read the latest manual_marks from `p`, so a numeric
+  // edit and the dots toggle (or two edits) fired before a re-render can't overwrite each other.
   const setMark = (segment: string, role: MarkRole, ms: number) =>
-    writeManual(setManualMark(manual, segment, role, ms));
+    onParamsChange((p) => ({
+      ...p,
+      manual_marks: serializeManualMarks(setManualMark(parseManualMarks(p.manual_marks), segment, role, ms)),
+    }));
   const resetMark = (segment: string, role: MarkRole) =>
-    writeManual(clearManualMark(manual, segment, role));
+    onParamsChange((p) => ({
+      ...p,
+      manual_marks: serializeManualMarks(clearManualMark(parseManualMarks(p.manual_marks), segment, role)),
+    }));
 
   return (
     <div className="rounded-xl border border-border bg-card/60 p-4">
@@ -73,7 +84,7 @@ export function MarksEditor({
         {nManual > 0 && (
           <button
             type="button"
-            onClick={() => onParamsChange({ ...params, manual_marks: "" })}
+            onClick={() => onParamsChange((p) => ({ ...p, manual_marks: "" }))}
             className="shrink-0 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
           >
             Reset all to auto
@@ -85,7 +96,7 @@ export function MarksEditor({
         <span className="text-xs text-foreground/90">Show landmark dots on the figure</span>
         <Switch
           checked={dotsOn}
-          onCheckedChange={(v) => onParamsChange({ ...params, marks: v })}
+          onCheckedChange={(v) => onParamsChange((p) => ({ ...p, marks: v }))}
           aria-label="Show landmark dots"
         />
       </label>

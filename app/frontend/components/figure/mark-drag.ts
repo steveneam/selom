@@ -21,6 +21,9 @@ export interface Crosshair {
   xPx: number;
   yTopPx: number;
   yBotPx: number;
+  /** The live dot's position on the line (where it will land) — rendered as an overlay circle. */
+  dotXPx: number;
+  dotYPx: number;
   label: string;
 }
 
@@ -50,16 +53,12 @@ function axisFor(gd: GraphDiv, ref: unknown, kind: "x" | "y"): PlotlyAxis | null
   const ax = gd._fullLayout?.[key];
   return ax && typeof ax.p2d === "function" ? ax : null;
 }
-type PlotlyApi = { restyle: (gd: GraphDiv, update: Record<string, unknown>, traces: number[]) => void };
-
 export interface MarkDragDeps {
   /** Latest spec (read fresh each gesture so re-runs are reflected). */
   getSpec: () => FigureSpec;
-  /** Plotly (for the live restyle), read lazily — may still be loading when the drag is wired. */
-  getPlotly: () => PlotlyApi | null;
   /** Commit a moved mark → set manual_marks + re-run. Absent → dragging is disabled. */
   onMarkMove?: (segment: string, role: MarkRole, tMs: number) => void;
-  /** Position the crosshair overlay (null clears it). */
+  /** Position the crosshair + live dot overlay (null clears it). */
   setCrosshair: (c: Crosshair | null) => void;
   /** The canvas container, for converting client pixels → container-relative. */
   container: HTMLElement | null;
@@ -157,31 +156,25 @@ export function wireMarkDrag(gd: GraphDiv, deps: MarkDragDeps): () => void {
     if (!a) return;
     const r = resolve(a, ev.clientX);
     if (!r) return;
-    // Move the dot live (sticky to the line); the value re-measures on drop.
-    const tr = (gd.data?.[a.trace] ?? {}) as { x?: number[]; y?: number[] };
-    const x = Array.isArray(tr.x) ? [...tr.x] : [];
-    const y = Array.isArray(tr.y) ? [...tr.y] : [];
-    x[a.point] = r.tMs;
-    y[a.point] = r.y;
-    try {
-      deps.getPlotly()?.restyle(gd, { x: [x], y: [y] }, [a.trace]);
-    } catch {
-      /* a transient Plotly state — skip this frame */
-    }
-    // Crosshair overlay (container-relative pixels).
+    // The live dot rides the line at the snapped time — drawn as an HTML overlay (no Plotly API, so
+    // plotly.js never enters the SSR graph). The real dot re-draws at the committed time on re-run.
     const crect = deps.container?.getBoundingClientRect();
     const grect = gd.getBoundingClientRect();
+    const xOff = num(a.xaxis._offset);
     const yOff = num(a.yaxis._offset);
     const yLen = num(a.yaxis._length);
-    if (crect && yOff !== null && yLen !== null && a.xaxis.d2p && num(a.xaxis._offset) !== null) {
-      const xPxGd = num(a.xaxis._offset)! + a.xaxis.d2p(r.tMs);
-      deps.setCrosshair({
-        xPx: grect.left - crect.left + xPxGd,
-        yTopPx: grect.top - crect.top + yOff,
-        yBotPx: grect.top - crect.top + yOff + yLen,
-        label: `${fmt(r.tMs)} ms · ${fmt(r.y)} µV`,
-      });
-    }
+    if (!crect || xOff === null || yOff === null || yLen === null || !a.xaxis.d2p || !a.yaxis.d2p) return;
+    const dx = grect.left - crect.left;
+    const dy = grect.top - crect.top;
+    const xPx = dx + xOff + a.xaxis.d2p(r.tMs);
+    deps.setCrosshair({
+      xPx,
+      yTopPx: dy + yOff,
+      yBotPx: dy + yOff + yLen,
+      dotXPx: xPx,
+      dotYPx: dy + yOff + a.yaxis.d2p(r.y),
+      label: `${fmt(r.tMs)} ms · ${fmt(r.y)} µV`,
+    });
   };
 
   const onUp = (ev: MouseEvent) => {

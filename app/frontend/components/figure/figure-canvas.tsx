@@ -75,32 +75,24 @@ export function FigureCanvas({
   const liveRef = useRef({ spec, store, onSelectTrace, overlay, onMarkMove });
   liveRef.current = { spec, store, onSelectTrace, overlay, onMarkMove };
 
-  // Mark-drag plumbing (erg-manual-marks R5). The crosshair overlay is positioned IMPERATIVELY via
-  // refs (never React state) so a drag never re-renders the Plot — which would let react-plotly
-  // reset the live dot position mid-drag. Plotly (for the live restyle) is lazy-loaded once.
+  // Mark-drag plumbing (erg-manual-marks R5). The crosshair + live dot are positioned IMPERATIVELY
+  // via refs (never React state) so a drag never re-renders the Plot. The dot moves as an HTML
+  // overlay (no Plotly API → plotly.js stays out of the SSR graph). The real dot re-draws on re-run.
   const containerRef = useRef<HTMLDivElement | null>(null);
   const lineRef = useRef<HTMLDivElement | null>(null);
   const labelRef = useRef<HTMLDivElement | null>(null);
-  const plotlyRef = useRef<{ restyle: (gd: never, u: Record<string, unknown>, t: number[]) => void } | null>(null);
+  const dotRef = useRef<HTMLDivElement | null>(null);
   const dragDisposeRef = useRef<(() => void) | null>(null);
-
-  useEffect(() => {
-    let on = true;
-    void import("plotly.js").then((m) => {
-      if (on) plotlyRef.current = (m as { default?: unknown }).default as never ?? (m as never);
-    });
-    return () => {
-      on = false;
-    };
-  }, []);
 
   const setCrosshair = useCallback((c: Crosshair | null) => {
     const line = lineRef.current;
     const label = labelRef.current;
-    if (!line || !label) return;
+    const dot = dotRef.current;
+    if (!line || !label || !dot) return;
     if (!c) {
       line.style.display = "none";
       label.style.display = "none";
+      dot.style.display = "none";
       return;
     }
     line.style.display = "block";
@@ -111,6 +103,9 @@ export function FigureCanvas({
     label.style.left = `${c.xPx}px`;
     label.style.top = `${c.yTopPx}px`;
     label.textContent = c.label;
+    dot.style.display = "block";
+    dot.style.left = `${c.dotXPx}px`;
+    dot.style.top = `${c.dotYPx}px`;
   }, []);
 
   // Stable gesture handlers, created once. Each Plotly canvas gesture becomes ONE
@@ -176,7 +171,6 @@ export function FigureCanvas({
     if (st && !ov && omm) {
       dragDisposeRef.current = wireMarkDrag(gd as never, {
         getSpec: () => liveRef.current.spec,
-        getPlotly: () => plotlyRef.current as never,
         onMarkMove: omm,
         setCrosshair,
         container: containerRef.current,
@@ -228,11 +222,17 @@ export function FigureCanvas({
           height: fixed ? `${display.layout.height}px` : "100%",
         }}
       />
-      {/* Drag crosshair (erg-manual-marks) — positioned imperatively during a dot drag. */}
+      {/* Drag crosshair + live dot (erg-manual-marks) — positioned imperatively during a dot drag. */}
       <div
         ref={lineRef}
         aria-hidden
         className="pointer-events-none absolute z-10 hidden w-px -translate-x-1/2 bg-primary/70"
+        style={{ display: "none" }}
+      />
+      <div
+        ref={dotRef}
+        aria-hidden
+        className="pointer-events-none absolute z-10 hidden size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-primary shadow"
         style={{ display: "none" }}
       />
       <div
