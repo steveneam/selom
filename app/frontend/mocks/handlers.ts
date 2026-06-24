@@ -115,6 +115,38 @@ export const handlers = [
     }
     return HttpResponse.json(mockInspect(filename, header, override));
   }),
+  // C6 multi-file combine: merge several single-condition ERG files into one canonical table. The
+  // mock concatenates the uploaded files' rows (header from the first) + returns the X-Combine-
+  // Summary header the FE reads; real content is verified against the live backend, not here.
+  http.post("/api/data/combine", async ({ request }) => {
+    let names: string[] = [];
+    let header = "sample_id,condition,intensity_group,time_ms,voltage_uv,role,condition_order";
+    const bodies: string[] = [];
+    try {
+      const fd = await request.formData();
+      const files = fd.getAll("files").filter((f): f is File => f instanceof File);
+      names = files.map((f) => f.name);
+      for (let i = 0; i < files.length; i++) {
+        const lines = (await files[i].text()).split(/\r?\n/).filter(Boolean);
+        if (i === 0 && lines[0]) header = lines[0];
+        bodies.push(...lines.slice(1));
+      }
+    } catch {
+      /* no body — return a minimal stub */
+    }
+    const conditions = Array.from(new Set(names.map((n) => n.replace(/\.[^.]+$/, "")))).slice(0, 8);
+    const summary = {
+      filename: `combined_${names.length}_files.csv`,
+      n_files: names.length,
+      conditions,
+      rows: bodies.length,
+      columns: header.split(","),
+      per_condition_n: Object.fromEntries(conditions.map((c) => [c, 1])),
+    };
+    return new HttpResponse([header, ...bodies].join("\n"), {
+      headers: { "Content-Type": "text/csv", "X-Combine-Summary": JSON.stringify(summary) },
+    });
+  }),
   http.post("/api/skills/:skillId/run", async ({ params, request }) => {
     // A real upload would parse `matrix`; the stub is input-independent by design,
     // so we return the canned figure (same as the backend stub run.py) plus a

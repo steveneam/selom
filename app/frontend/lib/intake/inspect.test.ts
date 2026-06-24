@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { modalityFromKind, qcFromInspect, type InspectResult } from "./inspect";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { combineData, modalityFromKind, qcFromInspect, type InspectResult } from "./inspect";
 
 function result(over: Partial<InspectResult> = {}): InspectResult {
   return {
@@ -12,6 +12,34 @@ function result(over: Partial<InspectResult> = {}): InspectResult {
     ...over,
   };
 }
+
+describe("combineData", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("needs 2+ files (a single file falls through to normal ingest)", async () => {
+    expect(await combineData([new File(["x"], "a.csv")])).toBeNull();
+  });
+
+  it("POSTs the files, names the dataset from the returned conditions", async () => {
+    const summary = { filename: "combined_2_files.csv", n_files: 2, conditions: ["C57", "Rd10"],
+                      rows: 12, columns: ["condition"], per_condition_n: { C57: 2, Rd10: 6 } };
+    const fetchMock = vi.fn(async () =>
+      new Response("condition\nC57\nRd10\n", {
+        headers: { "Content-Type": "text/csv", "X-Combine-Summary": JSON.stringify(summary) },
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await combineData([new File(["a"], "c57.csv"), new File(["b"], "rd10.csv")]);
+    expect(fetchMock).toHaveBeenCalledWith("/api/data/combine", expect.objectContaining({ method: "POST" }));
+    expect(res).not.toBeNull();
+    expect(res!.summary.conditions).toEqual(["C57", "Rd10"]);
+    expect(res!.file.name).toBe("Combined ERG — C57 + Rd10 (2 files).csv");
+  });
+
+  it("fail-soft → null on a non-OK response", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 400 })));
+    expect(await combineData([new File(["a"], "x.csv"), new File(["b"], "y.csv")])).toBeNull();
+  });
+});
 
 describe("modalityFromKind", () => {
   it("maps omics kinds, buckets the rest to unknown", () => {

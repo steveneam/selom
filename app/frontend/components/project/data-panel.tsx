@@ -12,7 +12,7 @@ import { cn } from "@/lib/cn";
 import { modalityColor } from "@/lib/catalog/modality";
 import { datasetDisplayName } from "@/lib/lineage/family";
 import { detectModality, proposeForModality, type IntakeProposal } from "@/lib/intake/mock";
-import { inspectData, modalityFromKind, qcFromInspect, type DataTypeOverride } from "@/lib/intake/inspect";
+import { combineData, inspectData, modalityFromKind, qcFromInspect, type DataTypeOverride } from "@/lib/intake/inspect";
 import { projectStore } from "@/lib/projects/store";
 import type { Dataset } from "@/lib/projects/types";
 
@@ -39,6 +39,8 @@ export function DataPanel({
   onAnalyze,
   incomingFile,
   onIncomingConsumed,
+  reattachDatasetId,
+  onReattach,
 }: {
   projectId: string;
   datasets: Dataset[];
@@ -46,6 +48,11 @@ export function DataPanel({
   /** A file dropped on the Overview hub — ingest it here on arrival. */
   incomingFile?: File | null;
   onIncomingConsumed?: () => void;
+  /** When set (from the lost-bytes banner), the next dropped file REFILLS this existing dataset
+   *  instead of creating a new one (C5 re-attach). */
+  reattachDatasetId?: string | null;
+  /** Push re-attached bytes up so the session can re-run the figure (sets `lastFile`). */
+  onReattach?: (datasetId: string, file: File) => void;
 }) {
   const [active, setActive] = React.useState<Active | null>(null);
   const [designFile, setDesignFile] = React.useState<File | null>(null);
@@ -53,6 +60,9 @@ export function DataPanel({
   const [disabledSteps, setDisabledSteps] = React.useState<Set<string>>(new Set());
   // The live engine inspect is in flight for the active dataset (drop or data-type override).
   const [inspecting, setInspecting] = React.useState(false);
+  // Multi-file combine (C6) is in flight; or its error.
+  const [combining, setCombining] = React.useState(false);
+  const [combineError, setCombineError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     setDisabledSteps(new Set());
@@ -80,11 +90,48 @@ export function DataPanel({
   );
 
   function ingest(file: File) {
+    // C5 re-attach: when the lost-bytes banner sent us here, the next file REFILLS the existing
+    // dataset (same record + a fresh sha) instead of spawning a duplicate, and the bytes go up so
+    // the figure can re-run this session.
+    const reattach = reattachDatasetId ? datasets.find((d) => d.id === reattachDatasetId) : undefined;
+    if (reattach) {
+      setActive({ dataset: reattach, file, real: true });
+      setDisabledSteps(new Set());
+      projectStore.markDatasetUpdated(reattach.id);
+      onReattach?.(reattach.id, file);
+      void runInspect(reattach, file);
+      return;
+    }
     const modality = detectModality(file.name);
     const dataset = projectStore.addDataset(projectId, file.name, modality);
     setActive({ dataset, file, real: true });
     setDisabledSteps(new Set());
     void runInspect(dataset, file);
+  }
+
+  // Drop SEVERAL files → combine them into one multi-condition dataset (C6): each file is a
+  // condition (its own `condition` column, e.g. C57/Rd10, else its stem). A single file falls
+  // through to the normal ingest path. Fail-soft: a backend error surfaces a note, no dataset made.
+  function combineFiles(files: File[]) {
+    if (files.length <= 1) {
+      if (files[0]) ingest(files[0]);
+      return;
+    }
+    setCombineError(null);
+    setCombining(true);
+    void combineData(files).then((result) => {
+      setCombining(false);
+      if (!result) {
+        setCombineError(
+          "Couldn't combine those files — they need to be ERG recordings (.iwxdata / Diagnosys / a canonical waveform table).",
+        );
+        return;
+      }
+      const dataset = projectStore.addDataset(projectId, result.file.name, detectModality(result.file.name));
+      setActive({ dataset, file: result.file, real: true });
+      setDisabledSteps(new Set());
+      void runInspect(dataset, result.file);
+    });
   }
 
   // The user corrects the detected data type (the user-input layer). Needs the real bytes to
@@ -128,20 +175,34 @@ export function DataPanel({
         {datasets.length === 0 ? (
           <Dropzone
             onFile={ingest}
+            onFiles={combineFiles}
+            multiple
             accept=".h5ad,.csv,.tsv,.txt,.mzML,.iwxdata"
-            title="Drop your data here"
-            hint="or click to browse — Selom detects the type, cleans it, and asks a few questions"
+            title={reattachDatasetId ? "Re-upload this dataset's file" : "Drop your data here"}
+            hint="or click to browse — drop several ERG recordings to combine them into one cohort"
             formats=".h5ad · .csv · .tsv · .txt · .mzML · .iwxdata"
           />
         ) : (
           <Dropzone
             onFile={ingest}
+            onFiles={combineFiles}
+            multiple
             accept=".h5ad,.csv,.tsv,.txt,.mzML,.iwxdata"
-            title="Add another dataset"
-            hint="Drop a file or click to browse"
+            title={reattachDatasetId ? "Re-upload this dataset's file" : "Add or combine datasets"}
+            hint="Drop one file, or several ERG recordings to combine into one cohort"
             icon={Plus}
             variant="secondary"
           />
+        )}
+        {combining && (
+          <p className="text-xs text-muted-foreground" role="status">
+            Combining files into one cohort…
+          </p>
+        )}
+        {combineError && (
+          <p className="rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-warn">
+            {combineError}
+          </p>
         )}
 
         {/* Optional design / sample sheet (item b) — for bulk & time-course DE. */}

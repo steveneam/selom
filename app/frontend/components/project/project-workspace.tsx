@@ -118,6 +118,9 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // against a real backend — so there's nothing real to send. Instead of POSTing a placeholder
   // file that the skill can't read (a confusing failure), we halt and prompt a re-upload.
   const [needData, setNeedData] = React.useState<{ datasetId?: string } | null>(null);
+  // The dataset the user is re-uploading bytes for (C5): the next file dropped in the Data tab
+  // REFILLS this existing dataset instead of spawning a duplicate. Set from the lost-bytes banner.
+  const [reattachId, setReattachId] = React.useState<string | null>(null);
   // Active journal style for the current figure (journal-styles v1) — DERIVED from the
   // spec's stamp (layout.meta.selomStyle), not held separately, so undo/redo and "New
   // figure" rewind the picker label for free. Runs come out in the Selom default.
@@ -493,6 +496,14 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     setView("skill");
   }
 
+  // C5: re-uploaded bytes refilled an EXISTING dataset — adopt them as this session's live file so
+  // the figure can re-run, and clear the re-attach intent.
+  function onReattach(id: string, file: File) {
+    setDatasetId(id);
+    setLastFile(file);
+    setReattachId(null);
+  }
+
   // Pick a suggested-pipeline step from the data-check verdict (P3a guidance): install the
   // skill and pre-select it in the Workbench, ready to run on this data. Routing steps are
   // bare slugs of Selom-native skills; the catalog/install layer is keyed by `selom.<slug>`.
@@ -669,7 +680,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
             variant="outline"
             className="shrink-0"
             onClick={() => {
-              if (needData.datasetId) setActiveDatasetId(needData.datasetId);
+              if (needData.datasetId) {
+                setActiveDatasetId(needData.datasetId);
+                setReattachId(needData.datasetId); // next drop refills THIS dataset (C5)
+              }
               setNeedData(null);
               setView("data");
             }}
@@ -952,6 +966,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                   onAnalyze={onAnalyze}
                   incomingFile={incomingFile}
                   onIncomingConsumed={() => setIncomingFile(null)}
+                  reattachDatasetId={reattachId}
+                  onReattach={onReattach}
                 />
               )}
 

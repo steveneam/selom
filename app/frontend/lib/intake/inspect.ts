@@ -99,6 +99,45 @@ export async function inspectData(file: File, override?: DataTypeOverride): Prom
   }
 }
 
+/** Summary of a multi-file combine (backend X-Combine-Summary header). */
+export interface CombineSummary {
+  filename: string;
+  n_files: number;
+  conditions: string[];
+  rows: number;
+  columns: string[];
+  per_condition_n: Record<string, number>;
+}
+
+export interface CombineResult {
+  /** The merged CSV as one File — turned into a normal dataset by the caller. */
+  file: File;
+  summary: CombineSummary;
+}
+
+/** Combine several single-condition ERG files into ONE multi-condition table — `POST
+ *  /api/data/combine` (C6). Each file = a condition (its own `condition` column, e.g. C57/Rd10,
+ *  else its filename stem). Returns the merged CSV as a File + a summary, or `null` on failure
+ *  (fail-soft — the caller can fall back to single-file ingest). */
+export async function combineData(files: File[]): Promise<CombineResult | null> {
+  if (files.length < 2) return null;
+  try {
+    const fd = new FormData();
+    for (const f of files) fd.append("files", f);
+    const res = await fetch("/api/data/combine", { method: "POST", body: fd });
+    if (!res.ok) return null;
+    const raw = res.headers.get("X-Combine-Summary");
+    const summary = (raw ? JSON.parse(raw) : {}) as CombineSummary;
+    const blob = await res.blob();
+    const name = summary.conditions?.length
+      ? `Combined ERG — ${summary.conditions.join(" + ")} (${files.length} files).csv`
+      : summary.filename || `combined_${files.length}_files.csv`;
+    return { file: new File([blob], name, { type: "text/csv" }), summary };
+  } catch {
+    return null;
+  }
+}
+
 /** Map an engine Kind to the coarse FE Modality (drives icon colour + the intake questions).
  *  The precise label lives in `QcReport.profileLabel`; ERG / results / generic land on "unknown"
  *  here (a neutral bucket) but carry their real label. */

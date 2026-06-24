@@ -189,6 +189,64 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   // edited directly on the figure (JSON-Patch). The `role` knob is pipeline-level, not surfaced.
   erg_traces: [
     {
+      key: "central", label: "Trace shows", type: "select",
+      options: [
+        { value: "representative", label: "Representative (one exemplar)" },
+        { value: "mean", label: "Mean of replicates" },
+        { value: "none", label: "Individual traces only (no mean)" },
+      ],
+      help: "Representative draws one exemplar recording per cell (the back-compatible default). Mean averages the n eye/animal recordings at each time. Individual draws every replicate at equal weight with no averaged line — combine several files first (multi-file) for a real cohort n.",
+    },
+    {
+      key: "spread", label: "Spread", type: "select",
+      options: [
+        { value: "band", label: "Shaded band" },
+        { value: "error_bars", label: "Error bars" },
+        { value: "individual", label: "Individual traces (behind mean)" },
+        { value: "both", label: "Band + error bars" },
+        { value: "none", label: "None (mean only)" },
+      ],
+      help: "How the variability across replicates is drawn behind/around the mean trace.",
+      showWhen: { key: "central", equals: "mean" },
+    },
+    {
+      key: "error", label: "Error metric", type: "select",
+      options: [
+        { value: "sem", label: "SEM (standard error)" },
+        { value: "sd", label: "SD (standard deviation)" },
+        { value: "ci95", label: "95% CI" },
+        { value: "minmax", label: "Range (min–max)" },
+      ],
+      help: "What the band/error bars span. SEM is the default; SD shows biological spread; 95% CI is the most defensible.",
+      showWhen: { key: "central", equals: "mean" },
+    },
+    {
+      key: "boundary_lines", label: "Band edges", type: "select",
+      options: [
+        { value: "none", label: "None (fill only)" },
+        { value: "solid", label: "Solid lines" },
+        { value: "dashed", label: "Dashed lines" },
+      ],
+      help: "Draw the band's upper/lower edges as lines (off by default — the fill alone).",
+      showWhen: { key: "central", equals: "mean" },
+    },
+    {
+      key: "band_alpha", label: "Band opacity", type: "range", step: 0.05,
+      help: "Opacity of the shaded ± band.",
+      showWhen: { key: "central", equals: "mean" },
+    },
+    {
+      key: "band_color", label: "Band colour", type: "text",
+      placeholder: "match the trace",
+      help: "Leave blank to match each trace's colour (default); or set a hex like #0072B2 to recolour every band.",
+      showWhen: { key: "central", equals: "mean" },
+    },
+    {
+      key: "error_every", label: "Error bar every Nth point", type: "range", step: 1,
+      help: "Draw an error bar only every Nth time sample, to de-clutter a dense trace (Origin's 'skip each group of N').",
+      showWhen: { key: "central", equals: "mean" },
+    },
+    {
       key: "adaptation", label: "Adaptation", type: "select",
       options: [
         { value: "auto", label: "Auto (scotopic first)" },
