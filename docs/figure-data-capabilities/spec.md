@@ -3,6 +3,14 @@
 > **Status: STUB for next-session deep work (owner steer 2026-06-24).** This is not yet an
 > implementation spec — it captures the problem + the design direction so next session starts from
 > research + design, not a live patch. Sequence: research → design → spec → build (the Selom way).
+>
+> **⚑ Next session OPENS with an owner interview** (owner-requested 2026-06-24) — use AskUserQuestion
+> to verify + harden this spec BEFORE building. Topics: (a) where the capability contract lives
+> (`meta.selom` vs `skill.json`) + which capabilities; (b) the gesture model (default drag = select?
+> zoom/pan as buttons? does zoom matter for ERG traces? keyboard modes); (c) the figure→tools mapping
+> (which skills get marks / fit / scale-bar / none); (d) scope (ERG-only first vs general); (e) the
+> a/b dot UX (label show/hide + styling — labels weren't visible in the T16 demo). The answers
+> finalize §D1–D3 below.
 
 ## Problem
 The figure editor (cosmetic inspector) and the **Figure-data** window currently wire editing
