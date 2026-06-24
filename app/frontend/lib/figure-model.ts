@@ -132,6 +132,23 @@ export interface Scalebar {
   visible: boolean;
 }
 
+/** Plotly drag mode the editor applies; `false` = no-op (a stray drag does nothing). */
+export type Dragmode = false | "select" | "pan" | "zoom";
+
+/**
+ * Resolved plot-area gesture config (docs/figure-data-capabilities/spec.md §2). Comes from the
+ * figure's declared `meta.selom.capabilities.gesture`; absent → leave Plotly's defaults so a figure
+ * that declares nothing keeps today's box-zoom behaviour (no regression).
+ */
+export interface GestureConfig {
+  /** Plotly `layout.dragmode` to apply; `undefined` → don't set it (keep Plotly's default). */
+  dragmode?: Dragmode;
+  /** Keep zoom + pan as modebar buttons (a mode the user presses). Default true. */
+  zoomTools: boolean;
+  /** Plotly `config.scrollZoom` to apply; `undefined` → leave Plotly's default (off for cartesian). */
+  scrollZoom?: boolean;
+}
+
 export interface FigureModel {
   traceKinds: TraceKind[];
   series: Series[];
@@ -145,7 +162,16 @@ export interface FigureModel {
     colorbar: boolean;
     scalebar: boolean;
     subplotRanges: boolean;
+    /** Editable ERG landmark dots (a/b, N1/P1) → dot-drag + numeric Marks editor. Declared by the
+     *  skill in meta.selom.capabilities.tools.landmarkMarks; falls back to "seeded marks present"
+     *  during migration so today's ERG figures keep working before they declare it. */
+    landmarkMarks: boolean;
+    /** A tunable model fit the editor can expose (Naka-Rushton on intensity-response), or null.
+     *  Schema-reserved in v1 — the fit-knobs panel is a follow-on. */
+    modelFit: "naka_rushton" | null;
   };
+  /** Resolved plot-area gesture config (dragmode / scrollZoom / zoom tools). */
+  gesture: GestureConfig;
   /** Trace indices for the conditional Style groups (marker controls, line width, heatmap colorscale). */
   markerTraceIndices: number[];
   lineTraceIndices: number[];
@@ -181,6 +207,28 @@ interface TraceInfo {
   visible: boolean;
 }
 
+/**
+ * The declared per-figure editing contract (docs/figure-data-capabilities/spec.md §1). Render-inert;
+ * every field optional; absent → the inferred floor / today's behaviour (no regression). Declared wins.
+ */
+interface SelomCapabilities {
+  /** Plot-area gesture config. Absent → keep Plotly's default (box-zoom). */
+  gesture?: {
+    /** Default dragmode. "none" → a stray drag is a no-op (ERG). */
+    default?: "none" | "select" | "pan" | "zoom";
+    /** Keep zoom + pan available as modebar buttons. Default true. */
+    zoomTools?: boolean;
+    /** Wheel-zoom. ERG → true (cartesian's default is off, so this must be set to keep it). */
+    scrollZoom?: boolean;
+  };
+  /** Data-coupled tool gates (default false → a figure that declares nothing gets none of these). */
+  tools?: {
+    landmarkMarks?: boolean;
+    modelFit?: "naka_rushton" | null;
+    scaleBar?: boolean;
+  };
+}
+
 /** Optional skill-stamped hint (render-inert; lives at layout.meta.selom). */
 interface SelomHint {
   figureKind?: string;
@@ -191,6 +239,40 @@ interface SelomHint {
   overlayHideY?: boolean;
   series?: { label: string; traceIndices: number[]; colorPath?: string }[];
   primitives?: { kind: PrimitiveKind; [k: string]: unknown }[];
+  /** The declared per-figure editing contract (gesture + data-coupled tool gates). */
+  capabilities?: SelomCapabilities;
+}
+
+/** Migration fallback for landmarkMarks: are seeded landmark dots present on this figure? */
+function hasSeededMarks(spec: FigureSpec): boolean {
+  const marks = (spec?.layout?.meta as { selom?: { marks?: unknown } } | undefined)?.selom?.marks;
+  return Array.isArray(marks) && marks.length > 0;
+}
+
+/** Resolve the declared editing contract over the inferred floor (declared wins). */
+function resolveContract(
+  spec: FigureSpec,
+  hint: SelomHint | null,
+  inferredScalebar: boolean,
+): { landmarkMarks: boolean; modelFit: "naka_rushton" | null; scalebar: boolean; gesture: GestureConfig } {
+  const caps = hint?.capabilities;
+  const landmarkMarks = caps?.tools?.landmarkMarks === true || hasSeededMarks(spec);
+  const modelFit = caps?.tools?.modelFit === "naka_rushton" ? "naka_rushton" : null;
+  const scalebar = inferredScalebar || caps?.tools?.scaleBar === true;
+
+  const g = caps?.gesture;
+  const dragmode: Dragmode | undefined =
+    g?.default === "none"
+      ? false
+      : g?.default === "select" || g?.default === "pan" || g?.default === "zoom"
+        ? g.default
+        : undefined;
+  const gesture: GestureConfig = {
+    dragmode,
+    zoomTools: g?.zoomTools !== false,
+    scrollZoom: typeof g?.scrollZoom === "boolean" ? g.scrollZoom : undefined,
+  };
+  return { landmarkMarks, modelFit, scalebar, gesture };
 }
 
 function readHint(spec: FigureSpec): SelomHint | null {
@@ -223,9 +305,11 @@ function makeSeries(key: string, label: string, members: TraceInfo[]): Series {
 }
 
 /**
- * Derive the full editor model from a spec. Pure + cheap; callers memoise on `spec`.
+ * Derive the full editor model from a spec. Pure + cheap; callers memoise on `spec`. Tolerates a
+ * null/undefined spec (every access is guarded) → an empty model, so a not-yet-rendered figure is safe.
  */
-export function deriveFigureModel(spec: FigureSpec): FigureModel {
+export function deriveFigureModel(specInput: FigureSpec | null | undefined): FigureModel {
+  const spec: FigureSpec = specInput ?? ({ data: [], layout: {} } as unknown as FigureSpec);
   const data: PlotlyTrace[] = Array.isArray(spec?.data) ? spec.data : [];
   const infos: TraceInfo[] = data.map((t, index) => {
     const kind = inferTraceKind(t);
@@ -245,11 +329,20 @@ export function deriveFigureModel(spec: FigureSpec): FigureModel {
 
   const traceKinds = infos.map((i) => i.kind);
   const series = groupSeries(spec, infos);
-  const { capabilities, primitives, markerTraceIndices, lineTraceIndices, heatmapTraceIndices } =
+  const { capabilities: inferred, primitives, markerTraceIndices, lineTraceIndices, heatmapTraceIndices } =
     deriveCapabilities(spec, infos);
   const scalebar = deriveScalebar(spec);
 
   const hint = readHint(spec);
+  // Resolve the declared editing contract (meta.selom.capabilities) over the inferred floor.
+  const contract = resolveContract(spec, hint, inferred.scalebar);
+  const capabilities = {
+    ...inferred,
+    scalebar: contract.scalebar,
+    landmarkMarks: contract.landmarkMarks,
+    modelFit: contract.modelFit,
+  };
+
   const figureKind = typeof hint?.figureKind === "string" ? hint.figureKind : null;
   const layoutMode = hint?.layoutMode === "overlay" ? "overlay" : "grid";
   const overlayCapable = figureKind === "trace_grid";
@@ -261,6 +354,7 @@ export function deriveFigureModel(spec: FigureSpec): FigureModel {
     primitives,
     scalebar,
     capabilities,
+    gesture: contract.gesture,
     markerTraceIndices,
     lineTraceIndices,
     heatmapTraceIndices,

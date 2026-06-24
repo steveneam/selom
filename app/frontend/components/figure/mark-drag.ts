@@ -14,7 +14,7 @@
  * broken canvas — with the numeric panel as the always-present fallback.
  */
 import type { FigureSpec, PlotlyTrace } from "@/lib/figure-spec";
-import { readSeededMarks, snapToSample, type MarkRole } from "@/lib/erg/marks";
+import { readSeededMarks, roleTag, snapToSample, type MarkRole } from "@/lib/erg/marks";
 
 export interface Crosshair {
   /** Pixel position (relative to the canvas container) of the guide line + readout. */
@@ -32,12 +32,6 @@ interface PlotlyAxis {
   _length?: number;
   p2d?: (p: number) => number;
   d2p?: (d: number) => number;
-}
-interface HoverPoint {
-  curveNumber?: number;
-  pointNumber?: number;
-  xaxis?: PlotlyAxis;
-  yaxis?: PlotlyAxis;
 }
 interface GraphDiv extends HTMLElement {
   on?: (ev: string, cb: (e: unknown) => void) => void;
@@ -78,6 +72,10 @@ interface Armed {
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const fmt = (v: number) => (Math.abs(v) >= 100 ? Math.round(v) : Math.round(v * 10) / 10);
 
+/** Magnet radius (px): the pointer arms (and can grab) a dot within this distance of its centre, so
+ *  you never have to click the dot exactly. Generous — the dot itself is ~7px; this gives a soft pull. */
+const GRAB_RADIUS_PX = 24;
+
 /** Map curveNumber → the draggable marks on that marker-dot trace (by point index). */
 function draggableByTrace(spec: FigureSpec): Map<number, Map<number, { segment: string; role: MarkRole }>> {
   const out = new Map<number, Map<number, { segment: string; role: MarkRole }>>();
@@ -104,6 +102,47 @@ function lineFor(data: PlotlyTrace[], markerTrace: number): { x: number[]; y: nu
 }
 
 /**
+ * The nearest draggable dot within the magnet radius of a client pixel, fully resolved for dragging
+ * (or null). Each dot's screen position is computed from its data coords via its subplot axes — so
+ * arming doesn't depend on Plotly's near-exact hover hit-testing; the pointer is "pulled" to a dot
+ * once it's within GRAB_RADIUS_PX. Degrades to null if the axis internals aren't readable.
+ */
+function nearestArmed(gd: GraphDiv, spec: FigureSpec, clientX: number, clientY: number): Armed | null {
+  const byTrace = draggableByTrace(spec);
+  if (byTrace.size === 0) return null;
+  const rect = gd.getBoundingClientRect();
+  const data = gd.data ?? [];
+  let best: Armed | null = null;
+  let bestD = GRAB_RADIUS_PX;
+  for (const [cn, byPt] of byTrace) {
+    const mk = data[cn];
+    const xs = mk?.x;
+    const ys = mk?.y;
+    if (!Array.isArray(xs) || !Array.isArray(ys)) continue;
+    const xaxis = axisFor(gd, mk?.xaxis, "x");
+    const yaxis = axisFor(gd, mk?.yaxis, "y");
+    const xOff = num(xaxis?._offset);
+    const yOff = num(yaxis?._offset);
+    if (!xaxis?.d2p || !yaxis?.d2p || xOff === null || yOff === null) continue;
+    const line = lineFor(data, cn);
+    if (!line) continue;
+    for (const [pn, hit] of byPt) {
+      const dx = (xs as number[])[pn];
+      const dy = (ys as number[])[pn];
+      if (typeof dx !== "number" || typeof dy !== "number") continue;
+      const px = rect.left + xOff + xaxis.d2p(dx);
+      const py = rect.top + yOff + yaxis.d2p(dy);
+      const d = Math.hypot(clientX - px, clientY - py);
+      if (d < bestD) {
+        bestD = d;
+        best = { trace: cn, point: pn, ...hit, xaxis, yaxis, lineX: line.x, lineY: line.y };
+      }
+    }
+  }
+  return best;
+}
+
+/**
  * Wire dot-dragging onto a Plotly graph div. Returns a cleanup function. Safe to call repeatedly
  * (each call cleans up the prior binding via the returned disposer in the caller).
  */
@@ -116,27 +155,18 @@ export function wireMarkDrag(gd: GraphDiv, deps: MarkDragDeps): () => void {
     if (!dragging) gd.style.cursor = "";
   };
 
-  const onHover = (e: unknown) => {
+  // Proximity arming (the magnet): on any pointer move over the graph, arm the NEAREST dot within
+  // GRAB_RADIUS_PX of the cursor and show the grab cursor — so you don't have to land on the dot
+  // exactly. Cleared when the pointer drifts away (or leaves the figure).
+  const onProximityMove = (ev: MouseEvent) => {
     if (dragging || !deps.onMarkMove) return;
-    const pts = (e as { points?: HoverPoint[] })?.points ?? [];
-    const byTrace = draggableByTrace(deps.getSpec());
-    // Scan ALL hovered points (a dot sits ON the line, so points[0] may be the line, not the dot).
-    for (const pt of pts) {
-      const cn = pt?.curveNumber;
-      const pn = pt?.pointNumber;
-      if (cn === undefined || pn === undefined) continue;
-      const hit = byTrace.get(cn)?.get(pn);
-      if (!hit) continue;
-      const mk = (gd.data ?? [])[cn];
-      const xaxis = axisFor(gd, mk?.xaxis, "x");
-      const yaxis = axisFor(gd, mk?.yaxis, "y");
-      const line = lineFor(gd.data ?? [], cn);
-      if (!xaxis || !yaxis || !line) continue;
-      armed = { trace: cn, point: pn, ...hit, xaxis, yaxis, lineX: line.x, lineY: line.y };
+    const found = nearestArmed(gd, deps.getSpec(), ev.clientX, ev.clientY);
+    if (found) {
+      armed = found;
       gd.style.cursor = "grab";
-      return;
+    } else {
+      clearArmed();
     }
-    clearArmed();
   };
 
   // Resolve the snapped time + the dot's y on the line + the readout, from a client X pixel.
@@ -173,7 +203,7 @@ export function wireMarkDrag(gd: GraphDiv, deps: MarkDragDeps): () => void {
       yBotPx: dy + yOff + yLen,
       dotXPx: xPx,
       dotYPx: dy + yOff + a.yaxis.d2p(r.y),
-      label: `${fmt(r.tMs)} ms · ${fmt(r.y)} µV`,
+      label: `${roleTag(a.role)} · ${fmt(r.tMs)} ms · ${fmt(r.y)} µV`,
     });
   };
 
@@ -190,8 +220,12 @@ export function wireMarkDrag(gd: GraphDiv, deps: MarkDragDeps): () => void {
   };
 
   const onDown = (ev: MouseEvent) => {
-    if (!armed || ev.button !== 0 || !deps.onMarkMove) return;
-    dragging = armed;
+    if (ev.button !== 0 || !deps.onMarkMove) return;
+    // Magnet on click too: if no dot is armed from a prior move, do a fresh proximity check at the
+    // press point — so a single click near a dot grabs it without needing a hover first.
+    const a = armed ?? nearestArmed(gd, deps.getSpec(), ev.clientX, ev.clientY);
+    if (!a) return;
+    dragging = a;
     gd.style.cursor = "grabbing";
     // Block Plotly's own zoom/pan for this gesture — capture-phase on the gd fires before Plotly's
     // mousedown on the inner drag rect, and stopImmediatePropagation keeps it from starting a box-zoom.
@@ -203,13 +237,13 @@ export function wireMarkDrag(gd: GraphDiv, deps: MarkDragDeps): () => void {
     onMove(ev); // place the crosshair immediately
   };
 
-  gd.on?.("plotly_hover", onHover);
-  gd.on?.("plotly_unhover", clearArmed);
+  gd.addEventListener("mousemove", onProximityMove);
+  gd.addEventListener("mouseleave", clearArmed);
   gd.addEventListener("mousedown", onDown, true);
 
   return () => {
-    gd.removeListener?.("plotly_hover", onHover);
-    gd.removeListener?.("plotly_unhover", clearArmed);
+    gd.removeEventListener("mousemove", onProximityMove);
+    gd.removeEventListener("mouseleave", clearArmed);
     gd.removeEventListener("mousedown", onDown, true);
     document.removeEventListener("mousemove", onMove, true);
     document.removeEventListener("mouseup", onUp, true);

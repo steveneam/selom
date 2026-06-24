@@ -11,6 +11,8 @@ import {
   manualMarkValue,
   parseManualMarks,
   roleLabel,
+  ROLE_COLORS,
+  rolesPresent,
   serializeManualMarks,
   setManualMark,
   type MarkRole,
@@ -30,12 +32,17 @@ export function MarksEditor({
   seededMarks,
   params,
   onParamsChange,
+  markLabelsShown = true,
+  onMarkLabelsShownChange,
 }: {
   seededMarks: SeededMark[];
   params: SkillParams;
   /** The figure-data setParams — used with functional updates so a toggle + a numeric edit fired
    *  back-to-back can't clobber each other (each reads the latest params, not a stale closure). */
   onParamsChange: React.Dispatch<React.SetStateAction<SkillParams>>;
+  /** Live "show a/b labels" state (owned by the parent so the preview restyles instantly). */
+  markLabelsShown?: boolean;
+  onMarkLabelsShownChange?: (shown: boolean) => void;
 }) {
   const manual = React.useMemo(() => parseManualMarks(params.manual_marks), [params.manual_marks]);
   const nManual = manualMarkCount(manual);
@@ -44,6 +51,14 @@ export function MarksEditor({
   // exist after the re-run). Fall back to the rendered figure's state when the param is unset.
   const renderedDots = seededMarks.some((m) => m.trace !== undefined);
   const dotsOn = params.marks === undefined ? renderedDots : String(params.marks) === "true";
+  // Pinned role labels on the dots — driven by the parent's live state so toggling restyles the
+  // preview instantly (no re-run); the param is also set so a re-run persists the choice.
+  const labelsOn = markLabelsShown;
+  const roles = rolesPresent(seededMarks);
+  const toggleLabels = (v: boolean) => {
+    onMarkLabelsShownChange?.(v);
+    onParamsChange((p) => ({ ...p, mark_labels: v }));
+  };
 
   // Group marks by cell (segment), preserving first-seen order.
   const cells = React.useMemo(() => {
@@ -101,31 +116,88 @@ export function MarksEditor({
         />
       </label>
 
-      <div className="mt-3 space-y-2.5">
-        {cells.map((cell) => (
-          <div key={cell.marks[0].segment} className="rounded-lg border border-border/70 bg-background/40 p-2">
-            <p className="mb-1.5 truncate text-[11px] font-medium text-foreground/80">{cell.label}</p>
-            <div className="space-y-1">
-              {cell.marks.map((m) => (
-                <MarkRow
-                  key={m.role}
-                  mark={m}
-                  override={manualMarkValue(manual, m.segment, m.role)}
-                  onSet={(ms) => setMark(m.segment, m.role, ms)}
-                  onReset={() => resetMark(m.segment, m.role)}
-                />
+      {dotsOn && (
+        <>
+          <label className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-border/70 bg-background/40 px-2.5 py-1.5">
+            <span className="flex items-center gap-1.5 text-xs text-foreground/90">
+              Show a/b labels on the dots <ModeChip mode="live" />
+            </span>
+            <Switch
+              checked={labelsOn}
+              onCheckedChange={toggleLabels}
+              aria-label="Show landmark labels"
+            />
+          </label>
+          {roles.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 px-0.5" aria-label="Landmark legend">
+              {roles.map((role) => (
+                <span key={role} className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <span
+                    className="size-2.5 rounded-full border border-white shadow-sm"
+                    style={{ backgroundColor: ROLE_COLORS[role] }}
+                  />
+                  {roleLabel(role)}
+                </span>
               ))}
             </div>
-          </div>
-        ))}
-      </div>
+          )}
+        </>
+      )}
 
-      <p className="mt-2.5 text-[11px] text-muted-foreground/80">
-        {nManual > 0
-          ? `${nManual} marker${nManual > 1 ? "s" : ""} operator-set — re-run to apply.`
-          : "All markers auto-detected. Adjust a time, then re-run."}
-      </p>
+      {cells.length === 0 ? (
+        <p className="mt-3 rounded-lg border border-dashed border-border/70 bg-background/40 p-3 text-[11px] leading-relaxed text-muted-foreground/80">
+          Turn on <span className="text-foreground/80">landmark dots</span> and re-run to list each cell’s
+          a/b (or N1/P1) times here — then adjust them numerically or by dragging the dots on the figure.
+        </p>
+      ) : (
+        <div className="mt-3 space-y-2.5">
+          {cells.map((cell) => (
+            <div key={cell.marks[0].segment} className="rounded-lg border border-border/70 bg-background/40 p-2">
+              <p className="mb-1.5 truncate text-[11px] font-medium text-foreground/80">{cell.label}</p>
+              <div className="space-y-1">
+                {cell.marks.map((m) => (
+                  <MarkRow
+                    key={m.role}
+                    mark={m}
+                    override={manualMarkValue(manual, m.segment, m.role)}
+                    onSet={(ms) => setMark(m.segment, m.role, ms)}
+                    onReset={() => resetMark(m.segment, m.role)}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {cells.length > 0 && (
+        <p className="mt-2.5 text-[11px] text-muted-foreground/80">
+          {nManual > 0
+            ? `${nManual} marker${nManual > 1 ? "s" : ""} operator-set — re-run to apply.`
+            : "All markers auto-detected. Adjust a time, then re-run."}
+        </p>
+      )}
     </div>
+  );
+}
+
+/** A small tag distinguishing a control that updates the figure LIVE (instant restyle) from one
+ *  that needs a re-run of the analysis to take effect — so the two toggles aren't ambiguous. */
+function ModeChip({ mode }: { mode: "live" | "rerun" }) {
+  return mode === "live" ? (
+    <span
+      title="Updates the figure instantly — no re-run"
+      className="rounded border border-emerald-500/40 px-1 py-px text-[9px] font-medium uppercase tracking-wide text-emerald-400"
+    >
+      Live
+    </span>
+  ) : (
+    <span
+      title="Takes effect when you click Re-run → new version"
+      className="rounded border border-stage-figuredata/40 px-1 py-px text-[9px] font-medium uppercase tracking-wide text-stage-figuredata"
+    >
+      Re-run
+    </span>
   );
 }
 

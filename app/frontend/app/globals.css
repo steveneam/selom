@@ -62,6 +62,7 @@
   */
   --stage-data: #60a5fa; /* blue — ingest */
   --stage-skill: #a78bfa; /* violet — analysis */
+  --stage-figuredata: #f59e0b; /* amber — the inputs/re-run behind a figure */
   --stage-figure: #22d3ee; /* cyan — the figure (brand) */
   --stage-publish: #34d399; /* green — reproducible / publish */
 
@@ -104,6 +105,7 @@
 
   --color-stage-data: var(--stage-data);
   --color-stage-skill: var(--stage-skill);
+  --color-stage-figuredata: var(--stage-figuredata);
   --color-stage-figure: var(--stage-figure);
   --color-stage-publish: var(--stage-publish);
 

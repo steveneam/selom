@@ -1,18 +1,87 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyStagedMarks,
   clearManualMark,
+  hideDotLabels,
   manualMarkCount,
   manualMarkValue,
   parseManualMarks,
   readSeededMarks,
   roleField,
   roleLabel,
+  ROLE_COLORS,
+  rolesPresent,
+  roleTag,
   serializeManualMarks,
   setManualMark,
   snapToSample,
+  type SeededMark,
 } from "./marks";
 import type { FigureSpec } from "@/lib/figure-spec";
+
+describe("live preview transforms (no re-run)", () => {
+  // A line trace (0) + its a/b dot trace (1) with the meta.selom.marks hint binding the dots.
+  const withDots = () =>
+    ({
+      data: [
+        { mode: "lines", xaxis: "x", x: [0, 10, 20, 30], y: [0, 5, 9, 2] },
+        { mode: "markers+text", xaxis: "x", x: [10, 20], y: [5, 9], text: ["a", "b"] },
+      ],
+      layout: {
+        meta: {
+          selom: {
+            marks: [
+              { segment: "C||G1|", role: "a", t_ms: 10, source: "auto", trace: 1, point: 0 },
+              { segment: "C||G1|", role: "b", t_ms: 20, source: "auto", trace: 1, point: 1 },
+            ],
+          },
+        },
+      },
+    }) as unknown as FigureSpec;
+
+  it("applyStagedMarks moves a dot to the staged time + the line's value there (immutably)", () => {
+    const spec = withDots();
+    const out = applyStagedMarks(spec, parseManualMarks('{"C||G1|":{"a_ms":30}}'));
+    // a-dot (point 0) snaps to sample 30, riding the line value (2) there
+    expect((out.data[1].x as number[])[0]).toBe(30);
+    expect((out.data[1].y as number[])[0]).toBe(2);
+    // b-dot (point 1) is untouched; original spec untouched
+    expect((out.data[1].x as number[])[1]).toBe(20);
+    expect((spec.data[1].x as number[])[0]).toBe(10);
+  });
+
+  it("applyStagedMarks is a no-op with nothing staged", () => {
+    const spec = withDots();
+    expect(applyStagedMarks(spec, {})).toBe(spec);
+  });
+
+  it("hideDotLabels flips the dot trace to markers (drops the pinned text)", () => {
+    const out = hideDotLabels(withDots());
+    expect(out.data[1].mode).toBe("markers");
+    expect(out.data[0].mode).toBe("lines"); // the line trace is untouched
+  });
+});
+
+describe("role styling helpers (figure-data-capabilities §6)", () => {
+  it("gives each role a distinct colour + a compact tag", () => {
+    expect(new Set(Object.values(ROLE_COLORS)).size).toBe(4); // all distinct
+    expect(roleTag("a")).toBe("a");
+    expect(roleTag("b")).toBe("b");
+    expect(roleTag("n1")).toBe("N1");
+    expect(roleTag("p1")).toBe("P1");
+  });
+
+  it("lists the distinct roles present, in first-seen order (the legend)", () => {
+    const marks = [
+      { segment: "s", role: "a", tMs: 1, source: "auto", label: "x" },
+      { segment: "s", role: "b", tMs: 2, source: "auto", label: "x" },
+      { segment: "t", role: "a", tMs: 3, source: "auto", label: "y" },
+    ] as SeededMark[];
+    expect(rolesPresent(marks)).toEqual(["a", "b"]);
+    expect(rolesPresent([])).toEqual([]);
+  });
+});
 
 describe("role helpers", () => {
   it("maps roles to manual_marks fields + labels", () => {

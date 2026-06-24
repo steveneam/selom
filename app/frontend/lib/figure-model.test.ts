@@ -354,6 +354,80 @@ function tinyGrid(extra: Record<string, unknown> = {}): SpecType {
   );
 }
 
+// --- capability contract (docs/figure-data-capabilities/spec.md) -------------------------
+
+describe("capability contract (meta.selom.capabilities)", () => {
+  const bare = spec([{ type: "scatter", mode: "lines", line: { color: "#111" } }]);
+
+  it("a figure that declares nothing keeps today's behaviour (no tools, Plotly default gesture)", () => {
+    const m = deriveFigureModel(bare);
+    expect(m.capabilities.landmarkMarks).toBe(false);
+    expect(m.capabilities.modelFit).toBeNull();
+    expect(m.gesture.dragmode).toBeUndefined(); // → canvas leaves Plotly's box-zoom default
+    expect(m.gesture.zoomTools).toBe(true);
+    expect(m.gesture.scrollZoom).toBeUndefined();
+  });
+
+  it("declared landmarkMarks turns the capability on", () => {
+    const m = deriveFigureModel(
+      spec([{ type: "scatter", mode: "lines", line: { color: "#111" } }], {
+        meta: { selom: { capabilities: { tools: { landmarkMarks: true } } } },
+      }),
+    );
+    expect(m.capabilities.landmarkMarks).toBe(true);
+  });
+
+  it("falls back to landmarkMarks=true when seeded marks are present (migration)", () => {
+    const m = deriveFigureModel(
+      spec([{ type: "scatter", mode: "lines", line: { color: "#111" } }], {
+        meta: { selom: { marks: [{ segment: "C|scotopic_flash|Group1|RE", role: "a", t_ms: 12, source: "auto" }] } },
+      }),
+    );
+    expect(m.capabilities.landmarkMarks).toBe(true);
+  });
+
+  it("gesture.default 'none' → dragmode false; scrollZoom + zoomTools carried", () => {
+    const m = deriveFigureModel(
+      spec([{ type: "scatter", mode: "lines", line: { color: "#111" } }], {
+        meta: { selom: { capabilities: { gesture: { default: "none", zoomTools: true, scrollZoom: true } } } },
+      }),
+    );
+    expect(m.gesture.dragmode).toBe(false);
+    expect(m.gesture.zoomTools).toBe(true);
+    expect(m.gesture.scrollZoom).toBe(true);
+  });
+
+  it("gesture.default 'pan' is passed through; zoomTools:false hides the buttons", () => {
+    const m = deriveFigureModel(
+      spec([{ type: "scatter", mode: "lines", line: { color: "#111" } }], {
+        meta: { selom: { capabilities: { gesture: { default: "pan", zoomTools: false } } } },
+      }),
+    );
+    expect(m.gesture.dragmode).toBe("pan");
+    expect(m.gesture.zoomTools).toBe(false);
+  });
+
+  it("modelFit 'naka_rushton' is exposed; a declared scaleBar forces the capability", () => {
+    const m = deriveFigureModel(
+      spec([{ type: "scatter", mode: "lines", line: { color: "#111" } }], {
+        meta: { selom: { capabilities: { tools: { modelFit: "naka_rushton", scaleBar: true } } } },
+      }),
+    );
+    expect(m.capabilities.modelFit).toBe("naka_rushton");
+    expect(m.capabilities.scalebar).toBe(true);
+  });
+
+  it("a bad/partial contract is ignored field-by-field, never throws", () => {
+    const m = deriveFigureModel(
+      spec([{ type: "scatter", mode: "lines", line: { color: "#111" } }], {
+        meta: { selom: { capabilities: { gesture: { default: "bogus" }, tools: { modelFit: "nope" } } } },
+      }),
+    );
+    expect(m.gesture.dragmode).toBeUndefined();
+    expect(m.capabilities.modelFit).toBeNull();
+  });
+});
+
 describe("trace-grid overlay layout", () => {
   it("flags overlay-capable, defaults to grid with both axes shown", () => {
     const m = deriveFigureModel(tinyGrid());

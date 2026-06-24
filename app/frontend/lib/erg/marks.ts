@@ -41,6 +41,27 @@ const ROLE_FIELD: Record<MarkRole, MarkField> = { a: "a_ms", b: "b_ms", n1: "n1_
 const ROLE_LABEL: Record<MarkRole, string> = { a: "a-wave", b: "b-wave", n1: "N1", p1: "P1" };
 const ALL_FIELDS: MarkField[] = ["a_ms", "b_ms", "n1_ms", "p1_ms"];
 
+/** Landmark role colours for the dots + the legend (docs/figure-data-capabilities/spec.md §6).
+ *  KEEP IN SYNC with app/backend/skills/_erg.py ROLE_COLORS. */
+export const ROLE_COLORS: Record<MarkRole, string> = {
+  a: "#2563eb",
+  b: "#d97706",
+  n1: "#0d9488",
+  p1: "#7c3aed",
+};
+
+/** A compact role tag for the drag readout ("a"/"b"/"N1"/"P1"). */
+export function roleTag(role: MarkRole): string {
+  return role === "n1" ? "N1" : role === "p1" ? "P1" : role;
+}
+
+/** Distinct roles present across a set of seeded marks, in first-seen order — drives the legend. */
+export function rolesPresent(marks: SeededMark[]): MarkRole[] {
+  const seen: MarkRole[] = [];
+  for (const m of marks) if (!seen.includes(m.role)) seen.push(m.role);
+  return seen;
+}
+
 export function roleField(role: MarkRole): MarkField {
   return ROLE_FIELD[role];
 }
@@ -139,6 +160,69 @@ export function manualMarkValue(
 /** Count of operator-set overrides across all segments (for the panel summary). */
 export function manualMarkCount(marks: ManualMarks): number {
   return Object.values(marks).reduce((n, seg) => n + Object.keys(seg).length, 0);
+}
+
+/**
+ * Hide the a/b (N1/P1) TEXT labels on the drawn dot traces — flips each dot trace's mode from
+ * "markers+text" to "markers". A pure, instant client-side restyle for the "show labels" toggle in
+ * the Figure-data preview (no backend re-run needed; labels are cosmetic on already-drawn dots).
+ * No-op when no dots are drawn. The dots themselves stay; only their pinned text is dropped.
+ */
+export function hideDotLabels(spec: FigureSpec): FigureSpec {
+  const traces = new Set<number>();
+  for (const m of readSeededMarks(spec)) if (m.trace !== undefined) traces.add(m.trace);
+  if (!traces.size || !Array.isArray(spec?.data)) return spec;
+  const data = spec.data.map((t, i) =>
+    traces.has(i) && typeof t?.mode === "string" && t.mode.includes("text")
+      ? { ...t, mode: "markers" }
+      : t,
+  );
+  return { ...spec, data };
+}
+
+/**
+ * Reposition the drawn dots to the STAGED manual-mark times — a pure, instant client-side preview of
+ * a dot drag / numeric time edit, so the dot moves the moment you let go (no backend re-run). Each
+ * overridden dot snaps to the nearest sample of its line and rides the trace's amplitude there. The
+ * re-run later re-measures the value server-side; this is just the live preview. No-op when nothing
+ * is staged or no dots are drawn.
+ */
+export function applyStagedMarks(spec: FigureSpec, manual: ManualMarks): FigureSpec {
+  if (!manual || !Object.keys(manual).length || !Array.isArray(spec?.data)) return spec;
+  const marks = readSeededMarks(spec);
+  if (!marks.length) return spec;
+  const data = [...spec.data];
+  let changed = false;
+  for (const m of marks) {
+    if (m.trace === undefined || m.point === undefined) continue;
+    const t = manualMarkValue(manual, m.segment, m.role);
+    if (t === undefined) continue;
+    const dot = data[m.trace];
+    if (!dot || !Array.isArray(dot.x) || !Array.isArray(dot.y)) continue;
+    // The line trace sharing this dot's subplot axis carries the samples the dot rides.
+    const line = data.find(
+      (d, i) =>
+        i !== m.trace &&
+        d?.xaxis === dot.xaxis &&
+        typeof d?.mode === "string" &&
+        d.mode.includes("lines") &&
+        Array.isArray(d.x) &&
+        Array.isArray(d.y),
+    );
+    if (!line) continue;
+    const xs = line.x as number[];
+    const ys = line.y as number[];
+    const snapped = snapToSample(xs, t);
+    const idx = xs.indexOf(snapped);
+    const y = idx >= 0 ? ys[idx] : (dot.y as number[])[m.point];
+    const nx = [...(dot.x as number[])];
+    const ny = [...(dot.y as number[])];
+    nx[m.point] = snapped;
+    ny[m.point] = y;
+    data[m.trace] = { ...dot, x: nx, y: ny };
+    changed = true;
+  }
+  return changed ? { ...spec, data } : spec;
 }
 
 /** Snap a dragged x-time to the nearest sample on a trace's x-array (the dot is sticky to the line). */

@@ -67,8 +67,8 @@ const CONTEXT: Record<RailView, { color: string; label: string }> = {
   data: { color: "var(--stage-data)", label: "Data" },
   skill: { color: "var(--stage-skill)", label: "Run a skill" },
   stats: { color: "var(--stage-publish)", label: "Statistics" },
-  figuredata: { color: "var(--stage-figure)", label: "Figure data" },
-  figure: { color: "var(--stage-figure)", label: "Figure" },
+  figuredata: { color: "var(--stage-figuredata)", label: "Figure data" },
+  figure: { color: "var(--stage-figure)", label: "Figure styling" },
   compare: { color: "var(--stage-figure)", label: "Compare" },
 };
 
@@ -340,7 +340,7 @@ export function Workrail({
 
         {/* FIGURE DATA — the inputs behind the open figure (params re-run + data checks).
             An action node like "Run a skill", but contextual: enabled only with a figure open. */}
-        <Stage color="var(--stage-figure)" filled action />
+        <Stage color="var(--stage-figuredata)" filled action />
         <div className="min-w-0 pb-4 pt-0.5">
           <button
             type="button"
@@ -351,21 +351,21 @@ export function Workrail({
             className={cn(
               "group flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
               view === "figuredata"
-                ? "border-[color-mix(in_oklab,var(--stage-figure)_50%,transparent)] bg-[color-mix(in_oklab,var(--stage-figure)_12%,var(--card))] text-foreground"
-                : "border-dashed border-[color-mix(in_oklab,var(--stage-figure)_35%,transparent)] text-foreground hover:bg-[color-mix(in_oklab,var(--stage-figure)_8%,transparent)]",
+                ? "border-[color-mix(in_oklab,var(--stage-figuredata)_50%,transparent)] bg-[color-mix(in_oklab,var(--stage-figuredata)_12%,var(--card))] text-foreground"
+                : "border-dashed border-[color-mix(in_oklab,var(--stage-figuredata)_35%,transparent)] text-foreground hover:bg-[color-mix(in_oklab,var(--stage-figuredata)_8%,transparent)]",
             )}
           >
-            <span aria-hidden className="grid size-6 place-items-center rounded-md [&_svg]:size-3.5" style={{ color: "var(--stage-figure)" }}>
+            <span aria-hidden className="grid size-6 place-items-center rounded-md [&_svg]:size-3.5" style={{ color: "var(--stage-figuredata)" }}>
               <SlidersHorizontal />
             </span>
             Figure data
           </button>
         </div>
 
-        {/* FIGURE — the editable figures. Cyan (brand). */}
+        {/* FIGURE STYLING — the editable figures. Cyan (brand). */}
         <Stage color="var(--stage-figure)" filled={figureNodes.length > 0} last />
         <Section
-          label="Figure"
+          label="Figure styling"
           count={figureNodes.length}
           color="var(--stage-figure)"
           collapsed={closedSections.has("figure")}
@@ -449,8 +449,8 @@ function CollapsedRail({
       <CollapsedDot icon={Database} label="Data" active={view === "data"} color="var(--stage-data)" filled={counts.data > 0} onClick={onData} />
       <CollapsedDot icon={Play} label="Run a skill" active={view === "skill"} color="var(--stage-skill)" filled onClick={onRunSkill} />
       <CollapsedDot icon={Table2} label="Statistics" active={view === "stats"} color="var(--stage-publish)" filled={counts.stats > 0} onClick={onExpand} />
-      <CollapsedDot icon={SlidersHorizontal} label="Figure data" active={view === "figuredata"} color="var(--stage-figure)" filled={counts.figure > 0} onClick={onExpand} />
-      <CollapsedDot icon={Sparkles} label="Figure" active={view === "figure" || view === "compare"} color="var(--stage-figure)" filled={counts.figure > 0} onClick={onExpand} />
+      <CollapsedDot icon={SlidersHorizontal} label="Figure data" active={view === "figuredata"} color="var(--stage-figuredata)" filled={counts.figure > 0} onClick={onExpand} />
+      <CollapsedDot icon={Sparkles} label="Figure styling" active={view === "figure" || view === "compare"} color="var(--stage-figure)" filled={counts.figure > 0} onClick={onExpand} />
     </nav>
   );
 }

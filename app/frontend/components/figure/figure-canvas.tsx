@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Config, Data, Layout } from "plotly.js";
 import type { FigureSpec } from "@/lib/figure-spec";
 import type { FigureStore } from "@/hooks/use-figure-store";
-import { projectOverlay } from "@/lib/figure-model";
+import { deriveFigureModel, projectOverlay } from "@/lib/figure-model";
 import { relayoutToOps, restyleToOps } from "@/lib/plotly-edits";
 import { wireMarkDrag, type Crosshair } from "./mark-drag";
 import type { MarkRole } from "@/lib/erg/marks";
@@ -65,15 +65,31 @@ export function FigureCanvas({
   const display = useMemo(() => (overlay ? projectOverlay(spec) : spec), [spec, overlay]);
   const fixed = typeof display.layout.width === "number";
 
+  // Capability-driven gesture model (docs/figure-data-capabilities/spec.md §3). Derived from the
+  // canonical spec so it's consistent across grid/overlay. ERG figures declare a no-op default
+  // (dragmode:false) so a stray drag never box-zooms; a figure that declares nothing → undefined,
+  // and we leave Plotly's defaults (box-zoom) untouched. Dot-drag is gated on landmarkMarks below.
+  const model = useMemo(() => deriveFigureModel(spec), [spec]);
+  const gesture = model.gesture;
+  const landmarkMarks = model.capabilities.landmarkMarks;
+
   const figure = useMemo(
-    () => structuredClone({ data: display.data, layout: { ...display.layout, autosize: !fixed } }),
-    [display, fixed],
+    () =>
+      structuredClone({
+        data: display.data,
+        layout: {
+          ...display.layout,
+          autosize: !fixed,
+          ...(gesture.dragmode !== undefined ? { dragmode: gesture.dragmode } : {}),
+        },
+      }),
+    [display, fixed, gesture.dragmode],
   );
 
   // Handlers read the latest spec/store via a ref so the directly-bound Plotly
   // listeners stay stable while always seeing live values.
-  const liveRef = useRef({ spec, store, onSelectTrace, overlay, onMarkMove });
-  liveRef.current = { spec, store, onSelectTrace, overlay, onMarkMove };
+  const liveRef = useRef({ spec, store, onSelectTrace, overlay, onMarkMove, landmarkMarks });
+  liveRef.current = { spec, store, onSelectTrace, overlay, onMarkMove, landmarkMarks };
 
   // Mark-drag plumbing (erg-manual-marks R5). The crosshair + live dot are positioned IMPERATIVELY
   // via refs (never React state) so a drag never re-renders the Plot. The dot moves as an HTML
@@ -161,14 +177,17 @@ export function FigureCanvas({
     el.on("plotly_restyle", h.restyle);
     el.on("plotly_click", h.click);
 
-    // (Re)wire dot-dragging on an editable, non-overlay figure with a mark-move handler. Bound
-    // regardless of whether Plotly has finished loading (the mousedown interceptor must be present
-    // so a grab on a dot never falls through to Plotly's box-zoom; the live restyle reads Plotly
-    // lazily). Dispose any prior binding first (idempotent across re-renders).
+    // (Re)wire dot-dragging — capability-gated (spec §3): only on a figure that DECLARES editable
+    // landmark marks (ERG trace / flicker-waveform), never on a UMAP scatter or any figure without
+    // them. Also requires an editable (store), non-overlay figure with a mark-move handler. Bound
+    // regardless of whether Plotly has finished loading. Dispose any prior binding first (idempotent).
     dragDisposeRef.current?.();
     dragDisposeRef.current = null;
-    const { store: st, overlay: ov, onMarkMove: omm } = liveRef.current;
-    if (st && !ov && omm) {
+    // Mark-drag needs only a mark-move handler (it sets manual_marks + re-runs) — NOT the cosmetic
+    // `store`. So it works in the read-only Figure-data preview too, not just the styler, as long as
+    // the figure declares landmark marks and isn't in the overlay projection.
+    const { overlay: ov, onMarkMove: omm, landmarkMarks: lm } = liveRef.current;
+    if (!ov && omm && lm) {
       dragDisposeRef.current = wireMarkDrag(gd as never, {
         getSpec: () => liveRef.current.spec,
         onMarkMove: omm,
@@ -180,14 +199,26 @@ export function FigureCanvas({
 
   useEffect(() => () => dragDisposeRef.current?.(), []);
 
-  const config = useMemo(
-    () => ({
+  const config = useMemo(() => {
+    // Zoom + pan stay as modebar buttons by default (a mode the user presses); a figure may drop
+    // them with capabilities.gesture.zoomTools:false. lasso/select are always off (no point-select).
+    const modeBarButtonsToRemove = [
+      "lasso2d",
+      "select2d",
+      ...(gesture.zoomTools ? [] : ["zoom2d", "pan2d", "zoomIn2d", "zoomOut2d"]),
+    ];
+    return {
       displaylogo: false,
       responsive: true,
+      // Wheel-zoom is intentionally OFF: on a multi-panel trace grid a stray scroll zooms a single
+      // panel and is fiddly to undo. Zoom stays a DELIBERATE action — the modebar Zoom button
+      // (drag a box) or Zoom in/out — and Reset axes (or a double-click) restores the default view.
+      scrollZoom: false,
       ...(displayModeBar === undefined ? {} : { displayModeBar }),
       // Direct manipulation: drag the legend / colour bar / annotations and
       // double-click titles in place. We DON'T enable blanket `editable` — that
       // also lets users drag data points (a data edit), which must stay server-side.
+      // These element drags are independent of `dragmode`, so they survive dragmode:false.
       edits: store
         ? {
             legendPosition: true,
@@ -202,11 +233,10 @@ export function FigureCanvas({
             shapePosition: true,
           }
         : undefined,
-      modeBarButtonsToRemove: ["lasso2d", "select2d"] as const,
+      modeBarButtonsToRemove,
       toImageButtonOptions: { format: "png" as const, scale: 2, filename: "selom-figure" },
-    }),
-    [store, displayModeBar],
-  );
+    };
+  }, [store, displayModeBar, gesture.zoomTools]);
 
   return (
     <div ref={containerRef} className="relative size-full">

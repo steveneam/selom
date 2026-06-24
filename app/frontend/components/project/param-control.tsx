@@ -100,7 +100,9 @@ export function ParamControl({
 
   return (
     <label className="block">
-      <span className="text-xs font-medium text-foreground">{field.label}</span>
+      {/* Reserve two lines for the label so a wrapped label (e.g. "Scale bar — amplitude (µV)")
+          and a one-line label ("Scale bar — time (ms)") keep their inputs aligned in the 2-col grid. */}
+      <span className="block min-h-8 text-xs font-medium leading-4 text-foreground">{field.label}</span>
       <input
         type={field.type === "number" ? "number" : "text"}
         value={String(v)}

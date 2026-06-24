@@ -27,23 +27,39 @@ export function FigureDataPanel({
   skillId,
   skillName,
   baseParams,
+  params,
+  onParamsChange,
   running,
   dataCheck,
   dataFit,
   seededMarks = [],
+  canEditMarks = false,
+  markLabelsShown = true,
+  onMarkLabelsShownChange,
   onRerun,
   onPickSkill,
   onPickManually,
 }: {
   skillId: string;
   skillName: string;
-  /** The figure's run params — what the controls prefill from. */
+  /** The figure's run params (what the figure was last run with) — the baseline for "dirty". */
   baseParams: SkillParams;
+  /** The STAGED params (controlled, owned by the parent so a dot drag + this panel share one source). */
+  params: SkillParams;
+  onParamsChange: React.Dispatch<React.SetStateAction<SkillParams>>;
   running: boolean;
   dataCheck?: Figure["dataCheck"];
   dataFit?: Figure["dataFit"];
-  /** Skill-seeded ERG landmark marks (meta.selom.marks) — drives the Marks editor when present. */
+  /** Skill-seeded ERG landmark marks (meta.selom.marks) — the rows the Marks editor renders. */
   seededMarks?: SeededMark[];
+  /** Whether this figure declares the landmarkMarks capability (docs/figure-data-capabilities/spec.md
+   *  §4) — the gate for the Marks editor. True for ERG trace/flicker figures even before dots are
+   *  drawn, so the operator can turn the dots on and adjust a/b (N1/P1) times. */
+  canEditMarks?: boolean;
+  /** Live state of the "show a/b labels" toggle — drives an instant client-side restyle of the
+   *  preview (the parent owns it so the preview can react without a re-run). */
+  markLabelsShown?: boolean;
+  onMarkLabelsShownChange?: (shown: boolean) => void;
   /** Re-run the skill with the edited inputs → a new figure version. */
   onRerun: (params: SkillParams) => void;
   /** From the data-check routing card: set up a suggested skill in the workbench. */
@@ -52,7 +68,8 @@ export function FigureDataPanel({
   onPickManually: () => void;
 }) {
   const { fields: schema, loading } = useSkillParams(skillId);
-  const [params, setParams] = React.useState<SkillParams>(() => ({ ...baseParams }));
+  // Params are CONTROLLED by the parent (so a dot drag and this panel write the same staged params).
+  const setParams = onParamsChange;
   // Did the user change anything from the figure's current inputs? Compared over the union of keys
   // (not just `schema`) so an edit to a non-overlay param — manual_marks / marks from the Marks
   // editor — also enables the re-run.
@@ -65,7 +82,7 @@ export function FigureDataPanel({
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <div>
         <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight text-foreground">
-          <SlidersHorizontal className="size-4 text-stage-figure" />
+          <SlidersHorizontal className="size-4 text-stage-figuredata" />
           Figure data
         </h2>
         <p className="mt-0.5 text-xs text-muted-foreground">
@@ -80,9 +97,17 @@ export function FigureDataPanel({
       )}
       {dataFit && <DataFitVerdict fit={dataFit} skillName={skillName} />}
 
-      {/* ERG landmark marks (erg-manual-marks): set/confirm a/b (or N1/P1) times, then re-run. */}
-      {seededMarks.length > 0 && (
-        <MarksEditor seededMarks={seededMarks} params={params} onParamsChange={setParams} />
+      {/* ERG landmark marks (figure-data-capabilities §4) — gated on the declared landmarkMarks
+          capability, not on dots being drawn, so the operator can turn the dots on then adjust a/b
+          (N1/P1) times and re-run. Model-fit knobs (capabilities.modelFit) are schema-reserved (v1). */}
+      {canEditMarks && (
+        <MarksEditor
+          seededMarks={seededMarks}
+          params={params}
+          onParamsChange={setParams}
+          markLabelsShown={markLabelsShown}
+          onMarkLabelsShownChange={onMarkLabelsShownChange}
+        />
       )}
 
       {/* Inputs → re-run. */}

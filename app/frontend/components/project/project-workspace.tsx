@@ -24,12 +24,15 @@ import { Card } from "@/components/ui/card";
 import { useFigureStore } from "@/hooks/use-figure-store";
 import { getSkill } from "@/lib/catalog/seed";
 import {
+  applyStagedMarks,
+  hideDotLabels,
   parseManualMarks,
   readSeededMarks,
   serializeManualMarks,
   setManualMark,
   type MarkRole,
 } from "@/lib/erg/marks";
+import { deriveFigureModel } from "@/lib/figure-model";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 import { projectStore, select, useProjects } from "@/lib/projects/store";
 import { useWorkspace, workspaceStore, wselect } from "@/lib/workspace/store";
@@ -135,10 +138,39 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // When the export popover is open, the page dims+blurs behind it but the figure
   // artboard stays crisp (it's the subject of the export) — see EditorWorkspace `elevated`.
   const [exportOpen, setExportOpen] = React.useState(false);
+  // Live "show a/b labels" toggle for the Figure-data preview (figure-data-capabilities §6). Labels
+  // are cosmetic on already-drawn dots, so hiding them is an INSTANT client-side restyle.
+  const [markLabelsShown, setMarkLabelsShown] = React.useState(true);
+  // The Figure-data inputs are STAGED here (lifted from the panel) so a dot drag and the numeric Marks
+  // editor write to the same params, the preview reflects them live, and ONE explicit re-run applies
+  // them. Reset from the open figure's own params when the figure changes (effect below).
+  const [fdParams, setFdParams] = React.useState<SkillParams>({});
   // Publish-confidence bundle for the open figure (B4): methods-text + repro record +
   // guardrails. Derived from the persisted record (Pillar 1) so it survives reload —
   // no longer transient React state.
   const activeFigure = activeFigureId ? figures.find((f) => f.id === activeFigureId) : undefined;
+  const fdBaseParams = (activeFigure?.provenance?.params ?? {}) as SkillParams;
+  // Reset the staged params + label toggle from the open figure whenever it changes (incl. after a
+  // re-run, which opens a new version → no pending changes).
+  React.useEffect(() => {
+    const p = (activeFigure?.provenance?.params as SkillParams | undefined) ?? {};
+    setFdParams({ ...p });
+    setMarkLabelsShown(p.mark_labels === undefined ? true : String(p.mark_labels) === "true");
+  }, [activeFigureId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Are there staged input changes pending a re-run? (drag / time edit / dots toggle / any input.)
+  const fdDirty = React.useMemo(() => {
+    const keys = new Set([...Object.keys(fdBaseParams), ...Object.keys(fdParams)]);
+    return [...keys].some((k) => fdParams[k] !== fdBaseParams[k]);
+  }, [fdParams, fdBaseParams]);
+  // The preview reflects the staged marks (dots move live) + the label toggle — both pure + instant.
+  const previewSpec = React.useMemo(() => {
+    let base = figure.spec ?? activeFigure?.spec;
+    if (!base) return base;
+    const manual = parseManualMarks(fdParams.manual_marks);
+    if (Object.keys(manual).length) base = applyStagedMarks(base, manual);
+    if (!markLabelsShown) base = hideDotLabels(base);
+    return base;
+  }, [figure.spec, activeFigure?.spec, fdParams.manual_marks, markLabelsShown]);
   const bundle = activeFigure
     ? {
         provenance: activeFigure.provenance,
@@ -454,17 +486,17 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     [activeFigure, datasets, resolveRunFile, designFile, figure, projectId],
   );
 
-  // Drag an ERG landmark dot on the canvas (erg-manual-marks R5) → merge the new time into the
-  // figure's manual_marks, keep the dots shown, and re-run (the same edit a typed time makes in the
-  // Marks panel; the amplitude re-measures server-side). Shares rerunFigureWithParams with the panel.
-  const onMarkMove = React.useCallback(
-    (segment: string, role: MarkRole, tMs: number) => {
-      const base = (activeFigure?.provenance?.params ?? {}) as SkillParams;
-      const manual = setManualMark(parseManualMarks(base.manual_marks), segment, role, tMs);
-      void rerunFigureWithParams({ ...base, marks: true, manual_marks: serializeManualMarks(manual) });
-    },
-    [activeFigure, rerunFigureWithParams],
-  );
+  // Drag an ERG landmark dot on the canvas (erg-manual-marks R5) → STAGE the new time into the shared
+  // figure-data params (same place the numeric Marks editor writes). The dot moves live (the preview
+  // applies the staged marks); the amplitude re-measures server-side on the next explicit re-run — so
+  // you can drag freely without a re-run per drop. The pending-changes banner prompts the re-run.
+  const onMarkMove = React.useCallback((segment: string, role: MarkRole, tMs: number) => {
+    setFdParams((p) => ({
+      ...p,
+      marks: true,
+      manual_marks: serializeManualMarks(setManualMark(parseManualMarks(p.manual_marks), segment, role, tMs)),
+    }));
+  }, []);
 
   // Freeze / unfreeze the open figure (S3.3, Decision D6) — tag it as the "paper"
   // version. Frozen figures are read-only; editing one forks a copy (see `editCopy`).
@@ -908,7 +940,26 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
               // Figure-data is figure-forward: the inputs sit beside a LIVE preview of the same
               // figure the styling box edits (shared `figure` store), so tuning a param + re-run
               // updates the graph in place — no switching to the artboard to see the change.
-              <div className="flex min-h-0 flex-1 gap-4">
+              <div className="flex min-h-0 flex-1 flex-col gap-3">
+                {/* Pending-changes prompt: any re-run input (dot drag, a/b time, dots toggle, an
+                    analysis input) stages here; the figure only updates when you re-run. */}
+                {fdDirty && (
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-stage-figuredata/45 bg-[color-mix(in_oklab,var(--stage-figuredata)_12%,var(--card))] px-3.5 py-2.5">
+                    <span className="text-xs leading-relaxed text-foreground">
+                      <span className="font-semibold text-stage-figuredata">Pending changes</span> — re-run to
+                      apply them to the measured values, the statistics table, and any downstream figures.
+                    </span>
+                    <Button
+                      size="sm"
+                      className="shrink-0"
+                      disabled={running != null}
+                      onClick={() => void rerunFigureWithParams(fdParams)}
+                    >
+                      <RefreshCw /> {running != null ? "Re-running…" : "Re-run → new version"}
+                    </Button>
+                  </div>
+                )}
+                <div className="flex min-h-0 flex-1 gap-4">
                 <div className="flex min-h-[520px] flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background">
                   <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
                     <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -930,7 +981,15 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                         style={{ width: "100%", maxWidth: "56rem", height: "min(70vh, 680px)" }}
                       >
                         <div className="min-h-0 min-w-0 flex-1">
-                          <FigureCanvas spec={(figure.spec ?? activeFigure.spec)!} displayModeBar={false} />
+                          {/* Show the modebar so the live preview always has Zoom / Pan / Autoscale /
+                              Reset-axes buttons — scroll-zoom (enabled for ERG) needs a reset to undo it.
+                              onMarkMove makes the a/b dots draggable here too (not just in the styler).
+                              previewSpec hides the dot labels client-side when the toggle is off. */}
+                          <FigureCanvas
+                            spec={(previewSpec ?? figure.spec ?? activeFigure.spec)!}
+                            displayModeBar
+                            onMarkMove={onMarkMove}
+                          />
                         </div>
                       </div>
                     </div>
@@ -946,14 +1005,20 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     skillId={activeFigure.skillId}
                     skillName={getSkill(activeFigure.skillId)?.name ?? activeFigure.skillId}
                     baseParams={activeFigure.provenance?.params ?? {}}
+                    params={fdParams}
+                    onParamsChange={setFdParams}
                     running={running != null}
                     dataCheck={activeFigure.dataCheck}
                     dataFit={activeFigure.dataFit}
                     seededMarks={readSeededMarks(figure.spec ?? activeFigure.spec)}
+                    canEditMarks={deriveFigureModel(figure.spec ?? activeFigure.spec).capabilities.landmarkMarks}
+                    markLabelsShown={markLabelsShown}
+                    onMarkLabelsShownChange={setMarkLabelsShown}
                     onRerun={rerunFigureWithParams}
                     onPickSkill={pickSuggestedSkill}
                     onPickManually={() => setView("skill")}
                   />
+                </div>
                 </div>
               </div>
             ) : (
