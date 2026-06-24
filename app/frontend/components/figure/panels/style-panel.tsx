@@ -5,7 +5,11 @@ import type { FigureStore } from "@/hooks/use-figure-store";
 import type { FigureSpec } from "@/lib/figure-spec";
 import { COLORBAR_POSITIONS, COLORWAYS, findColorbarTrace } from "@/lib/figure-spec";
 import { type FigureModel, seriesColorOps } from "@/lib/figure-model";
+import { readTones, toneOps, zExtent } from "@/lib/heatmap/colorscale";
 import { getAt, set, type Operation } from "@/lib/patch";
+
+/** One decimal place for the colour-scale sliders. */
+const r1 = (n: number) => Math.round(n * 10) / 10;
 
 /** Plotly named colour scales offered for heatmap-style figures. */
 const NAMED_SCALES = [
@@ -133,7 +137,12 @@ function LineControls({
   );
 }
 
-/** Named colour scale + reverse — for heatmaps without a separate colour-bar section. */
+/**
+ * Named colour scale + reverse + diverging re-tone (midpoint / saturation) — for heatmaps
+ * (heatmap-spec.md §D). The two sliders re-map the EXISTING z-matrix live (an instant, undoable
+ * figure-store edit, no re-run) so faint or saturated cells read clearly; they share state with the
+ * canvas colour-bar drag (drag the bar top/bottom/middle). Inference-driven, like the scale picker.
+ */
 function ColorscaleControls({
   store,
   spec,
@@ -143,13 +152,19 @@ function ColorscaleControls({
   spec: FigureSpec;
   model: FigureModel;
 }) {
-  const i0 = model.heatmapTraceIndices[0];
+  const idx = model.heatmapTraceIndices;
+  const i0 = idx[0];
   if (i0 === undefined) return null;
   const rawScale = getAt<unknown>(spec, `/data/${i0}/colorscale`);
   const scaleVal = typeof rawScale === "string" ? rawScale : "";
   const reversed = getAt<boolean>(spec, `/data/${i0}/reversescale`, false)!;
-  const apply = (leaf: string, v: unknown) =>
-    model.heatmapTraceIndices.map((i) => set(`/data/${i}/${leaf}`, v));
+  const apply = (leaf: string, v: unknown) => idx.map((i) => set(`/data/${i}/${leaf}`, v));
+
+  // Live re-tone (midpoint + symmetric saturation): bounds come from the z data extent.
+  const tones = readTones(spec);
+  const ext = zExtent(spec);
+  const sat = tones ? (tones.zmax - tones.zmin) / 2 : 0;
+  const maxAbs = tones && ext ? Math.max(ext.max - tones.zmid, tones.zmid - ext.min, 0.5) : 1;
 
   return (
     <Section title="Colour scale">
@@ -165,6 +180,28 @@ function ColorscaleControls({
         checked={reversed}
         onChange={(v) => store.commit(apply("reversescale", v))}
       />
+      {tones && ext && (
+        <>
+          <SliderField
+            label="Midpoint"
+            value={r1(tones.zmid)}
+            min={r1(ext.min)}
+            max={r1(ext.max)}
+            step={0.1}
+            store={store}
+            build={(v) => toneOps(idx, { zmid: v })}
+          />
+          <SliderField
+            label="Saturation ±"
+            value={r1(sat)}
+            min={0.2}
+            max={r1(maxAbs)}
+            step={0.1}
+            store={store}
+            build={(v) => toneOps(idx, { zmin: r1(tones.zmid - v), zmax: r1(tones.zmid + v) })}
+          />
+        </>
+      )}
     </Section>
   );
 }

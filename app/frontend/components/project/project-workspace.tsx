@@ -35,11 +35,14 @@ import {
 import { deriveFigureModel } from "@/lib/figure-model";
 import { applyStagedThresholds, readThresholds, type VolcanoThresholds } from "@/lib/volcano/thresholds";
 import {
+  captureLabels,
+  carryLabels,
   labelableGenes,
   labeledGenes,
   toggleGeneLabelOps,
   toggleLabelOps,
   type GeneLabelPoint,
+  type LabelAnnotation,
 } from "@/lib/volcano/labels";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 import { projectStore, select, useProjects } from "@/lib/projects/store";
@@ -364,6 +367,15 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     [datasetId, datasets, figure, resolveRunFile, designFile, projectId],
   );
 
+  // Capture the OPEN figure's hand-picked gene labels iff it's a volcano (the geneLabels capability), so
+  // a re-run can re-anchor them onto the fresh backend spec — they'd otherwise be lost (the auto top-N
+  // labels are a text trace, not annotations). generalization-spec §H follow-up. Non-volcano → [].
+  const captureCarryLabels = React.useCallback(
+    (): LabelAnnotation[] =>
+      figure.spec && deriveFigureModel(figure.spec).capabilities.geneLabels ? captureLabels(figure.spec) : [],
+    [figure],
+  );
+
   // Re-run a (stale) figure: replay its skill with the SAME params against the
   // dataset's CURRENT bytes, persisting a NEW version (`parentFigureId`). The prior is
   // retained, never mutated (Pillar 1). The new version stamps the current data
@@ -379,14 +391,18 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         setNeedData({ datasetId: fig.datasetId });
         return;
       }
+      // Persist hand-picked gene labels across the re-run, but only when re-running the figure that's
+      // actually open in the editor (else figure.spec is a different figure's labels).
+      const carryPrev = fig.id === activeFigureId ? captureCarryLabels() : [];
       setRunning(fig.skillId);
       try {
         const res = await runSkill(runtimeSkillId(fig.skillId), file, fig.provenance.params, designFile);
+        const nextSpec = carryPrev.length ? carryLabels(res.figure, carryPrev) : res.figure;
         const saved = projectStore.addFigure(projectId, {
           title: fig.title,
           datasetId: fig.datasetId,
           skillId: fig.skillId,
-          spec: res.figure,
+          spec: nextSpec,
           provenance: stampDataVersion(res.provenance, dataset),
           methods: res.methods,
           legend: res.legend,
@@ -398,14 +414,14 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           variantLabel: "re-run",
         });
         setActiveFigureId(saved.id);
-        figure.init(res.figure);
+        figure.init(nextSpec);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Re-run failed. Please try again.");
       } finally {
         setRunning(null);
       }
     },
-    [datasets, resolveRunFile, designFile, figure, projectId],
+    [activeFigureId, captureCarryLabels, datasets, resolveRunFile, designFile, figure, projectId],
   );
 
   // Parameter sweep (S3.1): run the open figure's skill once per value of a chosen
@@ -484,14 +500,18 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         setNeedData({ datasetId: origin.datasetId });
         return;
       }
+      // Persist hand-picked gene labels across the re-run (origin is the open figure → figure.spec is
+      // its spec): the fresh backend spec has none, so re-anchor them onto it (generalization-spec §H).
+      const carryPrev = captureCarryLabels();
       setRunning(origin.skillId);
       try {
         const res = await runSkill(runtimeSkillId(origin.skillId), file, params, designFile);
+        const nextSpec = carryPrev.length ? carryLabels(res.figure, carryPrev) : res.figure;
         const saved = projectStore.addFigure(projectId, {
           title: origin.title,
           datasetId: origin.datasetId,
           skillId: origin.skillId,
-          spec: res.figure,
+          spec: nextSpec,
           provenance: stampDataVersion(res.provenance, dataset),
           methods: res.methods,
           legend: res.legend,
@@ -503,7 +523,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           variantLabel: "edited inputs",
         });
         setActiveFigureId(saved.id);
-        figure.init(res.figure);
+        figure.init(nextSpec);
         // Stay on the Figure-data view: the live preview beside the inputs updates in place
         // (and the styling box shows the same shared figure when opened) — no view switch.
       } catch (e) {
@@ -515,7 +535,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         setRunning(null);
       }
     },
-    [activeFigure, datasets, resolveRunFile, designFile, figure, projectId],
+    [activeFigure, captureCarryLabels, datasets, resolveRunFile, designFile, figure, projectId],
   );
 
   // Drag an ERG landmark dot on the canvas (erg-manual-marks R5) → STAGE the new time into the shared

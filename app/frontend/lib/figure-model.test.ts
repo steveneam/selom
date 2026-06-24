@@ -406,6 +406,18 @@ describe("capability contract (meta.selom.capabilities)", () => {
     expect(deriveFigureModel(bare).capabilities.geneLabels).toBe(false);
   });
 
+  it("declared heatmapTones turns the heatmap colour-scale capability on (declared-only)", () => {
+    const on = deriveFigureModel(
+      spec([{ type: "heatmap", z: [[0, 1]] }], {
+        meta: { selom: { capabilities: { tools: { heatmapTones: true } } } },
+      }),
+    );
+    expect(on.capabilities.heatmapTones).toBe(true);
+    // A bare heatmap (no declaration) does NOT get the tones capability — declared-only.
+    expect(deriveFigureModel(spec([{ type: "heatmap", z: [[0, 1]] }])).capabilities.heatmapTones).toBe(false);
+    expect(deriveFigureModel(bare).capabilities.heatmapTones).toBe(false);
+  });
+
   it("falls back to landmarkMarks=true when seeded marks are present (migration)", () => {
     const m = deriveFigureModel(
       spec([{ type: "scatter", mode: "lines", line: { color: "#111" } }], {

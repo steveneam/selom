@@ -139,3 +139,41 @@ export function pointFromClick(pt: unknown): GeneLabelPoint | null {
   if (gene && typeof p?.x === "number" && typeof p?.y === "number") return { x: p.x, y: p.y, gene };
   return null;
 }
+
+/** A captured gene-label annotation (on a volcano every `layout.annotations` entry is one). */
+export type LabelAnnotation = Record<string, unknown> & { text?: unknown };
+
+/**
+ * Capture the user's hand-picked gene labels from a volcano spec — the FULL annotation objects (so their
+ * dragged position + styling survive), filtered to those carrying a gene `text`. Pair with `carryLabels`.
+ */
+export function captureLabels(spec: FigureSpec | null | undefined): LabelAnnotation[] {
+  return readAnnotations(spec).filter((a) => typeof a?.text === "string" && !!a.text) as LabelAnnotation[];
+}
+
+/**
+ * Persist hand-picked gene labels across a volcano re-run (generalization-spec §H follow-up). A re-run
+ * returns a FRESH backend spec with NONE of the user's label annotations (the auto top-N labels are a
+ * text TRACE, not annotations), so they would be lost. For each previously-labelled gene STILL plotted
+ * in the new spec, re-anchor its label at the gene's current point — keeping the user's drag offset +
+ * styling — drop labels for genes no longer plotted, and skip any gene the fresh spec already labels.
+ * Pure → returns the new spec (unchanged when nothing carries over). Safe on any figure: a spec with no
+ * gene `customdata` resolves no points, so nothing is carried.
+ */
+export function carryLabels(newSpec: FigureSpec, prev: readonly LabelAnnotation[]): FigureSpec {
+  if (!prev.length) return newSpec;
+  const present = labeledGenes(newSpec); // genes the fresh spec already labels (normally none)
+  const carried: Record<string, unknown>[] = [];
+  for (const a of prev) {
+    const gene = typeof a.text === "string" ? a.text : null;
+    if (!gene || present.has(gene)) continue;
+    const point = findPoint(newSpec, gene);
+    if (!point) continue; // gene no longer plotted → drop its label
+    carried.push({ ...a, x: point.x, y: point.y }); // re-anchor to current coords; keep ax/ay/text/styling
+    present.add(gene);
+  }
+  if (!carried.length) return newSpec;
+  const layout = (newSpec.layout ?? {}) as PlotlyLayout;
+  const annos = Array.isArray(layout.annotations) ? (layout.annotations as unknown[]) : [];
+  return { ...newSpec, layout: { ...layout, annotations: [...annos, ...carried] } };
+}

@@ -181,6 +181,11 @@ export interface FigureModel {
      *  undo/JSON-Patch), no re-run. Declared by the skill (volcano) in
      *  meta.selom.capabilities.tools.geneLabels (declared-only). Needs per-point gene `customdata`. */
     geneLabels: boolean;
+    /** Heatmap colour-scale direct-manipulation (heatmap-spec): re-tone the diverging midpoint (zmid)
+     *  + saturation clip (zmin/zmax) — a draggable colour bar + Style sliders, instant (figure store,
+     *  undoable, no re-run). Declared by the heatmap skill in meta.selom.capabilities.tools.heatmapTones
+     *  (declared-only). Gates lib/heatmap/colorscale.ts + colorbar-drag. */
+    heatmapTones: boolean;
   };
   /** Resolved plot-area gesture config (dragmode / scrollZoom / zoom tools). */
   gesture: GestureConfig;
@@ -242,6 +247,8 @@ interface SelomCapabilities {
     thresholds?: boolean;
     /** Gene labelling → click-to-label a point + a Statistics-table Label toggle (generalization-spec §H). */
     geneLabels?: boolean;
+    /** Heatmap colour-scale direct-manipulation → draggable colour bar (midpoint/clip) + Style re-tone sliders. */
+    heatmapTones?: boolean;
   };
 }
 
@@ -275,6 +282,7 @@ function resolveContract(
   modelFit: "naka_rushton" | null;
   thresholds: boolean;
   geneLabels: boolean;
+  heatmapTones: boolean;
   scalebar: boolean;
   gesture: GestureConfig;
 } {
@@ -284,6 +292,7 @@ function resolveContract(
   // Declared-only (no inference fallback): the volcano stamps these explicitly via _capabilities.py.
   const thresholds = caps?.tools?.thresholds === true;
   const geneLabels = caps?.tools?.geneLabels === true;
+  const heatmapTones = caps?.tools?.heatmapTones === true;
   const scalebar = inferredScalebar || caps?.tools?.scaleBar === true;
 
   const g = caps?.gesture;
@@ -297,7 +306,7 @@ function resolveContract(
     zoomTools: g?.zoomTools !== false,
     scrollZoom: g?.scrollZoom === true,
   };
-  return { landmarkMarks, modelFit, thresholds, geneLabels, scalebar, gesture };
+  return { landmarkMarks, modelFit, thresholds, geneLabels, heatmapTones, scalebar, gesture };
 }
 
 function readHint(spec: FigureSpec): SelomHint | null {
@@ -368,6 +377,7 @@ export function deriveFigureModel(specInput: FigureSpec | null | undefined): Fig
     modelFit: contract.modelFit,
     thresholds: contract.thresholds,
     geneLabels: contract.geneLabels,
+    heatmapTones: contract.heatmapTones,
   };
 
   const figureKind = typeof hint?.figureKind === "string" ? hint.figureKind : null;

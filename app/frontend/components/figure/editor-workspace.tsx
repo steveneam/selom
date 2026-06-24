@@ -71,7 +71,10 @@ export function EditorWorkspace({
             elevated && "z-[45]",
           )}
           style={
-            fixed ? undefined : { width: "100%", maxWidth: "64rem", height: "min(74vh, 720px)" }
+            // Fill the available width (so collapsing the side rails gives the figure more room
+            // instead of opening a dark gap), capped so it never stretches absurdly wide on an
+            // ultra-wide monitor; still centered on the dark stage when it does cap.
+            fixed ? undefined : { width: "100%", maxWidth: "88rem", height: "min(74vh, 720px)" }
           }
         >
           <div className="min-h-0 min-w-0 flex-1">

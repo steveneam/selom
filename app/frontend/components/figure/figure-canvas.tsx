@@ -9,6 +9,7 @@ import { deriveFigureModel, projectOverlay } from "@/lib/figure-model";
 import { relayoutToOps, restyleToOps } from "@/lib/plotly-edits";
 import { wireMarkDrag, type Crosshair } from "./mark-drag";
 import { wireThresholdDrag } from "./threshold-drag";
+import { wireColorbarDrag } from "./colorbar-drag";
 import type { MarkRole } from "@/lib/erg/marks";
 import type { VolcanoThresholds } from "@/lib/volcano/thresholds";
 import { pointFromClick, type GeneLabelPoint } from "@/lib/volcano/labels";
@@ -87,6 +88,7 @@ export function FigureCanvas({
   const landmarkMarks = model.capabilities.landmarkMarks;
   const thresholds = model.capabilities.thresholds;
   const geneLabels = model.capabilities.geneLabels;
+  const heatmapTones = model.capabilities.heatmapTones;
 
   const figure = useMemo(
     () =>
@@ -103,8 +105,8 @@ export function FigureCanvas({
 
   // Handlers read the latest spec/store via a ref so the directly-bound Plotly
   // listeners stay stable while always seeing live values.
-  const liveRef = useRef({ spec, store, onSelectTrace, overlay, onMarkMove, landmarkMarks, onThresholdChange, thresholds, onToggleLabel, geneLabels });
-  liveRef.current = { spec, store, onSelectTrace, overlay, onMarkMove, landmarkMarks, onThresholdChange, thresholds, onToggleLabel, geneLabels };
+  const liveRef = useRef({ spec, store, onSelectTrace, overlay, onMarkMove, landmarkMarks, onThresholdChange, thresholds, onToggleLabel, geneLabels, heatmapTones });
+  liveRef.current = { spec, store, onSelectTrace, overlay, onMarkMove, landmarkMarks, onThresholdChange, thresholds, onToggleLabel, geneLabels, heatmapTones };
 
   // Mark-drag plumbing (erg-manual-marks R5). The crosshair + live dot are positioned IMPERATIVELY
   // via refs (never React state) so a drag never re-renders the Plot. The dot moves as an HTML
@@ -115,6 +117,7 @@ export function FigureCanvas({
   const dotRef = useRef<HTMLDivElement | null>(null);
   const dragDisposeRef = useRef<(() => void) | null>(null);
   const thresholdDisposeRef = useRef<(() => void) | null>(null);
+  const colorbarDisposeRef = useRef<(() => void) | null>(null);
 
   const setCrosshair = useCallback((c: Crosshair | null) => {
     const line = lineRef.current;
@@ -234,11 +237,25 @@ export function FigureCanvas({
         onThresholdChange: otc,
       });
     }
+
+    // (Re)wire colour-bar dragging — capability-gated (heatmap-spec §E): only on a heatmap that DECLARES
+    // heatmapTones AND has an editable `store` (the styling artboard, not the read-only Figure-data
+    // preview — re-toning is a cosmetic, undoable store edit). Disposes any prior binding first.
+    colorbarDisposeRef.current?.();
+    colorbarDisposeRef.current = null;
+    const { heatmapTones: ht, store: stCb } = liveRef.current;
+    if (!ov && ht && stCb) {
+      colorbarDisposeRef.current = wireColorbarDrag(gd as never, {
+        getSpec: () => liveRef.current.spec,
+        store: stCb,
+      });
+    }
   }, [setCrosshair]);
 
   useEffect(() => () => {
     dragDisposeRef.current?.();
     thresholdDisposeRef.current?.();
+    colorbarDisposeRef.current?.();
   }, []);
 
   const config = useMemo(() => {

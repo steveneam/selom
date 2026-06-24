@@ -4,6 +4,8 @@ import type { FigureSpec } from "@/lib/figure-spec";
 import { applyPatches } from "@/lib/patch";
 
 import {
+  captureLabels,
+  carryLabels,
   findPoint,
   gatherLabelablePoints,
   isLabeled,
@@ -90,5 +92,49 @@ describe("volcano gene labels", () => {
     expect(pointFromClick({ x: 2, y: 3, customdata: ["FOO", 1e-5] })).toEqual({ x: 2, y: 3, gene: "FOO" });
     expect(pointFromClick({ x: 1, y: 1 })).toBeNull(); // no customdata → not labellable
     expect(pointFromClick(undefined)).toBeNull();
+  });
+
+  describe("persistence across a re-run (captureLabels + carryLabels)", () => {
+    it("captureLabels returns the user's gene-label annotations (full objects), skipping non-gene ones", () => {
+      const spec: FigureSpec = {
+        ...volcanoSpec(),
+        layout: { annotations: [{ x: 2, y: 3, text: "FOO", ay: -40 }, { x: 0, y: 0, text: "" }, { x: 1, y: 1 }] },
+      };
+      const captured = captureLabels(spec);
+      expect(captured).toEqual([{ x: 2, y: 3, text: "FOO", ay: -40 }]); // drops the empty + text-less entries
+    });
+
+    it("carryLabels re-anchors a labelled gene onto a fresh re-run spec, keeping its drag offset + text", () => {
+      const prev = captureLabels({ ...volcanoSpec(), layout: { annotations: [{ x: 2, y: 3, text: "FOO", ay: -40 }] } });
+      // The re-run produced a fresh spec (no annotations) where FOO sits at slightly new coords.
+      const fresh: FigureSpec = {
+        data: [{ type: "scattergl", mode: "markers", name: "up", x: [2.5], y: [3.5], customdata: [["FOO", 1e-6]] }],
+        layout: {},
+      };
+      const carried = carryLabels(fresh, prev);
+      expect(labeledGenes(carried)).toEqual(new Set(["FOO"]));
+      expect((carried.layout!.annotations as Record<string, unknown>[])[0]).toEqual({
+        x: 2.5, // re-anchored to the gene's current point
+        y: 3.5,
+        text: "FOO",
+        ay: -40, // user's drag offset preserved
+      });
+    });
+
+    it("carryLabels drops a label whose gene is no longer plotted, and is a no-op on a non-volcano spec", () => {
+      const prev = captureLabels({ ...volcanoSpec(), layout: { annotations: [{ x: 9, y: 9, text: "GONE" }] } });
+      expect(carryLabels(volcanoSpec(), prev)).toEqual(volcanoSpec()); // GONE not plotted → nothing carried
+      // No gene customdata anywhere → no labellable points → carry is a no-op.
+      const plain: FigureSpec = { data: [{ type: "heatmap", z: [[1]] }], layout: {} };
+      expect(carryLabels(plain, prev)).toBe(plain);
+      expect(carryLabels(volcanoSpec(), [])).toEqual(volcanoSpec()); // empty prev → unchanged
+    });
+
+    it("carryLabels skips a gene the fresh spec already labels (no duplicate annotation)", () => {
+      const prev = captureLabels({ ...volcanoSpec(), layout: { annotations: [{ x: 2, y: 3, text: "FOO" }] } });
+      const fresh: FigureSpec = { ...volcanoSpec(), layout: { annotations: [{ x: 2, y: 3, text: "FOO" }] } };
+      const carried = carryLabels(fresh, prev);
+      expect((carried.layout!.annotations as unknown[]).length).toBe(1); // not doubled
+    });
   });
 });
