@@ -6,7 +6,13 @@ import { ArrowUpRight, Check, Download, ExternalLink, Plus, X } from "lucide-rea
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getSkill } from "@/lib/catalog/seed";
-import type { SkillCatalogEntry } from "@/lib/catalog/types";
+import {
+  hasSkillInfo,
+  referenceHref,
+  referenceMeta,
+  referenceTypeLabel,
+} from "@/lib/catalog/references";
+import type { SkillCatalogEntry, SkillReference } from "@/lib/catalog/types";
 
 export function SkillDetail({
   skill,
@@ -120,6 +126,8 @@ export function SkillDetail({
             </Meta>
           )}
 
+          {hasSkillInfo(skill) && <SkillInfo skill={skill} />}
+
           {!verified && (
             <p className="rounded-md border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
               This skill is browsable now. It runs in a future sandbox (or once ported to a native
@@ -185,5 +193,68 @@ function Meta({ label, children }: { label: string; children: React.ReactNode })
       <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">{label}</p>
       {children}
     </div>
+  );
+}
+
+/**
+ * Provenance card (docs/skill-references/spec.md) — the "Skill Information" section: a
+ * plain-language background paragraph + the structured references that back the skill,
+ * each a linked citation. Sits beside the origin/license/tier chips so the install
+ * decision has "what is this, where's it from, can I cite it" in one place.
+ */
+function SkillInfo({ skill }: { skill: SkillCatalogEntry }) {
+  const refs = skill.references ?? [];
+  return (
+    <section
+      aria-label="Skill information"
+      className="space-y-3 rounded-lg border border-border bg-muted/30 p-4"
+    >
+      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
+        Skill Information
+      </p>
+      {skill.background && (
+        <p className="text-xs leading-relaxed text-foreground/85">{skill.background}</p>
+      )}
+      {refs.length > 0 && (
+        <ul className="space-y-2.5 border-t border-border/60 pt-3">
+          {refs.map((ref, i) => (
+            <ReferenceRow key={`${ref.title}-${i}`} reference={ref} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function ReferenceRow({ reference }: { reference: SkillReference }) {
+  const href = referenceHref(reference);
+  const meta = referenceMeta(reference);
+  return (
+    <li className="space-y-0.5">
+      <div className="flex items-baseline gap-2">
+        <span className="mt-px shrink-0 rounded border border-border px-1 py-px text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+          {referenceTypeLabel(reference.type)}
+        </span>
+        {href ? (
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="group inline-flex items-baseline gap-1 text-xs font-medium text-foreground hover:text-primary hover:underline"
+          >
+            {reference.title}
+            <ExternalLink className="size-3 shrink-0 translate-y-px text-muted-foreground group-hover:text-primary" />
+          </a>
+        ) : (
+          <span className="text-xs font-medium text-foreground/90">{reference.title}</span>
+        )}
+      </div>
+      {meta && <p className="tabular pl-[calc(0.5rem+1.6rem)] text-[11px] text-muted-foreground">{meta}</p>}
+      {reference.note && (
+        <p className="pl-[calc(0.5rem+1.6rem)] text-[11px] leading-snug text-muted-foreground/80">
+          {reference.note}
+        </p>
+      )}
+    </li>
   );
 }

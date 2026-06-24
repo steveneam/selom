@@ -17,6 +17,30 @@ export type SkillStatus = "production" | "beta" | "community";
 
 export type SkillEngine = "python" | "r" | "agent-sandbox";
 
+/** Reference type enum — mirrors the backend skills.references.REFERENCE_TYPES. */
+export type SkillReferenceType =
+  | "publication"
+  | "repo"
+  | "standard"
+  | "dataset"
+  | "method"
+  | "tool";
+
+/**
+ * A structured citation behind a skill (docs/skill-references/spec.md). Shape is a
+ * subset of what `/citations/*` returns so the two can share a formatter. `title` +
+ * `type` are required; a DOI resolves to https://doi.org/<doi>, else `url` is used.
+ */
+export interface SkillReference {
+  type: SkillReferenceType;
+  title: string;
+  authors?: string;
+  year?: number;
+  doi?: string;
+  url?: string;
+  note?: string;
+}
+
 export interface SkillCatalogEntry {
   /** Namespaced id: `<source>.<slug>`. */
   id: string;
@@ -39,4 +63,7 @@ export interface SkillCatalogEntry {
   version: string;
   /** Curation signal for sort (mock). */
   popularity: number;
+  /** Provenance card (docs/skill-references/spec.md) — present only when authored. */
+  background?: string;
+  references?: SkillReference[];
 }
