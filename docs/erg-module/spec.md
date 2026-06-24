@@ -353,7 +353,9 @@ reads `erg_waveforms_long` (a CSV `data_path`) and calls `grid_spec`. `origin="p
   and Fig 2B re-renders with the scale/label asks satisfied.
 
 ## Out of Scope
-- Photopic / cone ERG, OCT, optomotor, IHC figures (other reviewer asks, other data).
+- Photopic *cone-specific metrics* (no a-wave, OPs, flicker analysis), OCT, optomotor, IHC figures.
+  **Photopic flash *decode + trace figure* is now IN scope** (generic protocol registry, T14 below) —
+  only the cone a/b-wave *metric* and the calibrated photopic energy ladder remain pending.
 - Auto-fetching/streaming `.iwxdata` from the network share (manual paths via the manifest for now).
 - A general LabScribe-format library beyond what ERG ingest needs.
 - FE drag-to-recolor UX beyond the existing editor's layout/shape editing (Phase 3 uses what exists).
@@ -366,3 +368,27 @@ reads `erg_waveforms_long` (a CSV `data_path`) and calls `grid_spec`. `origin="p
 - **Verified:** 79 backend tests pass (primitive + 30 goldens + contract guard). Real path on the actual representatives → 42 hidden-axis panels + shared scale bar + a/b-wave table; trend reproduced via Selom's own pipeline at log 1.0: Control 211 ≫ 3'UTR 131 > PDE6B 92 > {Untreated 43, stuffer 32, CMV-GFP 43}.
 - **Reference data** (`D:\selom-data\erg-fig1e\`): reps Control 633_LE · Untreated 255_LE · PDE6B 256_RE · stuffer 248_LE · CMV-GFP 257_LE · 3'UTR 257_RE; `erg_metrics_long.csv`, `erg_waveforms_long.csv`, `fig1e_preview.png`.
 - **Pending:** render the editable figure in the Selom FE + publication export; Phase 2 (b-wave bar with individual points, Naka-Rushton intensity-response, ISCEV methods text).
+
+## T14 — protocol-generic `.iwxdata` (group-count blocker solved; photopic decodes) — 2026-06-24
+Owner steer: *"different labs/people have different group counts & intensities — take whatever's
+there and fill in the blanks for the values/labels."* So `skills/_iwx.py` no longer hard-rejects
+non-7-group files; the **intensity-group count is read from the file** (the SWEEP_INFO block-ID
+index — 7 scotopic, 5 photopic, any N) and a small **protocol registry** (`Protocol` /
+`resolve_protocol`, filename-hinted) fills the calibration blanks: known protocol → its cd·s/m²
+ladder + adaptation; unknown → ordinal `GroupN` labels + intensity `None` (honest, never fabricated).
+- **D9 — Decode is file-driven; calibration is a registry, not a hardcode.** The file is
+  self-describing about group *count/order* but NOT calibrated energy (the device `flash_param`
+  repeats across ND-filter steps — scotopic Group1–4 all read 0.7), so cd·s/m² must come from lab
+  calibration. Merge-to-target stays for the validated scotopic path (target from the protocol, not
+  the constant `7`); unknown protocols pass through untouched. Reversible: yes (registry-only).
+- **D10 — iWorx now emits `stimulus_type`** (`scotopic_flash`/`photopic_flash`/"") matching the
+  Diagnosys vocabulary, so a combined scotopic+photopic cohort filters to one mode via the existing
+  `_erg.resolve_flash_mode` instead of colliding on shared `GroupN` row labels. Scotopic output stays
+  byte-identical (title `Representative scotopic ERG`, 7 traces).
+- **Verified on real CMRI data** (`…/13. 1 Dec 2020_Experiment 11/Rd10#288_LE Photopic UV.iwxdata`):
+  decodes to 5 groups → `Representative photopic ERG` 5-row grid, intensity honestly unknown;
+  combined scotopic(7)+photopic(5) cohort renders 7 *or* 5 rows by `adaptation`, never 12. Tests:
+  `tests/test_iwx.py` (photopic-generic / scotopic-calibrated / unknown-count) + 185 ERG-family green.
+- **THE ONE PENDING BLANK:** the **5 photopic intensities (cd·s/m² + labels)** from the lab's
+  photopic calibration sheet — not in the file. Register on `PHOTOPIC.log_energies` in `_iwx.py` and
+  photopic rows light up with real intensities automatically. Until then they read `Group1…5`.

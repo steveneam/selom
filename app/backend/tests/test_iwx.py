@@ -16,14 +16,16 @@ from engine import ingest, profile_data, plan_cleaning
 from skills import _iwx
 
 
-def _make_iwxdata(path, group_uv=(20, 50, 100, 200, 150, 120, 110)):
-    """Write a minimal valid 7-intensity scotopic .iwxdata: 7 blocks, one sweep each, with a flat
+def _make_iwxdata(path, group_uv=(20, 50, 100, 200, 150, 120, 110), n_groups=7):
+    """Write a minimal valid N-intensity .iwxdata: ``n_groups`` blocks, one sweep each, with a flat
     baseline (first 50 samples = 0 mV) then a constant plateau = group_uv[gi]/UV_PER_RAW mV, so the
-    decoded+baseline-corrected trace reads group_uv[gi] µV after the pre-stim window."""
+    decoded+baseline-corrected trace reads group_uv[gi] µV after the pre-stim window. Each group gets
+    a distinct block-ID intensity index (gi+1) and a distinct flash_param so none merge. The default
+    7 groups = the scotopic protocol; pass ``n_groups=5`` for a photopic-shaped file."""
     header = b"\x00" * _iwx.HEADER_BYTES
     with zipfile.ZipFile(path, "w") as zf:
-        for gi in range(7):
-            mv = group_uv[gi] / _iwx.UV_PER_RAW
+        for gi in range(n_groups):
+            mv = group_uv[gi % len(group_uv)] / _iwx.UV_PER_RAW
             samples = bytearray(header)
             for i in range(_iwx.NUM_CH_POINTS):
                 v = 0.0 if i < _iwx._PRESTIM_SAMPLES else mv
@@ -82,17 +84,39 @@ def test_ingest_iwxdata_is_erg_certain_and_materializes(tmp_path):
     assert b.source.filename.endswith(".iwxdata")
 
 
-def test_non_scotopic_protocol_errors_honestly(tmp_path):
-    """A file that doesn't yield 7 intensity groups raises a clear ValueError (e.g. a photopic
-    export) — never a silent wrong decode."""
-    p = tmp_path / "C57Bl6 #677_LE Photopic UV.iwxdata"
-    header = b"\x00" * _iwx.HEADER_BYTES
-    with zipfile.ZipFile(str(p), "w") as zf:
-        for gi in range(3):  # only 3 intensities → not the 7-intensity scotopic protocol
-            zf.writestr(f"blk{gi}/CH000.dat", header + (struct.pack(_iwx.DOUBLE_FMT, 0.0) + b"\x00\x00") * 100)
-            zf.writestr(f"blk{gi}/blk_setting.txt", f"SWEEP_INFO 1 {gi + 1}.0 {((gi + 1) << 16) | 1}\n")
-    with pytest.raises(ValueError, match="expected 7"):
-        _iwx.load_eye(str(p))
+def test_photopic_protocol_decodes_generically(tmp_path):
+    """A 5-intensity photopic file now DECODES (owner steer 2026-06-24: solve the group-count
+    blocker, don't fork a skill) — file-driven group count, photopic adaptation tag, and intensity
+    left honestly unknown (None) until the photopic ladder is registered."""
+    p = tmp_path / "Rd10 #288_LE Photopic UV.iwxdata"
+    _make_iwxdata(str(p), n_groups=5)
+    eye = _iwx.load_eye(str(p))
+    assert len(eye.groups) == 5 and eye.protocol.name == "photopic"
+    df = _iwx.read_iwxdata(str(p))
+    assert sorted(df["intensity_group"].unique()) == [f"Group{i}" for i in range(1, 6)]
+    assert df["intensity_log_cd_s_m2"].isna().all()          # uncalibrated → honest "unknown"
+    assert (df["stimulus_type"] == "photopic_flash").all()   # tagged so it won't collide w/ scotopic
+
+
+def test_scotopic_calibration_and_stimulus_tag(tmp_path):
+    """The scotopic path stays calibrated + tagged: real log cd·s/m² ladder + scotopic_flash."""
+    p = tmp_path / "C57Bl6 #644_RE Scotopic Green.iwxdata"
+    _make_iwxdata(str(p))
+    df = _iwx.read_iwxdata(str(p))
+    assert (df["stimulus_type"] == "scotopic_flash").all()
+    assert df[df["intensity_group"] == "Group1"]["intensity_log_cd_s_m2"].iloc[0] == pytest.approx(-1.7)
+
+
+def test_unknown_count_decodes_generically(tmp_path):
+    """An unrecognised group count with no scotopic/photopic filename hint still decodes — ordinal
+    labels, no calibration, no stimulus tag — rather than being rejected on its group number."""
+    p = tmp_path / "mystery_protocol.iwxdata"
+    _make_iwxdata(str(p), n_groups=4)
+    eye = _iwx.load_eye(str(p))
+    assert len(eye.groups) == 4 and eye.protocol.name == "" and eye.protocol.log_energies == ()
+    df = _iwx.read_iwxdata(str(p))
+    assert df["intensity_log_cd_s_m2"].isna().all()
+    assert (df["stimulus_type"] == "").all()
 
 
 # --- opt-in: run against a real staged .iwxdata when present (owner machine / CMRI share) -----
