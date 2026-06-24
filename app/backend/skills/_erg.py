@@ -54,6 +54,13 @@ COLORS = {
     "AAV8-RK-PDE6B-3UTR": "#c0392b",
 }
 
+# Landmark-dot role styling (docs/figure-data-capabilities/spec.md §6). Each landmark role gets a
+# distinct colour (separate from the condition palette above) so a/b (and N1/P1) read apart at a
+# glance, and a label position that clears the trace: a/N1 are troughs → label below the dot;
+# b/P1 are peaks → label above. KEEP IN SYNC with app/frontend/lib/erg/marks.ts (ROLE_COLORS).
+ROLE_COLORS = {"a": "#2563eb", "b": "#d97706", "n1": "#0d9488", "p1": "#7c3aed"}
+ROLE_TEXTPOS = {"a": "bottom center", "b": "top center", "n1": "bottom center", "p1": "top center"}
+
 # Mains + instrument hum lines to notch (Hz). 50/100/150 = AU mains harmonics;
 # 163 = the discrete instrument line seen on flat .iwxdata traces.
 HUM_LINES = (50.0, 100.0, 150.0, 163.0)

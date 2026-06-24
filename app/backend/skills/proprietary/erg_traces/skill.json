@@ -25,6 +25,7 @@
     "scale_uv": { "type": "float", "default": 200.0, "min": 10.0, "max": 1000.0 },
     "scale_ms": { "type": "float", "default": 100.0, "min": 10.0, "max": 500.0 },
     "marks": { "type": "bool", "default": false },
+    "mark_labels": { "type": "bool", "default": true },
     "manual_marks": { "type": "str", "default": "" }
   },
   "outputs": [

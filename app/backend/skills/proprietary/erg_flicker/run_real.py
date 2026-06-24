@@ -56,6 +56,7 @@ def run(data_path: str, params: dict) -> dict:
     do_filter = to_bool(params.get("filter", True))
     lowpass = float(params.get("lowpass_hz", 120.0))
     show_marks = to_bool(params.get("marks", True))  # N1/P1 dots on each waveform panel (M3)
+    show_labels = to_bool(params.get("mark_labels", True))  # pinned N1/P1 labels (figure-data-capabilities §6)
     # Operator-set N1/P1 marks (docs/erg-manual-marks/spec.md) — applied only on the Selom
     # re-derivation path (device markers stay authoritative when the feed carries them). Keyed by
     # (condition, flicker_hz, eye); the grid aggregates over eyes, so the seed/lookup uses empty eye.
@@ -119,8 +120,10 @@ def run(data_path: str, params: dict) -> dict:
             marks = _erg.flicker_first_cycle_marks(t, y_disp, float(f)) if (show_marks and has_hz) else None
             if marks:
                 panel["markers"] = [
-                    {"x": marks["n1"][0], "y": marks["n1"][1], "label": "N1", "color": "#333333"},
-                    {"x": marks["p1"][0], "y": marks["p1"][1], "label": "P1", "color": "#333333"},
+                    {"x": marks["n1"][0], "y": marks["n1"][1], "label": "N1" if show_labels else "",
+                     "color": _erg.ROLE_COLORS["n1"], "textpos": _erg.ROLE_TEXTPOS["n1"]},
+                    {"x": marks["p1"][0], "y": marks["p1"][1], "label": "P1" if show_labels else "",
+                     "color": _erg.ROLE_COLORS["p1"], "textpos": _erg.ROLE_TEXTPOS["p1"]},
                 ]
             panels.append(panel)
             # N1→P1: prefer the device markers riding on the feed (one value per eye → mean across

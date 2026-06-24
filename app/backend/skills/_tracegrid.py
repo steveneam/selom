@@ -280,6 +280,16 @@ def grid_spec(
     if marks_meta:
         selom["marks"] = marks_meta
 
+    # Capability contract (docs/figure-data-capabilities/spec.md §1) — a trace grid is an ERG
+    # waveform figure: a stray drag must NOT box-zoom (default gesture "none") and wheel-zoom is OFF
+    # (a stray scroll zooms one panel and is fiddly to undo on a small-multiples grid); zoom/pan are
+    # DELIBERATE modebar buttons. It carries editable landmark dots iff it has marks, and owns the
+    # scale-bar primitive. Render-inert: drives the editor's tools + gestures, not pixels.
+    selom["capabilities"] = {
+        "gesture": {"default": "none", "zoomTools": True, "scrollZoom": False},
+        "tools": {"landmarkMarks": bool(marks_meta), "scaleBar": True},
+    }
+
     layout.setdefault("meta", {})["selom"] = selom
 
     return {"data": data, "layout": layout}
@@ -372,21 +382,24 @@ def _overlay_front(p: dict, xref: str, yref: str) -> list[dict]:
         })
     markers = p.get("markers")
     if markers:
+        colors = [m.get("color") or "#333333" for m in markers]
         tr = {
             "type": "scatter",
             "x": [round(float(m["x"]), 4) for m in markers],
             "y": [round(float(m["y"]), 6) for m in markers],
-            "marker": {"color": [m.get("color") or "#333333" for m in markers],
+            "marker": {"color": colors,
                        "size": float(markers[0].get("size", 7)),
                        "line": {"color": "#ffffff", "width": 0.8}, "symbol": "circle"},
             "xaxis": xref, "yaxis": yref, "showlegend": False,
         }
         labels = [str(m.get("label", "")) for m in markers]
         if any(labels):
+            # Pinned role labels (figure-data-capabilities §6): coloured to match each dot and placed
+            # per-role (trough labels below the dot, peak labels above) so they clear the trace.
             tr["mode"] = "markers+text"
             tr["text"] = labels
-            tr["textposition"] = "top center"
-            tr["textfont"] = {"size": 9}
+            tr["textposition"] = [m.get("textpos", "top center") for m in markers]
+            tr["textfont"] = {"size": 10, "color": colors}
             tr["hoverinfo"] = "x+y+text"
         else:
             tr["mode"] = "markers"

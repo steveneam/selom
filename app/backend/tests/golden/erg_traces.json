@@ -4693,7 +4693,18 @@
             "yLen": 200.0,
             "yUnit": "\u00b5V"
           }
-        ]
+        ],
+        "capabilities": {
+          "gesture": {
+            "default": "none",
+            "zoomTools": true,
+            "scrollZoom": false
+          },
+          "tools": {
+            "landmarkMarks": false,
+            "scaleBar": true
+          }
+        }
       }
     },
     "font": {

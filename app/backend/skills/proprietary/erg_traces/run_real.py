@@ -54,6 +54,9 @@ def run(data_path: str, params: dict) -> dict:
     # unchanged; the editor flips this on to drag/confirm marks. The `mark_meta` (render-inert) is
     # emitted regardless so the Marks panel can list segments + auto times without the dots showing.
     show_marks = to_bool(params.get("marks", False))
+    # Pinned a/b labels on the dots (figure-data-capabilities §6). Default on; a clean export can
+    # hide them (legend-only) without removing the dots.
+    show_labels = to_bool(params.get("mark_labels", True))
     # Central tendency: `representative` (one exemplar trace per condition×intensity — the
     # back-compatible default), `mean` (average the n eye/animal recordings at each time), or `none`
     # (no averaged trace — draw every replicate at equal weight: "individual traces only").
@@ -173,9 +176,11 @@ def run(data_path: str, params: dict) -> dict:
             if show_marks:
                 panel["markers"] = [
                     {"x": lm["a_t_ms"], "y": _y_at(panel["x"], panel["y"], lm["a_t_ms"]),
-                     "label": "a", "color": "#222222"},
+                     "label": "a" if show_labels else "", "color": _erg.ROLE_COLORS["a"],
+                     "textpos": _erg.ROLE_TEXTPOS["a"]},
                     {"x": lm["b_t_ms"], "y": _y_at(panel["x"], panel["y"], lm["b_t_ms"]),
-                     "label": "b", "color": "#c0392b"},
+                     "label": "b" if show_labels else "", "color": _erg.ROLE_COLORS["b"],
+                     "textpos": _erg.ROLE_TEXTPOS["b"]},
                 ]
             peak_uv = max(peak_uv, max((abs(v) for v in panel["y"]), default=0.0))
             panels.append(panel)
