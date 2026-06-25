@@ -7,12 +7,182 @@ top-variance genes, z-scored per gene. Both feed ``run.heatmap_spec``.
 
 from skills.heatmap.run import heatmap_spec
 from skills._plotly import jsonable
+from skills._design import load_design
 
 
 def run(data_path: str, params: dict) -> dict:
     if str(data_path).lower().endswith((".h5ad", ".h5")):
         return _scrna(data_path, params)
     return _bulk(data_path, params)
+
+
+def _resolve_annotations(params: dict) -> list[str]:
+    """The design-sheet columns the user asked to paint as annotation tracks (comma-separated)."""
+    raw = str(params.get("annotations") or "").strip()
+    return [c.strip() for c in raw.split(",") if c.strip()]
+
+
+def _col_tracks(xlabels, params: dict):
+    """Categorical annotation tracks aligned to the (already-ordered) columns, from the design sheet.
+
+    For each requested column, map every heatmap column label → its category value via the sample
+    sheet (joined on sample id), encode categories as integer codes (stable, sorted order), and
+    hand ``heatmap_spec`` the strips to paint. Returns None when no tracks are asked for or no sheet
+    is supplied; silently skips a requested column that isn't in the sheet (honest — never invents
+    a track). A column with no resolvable categories is dropped.
+    """
+    cols = _resolve_annotations(params)
+    if not cols:
+        return None
+    design = load_design(params)
+    if design is None:
+        return None
+    labels = [str(s) for s in xlabels]
+    tracks = []
+    for col in cols:
+        if col not in design.columns:
+            continue
+        values = [
+            str(design[col].get(s)) if s in design.index and design[col].get(s) is not None else ""
+            for s in labels
+        ]
+        cats = sorted({v for v in values if v and v.lower() != "nan"})
+        if not cats:
+            continue
+        index = {c: i for i, c in enumerate(cats)}
+        codes = [index.get(v, -1) for v in values]
+        tracks.append({"name": col, "categories": cats, "codes": codes})
+    return tracks or None
+
+
+_QUANT_PREF = ("condition", "genotype", "group", "treatment")
+
+
+def _two_group_columns(columns, params):
+    """The two sample groups for a log₂FC side track, from the sample sheet — the first design column
+    that splits these samples into exactly two levels (a named factor preferred). Returns
+    ``(group_a_cols, group_b_cols, label)`` sorted so the second level is the numerator, or None."""
+    design = load_design(params)
+    if design is None:
+        return None
+    labels = [str(c) for c in columns]
+    cols = list(design.columns)
+    ordered = [c for c in cols if str(c).strip().lower() in _QUANT_PREF]
+    ordered += [c for c in cols if c not in ordered]
+    for col in ordered:
+        groups: dict[str, list[str]] = {}
+        for s in labels:
+            if s in design.index:
+                v = design[col].get(s)
+                if v is not None and str(v).strip() and str(v).lower() != "nan":
+                    groups.setdefault(str(v), []).append(s)
+        if len(groups) == 2:
+            (ga, a_cols), (gb, b_cols) = sorted(groups.items())
+            return a_cols, b_cols, f"log2FC {gb}/{ga}"
+    return None
+
+
+def _row_quant(frame, params):
+    """A per-gene quantitative side-track value keyed by gene label, or None. ``variance`` / ``mean``
+    are computed from the displayed matrix (always available); ``logfc`` is the log₂ mean-count
+    fold-change between the sample sheet's two condition groups (falls back to None when no 2-level
+    design column applies)."""
+    import numpy as np
+
+    mode = str(params.get("quant_track") or "none").lower()
+    if mode in ("", "none"):
+        return None
+    labels = [str(g) for g in frame.index]
+    if mode == "variance":
+        vals = frame.var(axis=1).to_numpy()
+        return {"name": "variance", "diverging": False, "map": dict(zip(labels, map(float, vals)))}
+    if mode == "mean":
+        vals = frame.mean(axis=1).to_numpy()
+        return {"name": "mean", "diverging": False, "map": dict(zip(labels, map(float, vals)))}
+    if mode == "logfc":
+        groups = _two_group_columns(list(frame.columns), params)
+        if groups is None:
+            return None
+        a_cols, b_cols, name = groups
+        a = frame[a_cols].mean(axis=1).to_numpy()
+        b = frame[b_cols].mean(axis=1).to_numpy()
+        fc = np.log2(b + 1.0) - np.log2(a + 1.0)
+        return {"name": name, "diverging": True, "map": dict(zip(labels, map(float, fc)))}
+    return None
+
+
+def _build_row_quant(rq, ylabels):
+    """Project a ``_row_quant`` map onto the final (clustered) row order → the spec's value list."""
+    if rq is None:
+        return None
+    return {
+        "name": rq["name"],
+        "diverging": rq["diverging"],
+        "values": [rq["map"].get(str(label), 0.0) for label in ylabels],
+    }
+
+
+def _split_columns(z, xlabels, params):
+    """Block-split the columns by a categorical sample-sheet factor (heatmap-clustermap-spec §2 / refs
+    035617/035636). Re-orders the columns grouped by ``split_by``'s category, inserts a blank spacer
+    column between blocks, and returns a per-block header. Returns ``(z_list, xlabels, headers)`` —
+    ``z_list`` is a plain list-of-lists with ``None`` spacer cells (jsonable leaves NaN as invalid
+    JSON, so spacers are None, which Plotly draws as a gap). Identity when no/invalid factor or <2
+    groups (honest — never invents a split). Column clustering is dropped by the caller when splitting,
+    so the imposed categorical order isn't fought by a cross-block tree."""
+    import numpy as np
+
+    col = str(params.get("split_by") or "").strip()
+    if not col:
+        return z, xlabels, None
+    design = load_design(params)
+    if design is None or col not in design.columns:
+        return z, xlabels, None
+    labels = [str(s) for s in xlabels]
+    grp = {s: (str(design[col].get(s)) if s in design.index else "") for s in labels}
+    cats = sorted({g for g in grp.values() if g and g.lower() != "nan"})
+    if len(cats) < 2:
+        return z, xlabels, None
+
+    z = np.asarray(z, dtype=float)
+    src_cols, new_labels, headers = [], [], []
+    spacer = 0
+    for cat in cats:
+        members = [i for i, s in enumerate(labels) if grp[s] == cat]
+        if not members:
+            continue
+        if src_cols:  # a blank spacer column between blocks
+            spacer += 1
+            src_cols.append(None)
+            new_labels.append(" " * spacer)
+        start = len(new_labels)
+        for i in members:
+            src_cols.append(i)
+            new_labels.append(labels[i])
+        headers.append({"group": cat, "center": new_labels[start + len(members) // 2]})
+
+    z_list = [
+        [None if src is None else round(float(z[r, src]), 4) for src in src_cols]
+        for r in range(z.shape[0])
+    ]
+    return z_list, new_labels, headers
+
+
+def _cluster_and_split(z, ylabels, xcols, params):
+    """Cluster the rows (and columns, unless block-splitting) then optionally block-split the columns.
+    Splitting imposes the categorical column order, so column clustering + the cross-block tree are
+    dropped; rows still cluster. Returns ``(z, ylabels, xlabels, row_dendro, col_dendro, col_headers)``;
+    ``z`` is a plain list when split (with None spacers), else the clustered numpy array."""
+    split = bool(str(params.get("split_by") or "").strip())
+    cluster_params = params
+    if split:
+        mode = _resolve_cluster(params)
+        cluster_params = {**params, "cluster": "row" if mode in ("row", "both") else "none"}
+    z, ylabels, xlabels, row_dendro, col_dendro = _cluster(z, ylabels, xcols, cluster_params)
+    col_headers = None
+    if split:
+        z, xlabels, col_headers = _split_columns(z, xlabels, params)
+    return z, ylabels, xlabels, row_dendro, col_dendro, col_headers
 
 
 def _scrna(data_path: str, params: dict) -> dict:
@@ -55,9 +225,18 @@ def _scrna(data_path: str, params: dict) -> dict:
     expr["__g"] = sub.obs[groupby].astype(str).to_numpy()
     means = expr.groupby("__g")[genes].mean().T  # genes x groups
     z = _row_zscore(means, np)
-    z, genes, xlabels, row_dendro, col_dendro = _cluster(z, genes, list(means.columns), params)
+    rq = _row_quant(means, params)
+    z, genes, xlabels, row_dendro, col_dendro, col_headers = _cluster_and_split(
+        z, genes, list(means.columns), params
+    )
+    col_tracks = _col_tracks(xlabels, params)
+    row_quant = _build_row_quant(rq, genes)
+    z_list = z if isinstance(z, list) else z.tolist()
     return jsonable(
-        heatmap_spec(z.tolist(), xlabels, genes, "Marker heatmap", "cluster", row_dendro, col_dendro)
+        heatmap_spec(
+            z_list, xlabels, genes, "Marker heatmap", "cluster", row_dendro, col_dendro,
+            col_tracks, row_quant, col_headers,
+        )
     )
 
 
@@ -71,9 +250,18 @@ def _bulk(data_path: str, params: dict) -> dict:
     sub = df.loc[top]
     z = _row_zscore(sub, np)
     ylabels0 = [str(g) for g in sub.index]
-    z, ylabels, xlabels, row_dendro, col_dendro = _cluster(z, ylabels0, list(sub.columns), params)
+    rq = _row_quant(sub, params)
+    z, ylabels, xlabels, row_dendro, col_dendro, col_headers = _cluster_and_split(
+        z, ylabels0, list(sub.columns), params
+    )
+    col_tracks = _col_tracks(xlabels, params)
+    row_quant = _build_row_quant(rq, ylabels)
+    z_list = z if isinstance(z, list) else z.tolist()
     return jsonable(
-        heatmap_spec(z.tolist(), xlabels, ylabels, "Top-variable genes", "sample", row_dendro, col_dendro)
+        heatmap_spec(
+            z_list, xlabels, ylabels, "Top-variable genes", "sample", row_dendro, col_dendro,
+            col_tracks, row_quant, col_headers,
+        )
     )
 
 

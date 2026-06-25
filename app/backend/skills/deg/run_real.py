@@ -50,22 +50,12 @@ def _read_counts(data_path: str):
 
 
 def _load_design(params: dict):
-    """Read the optional design sheet (sample id in the first column or a ``SampleID``/
-    ``sample`` column) and return it indexed by sample id, or None if not supplied."""
-    import pandas as pd
+    """Read the optional design sheet → DataFrame indexed by sample id, or None if not supplied.
+    Delegates to the shared loader (``skills._design``) so the id-column heuristic is identical
+    wherever a sample sheet is consumed (deg contrast, heatmap annotation tracks)."""
+    from skills._design import load_design
 
-    design_path = params.get("_design_path")
-    if not design_path:
-        return None
-    if str(design_path).lower().endswith((".xlsx", ".xls")):
-        design = pd.read_excel(design_path)
-    else:
-        design = pd.read_csv(design_path)  # comma-delimited even when named .tsv here
-    id_col = next(
-        (c for c in design.columns if str(c).strip().lower() in ("sampleid", "sample", "sample_id", "id")),
-        design.columns[0],
-    )
-    return design.set_index(design[id_col].astype(str))
+    return load_design(params)
 
 
 def _labels_from_design_or_names(columns, params: dict):

@@ -44,6 +44,33 @@ def _run(params: dict) -> dict:
         os.unlink(path)
 
 
+def _design(path: str) -> None:
+    """A sample sheet for the 8 samples S0..S7 — two factors (condition + batch)."""
+    import pandas as pd
+
+    pd.DataFrame(
+        {
+            "sample": [f"S{i}" for i in range(8)],
+            "condition": ["wt"] * 4 + ["ko"] * 4,
+            "batch": (["b1", "b2"] * 4),
+        }
+    ).to_csv(path, index=False)
+
+
+def _run_with_design(params: dict) -> dict:
+    fd, path = tempfile.mkstemp(suffix=".csv")
+    dfd, dpath = tempfile.mkstemp(suffix="_design.csv")
+    os.close(fd)
+    os.close(dfd)
+    try:
+        _csv(path)
+        _design(dpath)
+        return run_skill("heatmap", path, {**params, "_design_path": dpath})
+    finally:
+        os.unlink(path)
+        os.unlink(dpath)
+
+
 def test_cluster_none_is_single_trace():
     fig = _run({"n_genes": 12})
     assert [t["type"] for t in fig["data"]] == ["heatmap"]
@@ -89,3 +116,100 @@ def test_cluster_both_adds_both_trees():
     assert fig["layout"]["xaxis"]["domain"] == [0.16, 1.0]
     assert fig["layout"]["yaxis"]["domain"] == [0.0, 0.84]
     assert fig["layout"]["yaxis"]["side"] == "right"
+
+
+def test_annotation_tracks_paint_aligned_strips():
+    fig = _run_with_design({"n_genes": 12, "cluster": "column", "annotations": "condition, batch"})
+    heatmaps = [t for t in fig["data"] if t["type"] == "heatmap"]
+    # main map + one strip per requested column
+    assert len(heatmaps) == 3
+    strips = [t for t in heatmaps if t.get("yaxis") in ("y4", "y5")]
+    assert len(strips) == 2
+    # first-requested track is adjacent to the heatmap (lower band) — condition on x4/y4
+    cond = next(t for t in strips if t["y"] == ["condition"])
+    assert cond["xaxis"] == "x4" and cond["yaxis"] == "y4"
+    # strips share the heatmap's column axis (matches:x) so they stay aligned under reorder
+    assert fig["layout"]["xaxis4"]["matches"] == "x"
+    # one z row, discrete scale, no colour bar of its own
+    assert len(cond["z"]) == 1 and cond["showscale"] is False
+    assert cond["zmin"] == -0.5 and cond["zmax"] == 1.5  # 2 categories (wt/ko)
+    # a per-category legend proxy exists for each category, grouped by track
+    proxies = [t for t in fig["data"] if t["type"] == "scatter" and t.get("showlegend")]
+    names = {(t["legendgroup"], t["name"]) for t in proxies}
+    assert ("condition", "wt") in names and ("condition", "ko") in names
+    assert ("batch", "b1") in names and ("batch", "b2") in names
+    # the heatmap cedes vertical room for the two strips (0.84 − 2·0.04 − 0.01)
+    assert fig["layout"]["yaxis"]["domain"] == [0.0, 0.75]
+
+
+def test_annotation_tracks_need_a_sample_sheet():
+    # annotations requested but NO design sheet → no strips, just the plain clustered map (honest)
+    fig = _run({"n_genes": 12, "cluster": "column", "annotations": "condition"})
+    assert [t["type"] for t in fig["data"]] == ["heatmap", "scatter"]
+    assert "xaxis4" not in fig["layout"]
+
+
+def test_annotation_unknown_column_is_skipped():
+    fig = _run_with_design({"n_genes": 12, "cluster": "none", "annotations": "condition, nonsense"})
+    strips = [t for t in fig["data"] if t["type"] == "heatmap" and t.get("yaxis") == "y4"]
+    assert len(strips) == 1 and strips[0]["y"] == ["condition"]
+    # no second strip for the bogus column
+    assert "yaxis5" not in fig["layout"]
+
+
+def test_quant_track_variance_bar_grows_from_zero():
+    fig = _run({"n_genes": 12, "quant_track": "variance"})
+    bars = [t for t in fig["data"] if t["type"] == "bar"]
+    assert len(bars) == 1
+    bar = bars[0]
+    # the quant bar takes the next free axis (no col tracks → x4) and shares the heatmap row axis
+    assert bar["xaxis"] == "x4" and bar["yaxis"] == "y4"
+    assert fig["layout"]["yaxis4"]["matches"] == "y"
+    # non-negative stat → axis starts at 0, single colour, no row tree but labels move right
+    assert fig["layout"]["xaxis4"]["range"][0] == 0
+    assert isinstance(bar["marker"]["color"], str)
+    assert fig["layout"]["yaxis"]["side"] == "right"  # the quant band owns the left
+    # the heatmap cedes the left 12% to the quant band
+    assert fig["layout"]["xaxis"]["domain"] == [0.12, 1.0]
+
+
+def test_quant_track_logfc_is_diverging_from_design():
+    fig = _run_with_design({"n_genes": 12, "cluster": "row", "quant_track": "logfc"})
+    bar = next(t for t in fig["data"] if t["type"] == "bar")
+    # log2FC between the design's two condition groups → 0-centred axis + per-bar sign colours
+    ax = fig["layout"][f"xaxis{bar['xaxis'][1:]}"]
+    assert ax["range"][0] == -ax["range"][1] and ax["zeroline"] is True
+    assert "log2FC" in ax["title"]["text"]
+    assert isinstance(bar["marker"]["color"], list)  # per-bar (sign) colours
+    # quant band sits right of the row tree (0.16) → heatmap starts at 0.28
+    assert fig["layout"]["xaxis"]["domain"] == [0.28, 1.0]
+
+
+def test_quant_logfc_without_design_falls_back_to_none():
+    # logfc asked but no sample sheet → no bar (honest), just the plain map
+    fig = _run({"n_genes": 12, "quant_track": "logfc"})
+    assert not [t for t in fig["data"] if t["type"] == "bar"]
+
+
+def test_split_by_blocks_columns_with_gaps_and_headers():
+    fig = _run_with_design({"n_genes": 12, "cluster": "both", "split_by": "condition"})
+    main = next(t for t in fig["data"] if t["type"] == "heatmap")
+    # columns regrouped into the two condition blocks (sorted: ko, then wt) with a blank spacer between
+    assert main["x"] == ["S4", "S5", "S6", "S7", " ", "S0", "S1", "S2", "S3"]
+    # the spacer column is a None gap in every row (Plotly draws it blank — never NaN in the JSON,
+    # which jsonable doesn't sanitise, so a real NaN would break the FE parse)
+    assert all(row[4] is None for row in main["z"])
+    assert all(v is None or isinstance(v, float) for row in main["z"] for v in row)
+    # a bold header centred over each block
+    headers = fig["layout"]["annotations"]
+    assert [h["text"] for h in headers] == ["ko", "wt"]
+    # column clustering is dropped in split mode (no top tree), the row tree still draws
+    assert "xaxis3" not in fig["layout"]
+    assert "xaxis2" in fig["layout"]
+
+
+def test_split_by_needs_a_sample_sheet():
+    fig = _run({"n_genes": 12, "cluster": "row", "split_by": "condition"})
+    main = next(t for t in fig["data"] if t["type"] == "heatmap")
+    assert " " not in main["x"]  # no spacer → no split happened
+    assert "annotations" not in fig["layout"]
