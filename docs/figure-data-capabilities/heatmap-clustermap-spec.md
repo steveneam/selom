@@ -1,8 +1,8 @@
 # Spec — Heatmap v2: publication clustermap (dendrograms · annotation tracks · rename · highlight)
 
-> **Status: BUILT — slices 1–6 + slice 7's coloured-tick-labels half SHIPPED + live-verified
-> 2026-06-25 (T20 slices 1–3 + dendrogram-size; T21 leaf-tips; T22 slices 4–6 + 7a). Remaining: slice 7b
-> coloured dendrogram BRANCHES (deferred — needs SciPy tree topology = a staged backend change, see T22 log).**
+> **Status: COMPLETE — all slices 1–7 SHIPPED + live-verified 2026-06-25 (T20 slices 1–3 +
+> dendrogram-size; T21 leaf-tips; T22 slices 4–6 + 7a coloured tick labels; T23 slice 7b coloured
+> dendrogram BRANCHES via the staged `cut_k` cut). The heatmap clustermap is one chart fully deep.**
 > Author Claude (Opus 4.8), owner Steven. Extends the shipped heatmap colour re-tone (`heatmap-spec.md`,
 > `heatmapTones`). Driven by 5 owner reference screenshots (design targets) + the owner's
 > rename-with-provenance discussion. **Build log at the bottom.**
@@ -163,12 +163,30 @@ surface in the Figure-data Inputs from the `param_spec` overlay; a re-run thread
   generalised), and stamps `meta.selom.labelColorBy.{axis}`; a Style "Colour labels by group" select
   (gated on tracks present). Instant + undoable, no re-run. Live-verified: labels recoloured red/teal to
   match the strip, Undo cleared them.
-- **Slice 7b — coloured dendrogram BRANCHES: DEFERRED (with rationale).** Doing it properly needs the
-  SciPy linkage topology (`color_threshold`/`fcluster` at a cut k) → multiple per-cluster line traces;
-  that's a **staged backend** change (the "cut" defines clusters = a clustering op) and it interacts with
-  the leaf-tips render projection (which assumes one dendro trace per axis) + block-split. Lowest-priority
-  visual of the set; scoped for a focused follow-up (pairs naturally with a `cut_k` that also drives a
-  dendrogram-cut block-split).
+- **Slice 7b — coloured dendrogram BRANCHES: BUILT (T23, the deferred piece).** A new staged `cut_k`
+  param (skill.json `param_spec` int 0–8; FE range in the Figure-data Inputs). When ≥ 2, `_order_rows`
+  passes a `color_threshold` to SciPy's `dendrogram` (the distance of the (k−1)-th largest merge =
+  exactly k clusters) with `set_link_color_palette(_CLUSTER_PALETTE)` + `above_threshold_color=
+  _TRUNK_COLOR`, and captures the per-link `color_list` into `dendro["colors"]` (the global palette is
+  reset in a `finally` so it never leaks to another figure). `run._dendro_trace`→`_dendro_traces`
+  (plural): with colours it groups the links into one scatter trace **per cluster colour** (grey trunk
+  drawn first, clusters layered over), else the single grey trace as before; `heatmap_spec` `data +=`
+  the list. Threaded for BOTH trees via `_cluster`. Default `cut_k=0` → byte-identical single-trace tree.
+  - **Leaf-tips interaction RESOLVED (the flagged risk).** Splitting one tree into several coloured
+    traces broke the leaf-tip render projection's one-trace-per-axis assumption. `lib/heatmap/
+    dendrogram.ts` is now multi-trace-aware: `traceCoords`→`traceCoordsAt(index)` + `axisTraceIndices`;
+    `maxDistance`/`leafStubs` aggregate across **all** traces of an axis; `applyDendrogramTips` extends
+    leaf bases per-trace and widens the gutter distance-axis **once per axis** using the global max
+    extension. Single-trace behaviour is identical (the existing tests still pass).
+  - **Verified live** on the real iRPE bulk (B5 project) end-to-end: `cut_k=3` + cluster=both drew the
+    row tree as green/red/blue clusters under a grey trunk + the column tree as blue/red clusters, the
+    condition strip + column reorder composing cleanly; the Row leaf-tip lever then grew the stubs across
+    all four coloured row traces (the multi-trace projection), no console errors. (A `file://` Plotly
+    pre-check on the real backend spec de-risked the geometry first.)
+  - **Follow-up still open (not built):** a `cut_k` that ALSO drives a dendrogram-cut block-split
+    (unify with slice 5's categorical split → an unsupervised split needing no sample sheet). The cut
+    threshold is factored (`_cut_threshold`) so this is a fill-in. Today `cut_k` = colour only; it
+    composes with the categorical `split_by` independently.
 - **Editor fix (owner-reported live).** A clustermap's furniture axes (tree gutters, track strips, quant
   bar) have no titles, so Plotly painted a "Click to enter … axis title" placeholder over each one (8+)
   in the editor (where inline axis-title editing is on). `figure-canvas` now drops `edits.axisTitleText`
