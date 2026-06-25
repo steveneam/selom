@@ -105,7 +105,10 @@ alongside/after as the proof. The deferred buckets wait for the explicit data-ar
 
 ## Progress
 
-- [ ] B1 · [ ] B2 · [ ] B3 · [ ] B4 · [ ] B5
+- [◐] B1 (impl + tsc/eslint/vitest green, commit `322228c`; **browser live-verify pending** — FE dev
+  server hit a Turbopack/Windows child-process panic `0xc0000142` on globals.css PostCSS this session,
+  an env issue not the change; run the forced-throw isolation + 20× switch test next session) ·
+  [ ] B2 · [ ] B3 · [ ] B4 · [ ] B5
 - [ ] C1 · [ ] C2 · [ ] C3 · [ ] C4 ⚑
 - [ ] D1 · [ ] D2 · [ ] D3 · [ ] D4 ⚑
 - [ ] E1 · [ ] E2
