@@ -1,8 +1,10 @@
 # Spec — Heatmap v2: publication clustermap (dendrograms · annotation tracks · rename · highlight)
 
-> **Status: DRAFT — owner-requested 2026-06-25, build NEXT session.** Author Claude (Opus 4.8), owner
-> Steven. Extends the shipped heatmap colour re-tone (`heatmap-spec.md`, `heatmapTones`). Driven by 5
-> owner reference screenshots (design targets) + the owner's rename-with-provenance discussion.
+> **Status: PARTIALLY BUILT — slices 1–3 + the owner's dendrogram-size control SHIPPED + live-verified
+> 2026-06-25 (session T20). Remaining: annotation tracks · block-split · quant side track (slices 4–7).**
+> Author Claude (Opus 4.8), owner Steven. Extends the shipped heatmap colour re-tone (`heatmap-spec.md`,
+> `heatmapTones`). Driven by 5 owner reference screenshots (design targets) + the owner's
+> rename-with-provenance discussion. **Build log at the bottom.**
 >
 > **Owner intent (verbatim distilled):** (1) a per-user **rename** of gene + sample labels that lives in
 > **Figure Styling** so it's a cosmetic edit and **source provenance is never lost**; (2) the
@@ -103,6 +105,33 @@ undoable, **provenance-safe**); anything that changes the numbers/ordering → a
 - Alternative clustering metrics/linkages (keep correlation→euclidean + average linkage as shipped).
 - A general "annotation track" descriptor language — heatmap-specific for v2.
 - Editing the underlying data (renames are display-only by design).
+
+## Build log — T20 (2026-06-25)
+Shipped + live-verified on the real iRPE bulk data (`D:\selom-data\alpk1\irpe_rawcounts`) through the
+full app (upload → classify → run → editor → Figure-data re-run → style edits):
+- **Slice 1 — column clustering + top dendrogram (staged).** New `cluster` param (`none|row|column|both`,
+  replaces `dendrogram`); `_order_rows` gained an `orientation` arg; `_cluster` transposes the z-matrix
+  to cluster samples and draws a TOP gutter mirroring the left one (`heatmap_spec` now takes
+  `row_dendro` + `col_dendro`, lays out 4 cases). Rows still always cluster for ordering; the mode
+  governs which trees draw + whether samples reorder. Golden regen (render-inert meta); BE tests.
+- **Slice 2 — `heatmapLabels` capability + provenance-safe rename (instant).** Backend stamps the
+  CANONICAL pre-symbol labels at `meta.selom.heatmapLabels` (render-inert) + declares the
+  `heatmapLabels` capability (`_capabilities.py` → `resolveContract`). Rename writes the axis
+  **`ticktext`** (a LAYOUT edit → client-side/instant/undoable) — NOT the data `x`/`y` (which are a
+  server re-run AND insert-not-replace under JSON-Patch), so the data stays canonical, hover shows the
+  original, and provenance is intact. `lib/heatmap/labels.ts` (pure) + a Figure-Styling "Labels" panel.
+- **Slice 3 — gene-of-interest highlight + label side (instant).** Highlight wraps a label's ticktext in
+  an inline colour span (`<span style="color:#dc2626">…`), since a uniform `tickfont.color` can't colour
+  one tick; side = `yaxis.side`. The panel hides the side toggle and shows a "pinned right" note when a
+  row dendrogram owns the left.
+- **Owner add — dendrogram-size control (instant).** Owner asked mid-session for a way to give the trees
+  more room so the connections read clearly. `lib/heatmap/dendrogram.ts` (pure) re-proportions the
+  gutter vs heatmap axis DOMAINS (a layout edit → instant, undoable, no re-run); a "Dendrogram" Style
+  section with **Row tree width** / **Column tree height** sliders (shown per present tree). Live-verified
+  spreading the column tree to 45%.
+- **Note (out of scope, carried):** a re-run resets the cosmetic ticktext labels (new version = fresh
+  spec), mirroring the old volcano behaviour before `carryLabels`. A heatmap label-persistence analog
+  could follow if the owner wants it.
 
 ## References
 - `docs/figure-data-capabilities/heatmap-spec.md` (v1 re-tone, shipped) ·
