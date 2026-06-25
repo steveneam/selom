@@ -1,12 +1,33 @@
 "use client";
 
+import * as React from "react";
 import { ColorField, Section, SelectField, SliderField, SwitchField } from "./controls";
+import { Input } from "@/components/ui/input";
 import type { FigureStore } from "@/hooks/use-figure-store";
 import type { FigureSpec } from "@/lib/figure-spec";
 import { COLORBAR_POSITIONS, COLORWAYS, findColorbarTrace } from "@/lib/figure-spec";
 import { type FigureModel, seriesColorOps } from "@/lib/figure-model";
 import { readTones, toneOps, zExtent } from "@/lib/heatmap/colorscale";
+import {
+  type LabelRow,
+  hasRowDendrogram,
+  labelRows,
+  labelSideOps,
+  mainHeatmapIndex,
+  renameLabelOps,
+  setHighlightOps,
+} from "@/lib/heatmap/labels";
+import {
+  colTreeFraction,
+  hasColTree,
+  hasDendrogram,
+  hasRowTree,
+  rowTreeFraction,
+  setColTreeOps,
+  setRowTreeOps,
+} from "@/lib/heatmap/dendrogram";
 import { getAt, set, type Operation } from "@/lib/patch";
+import { cn } from "@/lib/cn";
 
 /** One decimal place for the colour-scale sliders. */
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -47,6 +68,12 @@ export function StylePanel({
       {cap.lines && <LineControls store={store} spec={spec} model={model} />}
       {cap.colorscale && model.heatmapTraceIndices.length > 0 && (
         <ColorscaleControls store={store} spec={spec} model={model} />
+      )}
+      {model.heatmapTraceIndices.length > 0 && hasDendrogram(spec) && (
+        <DendrogramControls store={store} spec={spec} />
+      )}
+      {cap.heatmapLabels && model.heatmapTraceIndices.length > 0 && (
+        <LabelsControls store={store} spec={spec} />
       )}
 
       <PaletteControls store={store} spec={spec} model={model} />
@@ -203,6 +230,199 @@ function ColorscaleControls({
         </>
       )}
     </Section>
+  );
+}
+
+/**
+ * Dendrogram: how much room the row / column clustering trees get (owner request 2026-06-25). An
+ * instant, undoable layout edit — it re-proportions the gutter vs heatmap domains (no re-run), so a
+ * bigger tree draws the same branches more spread out and the connections read clearly. Shown only
+ * for the trees actually present.
+ */
+function DendrogramControls({ store, spec }: { store: FigureStore; spec: FigureSpec }) {
+  const showRow = hasRowTree(spec);
+  const showCol = hasColTree(spec);
+  return (
+    <Section title="Dendrogram">
+      <p className="text-[11px] leading-relaxed text-muted-foreground/80">
+        Give a tree more room to spread its branches — the clustering and data are unchanged.
+      </p>
+      {showRow && (
+        <SliderField
+          label="Row tree width"
+          value={Math.round(rowTreeFraction(spec) * 100)}
+          min={8}
+          max={45}
+          step={1}
+          unit="%"
+          store={store}
+          build={(v) => setRowTreeOps(spec, v / 100)}
+        />
+      )}
+      {showCol && (
+        <SliderField
+          label="Column tree height"
+          value={Math.round(colTreeFraction(spec) * 100)}
+          min={8}
+          max={45}
+          step={1}
+          unit="%"
+          store={store}
+          build={(v) => setColTreeOps(spec, v / 100)}
+        />
+      )}
+    </Section>
+  );
+}
+
+/**
+ * Labels: rename any gene (row) / sample (column) display label, highlight genes of interest (red),
+ * and move the gene labels to a side (heatmap-clustermap-spec §6–8). All provenance-SAFE cosmetic
+ * edits — they write the axis ticktext / side (instant, undoable, no re-run); the data, run params
+ * and methods are untouched, the original stays in the hover, and the canonical IDs stay the source
+ * of truth. Genes are searchable (a clustermap can show up to 100).
+ */
+function LabelsControls({ store, spec }: { store: FigureStore; spec: FigureSpec }) {
+  const [query, setQuery] = React.useState("");
+  if (mainHeatmapIndex(spec) < 0) return null;
+  const samples = labelRows(spec, "x");
+  const genes = labelRows(spec, "y");
+  const q = query.trim().toLowerCase();
+  const shownGenes = q
+    ? genes.filter((g) => g.text.toLowerCase().includes(q) || g.original.toLowerCase().includes(q))
+    : genes;
+
+  // Gene labels are pinned to the right when a row dendrogram owns the left gutter (035617/035636);
+  // without a tree the side is a free choice.
+  const treePinned = hasRowDendrogram(spec);
+  const geneSide = treePinned ? "right" : getAt<string>(spec, "/layout/yaxis/side", "left")!;
+
+  return (
+    <Section title="Labels">
+      <p className="text-[11px] leading-relaxed text-muted-foreground/80">
+        Renaming is display-only — the data, parameters and methods are untouched and the original
+        label stays in the hover.
+      </p>
+
+      {samples.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
+            Samples · {samples.length}
+          </h4>
+          {samples.map((r) => (
+            <RenameRow
+              key={`x${r.index}`}
+              row={r}
+              onCommit={(t) => store.commit(renameLabelOps(spec, "x", r.index, t))}
+            />
+          ))}
+        </div>
+      )}
+
+      {genes.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
+            Genes · {genes.length}
+          </h4>
+          {treePinned ? (
+            <p className="text-[11px] text-muted-foreground/70">
+              Gene labels sit on the right (the row dendrogram owns the left).
+            </p>
+          ) : (
+            <SelectField
+              label="Label side"
+              value={geneSide === "right" ? "right" : "left"}
+              options={[
+                { value: "left", label: "Left" },
+                { value: "right", label: "Right" },
+              ]}
+              onChange={(v) => store.commit(labelSideOps("y", v as "left" | "right"))}
+            />
+          )}
+          {genes.length > 8 && (
+            <Input
+              value={query}
+              placeholder="Filter genes…"
+              className="h-7 text-xs"
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          )}
+          <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+            {shownGenes.map((r) => (
+              <RenameRow
+                key={`y${r.index}`}
+                row={r}
+                onCommit={(t) => store.commit(renameLabelOps(spec, "y", r.index, t))}
+                highlighted={r.highlighted}
+                onToggleHighlight={(next) => store.commit(setHighlightOps(spec, "y", r.index, next))}
+              />
+            ))}
+            {shownGenes.length === 0 && (
+              <p className="text-[11px] text-muted-foreground/70">No genes match “{query}”.</p>
+            )}
+          </div>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+/**
+ * One compact rename row: an input pre-filled with the current label + a muted "was …" when changed,
+ * plus an optional gene-of-interest highlight toggle (red, 035617). Uncontrolled (commit on blur /
+ * Enter) and `key`-remounted on the committed text, so an external change (undo, reset) re-seeds it
+ * without a setState-in-effect.
+ */
+function RenameRow({
+  row,
+  onCommit,
+  highlighted,
+  onToggleHighlight,
+}: {
+  row: LabelRow;
+  onCommit: (text: string) => void;
+  highlighted?: boolean;
+  onToggleHighlight?: (next: boolean) => void;
+}) {
+  return (
+    <div className="space-y-0.5">
+      <div className="flex items-center gap-1.5">
+        <Input
+          key={row.text}
+          defaultValue={row.text}
+          placeholder={row.original}
+          className="h-7 flex-1 text-xs"
+          aria-label={`Rename ${row.original}`}
+          onBlur={(e) => {
+            if (e.target.value !== row.text) onCommit(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          }}
+        />
+        {onToggleHighlight && (
+          <button
+            type="button"
+            onClick={() => onToggleHighlight(!highlighted)}
+            aria-pressed={!!highlighted}
+            title={highlighted ? "Remove highlight" : "Highlight as a gene of interest"}
+            className={cn(
+              "grid size-7 shrink-0 place-items-center rounded-md border text-[13px] leading-none transition-colors",
+              highlighted
+                ? "border-red-500/70 bg-red-500/10 text-red-600"
+                : "border-input text-muted-foreground/50 hover:text-foreground",
+            )}
+          >
+            ●
+          </button>
+        )}
+      </div>
+      {row.text !== row.original && (
+        <p className="truncate pl-1 text-[10px] text-muted-foreground/70" title={row.original}>
+          was {row.original}
+        </p>
+      )}
+    </div>
   );
 }
 

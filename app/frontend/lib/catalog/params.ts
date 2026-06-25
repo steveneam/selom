@@ -122,12 +122,14 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   heatmap: [
     { key: "n_genes", label: "Genes shown", type: "range", step: 5, help: "Top genes by variance (bulk) or markers per cluster (scRNA)." },
     {
-      key: "dendrogram", label: "Dendrogram", type: "select",
+      key: "cluster", label: "Clustering", type: "select",
       options: [
         { value: "none", label: "None" },
-        { value: "row", label: "Row tree" },
+        { value: "row", label: "Rows (genes)" },
+        { value: "column", label: "Columns (samples)" },
+        { value: "both", label: "Both" },
       ],
-      help: "Draw the row hierarchical-clustering tree alongside the heatmap.",
+      help: "Draw the hierarchical-clustering dendrogram for rows, columns, or both. Rows are always clustered for ordering; this controls which trees show and whether samples are reordered.",
     },
   ],
   // Gene-set builder Phase A: apply a corpus source / a highlight panel from "Gene Sets".

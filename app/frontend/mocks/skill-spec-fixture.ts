@@ -55,7 +55,7 @@ export const SKILL_PARAM_SPECS: Record<string, BackendParamSpec> = {
   heatmap: {
     n_genes: { type: "int", default: 20, min: 5, max: 100 },
     groupby: { type: "str", default: "leiden" },
-    dendrogram: { type: "str", default: "none", options: ["none", "row"] },
+    cluster: { type: "str", default: "none", options: ["none", "row", "column", "both"] },
   },
   enrichment: {
     top_n: { type: "int", default: 12, min: 3, max: 40 },
