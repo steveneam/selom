@@ -10,7 +10,10 @@ import { type FigureModel, seriesColorOps } from "@/lib/figure-model";
 import { readTones, toneOps, zExtent } from "@/lib/heatmap/colorscale";
 import {
   type LabelRow,
+  annotationTrackNames,
+  colorLabelsByGroupOps,
   hasRowDendrogram,
+  labelColorBy,
   labelRows,
   labelSideOps,
   mainHeatmapIndex,
@@ -35,6 +38,10 @@ import { cn } from "@/lib/cn";
 
 /** One decimal place for the colour-scale sliders. */
 const r1 = (n: number) => Math.round(n * 10) / 10;
+
+/** Sentinel for the "off" choice of the group-colouring select — Radix Select rejects an empty-string
+ *  item value, and it can't collide with a real annotation-column name. */
+const COLOR_BY_NONE = "__none__";
 
 /** Plotly named colour scales offered for heatmap-style figures. */
 const NAMED_SCALES = [
@@ -340,6 +347,12 @@ function LabelsControls({ store, spec }: { store: FigureStore; spec: FigureSpec 
   const treePinned = hasRowDendrogram(spec);
   const geneSide = treePinned ? "right" : getAt<string>(spec, "/layout/yaxis/side", "left")!;
 
+  // Colour the sample labels by an annotation track's group (035617/035636) — instant, reuses the
+  // strip colours. Only offered when at least one annotation track is present. The "off" choice uses a
+  // sentinel value (Radix Select forbids an empty-string item value).
+  const tracks = annotationTrackNames(spec);
+  const colorBy = labelColorBy(spec, "x") ?? COLOR_BY_NONE;
+
   return (
     <Section title="Labels">
       <p className="text-[11px] leading-relaxed text-muted-foreground/80">
@@ -352,6 +365,19 @@ function LabelsControls({ store, spec }: { store: FigureStore; spec: FigureSpec 
           <h4 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
             Samples · {samples.length}
           </h4>
+          {tracks.length > 0 && (
+            <SelectField
+              label="Colour labels by group"
+              value={colorBy}
+              options={[
+                { value: COLOR_BY_NONE, label: "None" },
+                ...tracks.map((t) => ({ value: t, label: t })),
+              ]}
+              onChange={(v) =>
+                store.commit(colorLabelsByGroupOps(spec, "x", v === COLOR_BY_NONE ? null : v))
+              }
+            />
+          )}
           {samples.map((r) => (
             <RenameRow
               key={`x${r.index}`}

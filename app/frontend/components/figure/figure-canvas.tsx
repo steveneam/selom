@@ -93,6 +93,18 @@ export function FigureCanvas({
   // drag mode via meta.selom.capabilities.gesture. Dot-drag is gated on landmarkMarks below.
   const model = useMemo(() => deriveFigureModel(spec), [spec]);
   const gesture = model.gesture;
+  // A clustermap carries furniture axes (tree gutters x2/y2·x3/y3, annotation strips + quant bar
+  // x4/y4…) that have no titles. With inline axis-title editing on, Plotly paints a "Click to enter
+  // … axis title" placeholder over EVERY title-less axis — 8+ of them litter a full clustermap in the
+  // editor. So drop inline axis-title editing when secondary axes are present (the main sample/gene
+  // titles are auto-set and meaningful); single-axis figures keep click-to-edit titles.
+  const hasSecondaryAxes = useMemo(
+    () =>
+      Object.keys((spec?.layout ?? {}) as Record<string, unknown>).some((k) =>
+        /^[xy]axis([2-9]|\d\d)$/.test(k),
+      ),
+    [spec],
+  );
   const landmarkMarks = model.capabilities.landmarkMarks;
   const thresholds = model.capabilities.thresholds;
   const geneLabels = model.capabilities.geneLabels;
@@ -311,7 +323,7 @@ export function FigureCanvas({
             annotationTail: true,
             annotationText: true,
             titleText: true,
-            axisTitleText: true,
+            axisTitleText: !hasSecondaryAxes,
             colorbarPosition: true,
             colorbarTitleText: true,
             shapePosition: true,
@@ -320,7 +332,7 @@ export function FigureCanvas({
       modeBarButtonsToRemove,
       toImageButtonOptions: { format: "png" as const, scale: 2, filename: "selom-figure" },
     };
-  }, [store, displayModeBar, gesture.zoomTools, gesture.scrollZoom]);
+  }, [store, displayModeBar, gesture.zoomTools, gesture.scrollZoom, hasSecondaryAxes]);
 
   return (
     <div ref={containerRef} className="relative size-full">

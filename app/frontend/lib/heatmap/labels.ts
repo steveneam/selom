@@ -185,3 +185,85 @@ export function hasRowDendrogram(spec: FigureSpec | null | undefined): boolean {
   const xa = layoutObj(spec).xaxis2;
   return !!xa;
 }
+
+// --- Colour tick labels by annotation group (heatmap-clustermap-spec §8 / refs 035617/035636) -----
+//
+// The publication clustermaps colour the SAMPLE tick labels by their group (DR teal / PD red). When a
+// categorical annotation track is present (slice 4), each sample already has a group + a colour — so
+// colouring its label is a cosmetic reuse of the SAME span mechanism the gene highlight uses (a uniform
+// tickfont.color can't colour one tick). Reads the group→colour map straight off the track's legend
+// proxies + the per-column category off the strip's customdata, so the labels match the strips exactly.
+// Instant + undoable (writes the axis ticktext); the chosen track rides meta.selom.labelColorBy.{axis}
+// so the control knows the active selection (committed in the same op set → reverts together on undo).
+
+/** Wrap a label in an arbitrary colour span (the shape `parseTick` understands), or plain when null. */
+export function formatColorTick(text: string, color: string | null): string {
+  return color ? `<span style="color:${color}">${text}</span>` : text;
+}
+
+/** The annotation strips' legend proxies give each (track → category → colour). Built from the
+ *  showlegend scatter proxies the backend emits beside the strips. */
+function trackColorMap(spec: FigureSpec | null | undefined): Record<string, Record<string, string>> {
+  const data = Array.isArray(spec?.data) ? (spec!.data as PlotlyTrace[]) : [];
+  const out: Record<string, Record<string, string>> = {};
+  for (const t of data) {
+    const tt = t as { type?: string; showlegend?: boolean; legendgroup?: unknown; name?: unknown; marker?: { color?: unknown } };
+    if (tt.type !== "scatter" || tt.showlegend !== true) continue;
+    const group = typeof tt.legendgroup === "string" ? tt.legendgroup : null;
+    const name = tt.name == null ? null : String(tt.name);
+    const color = typeof tt.marker?.color === "string" ? tt.marker.color : null;
+    if (!group || name == null || !color) continue;
+    (out[group] ??= {})[name] = color;
+  }
+  return out;
+}
+
+/** The annotation-track names present on the figure (the column strips), in render order. */
+export function annotationTrackNames(spec: FigureSpec | null | undefined): string[] {
+  return Object.keys(trackColorMap(spec));
+}
+
+/** A track strip's per-column category list (from its customdata), aligned to the heatmap columns. */
+function trackCategories(spec: FigureSpec | null | undefined, trackName: string): string[] | null {
+  const data = Array.isArray(spec?.data) ? (spec!.data as PlotlyTrace[]) : [];
+  for (const t of data) {
+    const tt = t as { type?: string; y?: unknown; customdata?: unknown };
+    if (tt.type !== "heatmap" || !Array.isArray(tt.y) || tt.y.length !== 1) continue;
+    if (String(tt.y[0]) !== trackName) continue;
+    const cd = tt.customdata;
+    if (Array.isArray(cd) && Array.isArray(cd[0])) return (cd[0] as unknown[]).map(String);
+  }
+  return null;
+}
+
+/** Which track currently colours an axis's labels (meta.selom.labelColorBy.{axis}), or null. */
+export function labelColorBy(spec: FigureSpec | null | undefined, axis: LabelAxis): string | null {
+  const meta = layoutObj(spec).meta as { selom?: { labelColorBy?: Record<string, unknown> } } | undefined;
+  const v = meta?.selom?.labelColorBy?.[axis];
+  return typeof v === "string" && v ? v : null;
+}
+
+/**
+ * Colour an axis's tick labels by an annotation track's group (or clear, when `trackName` is null).
+ * Each label is wrapped in its group's colour — the SAME colour as the strip — preserving any rename.
+ * Writes the axis ticktext + stamps the chosen track at `meta.selom.labelColorBy.{axis}` in one
+ * commit (instant, undoable together). A label whose group has no colour falls back to plain.
+ */
+export function colorLabelsByGroupOps(
+  spec: FigureSpec,
+  axis: LabelAxis,
+  trackName: string | null,
+): Operation[] {
+  const rows = labelRows(spec, axis);
+  if (!rows.length) return [];
+  const colors = trackName ? trackColorMap(spec)[trackName] : null;
+  const cats = trackName ? trackCategories(spec, trackName) : null;
+  const ticks = rows.map((r, i) => {
+    const cat = cats?.[i];
+    const color = trackName && colors && cat ? (colors[cat] ?? null) : null;
+    return formatColorTick(r.text, color);
+  });
+  const prior = layoutObj(spec).meta as { selom?: { labelColorBy?: Record<string, unknown> } } | undefined;
+  const next = { ...(prior?.selom?.labelColorBy ?? {}), [axis]: trackName ?? "" };
+  return [...ticktextOps(axis, ticks), set("/layout/meta/selom/labelColorBy", next)];
+}

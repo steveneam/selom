@@ -5,11 +5,14 @@ import { applyPatches } from "@/lib/patch";
 
 import {
   HIGHLIGHT_COLOR,
+  annotationTrackNames,
   categoryLabels,
+  colorLabelsByGroupOps,
   currentTicktext,
   formatTick,
   hasRowDendrogram,
   highlightedGenes,
+  labelColorBy,
   labelRows,
   labelSideOps,
   mainHeatmapIndex,
@@ -145,5 +148,61 @@ describe("heatmap labels — highlight + side", () => {
     const spec = heatmapSpec();
     const next = applyPatches(spec, labelSideOps("y", "right"));
     expect((next.layout as Record<string, { side?: string }>).yaxis.side).toBe("right");
+  });
+});
+
+/** A heatmap with a `condition` annotation strip (customdata = per-column category) + legend proxies
+ *  (category → colour), the shape the backend emits for slice 4. */
+function specWithTrack(): FigureSpec {
+  const data: Record<string, unknown>[] = [
+    { type: "heatmap", z: [[0, 1, -2]], x: ["S1", "S2", "S3"], y: ["GENE"], colorscale: "RdBu" },
+    // the condition strip: S1/S2 = wt, S3 = ko
+    { type: "heatmap", z: [[0, 0, 1]], x: ["S1", "S2", "S3"], y: ["condition"], yaxis: "y4", xaxis: "x4", customdata: [["wt", "wt", "ko"]] },
+    // legend proxies carry the group → colour map
+    { type: "scatter", x: [null], y: [null], mode: "markers", showlegend: true, legendgroup: "condition", name: "wt", marker: { color: "#1f77b4" } },
+    { type: "scatter", x: [null], y: [null], mode: "markers", showlegend: true, legendgroup: "condition", name: "ko", marker: { color: "#d62728" } },
+  ];
+  const layout: Record<string, unknown> = {
+    xaxis: { title: { text: "sample" } },
+    yaxis: { title: { text: "gene" } },
+    meta: { selom: { heatmapLabels: { x: ["S1", "S2", "S3"], y: ["ENSG1~GENE"] } } },
+  };
+  return { data, layout } as unknown as FigureSpec;
+}
+
+describe("heatmap labels — colour by annotation group (slice 7)", () => {
+  it("annotationTrackNames lists the strips' tracks", () => {
+    expect(annotationTrackNames(specWithTrack())).toEqual(["condition"]);
+    expect(annotationTrackNames(heatmapSpec())).toEqual([]);
+  });
+
+  it("colours each sample label by its group colour and records the choice", () => {
+    const spec = specWithTrack();
+    const next = applyPatches(spec, colorLabelsByGroupOps(spec, "x", "condition"));
+    const tt = (next.layout as Record<string, { ticktext?: string[] }>).xaxis.ticktext!;
+    expect(tt).toEqual([
+      `<span style="color:#1f77b4">S1</span>`,
+      `<span style="color:#1f77b4">S2</span>`,
+      `<span style="color:#d62728">S3</span>`,
+    ]);
+    expect(labelColorBy(next, "x")).toBe("condition");
+  });
+
+  it("preserves a rename when colouring by group", () => {
+    let spec = specWithTrack();
+    spec = applyPatches(spec, renameLabelOps(spec, "x", 0, "Ctrl-1"));
+    spec = applyPatches(spec, colorLabelsByGroupOps(spec, "x", "condition"));
+    expect(labelRows(spec, "x")[0].text).toBe("Ctrl-1"); // span stripped → rename intact
+    const tt = (spec.layout as Record<string, { ticktext?: string[] }>).xaxis.ticktext!;
+    expect(tt[0]).toBe(`<span style="color:#1f77b4">Ctrl-1</span>`);
+  });
+
+  it("clearing the group colouring returns plain labels", () => {
+    let spec = specWithTrack();
+    spec = applyPatches(spec, colorLabelsByGroupOps(spec, "x", "condition"));
+    spec = applyPatches(spec, colorLabelsByGroupOps(spec, "x", null));
+    const tt = (spec.layout as Record<string, { ticktext?: string[] }>).xaxis.ticktext!;
+    expect(tt).toEqual(["S1", "S2", "S3"]);
+    expect(labelColorBy(spec, "x")).toBe(null);
   });
 });

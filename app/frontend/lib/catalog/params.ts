@@ -131,6 +131,26 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       ],
       help: "Draw the hierarchical-clustering dendrogram for rows, columns, or both. Rows are always clustered for ordering; this controls which trees show and whether samples are reordered.",
     },
+    {
+      key: "annotations", label: "Annotation tracks", type: "text",
+      placeholder: "e.g. condition, genotype",
+      help: "Comma-separated sample-sheet columns to paint as categorical colour strips above the columns. Needs a design / sample sheet (add one in the Data tab).",
+    },
+    {
+      key: "quant_track", label: "Row side bar", type: "select",
+      options: [
+        { value: "none", label: "None" },
+        { value: "variance", label: "Variance (per gene)" },
+        { value: "mean", label: "Mean expression" },
+        { value: "logfc", label: "log₂ fold-change (groups)" },
+      ],
+      help: "A quantitative bar aligned to the rows, left of the heatmap. Variance / mean come from the data; log₂FC needs a design sheet with a two-group condition column.",
+    },
+    {
+      key: "split_by", label: "Split columns by", type: "text",
+      placeholder: "e.g. condition",
+      help: "A sample-sheet column to block-split the columns into groups (gap + header per block). Column clustering is dropped in favour of the group order. Needs a design / sample sheet.",
+    },
   ],
   // Gene-set builder Phase A: apply a corpus source / a highlight panel from "Gene Sets".
   enrichment: [
