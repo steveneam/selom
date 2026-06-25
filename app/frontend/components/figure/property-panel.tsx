@@ -12,6 +12,7 @@ import { LegendPanel } from "./panels/legend-panel";
 import { DataPanel } from "./panels/data-panel";
 import { MarksPanel } from "./panels/marks-panel";
 import { PagePanel } from "./panels/page-panel";
+import { PaneBoundary } from "@/components/ui/error-boundary";
 
 const BASE_TABS = [
   { value: "style", label: "Style", icon: Palette },
@@ -76,26 +77,42 @@ export function PropertyPanel({
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
+        {/* Each tab panel is isolated (Task B1): a panel that throws while reading a
+            capability-specific shape (e.g. colour-scale on a heatmap-less spec) shows a local
+            fallback instead of unmounting the whole inspector. `spec` is the reset key — a figure
+            switch (new spec) auto-clears a stuck panel. */}
         <div className="p-4">
           <TabsContent value="style">
-            <StylePanel store={store} spec={spec} model={model} />
+            <PaneBoundary label="style" resetKeys={[spec]}>
+              <StylePanel store={store} spec={spec} model={model} />
+            </PaneBoundary>
           </TabsContent>
           <TabsContent value="axes">
-            <AxesPanel store={store} spec={spec} />
+            <PaneBoundary label="axes" resetKeys={[spec]}>
+              <AxesPanel store={store} spec={spec} />
+            </PaneBoundary>
           </TabsContent>
           <TabsContent value="legend">
-            <LegendPanel store={store} spec={spec} />
+            <PaneBoundary label="legend" resetKeys={[spec]}>
+              <LegendPanel store={store} spec={spec} />
+            </PaneBoundary>
           </TabsContent>
           <TabsContent value="data">
-            <DataPanel store={store} spec={spec} model={model} focusedSeriesKey={focusedSeriesKey} />
+            <PaneBoundary label="data" resetKeys={[spec]}>
+              <DataPanel store={store} spec={spec} model={model} focusedSeriesKey={focusedSeriesKey} />
+            </PaneBoundary>
           </TabsContent>
           {hasMarks && (
             <TabsContent value="marks">
-              <MarksPanel store={store} spec={spec} model={model} />
+              <PaneBoundary label="marks" resetKeys={[spec]}>
+                <MarksPanel store={store} spec={spec} model={model} />
+              </PaneBoundary>
             </TabsContent>
           )}
           <TabsContent value="page">
-            <PagePanel store={store} spec={spec} />
+            <PaneBoundary label="page" resetKeys={[spec]}>
+              <PagePanel store={store} spec={spec} />
+            </PaneBoundary>
           </TabsContent>
         </div>
       </ScrollArea>

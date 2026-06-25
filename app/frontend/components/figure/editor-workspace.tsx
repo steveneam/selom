@@ -6,6 +6,7 @@ import { FigureCanvas } from "./figure-canvas";
 import { PropertyPanel } from "./property-panel";
 import { SkillCard } from "./skill-card";
 import { Button } from "@/components/ui/button";
+import { PaneBoundary } from "@/components/ui/error-boundary";
 import { cn } from "@/lib/cn";
 import type { FigureStore } from "@/hooks/use-figure-store";
 import type { MarkRole } from "@/lib/erg/marks";
@@ -79,16 +80,20 @@ export function EditorWorkspace({
         >
           <div className="min-h-0 min-w-0 flex-1">
             {/* Read-only: no `store` → no edit gestures, no `edits` config, pure view. Click-to-
-                select still works (selection isn't an edit) so the inspector can focus a series. */}
-            <FigureCanvas
-              spec={spec}
-              store={readOnly ? undefined : store}
-              onSelectTrace={
-                readOnly ? undefined : (trace) => setSelection((s) => ({ trace, nonce: (s?.nonce ?? 0) + 1 }))
-              }
-              onMarkMove={readOnly ? undefined : onMarkMove}
-              onToggleLabel={readOnly ? undefined : onToggleLabel}
-            />
+                select still works (selection isn't an edit) so the inspector can focus a series.
+                Isolated (Task B1): a render throw in Plotly / a bespoke drag plug-in shows a
+                fallback instead of unmounting the editor; `spec` resets it on a figure switch. */}
+            <PaneBoundary label="canvas" title="This figure couldn't be drawn" resetKeys={[spec]}>
+              <FigureCanvas
+                spec={spec}
+                store={readOnly ? undefined : store}
+                onSelectTrace={
+                  readOnly ? undefined : (trace) => setSelection((s) => ({ trace, nonce: (s?.nonce ?? 0) + 1 }))
+                }
+                onMarkMove={readOnly ? undefined : onMarkMove}
+                onToggleLabel={readOnly ? undefined : onToggleLabel}
+              />
+            </PaneBoundary>
           </div>
         </div>
       </div>

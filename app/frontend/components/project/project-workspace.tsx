@@ -6,6 +6,7 @@ import { ArrowRight, Lock, Paintbrush, Redo2, RefreshCw, SlidersHorizontal, Spar
 import { DataPanel, type AnalyzeArgs } from "./data-panel";
 import { DataCheckPanel } from "./data-check";
 import { FigureDataPanel } from "./figure-data-panel";
+import { PaneBoundary } from "@/components/ui/error-boundary";
 import { Dropzone } from "./dropzone";
 import { WorkbenchPanel } from "./workbench-panel";
 import { PublishConfidence } from "./publish-confidence";
@@ -1088,13 +1089,21 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                           {/* Show the modebar so the live preview always has Zoom / Pan / Autoscale /
                               Reset-axes buttons — scroll-zoom (enabled for ERG) needs a reset to undo it.
                               onMarkMove makes the a/b dots draggable here too (not just in the styler).
-                              previewSpec hides the dot labels client-side when the toggle is off. */}
-                          <FigureCanvas
-                            spec={(previewSpec ?? figure.spec ?? activeFigure.spec)!}
-                            displayModeBar
-                            onMarkMove={onMarkMove}
-                            onThresholdChange={onThresholdChange}
-                          />
+                              previewSpec hides the dot labels client-side when the toggle is off.
+                              Isolated (Task B1): a staged-preview projection that throws shows a fallback
+                              rather than unmounting the Figure-data stage. */}
+                          <PaneBoundary
+                            label="preview"
+                            title="This preview couldn't be drawn"
+                            resetKeys={[activeFigure.id, previewSpec]}
+                          >
+                            <FigureCanvas
+                              spec={(previewSpec ?? figure.spec ?? activeFigure.spec)!}
+                              displayModeBar
+                              onMarkMove={onMarkMove}
+                              onThresholdChange={onThresholdChange}
+                            />
+                          </PaneBoundary>
                         </div>
                       </div>
                     </div>
@@ -1105,6 +1114,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                   )}
                 </div>
                 <div className="w-[360px] shrink-0 overflow-y-auto pr-1">
+                  {/* Isolated (Task B1): the Figure-data inputs are bespoke per skill — if a control
+                      throws on an unexpected param/spec shape, the inputs pane fails alone, not the
+                      whole stage. The figure id resets it on a switch (it already re-keys on id). */}
+                  <PaneBoundary label="figure-data" title="These inputs couldn't be shown" resetKeys={[activeFigure.id]}>
                   <FigureDataPanel
                     key={activeFigure.id}
                     skillId={activeFigure.skillId}
@@ -1125,6 +1138,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     onPickSkill={pickSuggestedSkill}
                     onPickManually={() => setView("skill")}
                   />
+                  </PaneBoundary>
                 </div>
                 </div>
               </div>
@@ -1186,7 +1200,9 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                         <Paintbrush /> Open figure
                       </Button>
                     </div>
-                    <StatsPanel table={activeStatsTable} defaultOpen labeling={statsLabeling} />
+                    <PaneBoundary label="stats" title="This table couldn't be shown" resetKeys={[activeFigure.id]}>
+                      <StatsPanel table={activeStatsTable} defaultOpen labeling={statsLabeling} />
+                    </PaneBoundary>
                   </div>
                 ) : (
                   <EmptyState
