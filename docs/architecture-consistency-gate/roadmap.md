@@ -1,6 +1,6 @@
 # Selom Architecture Gate — Agile Roadmap
 
-Last updated: 2026-06-25 23:40 +10:00 — Claude.
+Last updated: 2026-06-26 00:25 +10:00 — Claude.
 Status: **Active lane.** Owner greenlit the gate (2026-06-25): "stick with this plan…
 go with your recommended task… this is the lane until it is mostly complete; other
 tasks/plans/pillars on hold." Companion to `plan.md` (why) + `inventory.md` (current state).
@@ -61,6 +61,7 @@ The "faster / cleaner execution / caching strategy" ask. Content hash from `plan
 | **C2** | Source/render split + ETag/304 | Separate the compute cache (above) from the figure-envelope cache `(result_hash, theme_version, render_params)`; `ETag` = content hash on figure GET, honor `If-None-Match` → 304. | A theme/style/label change re-renders **without** re-running the skill; a repeat GET is a 304. | ~1 |
 | **C3** | Input cache + param-range + exec timeout | Cache the parsed input by `input_sha256`; enforce `param_spec` min/max/options at the API (400 on out-of-range); add a per-skill execution timeout. | `fc_threshold=100` on a `max:5` param → 400; a hung skill times out instead of pinning a worker; the same file isn't re-parsed across `/data/inspect` + `/run`. | ~1 |
 | **C4** | R2 object-store tier ⚑ | Promote the durable cache layer to R2 (Parquet result + JSON spec under the content hash). | — | **DEFERRED (materialization)** |
+| **C5** | Param-spec caching (don't re-fetch the immutable) | The `param_spec` is immutable per `skill_version`, yet the Figure-data Inputs re-fetch it on every open (so the "renders with no backend" figures can't show their inputs, and B3 must show an error there). Cache it: **(A, FE-only)** persist fetched specs to localStorage keyed by `skill_id`+version and seed `useSkillParams` from it (instant + offline after first fetch); **(B, cross-lane)** stamp `param_spec` into each figure's provenance at run so the figure is self-describing forever. B3's error/Retry stays as the floor. *(Owner 2026-06-26: file for Task C, not B3. Surfaced during B3 verify — the "no backend → /api/skills/{id} fails" question.)* | A re-opened figure shows its inputs with **no** describe round-trip; an offline already-run figure shows tunable inputs (re-run still needs the backend). | ~1 |
 
 ## Task D — Canonical table contract + analytical lane  ·  lane: BE  ·  D1–D3 DB-free, D4 deferred
 
@@ -124,8 +125,22 @@ alongside/after as the proof. The deferred buckets wait for the explicit data-ar
   tab rendered **"No heatmap trace in this figure."** and the Figure-data ThresholdEditor rendered
   **"No points yet…"** — editor + siblings stayed live, console clean. No-regression confirmed (a real
   iRPE clustermap still shows the full Colour-scale controls, state `ready`). Probe reverted,
-  `project-workspace.tsx` byte-identical to HEAD. · [ ] B3 · [ ] B4 · [ ] B5
-- [ ] C1 · [ ] C2 · [ ] C3 · [ ] C4 ⚑
+  `project-workspace.tsx` byte-identical to HEAD.
+- [x] B3 (pane state machine + stable skeletons; tsc/eslint green, vitest **288** [+4]; **browser
+  live-verified 2026-06-26** on the B5 iRPE project). New pure `lib/ui/pane-state.ts` — the
+  `PaneState` discriminated union (`idle|loading|empty|partial|stale|error|ready`) + predicates
+  (`hasData`/`isPending`/`isDegraded`); new `components/ui/pane-shell.tsx` `<PaneShell>` renders a
+  stable outer shape per tag (loading→skeleton · empty→note · error→message+Retry · partial/stale→
+  content+note). `useSkillParams` gained an **8s fetch timeout + AbortController + an `error` status +
+  `retry()`** (cache entry evicted on failure so Retry re-fetches) — the fix for the infinite "Loading
+  inputs…" spinner; `{fields,loading}` kept back-compatible for sweep-form/workbench-panel. The
+  Figure-data **Inputs** pane renders loading/empty/error/ready through `<PaneShell>`; `property-panel`'s
+  `!spec` `return null` became a stable empty shell. **Verified live**: a dead-backend proxy gave the
+  error state + Retry (no infinite spinner), in the same Inputs card; starting the backend + Retry
+  rendered the real param controls (`ready`). No store-mutating probe this pass → B5 fixture untouched
+  (8 figures intact). **Filed C5** (param-spec caching) per owner — the "no backend → fetch fails"
+  dependency is reducible (cache the immutable spec); B3's error/Retry is the floor. · [ ] B4 · [ ] B5
+- [ ] C1 · [ ] C2 · [ ] C3 · [ ] C4 ⚑ · [ ] C5
 - [ ] D1 · [ ] D2 · [ ] D3 · [ ] D4 ⚑
 - [ ] E1 · [ ] E2
 - [ ] F1 ⚑ · [ ] F2 ⚑ · [ ] F3 ⚑
