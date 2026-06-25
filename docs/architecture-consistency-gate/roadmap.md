@@ -1,6 +1,6 @@
 # Selom Architecture Gate — Agile Roadmap
 
-Last updated: 2026-06-25 20:10 +10:00 — Claude.
+Last updated: 2026-06-25 23:40 +10:00 — Claude.
 Status: **Active lane.** Owner greenlit the gate (2026-06-25): "stick with this plan…
 go with your recommended task… this is the lane until it is mostly complete; other
 tasks/plans/pillars on hold." Companion to `plan.md` (why) + `inventory.md` (current state).
@@ -105,10 +105,26 @@ alongside/after as the proof. The deferred buckets wait for the explicit data-ar
 
 ## Progress
 
-- [◐] B1 (impl + tsc/eslint/vitest green, commit `322228c`; **browser live-verify pending** — FE dev
-  server hit a Turbopack/Windows child-process panic `0xc0000142` on globals.css PostCSS this session,
-  an env issue not the change; run the forced-throw isolation + 20× switch test next session) ·
-  [ ] B2 · [ ] B3 · [ ] B4 · [ ] B5
+- [x] B1 (impl + tsc/eslint/vitest green, commit `322228c`; **browser live-verified 2026-06-25** on
+  real B5 iRPE clustermap — a `?b1throw` probe forced a StylePanel throw: the Style pane showed its
+  local fallback while the 11-trace canvas + Axes/Legend/Data/Page tabs + toolbar + skill card stayed
+  live [console: "handled by the <ErrorBoundary>"], and switching to a plain heatmap auto-cleared the
+  boundary [resetKeys=[spec]] → Style re-rendered. Probe reverted, tree clean. ⚠ Turbopack
+  `0xc0000142` recurred even in a fresh shell → ran the dev server on **`npx next dev --webpack`** as
+  the env workaround)
+- [x] B2 (fail-safe at the spec→component seam; tsc/eslint green, vitest **284** [+15]; **browser
+  live-verified 2026-06-25** on the B5 iRPE project). New pure `lib/figure/contract.ts`:
+  `validateFigureContract` coerces ANY input (null/string/array/partial) to a render-safe
+  `{data,layout}` so the figure-store `init` NEVER throws (wired in `use-figure-store.ts`;
+  `normalizeSpec` also hardened as defense-in-depth); `heatmapColorscaleState` resolves the heatmap
+  colour-scale section to `ready|empty|hidden` so a non-heatmap colorscale (trajectory/markers) stays
+  hidden as before. The 3 named readers (`readTones`/`readThresholds`/`readSeededMarks`) confirmed
+  null-safe + locked with seam tests. **Both acceptance cases verified live** via a `?b2probe`-gated
+  contrived spec (declares heatmapTones+thresholds, no heatmap trace, empty volcano buckets): the Style
+  tab rendered **"No heatmap trace in this figure."** and the Figure-data ThresholdEditor rendered
+  **"No points yet…"** — editor + siblings stayed live, console clean. No-regression confirmed (a real
+  iRPE clustermap still shows the full Colour-scale controls, state `ready`). Probe reverted,
+  `project-workspace.tsx` byte-identical to HEAD. · [ ] B3 · [ ] B4 · [ ] B5
 - [ ] C1 · [ ] C2 · [ ] C3 · [ ] C4 ⚑
 - [ ] D1 · [ ] D2 · [ ] D3 · [ ] D4 ⚑
 - [ ] E1 · [ ] E2
