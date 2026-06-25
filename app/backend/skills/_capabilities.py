@@ -23,10 +23,13 @@ _PROFILES: dict[str, dict] = {
     # Heatmap: the diverging colour scale is directly re-tonable — drag the colour bar (top → zmax,
     # bottom → zmin, middle → zmid) or the Style midpoint/saturation sliders re-tone the existing
     # z-matrix LIVE (an instant figure-store edit, undoable, NO re-run; the genes/clustering change
-    # stays a staged re-run). heatmap-spec.md.
+    # stays a staged re-run). heatmap-spec.md. AND the gene/sample axis labels are RENAMABLE +
+    # highlightable in Figure Styling — a cosmetic axis-ticktext edit that never touches the data,
+    # so the canonical IDs (kept in meta.selom.heatmapLabels + hover) stay the source of truth
+    # (heatmap-clustermap-spec §6–8).
     "heatmap": {
         "gesture": {"default": "none", "zoomTools": True, "scrollZoom": False},
-        "tools": {"heatmapTones": True},
+        "tools": {"heatmapTones": True, "heatmapLabels": True},
     },
 }
 

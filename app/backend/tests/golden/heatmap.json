@@ -266,6 +266,53 @@
         }
       }
     },
+    "meta": {
+      "selom": {
+        "heatmapLabels": {
+          "x": [
+            "c0",
+            "c1",
+            "c2",
+            "c3",
+            "c4",
+            "c5"
+          ],
+          "y": [
+            "GENE1",
+            "GENE2",
+            "GENE3",
+            "GENE4",
+            "GENE5",
+            "GENE6",
+            "GENE7",
+            "GENE8",
+            "GENE9",
+            "GENE10",
+            "GENE11",
+            "GENE12",
+            "GENE13",
+            "GENE14",
+            "GENE15",
+            "GENE16",
+            "GENE17",
+            "GENE18",
+            "GENE19",
+            "GENE20"
+          ]
+        },
+        "capabilities": {
+          "gesture": {
+            "default": "none",
+            "zoomTools": true,
+            "scrollZoom": false
+          },
+          "tools": {
+            "heatmapTones": true,
+            "heatmapLabels": true
+          }
+        }
+      }
+    },
     "font": {
       "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
       "size": 13,
@@ -303,20 +350,6 @@
       },
       "bgcolor": "rgba(0,0,0,0)",
       "bordercolor": "rgba(0,0,0,0)"
-    },
-    "meta": {
-      "selom": {
-        "capabilities": {
-          "gesture": {
-            "default": "none",
-            "zoomTools": true,
-            "scrollZoom": false
-          },
-          "tools": {
-            "heatmapTones": true
-          }
-        }
-      }
     }
   }
 }

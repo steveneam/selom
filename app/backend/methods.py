@@ -177,14 +177,20 @@ def _volcano(p: dict):
 
 
 def _heatmap(p: dict):
+    cluster = str(p.get("cluster") or "none").lower()  # none | row | column | both
+    cols = (
+        " Samples were likewise clustered (correlation distance, average linkage) and a column "
+        "dendrogram is drawn above the columns."
+        if cluster in ("column", "both") else ""
+    )
     tree = (
         " and the clustering dendrogram is drawn alongside the rows"
-        if str(p.get("dendrogram") or "none").lower() == "row" else ""
+        if cluster in ("row", "both") else ""
     )
     text = (
         f"Expression of the top {p['n_genes']} genes was z-scored per gene and displayed as a heatmap "
         f"grouped by {p['groupby']}. Rows were ordered by hierarchical clustering (correlation distance, "
-        f"average linkage; SciPy){tree}."
+        f"average linkage; SciPy){tree}.{cols}"
     )
     return text, [SCIPY]
 
