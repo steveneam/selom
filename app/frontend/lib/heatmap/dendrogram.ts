@@ -182,39 +182,45 @@ function dendroTraces(spec: FigureSpec | null | undefined): Array<{ index: numbe
   return out;
 }
 
-/** The distance (col → y, row → x) and position (col → x, row → y) coordinate arrays of a tree's trace. */
-function traceCoords(
+/** The dendrogram trace indices for an axis. Usually one; a `cut_k` cut colours the branches into
+ *  several traces on the SAME gutter axis, so the leaf-tip logic spans all of them. */
+function axisTraceIndices(spec: FigureSpec | null | undefined, axis: TipAxis): number[] {
+  return dendroTraces(spec)
+    .filter((t) => t.axis === axis)
+    .map((t) => t.index);
+}
+
+/** The distance (col → y, row → x) and position (col → x, row → y) coordinate arrays of a SPECIFIC
+ *  dendrogram trace (by index — one of possibly several coloured branch traces on the axis). */
+function traceCoordsAt(
   spec: FigureSpec,
+  index: number,
   axis: TipAxis,
 ): { index: number; dist: unknown[]; pos: unknown[] } | null {
-  const hit = dendroTraces(spec).find((t) => t.axis === axis);
-  if (!hit) return null;
-  const t = (spec.data as PlotlyTrace[])[hit.index];
+  const t = (spec.data as PlotlyTrace[] | undefined)?.[index];
+  if (!t) return null;
   const dist = axis === "col" ? t.y : t.x;
   const pos = axis === "col" ? t.x : t.y;
   if (!Array.isArray(dist) || !Array.isArray(pos)) return null;
-  return { index: hit.index, dist: dist as unknown[], pos: pos as unknown[] };
+  return { index, dist: dist as unknown[], pos: pos as unknown[] };
 }
 
-/** The tree's max merge distance (the root) — for the lever's range + the projected gutter top. */
+/** The tree's max merge distance (the root) — for the lever's range + the projected gutter top.
+ *  Spans every coloured branch trace of the axis (the root may live on the grey trunk trace). */
 export function maxDistance(spec: FigureSpec, axis: TipAxis): number {
-  const c = traceCoords(spec, axis);
-  if (!c) return 0;
   let m = 0;
-  for (const v of c.dist) if (isNum(v) && v > m) m = v;
+  for (const index of axisTraceIndices(spec, axis)) {
+    const c = traceCoordsAt(spec, index, axis);
+    if (!c) continue;
+    for (const v of c.dist) if (isNum(v) && v > m) m = v;
+  }
   return m;
 }
 
-/**
- * Every leaf stub of a tree: its position, key, and first-merge distance (the stub's far end). The
- * SciPy polyline is links of 4 points (a ⊓: left arm, merge bar, right arm) + a `null` separator;
- * an arm whose base sits at distance 0 is a leaf. Reused by the drag for hit-testing + highlight.
- */
-export function leafStubs(spec: FigureSpec, axis: TipAxis): LeafStub[] {
-  const c = traceCoords(spec, axis);
-  if (!c) return [];
-  const { dist, pos } = c;
-  const out: LeafStub[] = [];
+/** Scan one trace's (dist, pos) coordinate arrays for leaf stubs, appending to `out`. The SciPy
+ *  polyline is links of 4 points (a ⊓: left arm, merge bar, right arm) + a `null` separator; an arm
+ *  whose base sits at distance 0 is a leaf. */
+function scanLeafStubs(dist: unknown[], pos: unknown[], out: LeafStub[]): void {
   for (let k = 0; k + 3 < dist.length; ) {
     if (!isNum(dist[k])) {
       k++;
@@ -234,6 +240,19 @@ export function leafStubs(spec: FigureSpec, axis: TipAxis): LeafStub[] {
     k += 4;
     while (k < dist.length && !isNum(dist[k])) k++; // skip the null separator(s)
   }
+}
+
+/**
+ * Every leaf stub of a tree: its position, key, and first-merge distance (the stub's far end).
+ * Aggregated across all of the axis's traces, so a `cut_k`-coloured tree (whose leaves are split
+ * across per-cluster traces) still yields every leaf. Reused by the drag for hit-testing + highlight.
+ */
+export function leafStubs(spec: FigureSpec, axis: TipAxis): LeafStub[] {
+  const out: LeafStub[] = [];
+  for (const index of axisTraceIndices(spec, axis)) {
+    const c = traceCoordsAt(spec, index, axis);
+    if (c) scanLeafStubs(c.dist, c.pos, out);
+  }
   return out;
 }
 
@@ -251,43 +270,55 @@ export function leafTipLength(spec: FigureSpec, axis: TipAxis, leafKey: string):
  * is preserved and only the stubs lengthen. The gutter's distance-axis range widens to `[-E, top]`
  * (col) / `[top, -E]` (row, reversed) so the longer stubs stay inside the gutter without overlapping
  * the heatmap. Identity (today's render) when no pref / no tree / `gap=0` and no per-leaf tips.
+ *
+ * Works per AXIS, not per trace: a `cut_k`-coloured tree spreads its leaves across several per-cluster
+ * traces on the same gutter axis, so every such trace is grown, and the gutter range is widened ONCE
+ * (using the global max extension) so all the coloured branches share a consistent distance scale.
  */
 export function applyDendrogramTips(spec: FigureSpec): FigureSpec {
   const prefs = readDendrogramTips(spec);
   if (!prefs.col && !prefs.row) return spec; // fast path: no pref → today's render
-  const traces = dendroTraces(spec);
-  if (!traces.length) return spec;
+  if (!dendroTraces(spec).length) return spec;
 
   let newData: PlotlyTrace[] | null = null;
   const newLayout: Record<string, unknown> = { ...(spec.layout as Record<string, unknown>) };
   let changed = false;
 
-  for (const { index, axis } of traces) {
+  for (const axis of ["row", "col"] as TipAxis[]) {
     const pref = prefs[axis];
     const hasTips = pref?.tips && Object.keys(pref.tips).some((k) => (pref.tips![k] ?? 0) > 0);
     if (!pref || (!(pref.gap && pref.gap > 0) && !hasTips)) continue;
-    const c = traceCoords(spec, axis);
-    if (!c) continue;
-    const { dist, pos } = c;
-    const nextDist = dist.slice();
+    const indices = axisTraceIndices(spec, axis);
+    if (!indices.length) continue;
+
     let maxE = 0;
-    for (let k = 0; k < nextDist.length; k++) {
-      const d = nextDist[k];
-      const p = pos[k];
-      if (!isNum(d) || !isNum(p) || Math.abs(d) > TIP_EPS) continue; // leaf bases only
-      const e = (pref.gap ?? 0) + (pref.tips?.[leafKeyOf(p)] ?? 0);
-      if (e > 0) {
-        nextDist[k] = -e;
-        if (e > maxE) maxE = e;
+    for (const index of indices) {
+      const c = traceCoordsAt(spec, index, axis);
+      if (!c) continue;
+      const { dist, pos } = c;
+      const nextDist = dist.slice();
+      let touched = false;
+      for (let k = 0; k < nextDist.length; k++) {
+        const d = nextDist[k];
+        const p = pos[k];
+        if (!isNum(d) || !isNum(p) || Math.abs(d) > TIP_EPS) continue; // leaf bases only
+        const e = (pref.gap ?? 0) + (pref.tips?.[leafKeyOf(p)] ?? 0);
+        if (e > 0) {
+          nextDist[k] = -e;
+          touched = true;
+          if (e > maxE) maxE = e;
+        }
       }
+      if (!touched) continue;
+      newData = newData ?? (spec.data as PlotlyTrace[]).slice();
+      const t = newData[index];
+      newData[index] = axis === "col" ? { ...t, y: nextDist } : { ...t, x: nextDist };
+      changed = true;
     }
     if (maxE <= 0) continue;
 
-    newData = newData ?? (spec.data as PlotlyTrace[]).slice();
-    const t = newData[index];
-    newData[index] = axis === "col" ? { ...t, y: nextDist } : { ...t, x: nextDist };
-
-    // Widen the gutter's distance axis so the extended stubs fit (keeping the root's `top`).
+    // Widen the gutter's distance axis ONCE for the whole tree (keeping the root's `top`), so every
+    // coloured branch trace on this axis shares the same widened scale.
     const key = distAxisKey(axis);
     const ax = { ...((newLayout[key] as Record<string, unknown>) ?? {}) };
     const r = ax.range as unknown[] | undefined;
@@ -297,7 +328,6 @@ export function applyDendrogramTips(spec: FigureSpec): FigureSpec {
         : maxDistance(spec, axis) * 1.05;
     ax.range = axis === "col" ? [-maxE, top] : [top, -maxE]; // row distance axis is reversed
     newLayout[key] = ax;
-    changed = true;
   }
 
   if (!changed || !newData) return spec;

@@ -183,6 +183,62 @@ describe("applyDendrogramTips projection", () => {
   });
 });
 
+/**
+ * A `cut_k`-coloured COLUMN tree (heatmap-clustermap-spec §9): three leaves split into a grey trunk
+ * trace (the root link, carrying leaf 25's base) + one coloured-cluster trace (the {5,15} pair),
+ * BOTH on x3/y3 — the multi-trace-per-axis shape the leaf-tip logic must span.
+ */
+function clustermapColoredCol(): FigureSpec {
+  return {
+    data: [
+      { type: "heatmap", z: [[1, 2, 3]] },
+      // grey trunk: link joining the {5,15} centroid (@10) to leaf 25 — leaf base at pos 25 (y=0)
+      { type: "scatter", mode: "lines", x: [10, 10, 25, 25, null], y: [1, 2, 2, 0, null], xaxis: "x3", yaxis: "y3", line: { color: "#94a3b8" } },
+      // coloured cluster: link joining leaves 5 + 15 — leaf bases at pos 5 and 15 (y=0)
+      { type: "scatter", mode: "lines", x: [5, 5, 15, 15, null], y: [0, 1, 1, 0, null], xaxis: "x3", yaxis: "y3", line: { color: "#2563eb" } },
+    ],
+    layout: {
+      xaxis: { domain: [0, 1] },
+      yaxis: { domain: [0, 0.84] },
+      xaxis3: { domain: [0, 1] },
+      yaxis3: { domain: [0.86, 1], range: [0, 2.1] },
+      meta: { selom: {} },
+    },
+  } as unknown as FigureSpec;
+}
+
+describe("coloured branches (cut_k): leaf tips span every trace of the axis", () => {
+  it("leafStubs aggregates leaves across all coloured traces; maxDistance spans them", () => {
+    const spec = clustermapColoredCol();
+    const keys = leafStubs(spec, "col")
+      .map((s) => s.leafKey)
+      .sort();
+    expect(keys).toEqual(["15.00", "25.00", "5.00"]); // leaf 25 on the trunk, 5+15 on the cluster
+    expect(maxDistance(spec, "col")).toBeCloseTo(2); // the root lives on the trunk trace
+  });
+
+  it("the lever grows leaf bases on BOTH traces and widens the gutter range once", () => {
+    const spec = applyPatches(clustermapColoredCol(), tipLengthOps(clustermapColoredCol(), "col", 0.4));
+    const out = applyDendrogramTips(spec);
+    const trunk = (out.data as Record<string, unknown[]>[])[1];
+    const cluster = (out.data as Record<string, unknown[]>[])[2];
+    expect(trunk.y).toEqual([1, 2, 2, -0.4, null]); // leaf 25's base grown; merges untouched
+    expect(cluster.y).toEqual([-0.4, 1, 1, -0.4, null]); // leaves 5 + 15 grown
+    expect((out.layout as Record<string, { range?: number[] }>).yaxis3.range).toEqual([-0.4, 2.1]);
+  });
+
+  it("a per-leaf override targets only the trace carrying that leaf", () => {
+    let spec = clustermapColoredCol();
+    spec = applyPatches(spec, setLeafTipOps(spec, "col", "25.00", 0.7));
+    const out = applyDendrogramTips(spec);
+    const trunk = (out.data as Record<string, unknown[]>[])[1];
+    const cluster = (out.data as Record<string, unknown[]>[])[2];
+    expect(trunk.y).toEqual([1, 2, 2, -0.7, null]); // only leaf 25 (on the trunk trace) moved
+    expect(cluster.y).toEqual([0, 1, 1, 0, null]); // the cluster trace is untouched
+    expect((out.layout as Record<string, { range?: number[] }>).yaxis3.range).toEqual([-0.7, 2.1]);
+  });
+});
+
 describe("tip ops write the right meta paths", () => {
   it("the lever sets the uniform gap and is read back", () => {
     const spec = applyPatches(clustermapTrees(), tipLengthOps(clustermapTrees(), "col", 0.4));

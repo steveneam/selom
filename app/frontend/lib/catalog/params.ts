@@ -132,6 +132,10 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       help: "Draw the hierarchical-clustering dendrogram for rows, columns, or both. Rows are always clustered for ordering; this controls which trees show and whether samples are reordered.",
     },
     {
+      key: "cut_k", label: "Colour branches (clusters)", type: "range", step: 1,
+      help: "Cut the clustering tree into k groups and colour each cluster's branches a distinct hue (0 = one grey tree). Needs a tree drawn (Clustering ≠ None).",
+    },
+    {
       key: "annotations", label: "Annotation tracks", type: "text",
       placeholder: "e.g. condition, genotype",
       help: "Comma-separated sample-sheet columns to paint as categorical colour strips above the columns. Needs a design / sample sheet (add one in the Data tab).",
