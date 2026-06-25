@@ -10,6 +10,8 @@ import { relayoutToOps, restyleToOps } from "@/lib/plotly-edits";
 import { wireMarkDrag, type Crosshair } from "./mark-drag";
 import { wireThresholdDrag } from "./threshold-drag";
 import { wireColorbarDrag } from "./colorbar-drag";
+import { wireDendrogramTipDrag } from "./dendrogram-drag";
+import { applyDendrogramTips, hasDendrogram } from "@/lib/heatmap/dendrogram";
 import type { MarkRole } from "@/lib/erg/marks";
 import type { VolcanoThresholds } from "@/lib/volcano/thresholds";
 import { pointFromClick, type GeneLabelPoint } from "@/lib/volcano/labels";
@@ -76,7 +78,13 @@ export function FigureCanvas({
   const overlay =
     (spec?.layout?.meta as { selom?: { layoutMode?: string } } | undefined)?.selom?.layoutMode ===
     "overlay";
-  const display = useMemo(() => (overlay ? projectOverlay(spec) : spec), [spec, overlay]);
+  // Compose the render spec: the ERG grid→overlay projection (trace-grids only) OR the dendrogram
+  // leaf-tip projection (clustermaps only). Both are pure + identity when their pref is absent, so the
+  // canonical `spec` (the store's source of truth, what undo/redo/export operate on) is never mutated.
+  const display = useMemo(
+    () => (overlay ? projectOverlay(spec) : applyDendrogramTips(spec)),
+    [spec, overlay],
+  );
   const fixed = typeof display.layout.width === "number";
 
   // Capability-driven gesture model (generalization-spec §A). Derived from the canonical spec so it's
@@ -118,6 +126,7 @@ export function FigureCanvas({
   const dragDisposeRef = useRef<(() => void) | null>(null);
   const thresholdDisposeRef = useRef<(() => void) | null>(null);
   const colorbarDisposeRef = useRef<(() => void) | null>(null);
+  const dendroTipDisposeRef = useRef<(() => void) | null>(null);
 
   const setCrosshair = useCallback((c: Crosshair | null) => {
     const line = lineRef.current;
@@ -250,12 +259,27 @@ export function FigureCanvas({
         store: stCb,
       });
     }
+
+    // (Re)wire dendrogram leaf-tip dragging (dendrogram-tips-spec.md) — only on a clustermap that
+    // HAS a tree AND an editable `store` (the styling artboard; lengthening a stub is a cosmetic,
+    // undoable store edit, like the colour-bar). Gated on a present tree, not a declared capability.
+    dendroTipDisposeRef.current?.();
+    dendroTipDisposeRef.current = null;
+    const { store: stDt } = liveRef.current;
+    if (!ov && stDt && hasDendrogram(liveRef.current.spec)) {
+      dendroTipDisposeRef.current = wireDendrogramTipDrag(gd as never, {
+        getSpec: () => liveRef.current.spec,
+        store: stDt,
+        container: containerRef.current,
+      });
+    }
   }, [setCrosshair]);
 
   useEffect(() => () => {
     dragDisposeRef.current?.();
     thresholdDisposeRef.current?.();
     colorbarDisposeRef.current?.();
+    dendroTipDisposeRef.current?.();
   }, []);
 
   const config = useMemo(() => {

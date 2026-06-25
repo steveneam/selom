@@ -22,9 +22,13 @@ import {
   hasColTree,
   hasDendrogram,
   hasRowTree,
+  maxDistance,
   rowTreeFraction,
   setColTreeOps,
   setRowTreeOps,
+  tipGap,
+  tipLengthOps,
+  type TipAxis,
 } from "@/lib/heatmap/dendrogram";
 import { getAt, set, type Operation } from "@/lib/patch";
 import { cn } from "@/lib/cn";
@@ -271,7 +275,46 @@ function DendrogramControls({ store, spec }: { store: FigureStore; spec: FigureS
           build={(v) => setColTreeOps(spec, v / 100)}
         />
       )}
+      <p className="text-[11px] leading-relaxed text-muted-foreground/80">
+        Lengthen the short leaf end-stubs between the branches and the heatmap — uniformly here, or one
+        at a time by dragging a stub on the figure (hover to highlight it).
+      </p>
+      {showRow && <LeafTipLever store={store} spec={spec} axis="row" label="Row leaf tip length" />}
+      {showCol && <LeafTipLever store={store} spec={spec} axis="col" label="Column leaf tip length" />}
     </Section>
+  );
+}
+
+/**
+ * The uniform "Leaf tip length" lever for one tree (dendrogram-tips-spec.md). Drives `meta.selom.
+ * dendrogramTips.<axis>.gap` — an instant, undoable layout/meta edit the canvas projects at render
+ * time (`applyDendrogramTips`), so the stubs grow without a re-run and the canonical trace is untouched.
+ * Shown as 0–100 % of a sensible cap (half the tree's height) so the owner thinks in "stub length".
+ */
+function LeafTipLever({
+  store,
+  spec,
+  axis,
+  label,
+}: {
+  store: FigureStore;
+  spec: FigureSpec;
+  axis: TipAxis;
+  label: string;
+}) {
+  const cap = Math.max(1e-3, maxDistance(spec, axis) * 0.5);
+  const pct = Math.round((tipGap(spec, axis) / cap) * 100);
+  return (
+    <SliderField
+      label={label}
+      value={Math.min(100, Math.max(0, pct))}
+      min={0}
+      max={100}
+      step={1}
+      unit="%"
+      store={store}
+      build={(v) => tipLengthOps(spec, axis, (v / 100) * cap)}
+    />
   );
 }
 
