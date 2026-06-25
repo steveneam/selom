@@ -122,16 +122,46 @@ def _build_row_quant(rq, ylabels):
     }
 
 
-def _split_columns(z, xlabels, params):
-    """Block-split the columns by a categorical sample-sheet factor (heatmap-clustermap-spec §2 / refs
-    035617/035636). Re-orders the columns grouped by ``split_by``'s category, inserts a blank spacer
-    column between blocks, and returns a per-block header. Returns ``(z_list, xlabels, headers)`` —
-    ``z_list`` is a plain list-of-lists with ``None`` spacer cells (jsonable leaves NaN as invalid
-    JSON, so spacers are None, which Plotly draws as a gap). Identity when no/invalid factor or <2
-    groups (honest — never invents a split). Column clustering is dropped by the caller when splitting,
-    so the imposed categorical order isn't fought by a cross-block tree."""
+def _block_split(z, xlabels, grp, cats):
+    """Regroup the columns into the given category blocks (``cats`` in order), a blank spacer column
+    between blocks, one centred header per block. ``grp`` maps a column label → its category; a column
+    whose category isn't in ``cats`` is dropped (honest — never invented). Returns
+    ``(z_list, new_labels, headers)`` where ``z_list`` is a plain list-of-lists with ``None`` spacer
+    cells (jsonable leaves NaN as invalid JSON, so spacers are None → Plotly draws a gap). Shared by
+    the categorical (``split_by``) and the dendrogram-cut (``split_by_cut``) splits."""
     import numpy as np
 
+    z = np.asarray(z, dtype=float)
+    labels = [str(s) for s in xlabels]
+    src_cols, new_labels, headers = [], [], []
+    spacer = 0
+    for cat in cats:
+        members = [i for i, s in enumerate(labels) if grp.get(s) == cat]
+        if not members:
+            continue
+        if src_cols:  # a blank spacer column between blocks
+            spacer += 1
+            src_cols.append(None)
+            new_labels.append(" " * spacer)
+        start = len(new_labels)
+        for i in members:
+            src_cols.append(i)
+            new_labels.append(labels[i])
+        headers.append({"group": str(cat), "center": new_labels[start + len(members) // 2]})
+
+    z_list = [
+        [None if src is None else round(float(z[r, src]), 4) for src in src_cols]
+        for r in range(z.shape[0])
+    ]
+    return z_list, new_labels, headers
+
+
+def _split_columns(z, xlabels, params):
+    """Block-split the columns by a categorical sample-sheet factor (heatmap-clustermap-spec §2 / refs
+    035617/035636). Groups the columns by ``split_by``'s category (sorted), with blank spacers + a
+    per-block header. Identity when no/invalid factor or <2 groups (honest — never invents a split).
+    Column clustering is dropped by the caller when splitting, so the imposed categorical order isn't
+    fought by a cross-block tree."""
     col = str(params.get("split_by") or "").strip()
     if not col:
         return z, xlabels, None
@@ -143,46 +173,81 @@ def _split_columns(z, xlabels, params):
     cats = sorted({g for g in grp.values() if g and g.lower() != "nan"})
     if len(cats) < 2:
         return z, xlabels, None
+    return _block_split(z, xlabels, grp, cats)
 
-    z = np.asarray(z, dtype=float)
-    src_cols, new_labels, headers = [], [], []
-    spacer = 0
-    for cat in cats:
-        members = [i for i, s in enumerate(labels) if grp[s] == cat]
-        if not members:
-            continue
-        if src_cols:  # a blank spacer column between blocks
-            spacer += 1
-            src_cols.append(None)
-            new_labels.append(" " * spacer)
-        start = len(new_labels)
-        for i in members:
-            src_cols.append(i)
-            new_labels.append(labels[i])
-        headers.append({"group": cat, "center": new_labels[start + len(members) // 2]})
 
-    z_list = [
-        [None if src is None else round(float(z[r, src]), 4) for src in src_cols]
-        for r in range(z.shape[0])
-    ]
-    return z_list, new_labels, headers
+def _wants_cut_split(params) -> bool:
+    """The user asked to block-split the columns by the dendrogram CUT (``split_by_cut`` on) and a
+    valid ``cut_k`` (≥ 2) is set — an unsupervised split that needs NO sample sheet."""
+    v = params.get("split_by_cut")
+    on = v is True or str(v).strip().lower() in ("true", "1", "yes", "on")
+    return on and _resolve_cut_k(params) is not None
+
+
+def _split_by_cut(z, xlabels, k):
+    """Block-split the columns into the k clusters from cutting the COLUMN dendrogram — an unsupervised
+    split (heatmap-clustermap-spec §2/§9), no sample sheet. Clusters the columns (``z`` is genes×samples,
+    so ``z.T`` is the samples), cuts the tree at k with ``fcluster``, and regroups via ``_block_split``;
+    blocks are named ``Cluster N`` in first-appearance (leaf) order. Returns ``(z_list, xlabels, headers)``
+    or None when the cut isn't possible (too few columns / k out of range — honest, no split)."""
+    import numpy as np
+    from scipy.cluster.hierarchy import fcluster, linkage
+    from scipy.spatial.distance import pdist
+
+    zt = np.asarray(z, dtype=float).T  # samples × genes
+    if zt.shape[0] < 3 or zt.shape[1] < 2 or k is None or k < 2 or k > zt.shape[0]:
+        return None
+    dist = pdist(zt, metric="correlation")
+    if not np.all(np.isfinite(dist)):
+        dist = pdist(zt, metric="euclidean")
+    raw = fcluster(linkage(dist, method="average"), t=k, criterion="maxclust")
+    labels = [str(s) for s in xlabels]
+    # order clusters by first appearance across the (leaf-ordered) columns so the blocks read left→right
+    order, seen = [], set()
+    for i in range(len(labels)):
+        c = int(raw[i])
+        if c not in seen:
+            seen.add(c)
+            order.append(c)
+    if len(order) < 2:
+        return None
+    rank = {c: i + 1 for i, c in enumerate(order)}
+    grp = {labels[i]: f"Cluster {rank[int(raw[i])]}" for i in range(len(labels))}
+    cats = [f"Cluster {i + 1}" for i in range(len(order))]
+    return _block_split(z, xlabels, grp, cats)
 
 
 def _cluster_and_split(z, ylabels, xcols, params):
-    """Cluster the rows (and columns, unless block-splitting) then optionally block-split the columns.
-    Splitting imposes the categorical column order, so column clustering + the cross-block tree are
-    dropped; rows still cluster. Returns ``(z, ylabels, xlabels, row_dendro, col_dendro, col_headers)``;
-    ``z`` is a plain list when split (with None spacers), else the clustered numpy array."""
-    split = bool(str(params.get("split_by") or "").strip())
-    cluster_params = params
-    if split:
-        mode = _resolve_cluster(params)
-        cluster_params = {**params, "cluster": "row" if mode in ("row", "both") else "none"}
-    z, ylabels, xlabels, row_dendro, col_dendro = _cluster(z, ylabels, xcols, cluster_params)
-    col_headers = None
-    if split:
+    """Cluster the rows (and columns, unless block-splitting) then optionally block-split the columns —
+    by a categorical sample-sheet factor (``split_by``) or, unsupervised, by the column-dendrogram CUT
+    (``split_by_cut`` + ``cut_k``, no sheet). Either split imposes the column order, so the column tree
+    is dropped (the blocks replace it); rows still cluster + the row tree (if any) keeps its ``cut_k``
+    branch colours. Returns ``(z, ylabels, xlabels, row_dendro, col_dendro, col_headers)``; ``z`` is a
+    plain list when split (with None spacers), else the clustered numpy array."""
+    cat_split = bool(str(params.get("split_by") or "").strip())
+    cut_split = (not cat_split) and _wants_cut_split(params)
+    mode = _resolve_cluster(params)
+    want_row_tree = mode in ("row", "both")
+
+    if cat_split:
+        # categorical split: never column-cluster (the categorical order is imposed)
+        cluster_params = {**params, "cluster": "row" if want_row_tree else "none"}
+        z, ylabels, xlabels, row_dendro, _ = _cluster(z, ylabels, xcols, cluster_params)
         z, xlabels, col_headers = _split_columns(z, xlabels, params)
-    return z, ylabels, xlabels, row_dendro, col_dendro, col_headers
+        return z, ylabels, xlabels, row_dendro, None, col_headers
+
+    # default + cut-split path: cluster per the user's mode, but cut-split needs column clustering on
+    cluster_params = params
+    if cut_split and mode not in ("column", "both"):
+        cluster_params = {**params, "cluster": "both" if want_row_tree else "column"}
+    z, ylabels, xlabels, row_dendro, col_dendro = _cluster(z, ylabels, xcols, cluster_params)
+
+    if cut_split:
+        split = _split_by_cut(z, xlabels, _resolve_cut_k(params))
+        if split is not None:
+            z, xlabels, col_headers = split
+            return z, ylabels, xlabels, row_dendro, None, col_headers  # blocks replace the column tree
+    return z, ylabels, xlabels, row_dendro, col_dendro, None
 
 
 def _scrna(data_path: str, params: dict) -> dict:

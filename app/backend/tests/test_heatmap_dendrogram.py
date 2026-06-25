@@ -264,3 +264,38 @@ def test_cut_k_without_a_tree_is_noop():
     # cut_k asked but no tree drawn (cluster='none') → nothing to colour, the plain single-trace map
     fig = _run({"n_genes": 12, "cluster": "none", "cut_k": 3})
     assert [t["type"] for t in fig["data"]] == ["heatmap"]
+
+
+def test_split_by_cut_blocks_columns_unsupervised():
+    # split_by_cut + cut_k → block-split the columns by the dendrogram cut, NO sample sheet needed
+    fig = _run({"n_genes": 12, "cluster": "both", "cut_k": 2, "split_by_cut": True})
+    main = next(t for t in fig["data"] if t["type"] == "heatmap")
+    # two contiguous blocks with a blank spacer column between them
+    assert main["x"].count(" ") == 1
+    assert all(row[main["x"].index(" ")] is None for row in main["z"])
+    # one "Cluster N" header per block (named by the cut, not a sheet column)
+    headers = [h["text"] for h in fig["layout"]["annotations"]]
+    assert headers == ["Cluster 1", "Cluster 2"]
+    # the column tree is replaced by the blocks; the row tree (+ its cut_k colours) still draws
+    assert "xaxis3" not in fig["layout"]
+    assert "xaxis2" in fig["layout"]
+    row_colors = {t["line"]["color"] for t in _row_tree_traces(fig)}
+    assert row_colors & set(_CLUSTER_PALETTE)  # row branches still coloured by cut_k
+
+
+def test_split_by_cut_needs_cut_k():
+    # split_by_cut on but cut_k < 2 → no split (honest), the plain clustered map with the column tree
+    fig = _run({"n_genes": 12, "cluster": "both", "cut_k": 0, "split_by_cut": True})
+    main = next(t for t in fig["data"] if t["type"] == "heatmap")
+    assert " " not in main["x"]
+    assert "annotations" not in fig["layout"]
+    assert "xaxis3" in fig["layout"]  # column tree kept (no split happened)
+
+
+def test_categorical_split_takes_precedence_over_cut():
+    # both split_by (sheet) and split_by_cut set → the explicit categorical split wins
+    fig = _run_with_design(
+        {"n_genes": 12, "cluster": "both", "cut_k": 2, "split_by": "condition", "split_by_cut": True}
+    )
+    headers = [h["text"] for h in fig["layout"]["annotations"]]
+    assert headers == ["ko", "wt"]  # the sheet's categories, NOT "Cluster N"
