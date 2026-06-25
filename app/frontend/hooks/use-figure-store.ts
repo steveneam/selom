@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useReducer } from "react";
 import type { FigureSpec } from "@/lib/figure-spec";
 import { normalizeSpec } from "@/lib/figure-spec";
+import { validateFigureContract } from "@/lib/figure/contract";
 import { applyPatches, type Operation } from "@/lib/patch";
 
 /**
@@ -39,8 +40,13 @@ const EMPTY: State = { present: null, past: [], future: [], checkpoint: null };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case "init":
-      return { present: normalizeSpec(action.spec), past: [], future: [], checkpoint: null };
+    case "init": {
+      // Validate the spec shape at the data→component boundary (Task B2): an unknown / partial /
+      // corrupt spec is coerced to a render-safe shape so init NEVER throws — it routes to a blank
+      // (empty) figure instead of taking the editor down. A genuine figure passes through unchanged.
+      const { spec } = validateFigureContract(action.spec);
+      return { present: normalizeSpec(spec), past: [], future: [], checkpoint: null };
+    }
 
     case "set": {
       if (!state.present || action.ops.length === 0) return state;

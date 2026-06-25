@@ -66,7 +66,14 @@ export const FONT_FAMILIES: { label: string; value: string }[] = [
  * artboard — the journal default). Returns a NEW spec; the input is untouched.
  */
 export function normalizeSpec(input: FigureSpec): FigureSpec {
-  const spec: FigureSpec = structuredClone(input);
+  // Defense-in-depth at the seam (Task B2): a null / non-object / partial input must never throw here.
+  // The figure store already runs validateFigureContract before this; coerce again so a direct caller
+  // (or a future one) is equally safe. A blank `{ data: [], layout: {} }` normalizes to a valid figure.
+  const safe =
+    input && typeof input === "object" && !Array.isArray(input)
+      ? input
+      : ({ data: [], layout: {} } as FigureSpec);
+  const spec: FigureSpec = structuredClone(safe);
   const L: PlotlyLayout = (spec.layout ??= {});
 
   L.paper_bgcolor ??= "#ffffff";

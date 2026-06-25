@@ -7,6 +7,7 @@ import type { FigureStore } from "@/hooks/use-figure-store";
 import type { FigureSpec } from "@/lib/figure-spec";
 import { COLORBAR_POSITIONS, COLORWAYS, findColorbarTrace } from "@/lib/figure-spec";
 import { type FigureModel, seriesColorOps } from "@/lib/figure-model";
+import { heatmapColorscaleState } from "@/lib/figure/contract";
 import { readTones, toneOps, zExtent } from "@/lib/heatmap/colorscale";
 import {
   type LabelRow,
@@ -72,13 +73,26 @@ export function StylePanel({
   model: FigureModel;
 }) {
   const { capabilities: cap } = model;
+  // The heatmap colour-scale section's fail-safe state (Task B2): a heatmap trace → the controls; a
+  // declared-heatmap-but-traceless spec → an explicit "no heatmap trace" note (never a crash); a
+  // non-heatmap colorscale (trajectory/markers continuous colour) → hidden, exactly as before.
+  const colorscaleState = heatmapColorscaleState({
+    heatmapTones: cap.heatmapTones,
+    heatmapLabels: cap.heatmapLabels,
+    heatmapTraceCount: model.heatmapTraceIndices.length,
+  });
 
   return (
     <div className="space-y-6">
       {cap.markers && <MarkerControls store={store} spec={spec} model={model} />}
       {cap.lines && <LineControls store={store} spec={spec} model={model} />}
-      {cap.colorscale && model.heatmapTraceIndices.length > 0 && (
-        <ColorscaleControls store={store} spec={spec} model={model} />
+      {colorscaleState === "ready" && <ColorscaleControls store={store} spec={spec} model={model} />}
+      {colorscaleState === "empty" && (
+        <Section title="Colour scale">
+          <p className="text-[11px] leading-relaxed text-muted-foreground/70">
+            No heatmap trace in this figure.
+          </p>
+        </Section>
       )}
       {model.heatmapTraceIndices.length > 0 && hasDendrogram(spec) && (
         <DendrogramControls store={store} spec={spec} />

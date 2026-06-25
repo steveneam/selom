@@ -75,11 +75,19 @@ export function ThresholdEditor({
         <NumRow label="adj. p ≤" value={round(fdr, 4)} ariaLabel="Adjusted p-value threshold" onSet={setFdr} />
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5" aria-label="Bucket counts">
-        <Count color={BUCKET_COLORS.up} label="up" n={readout.up} />
-        <Count color={BUCKET_COLORS.down} label="down" n={readout.down} />
-        <Count color={BUCKET_COLORS.ns} label="n.s." n={readout.ns} />
-      </div>
+      {/* Fail-safe empty state (Task B2): a volcano whose bucket traces carry no points (a partial /
+          not-yet-run spec) shows "No points yet" rather than a misleading 0 / 0 / 0 readout. */}
+      {points.length === 0 ? (
+        <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground/70">
+          No points yet — run the skill to populate the volcano, then the counts update live.
+        </p>
+      ) : (
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5" aria-label="Bucket counts">
+          <Count color={BUCKET_COLORS.up} label="up" n={readout.up} />
+          <Count color={BUCKET_COLORS.down} label="down" n={readout.down} />
+          <Count color={BUCKET_COLORS.ns} label="n.s." n={readout.ns} />
+        </div>
+      )}
     </div>
   );
 }

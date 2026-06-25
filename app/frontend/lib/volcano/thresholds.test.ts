@@ -45,6 +45,26 @@ describe("volcano thresholds", () => {
     expect(pts).toHaveLength(4); // 2 ns + 1 up + 1 down, never the labels trace
   });
 
+  it("readThresholds + gatherPoints are null-safe at the seam (null/undefined/garbage → null/[])", () => {
+    // Task B2: the threshold editor reads these off whatever spec it's handed — they must degrade, not throw.
+    expect(readThresholds(null)).toBeNull();
+    expect(readThresholds(undefined)).toBeNull();
+    expect(readThresholds({ data: [], layout: {} } as unknown as FigureSpec)).toBeNull(); // no lines
+    expect(gatherPoints(null)).toEqual([]);
+    expect(gatherPoints(undefined)).toEqual([]);
+    expect(gatherPoints({ layout: {} } as unknown as FigureSpec)).toEqual([]); // no data array
+    // The "no points yet" empty state: a volcano spec whose bucket traces carry no points.
+    const emptyVolcano = {
+      data: [
+        { type: "scattergl", mode: "markers", name: "up", x: [], y: [] },
+        { type: "scattergl", mode: "markers", name: "down", x: [], y: [] },
+        { type: "scattergl", mode: "markers", name: "n.s.", x: [], y: [] },
+      ],
+      layout: {},
+    } as unknown as FigureSpec;
+    expect(gatherPoints(emptyVolcano)).toEqual([]);
+  });
+
   it("re-buckets points by a looser FC + moves the FC lines, leaving labels untouched", () => {
     const { spec, readout } = applyStagedThresholds(volcanoSpec(), { fc: 0.4, fdr: 0.05 });
     // (0.5,3) now clears |0.4| and y_cut → up; (2,3) up; (-2,3) down; (2,0.5) below y_cut → ns.

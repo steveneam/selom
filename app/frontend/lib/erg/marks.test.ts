@@ -123,6 +123,13 @@ describe("readSeededMarks", () => {
     expect(readSeededMarks(undefined)).toEqual([]);
     expect(readSeededMarks({ data: [], layout: {} } as unknown as FigureSpec)).toEqual([]);
   });
+
+  it("is null-safe at the seam (null / garbage spec → [], never throws)", () => {
+    // Task B2: the Marks panel reads this off whatever spec it's handed.
+    expect(readSeededMarks(null)).toEqual([]);
+    expect(readSeededMarks({} as unknown as FigureSpec)).toEqual([]);
+    expect(readSeededMarks({ layout: { meta: { selom: { marks: "nope" } } } } as unknown as FigureSpec)).toEqual([]);
+  });
 });
 
 describe("manual_marks map round-trip", () => {

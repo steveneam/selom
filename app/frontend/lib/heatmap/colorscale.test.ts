@@ -66,6 +66,15 @@ describe("heatmap colour-scale transforms", () => {
     expect(t).toMatchObject({ zmid: 0.5, zmin: -1, zmax: 1, reversed: false });
   });
 
+  it("readTones is null-safe at the seam (null/undefined/garbage/heatmap-less → null, never throws)", () => {
+    // Task B2: a pane reading tones off an unexpected spec must degrade to null, not crash.
+    expect(readTones(null)).toBeNull();
+    expect(readTones(undefined)).toBeNull();
+    expect(readTones({} as unknown as FigureSpec)).toBeNull();
+    expect(readTones({ data: "nope" } as unknown as FigureSpec)).toBeNull();
+    expect(readTones({ data: [{ type: "scatter", x: [1], y: [1] }], layout: {} } as unknown as FigureSpec)).toBeNull();
+  });
+
   it("toneOps writes the right leafs on every heatmap trace and round-trips", () => {
     const ops = toneOps([0], { zmid: 0.5, zmin: -1.5, zmax: 1.5 });
     expect(ops).toEqual([
