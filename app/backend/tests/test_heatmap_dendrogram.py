@@ -213,3 +213,54 @@ def test_split_by_needs_a_sample_sheet():
     main = next(t for t in fig["data"] if t["type"] == "heatmap")
     assert " " not in main["x"]  # no spacer → no split happened
     assert "annotations" not in fig["layout"]
+
+
+# --- cut_k: coloured dendrogram branches (heatmap-clustermap-spec §9 / refs 035648/035701) ---------
+
+from skills.heatmap.run import _CLUSTER_PALETTE, _TRUNK_COLOR  # noqa: E402
+
+
+def _row_tree_traces(fig):
+    return [t for t in fig["data"] if t["type"] == "scatter" and t.get("xaxis") == "x2"]
+
+
+def test_cut_k_zero_is_a_single_grey_tree():
+    # cut_k=0 (default) → the dendrogram is one grey polyline trace, exactly as before the feature
+    fig = _run({"n_genes": 12, "cluster": "row", "cut_k": 0})
+    rows = _row_tree_traces(fig)
+    assert len(rows) == 1
+    assert rows[0]["line"]["color"] == _TRUNK_COLOR
+
+
+def test_cut_k_colours_row_branches_by_cluster():
+    fig = _run({"n_genes": 12, "cluster": "row", "cut_k": 3})
+    rows = _row_tree_traces(fig)
+    # the tree splits into the grey trunk + one trace per below-cut cluster colour
+    assert len(rows) > 1
+    colors = [t["line"]["color"] for t in rows]
+    assert colors[0] == _TRUNK_COLOR  # trunk drawn first (under the coloured clusters)
+    cluster_colors = [c for c in colors if c != _TRUNK_COLOR]
+    assert len(cluster_colors) >= 2  # a real cut, multiple clusters
+    assert set(cluster_colors) <= set(_CLUSTER_PALETTE)  # only the cluster palette
+    assert len(set(cluster_colors)) == len(cluster_colors)  # one trace per colour
+    # every leaf base (distance 0) survives the colour split — the FE leaf-tip projection relies on
+    # all leaves still being present across the (now multiple) traces of the axis
+    zeros = sum(1 for t in rows for v in t["x"] if v == 0)
+    assert zeros == 12
+
+
+def test_cut_k_colours_both_trees():
+    fig = _run({"n_genes": 12, "cluster": "both", "cut_k": 3})
+    rows = _row_tree_traces(fig)
+    cols = [t for t in fig["data"] if t["type"] == "scatter" and t.get("xaxis") == "x3"]
+    # both gutters get the grey trunk + coloured clusters
+    assert len(rows) > 1 and len(cols) > 1
+    for traces in (rows, cols):
+        cluster_colors = {t["line"]["color"] for t in traces} - {_TRUNK_COLOR}
+        assert cluster_colors and cluster_colors <= set(_CLUSTER_PALETTE)
+
+
+def test_cut_k_without_a_tree_is_noop():
+    # cut_k asked but no tree drawn (cluster='none') → nothing to colour, the plain single-trace map
+    fig = _run({"n_genes": 12, "cluster": "none", "cut_k": 3})
+    assert [t["type"] for t in fig["data"]] == ["heatmap"]

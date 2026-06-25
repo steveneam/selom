@@ -20,6 +20,17 @@ from skills._charts import LINE_PALETTE
 # present) keeps its 0.16 band; the track band sits between the heatmap and that tree.
 _TRACK_H = 0.04
 
+# Coloured dendrogram branches (heatmap-clustermap-spec §9 / refs 035648/035701): when the tree is
+# cut into k clusters (the ``cut_k`` param), each below-cut cluster gets a distinct hue and the shared
+# trunk above the cut stays grey. ``_TRUNK_COLOR`` is the existing single-tree dendrogram grey; the
+# cluster palette is kept SEPARATE from the annotation-track palette so a "cluster" colour never reads
+# as a "category" colour. SciPy bakes these exact hex strings into its ``color_list`` (run_real sets
+# them via ``set_link_color_palette`` + ``above_threshold_color``); this module just groups by colour.
+_TRUNK_COLOR = "#94a3b8"
+_CLUSTER_PALETTE = [
+    "#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed", "#0891b2", "#db2777", "#65a30d",
+]
+
 
 def run(data_path: str, params: dict) -> dict:
     if use_real_engine("pandas"):
@@ -54,38 +65,66 @@ def _h_colorbar(y: float = -0.16) -> dict:
     }
 
 
-def _dendro_trace(dendro, axis_id, transpose):
-    """Build a dendrogram polyline trace + return ``(trace, max_distance)``.
+def _dendro_traces(dendro, axis_id, transpose):
+    """Build the dendrogram polyline trace(s) + return ``(traces, max_distance)``.
 
-    A SciPy dendrogram gives paired ``icoord`` (leaf-axis positions) and ``dcoord`` (distances).
-    For a LEFT (row) tree the distance runs along x and the leaf positions along y; for a TOP
-    (column) tree it's the reverse. ``transpose`` selects: ``False`` → row tree (x=distance,
-    y=leaf), ``True`` → column tree (x=leaf, y=distance). ``axis_id`` (e.g. ``"2"``/``"3"``)
-    pins the trace to its own gutter axes (``x{id}``/``y{id}``).
+    A SciPy dendrogram gives paired ``icoord`` (leaf-axis positions) and ``dcoord`` (distances),
+    one link per entry. For a LEFT (row) tree the distance runs along x and the leaf positions
+    along y; for a TOP (column) tree it's the reverse. ``transpose`` selects: ``False`` → row tree
+    (x=distance, y=leaf), ``True`` → column tree (x=leaf, y=distance). ``axis_id`` (e.g.
+    ``"2"``/``"3"``) pins the trace(s) to their own gutter axes (``x{id}``/``y{id}``).
+
+    Without a cut this is ONE grey trace (every link concatenated, ``None``-separated). With a
+    ``colors`` list (one colour per link, from a ``cut_k`` cut — heatmap-clustermap-spec §9) the
+    links are grouped into one trace PER colour so each cluster's branches read in its own hue; the
+    grey trunk draws first (underneath) so the coloured clusters sit on top. Splitting one tree into
+    several traces is why the FE leaf-tip projection is multi-trace-aware (``lib/heatmap/dendrogram``).
     """
-    xs, ys, max_d = [], [], 0.0
-    for dc, ic in zip(dendro["dcoord"], dendro["icoord"]):
+    colors = dendro.get("colors")
+    links = list(zip(dendro["dcoord"], dendro["icoord"]))
+    max_d = max((max(dc) for dc, _ in links), default=0.0)
+
+    def _xy(dc, ic):
         dvals = [round(float(v), 4) for v in dc]
         ivals = [round(float(v), 4) for v in ic]
         if transpose:  # column tree: leaf positions on x, distance on y
-            xs += ivals + [None]
-            ys += dvals + [None]
-        else:  # row tree: distance on x, leaf positions on y
-            xs += dvals + [None]
-            ys += ivals + [None]
-        max_d = max(max_d, max(dc))
-    trace = {
-        "type": "scatter",
-        "mode": "lines",
-        "x": xs,
-        "y": ys,
-        "xaxis": f"x{axis_id}",
-        "yaxis": f"y{axis_id}",
-        "line": {"color": "#94a3b8", "width": 1},
-        "hoverinfo": "skip",
-        "showlegend": False,
-    }
-    return trace, max_d
+            return ivals + [None], dvals + [None]
+        return dvals + [None], ivals + [None]  # row tree: distance on x, leaf positions on y
+
+    def _trace(xs, ys, color):
+        return {
+            "type": "scatter",
+            "mode": "lines",
+            "x": xs,
+            "y": ys,
+            "xaxis": f"x{axis_id}",
+            "yaxis": f"y{axis_id}",
+            "line": {"color": color, "width": 1},
+            "hoverinfo": "skip",
+            "showlegend": False,
+        }
+
+    if not colors:
+        xs, ys = [], []
+        for dc, ic in links:
+            x, y = _xy(dc, ic)
+            xs += x
+            ys += y
+        return [_trace(xs, ys, _TRUNK_COLOR)], max_d
+
+    # Group links by their assigned colour, preserving first-appearance order, then draw the trunk
+    # (grey, above-cut links) first so the coloured clusters layer cleanly over it.
+    groups: dict[str, tuple[list, list]] = {}
+    order: list[str] = []
+    for (dc, ic), color in zip(links, colors):
+        if color not in groups:
+            groups[color] = ([], [])
+            order.append(color)
+        x, y = _xy(dc, ic)
+        groups[color][0].extend(x)
+        groups[color][1].extend(y)
+    order.sort(key=lambda c: 0 if c == _TRUNK_COLOR else 1)
+    return [_trace(groups[c][0], groups[c][1], c) for c in order], max_d
 
 
 def _track_color(i: int) -> str:
@@ -321,8 +360,8 @@ def heatmap_spec(
         heat["colorbar"] = _h_colorbar(-0.30 if has_tracks else -0.16)
 
     if has_row:
-        row_trace, max_dr = _dendro_trace(row_dendro, "2", transpose=False)
-        data.append(row_trace)
+        row_traces, max_dr = _dendro_traces(row_dendro, "2", transpose=False)
+        data += row_traces
         # leaves (distance 0) abut the heatmap on the right, root at the left
         layout["xaxis2"] = {"domain": [0.0, 0.14], "range": [max_dr * 1.05, 0],
                             "showticklabels": False, "showgrid": False, "zeroline": False, "ticks": ""}
@@ -330,8 +369,8 @@ def heatmap_spec(
                             "showticklabels": False, "showgrid": False, "zeroline": False, "ticks": ""}
 
     if has_col:
-        col_trace, max_dc = _dendro_trace(col_dendro, "3", transpose=True)
-        data.append(col_trace)
+        col_traces, max_dc = _dendro_traces(col_dendro, "3", transpose=True)
+        data += col_traces
         # leaves (distance 0) abut the heatmap at the bottom of the top gutter, root at the top
         layout["xaxis3"] = {"domain": [x_lo, 1.0], "range": [0, 10 * n_cols], "anchor": "y3",
                             "showticklabels": False, "showgrid": False, "zeroline": False, "ticks": ""}

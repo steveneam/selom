@@ -5,7 +5,7 @@ expression per cluster, z-scored per gene. Bulk CSV (genes x samples): take the
 top-variance genes, z-scored per gene. Both feed ``run.heatmap_spec``.
 """
 
-from skills.heatmap.run import heatmap_spec
+from skills.heatmap.run import _CLUSTER_PALETTE, _TRUNK_COLOR, heatmap_spec
 from skills._plotly import jsonable
 from skills._design import load_design
 
@@ -283,6 +283,29 @@ def _resolve_cluster(params) -> str:
     return val if val in _CLUSTER_OPTIONS else "none"
 
 
+def _resolve_cut_k(params):
+    """The number of clusters to colour the dendrogram branches into (``cut_k`` param), or None when
+    unset / < 2 (no cut → the single grey tree). Heatmap-clustermap-spec §9 / refs 035648/035701."""
+    try:
+        k = int(params.get("cut_k") or 0)
+    except (TypeError, ValueError):
+        return None
+    return k if k >= 2 else None
+
+
+def _cut_threshold(linkage_matrix, k):
+    """The SciPy ``color_threshold`` that splits a tree into ``k`` coloured clusters: the distance of
+    the (k−1)-th largest merge, so those k−1 trunk merges stay at-or-above threshold (grey) and
+    everything below forms k coloured clusters. None when k is invalid for this tree's leaf count."""
+    import numpy as np
+
+    n_leaves = linkage_matrix.shape[0] + 1  # n−1 merges → n leaves
+    if k is None or k < 2 or k > n_leaves:
+        return None
+    dists = np.sort(linkage_matrix[:, 2])
+    return float(dists[-(k - 1)])
+
+
 def _cluster(z, ylabels, xlabels, params):
     """Apply the resolved clustering mode to a genes×samples z-matrix.
 
@@ -293,20 +316,21 @@ def _cluster(z, ylabels, xlabels, params):
     samples, else it no-ops gracefully). Returns ``(z, ylabels, xlabels, row_dendro, col_dendro)``.
     """
     mode = _resolve_cluster(params)
+    cut_k = _resolve_cut_k(params)
     want_row_tree = mode in ("row", "both")
     want_cols = mode in ("column", "both")
 
-    z, ylabels, row_dendro = _order_rows(z, ylabels, want_row_tree)
+    z, ylabels, row_dendro = _order_rows(z, ylabels, want_row_tree, cut_k=cut_k)
     col_dendro = None
     if want_cols:
         # Cluster samples by transposing: rows-of-the-transpose ARE the columns. Distances over
         # columns are invariant to the row permutation above, so order of operations is safe.
-        zt, xlabels, col_dendro = _order_rows(z.T, xlabels, True, orientation="top")
+        zt, xlabels, col_dendro = _order_rows(z.T, xlabels, True, orientation="top", cut_k=cut_k)
         z = zt.T
     return z, ylabels, xlabels, row_dendro, col_dendro
 
 
-def _order_rows(z, labels, want_dendro=False, orientation="left"):
+def _order_rows(z, labels, want_dendro=False, orientation="left", cut_k=None):
     """Reorder rows by hierarchical-clustering leaf order so co-varying genes sit
     together — the standard *clustered* heatmap layout (vs. raw input order). Rows are
     already z-scored, so correlation distance groups by expression *pattern*, not
@@ -316,7 +340,10 @@ def _order_rows(z, labels, want_dendro=False, orientation="left"):
     Returns ``(z, labels, dendro)``. When ``want_dendro`` is set, ``dendro`` carries the
     SciPy dendrogram line coordinates (``icoord``/``dcoord``) for an ``orientation`` tree
     (``left`` for a row gutter, ``top`` for a column gutter) so the caller can draw the
-    clustering tree aligned to these leaf-ordered rows; otherwise ``dendro`` is None.
+    clustering tree aligned to these leaf-ordered rows; otherwise ``dendro`` is None. When
+    ``cut_k`` ≥ 2 the tree is cut into k clusters and ``dendro["colors"]`` carries SciPy's
+    per-link colour (each cluster a hue from ``_CLUSTER_PALETTE``, the trunk ``_TRUNK_COLOR``)
+    so ``run.heatmap_spec`` draws coloured branches (heatmap-clustermap-spec §9).
     """
     import numpy as np
 
@@ -324,7 +351,7 @@ def _order_rows(z, labels, want_dendro=False, orientation="left"):
     if z.shape[0] < 3 or z.shape[1] < 2:
         return z, labels, None
 
-    from scipy.cluster.hierarchy import dendrogram, leaves_list, linkage
+    from scipy.cluster.hierarchy import leaves_list, linkage
     from scipy.spatial.distance import pdist
 
     dist = pdist(z, metric="correlation")
@@ -332,10 +359,34 @@ def _order_rows(z, labels, want_dendro=False, orientation="left"):
         dist = pdist(z, metric="euclidean")
     linkage_matrix = linkage(dist, method="average")
     if want_dendro:
-        dd = dendrogram(linkage_matrix, no_plot=True, orientation=orientation)
+        dd, colors = _dendrogram(linkage_matrix, orientation, cut_k)
         order = dd["leaves"]  # same leaf order the icoord positions are built against
         dendro = {"icoord": dd["icoord"], "dcoord": dd["dcoord"]}
+        if colors is not None:
+            dendro["colors"] = colors
     else:
         order = leaves_list(linkage_matrix)
         dendro = None
     return z[order], [labels[i] for i in order], dendro
+
+
+def _dendrogram(linkage_matrix, orientation, cut_k):
+    """Build the SciPy dendrogram dict (+ optional per-link ``color_list``). With a valid ``cut_k``
+    the link palette is set to ``_CLUSTER_PALETTE`` and above-cut links to ``_TRUNK_COLOR``, so the
+    returned colours are the literal hex strings ``run.heatmap_spec`` groups branches by; the global
+    palette is reset afterwards so the colouring never leaks to another figure. Returns
+    ``(dendrogram_dict, colors_or_None)``."""
+    from scipy.cluster.hierarchy import dendrogram, set_link_color_palette
+
+    thr = _cut_threshold(linkage_matrix, cut_k)
+    if thr is None:
+        return dendrogram(linkage_matrix, no_plot=True, orientation=orientation), None
+    set_link_color_palette(list(_CLUSTER_PALETTE))
+    try:
+        dd = dendrogram(
+            linkage_matrix, no_plot=True, orientation=orientation,
+            color_threshold=thr, above_threshold_color=_TRUNK_COLOR,
+        )
+    finally:
+        set_link_color_palette(None)  # reset the module-global palette (no cross-figure leak)
+    return dd, list(dd["color_list"])

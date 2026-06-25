@@ -11,6 +11,7 @@
     "n_genes":    { "type": "int", "default": 20, "min": 5, "max": 100 },
     "groupby":    { "type": "str", "default": "leiden" },
     "cluster":    { "type": "str", "default": "none", "options": ["none", "row", "column", "both"] },
+    "cut_k":      { "type": "int", "default": 0, "min": 0, "max": 8, "note": "Colour the dendrogram branches into k clusters (cut the tree at k). 0 = a single grey tree. Needs a tree drawn (cluster ≠ none)." },
     "annotations":{ "type": "str", "default": "", "note": "Comma-separated sample-sheet columns to paint as categorical annotation tracks above the columns (needs a design / sample sheet)." },
     "quant_track":{ "type": "str", "default": "none", "options": ["none", "variance", "mean", "logfc"], "note": "A quantitative side bar aligned to the rows: per-gene variance / mean, or log2 fold-change between the sample sheet's two condition groups." },
     "split_by":   { "type": "str", "default": "", "note": "A sample-sheet column to block-split the columns by (gaps + group headers; column clustering is dropped). Needs a design / sample sheet." }
