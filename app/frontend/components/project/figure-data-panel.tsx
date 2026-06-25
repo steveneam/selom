@@ -8,8 +8,10 @@ import { ThresholdEditor } from "./threshold-editor";
 import { DataCheckPanel } from "./data-check";
 import { DataFitVerdict } from "@/components/reproduction/data-fit-panel";
 import { Button } from "@/components/ui/button";
-import { visibleParamFields } from "@/lib/catalog/params";
+import { PaneShell } from "@/components/ui/pane-shell";
+import { visibleParamFields, type ParamField } from "@/lib/catalog/params";
 import { useSkillParams } from "@/lib/catalog/use-skill-params";
+import type { PaneState } from "@/lib/ui/pane-state";
 import type { FigureSpec } from "@/lib/figure-spec";
 import type { SkillParams } from "@/lib/skills-api";
 import type { SeededMark } from "@/lib/erg/marks";
@@ -76,9 +78,32 @@ export function FigureDataPanel({
   /** From the data-check routing card: take over and pick a skill manually. */
   onPickManually: () => void;
 }) {
-  const { fields: schema, loading } = useSkillParams(skillId);
+  const { fields: schema, status: paramsStatus, retry: retryParams } = useSkillParams(skillId);
   // Params are CONTROLLED by the parent (so a dot drag and this panel write the same staged params).
   const setParams = onParamsChange;
+  // The Inputs pane as a stable PaneState (Task B3): loading → skeleton (not a vanished pane); a
+  // failed/timed-out param-spec fetch → an error + Retry (not an infinite spinner); a successful
+  // fetch with no tunable knobs → an explicit "fixed defaults" empty note; else the controls.
+  const inputsState: PaneState<ParamField[]> = React.useMemo(() => {
+    switch (paramsStatus) {
+      case "idle":
+      case "loading":
+        return { status: "loading", label: "Loading inputs…" };
+      case "error":
+        return {
+          status: "error",
+          message: "Couldn’t load this skill’s inputs (the backend didn’t respond).",
+          retry: retryParams,
+        };
+      case "empty":
+        return {
+          status: "empty",
+          message: "This skill runs with fixed defaults — there are no adjustable inputs to re-run.",
+        };
+      default:
+        return { status: "ready", data: schema };
+    }
+  }, [paramsStatus, schema, retryParams]);
   // Did the user change anything from the figure's current inputs? Compared over the union of keys
   // (not just `schema`) so an edit to a non-overlay param — manual_marks / marks from the Marks
   // editor — also enables the re-run.
@@ -125,38 +150,27 @@ export function FigureDataPanel({
         <ThresholdEditor figureSpec={figureSpec} params={params} onParamsChange={setParams} />
       )}
 
-      {/* Inputs → re-run. */}
-      <div className="rounded-xl border border-border bg-card/60 p-4">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Inputs</p>
-        {loading ? (
-          <p className="mt-2 text-xs text-muted-foreground">Loading inputs…</p>
-        ) : schema.length === 0 ? (
-          <p className="mt-2 text-xs text-muted-foreground">
-            This skill runs with fixed defaults — there are no adjustable inputs to re-run.
-          </p>
-        ) : (
-          <>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {visibleParamFields(schema, params).map((f) => (
-                <ParamControl
-                  key={f.key}
-                  field={f}
-                  value={params[f.key]}
-                  onChange={(v) => setParams((p) => ({ ...p, [f.key]: v }))}
-                />
-              ))}
-            </div>
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <span className="text-[11px] text-muted-foreground">
-                {dirty ? "Re-runs the analysis → a new linked version." : "Adjust an input to re-run."}
-              </span>
-              <Button size="sm" disabled={running || !dirty} onClick={() => onRerun(params)}>
-                <RefreshCw /> {running ? "Re-running…" : "Re-run → new version"}
-              </Button>
-            </div>
-          </>
-        )}
-      </div>
+      {/* Inputs → re-run. A stable slot across loading / error / empty / ready (Task B3). */}
+      <PaneShell state={inputsState} title="Inputs">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {visibleParamFields(schema, params).map((f) => (
+            <ParamControl
+              key={f.key}
+              field={f}
+              value={params[f.key]}
+              onChange={(v) => setParams((p) => ({ ...p, [f.key]: v }))}
+            />
+          ))}
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <span className="text-[11px] text-muted-foreground">
+            {dirty ? "Re-runs the analysis → a new linked version." : "Adjust an input to re-run."}
+          </span>
+          <Button size="sm" disabled={running || !dirty} onClick={() => onRerun(params)}>
+            <RefreshCw /> {running ? "Re-running…" : "Re-run → new version"}
+          </Button>
+        </div>
+      </PaneShell>
     </div>
   );
 }

@@ -13,6 +13,7 @@ import { DataPanel } from "./panels/data-panel";
 import { MarksPanel } from "./panels/marks-panel";
 import { PagePanel } from "./panels/page-panel";
 import { PaneBoundary } from "@/components/ui/error-boundary";
+import { PaneShell } from "@/components/ui/pane-shell";
 
 const BASE_TABS = [
   { value: "style", label: "Style", icon: Palette },
@@ -49,7 +50,20 @@ export function PropertyPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection?.nonce]);
 
-  if (!spec || !model) return null;
+  // Stable slot when there's no figure to inspect (Task B3): render the inspector's outer shape with
+  // an empty state instead of vanishing to `null`, so the panel never collapses out of the layout.
+  if (!spec || !model) {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="border-b border-border px-3 py-2.5">
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Inspector
+          </span>
+        </div>
+        <PaneShell state={{ status: "empty", message: "No figure open — open a figure to inspect it." }} className="m-3" />
+      </div>
+    );
+  }
 
   const tabs = hasMarks
     ? [...BASE_TABS, { value: "marks", label: "Marks", icon: Shapes }, { value: "page", label: "Page", icon: FileText }]

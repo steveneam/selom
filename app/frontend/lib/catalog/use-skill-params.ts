@@ -22,58 +22,111 @@ import { paramFieldsFromSpec, type BackendParamSpec, type ParamField } from "./p
 
 const DESCRIBE_URL = (runtimeId: string) => `/api/skills/${encodeURIComponent(runtimeId)}`;
 
-const cache = new Map<string, Promise<BackendParamSpec>>();
+/** How long to wait for the describe endpoint before treating it as failed (Task B3): a hung backend
+ *  must surface an ERROR state, not an infinite "Loading inputs…" spinner. */
+const FETCH_TIMEOUT_MS = 8000;
 
-/** Fetch (and cache) a skill's backend `param_spec`. Empty object on any failure. */
-export function loadSkillParamSpec(catalogOrRuntimeId: string): Promise<BackendParamSpec> {
+/** The outcome of a param-spec load — `ok:false` distinguishes a FAILED/timed-out fetch (→ error
+ *  state) from a successful fetch that simply has no tunable params (→ empty / fixed-defaults). */
+export interface ParamSpecResult {
+  spec: BackendParamSpec;
+  ok: boolean;
+}
+
+const cache = new Map<string, Promise<ParamSpecResult>>();
+
+/**
+ * Fetch (and cache) a skill's backend `param_spec`, with an {@link FETCH_TIMEOUT_MS} timeout.
+ * Resolves `{ spec, ok }` — never rejects. On failure/timeout `ok` is false and the entry is evicted
+ * from the cache, so a retry (or the next mount) re-fetches rather than serving a stuck failure.
+ */
+export function loadSkillParamSpec(catalogOrRuntimeId: string): Promise<ParamSpecResult> {
   const runtimeId = runtimeSkillId(catalogOrRuntimeId);
   let p = cache.get(runtimeId);
   if (!p) {
-    p = fetch(DESCRIBE_URL(runtimeId), { headers: { accept: "application/json" } })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`GET ${DESCRIBE_URL(runtimeId)} -> ${res.status}`);
-        const data = (await res.json()) as { param_spec?: unknown };
-        const spec = data?.param_spec;
-        return spec && typeof spec === "object" ? (spec as BackendParamSpec) : {};
-      })
-      .catch(() => ({}) as BackendParamSpec); // backend unreachable / unknown skill -> no controls
+    p = fetchParamSpec(runtimeId);
     cache.set(runtimeId, p);
   }
   return p;
 }
 
+async function fetchParamSpec(runtimeId: string): Promise<ParamSpecResult> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(DESCRIBE_URL(runtimeId), {
+      headers: { accept: "application/json" },
+      signal: ctrl.signal,
+    });
+    if (!res.ok) throw new Error(`GET ${DESCRIBE_URL(runtimeId)} -> ${res.status}`);
+    const data = (await res.json()) as { param_spec?: unknown };
+    const spec = data?.param_spec;
+    return { spec: spec && typeof spec === "object" ? (spec as BackendParamSpec) : {}, ok: true };
+  } catch {
+    // Backend unreachable / unknown skill / timeout. Evict so the next call (or a Retry) re-fetches.
+    cache.delete(runtimeId);
+    return { spec: {}, ok: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Pane status for the param-spec load (Task B3) — a typed tag instead of parallel booleans:
+ *  `idle` (no skill) · `loading` · `error` (fetch failed/timed out) · `empty` (no tunable inputs) ·
+ *  `ready`. Consumers map it to a {@link PaneState}/`<PaneShell>` so loading ≠ empty ≠ error. */
+export type SkillParamsStatus = "idle" | "loading" | "error" | "empty" | "ready";
+
 /**
  * Load a skill's parameter fields (presentation overlay merged over the backend spec).
- * Returns `{ fields, loading }`. `fields` is `[]` while loading and for any skill with no
- * overlay / unreachable spec. Pass `null`/`undefined` (no skill selected) to stay idle.
+ * Returns `{ fields, loading, status, retry }`. `fields` is `[]` while loading and for any skill with
+ * no overlay / unreachable spec. `loading` is kept for back-compat; `status` distinguishes a FAILED
+ * fetch (`error`, with a working `retry`) from a successful one with no inputs (`empty`). Pass
+ * `null`/`undefined` (no skill selected) to stay `idle`.
  */
 export function useSkillParams(catalogOrRuntimeId: string | null | undefined): {
   fields: ParamField[];
   loading: boolean;
+  status: SkillParamsStatus;
+  retry: () => void;
 } {
   const runtimeId = catalogOrRuntimeId ? runtimeSkillId(catalogOrRuntimeId) : null;
-  // Keep the spec tagged with the skill it belongs to, so a stale in-flight response from
-  // a previously-selected skill never renders against the current one. `loading` is derived
-  // (no separate state) — true whenever a skill is selected but its spec hasn't loaded yet.
-  const [loaded, setLoaded] = React.useState<{ id: string; spec: BackendParamSpec } | null>(null);
+  // Tag the result with the skill AND the attempt it belongs to, so neither a stale response from a
+  // previously-selected skill nor a pre-Retry result renders against the current request — `ready`
+  // checks both. Deriving readiness this way (vs a synchronous reset) keeps the loading skeleton
+  // showing during a switch/Retry without a setState in the effect body.
+  const [loaded, setLoaded] = React.useState<{ id: string; spec: BackendParamSpec; ok: boolean; attempt: number } | null>(null);
+  const [attempt, setAttempt] = React.useState(0);
 
   React.useEffect(() => {
     if (!runtimeId) return;
     let on = true;
-    loadSkillParamSpec(runtimeId).then((spec) => {
-      if (on) setLoaded({ id: runtimeId, spec });
+    // A Retry re-runs this effect (the failed entry was evicted from the cache, so this re-fetches).
+    loadSkillParamSpec(runtimeId).then((res) => {
+      if (on) setLoaded({ id: runtimeId, spec: res.spec, ok: res.ok, attempt });
     });
     return () => {
       on = false;
     };
-  }, [runtimeId]);
+  }, [runtimeId, attempt]);
 
-  const ready = !!runtimeId && loaded?.id === runtimeId;
-  const spec = ready ? loaded!.spec : null;
+  const ready = !!runtimeId && loaded?.id === runtimeId && loaded?.attempt === attempt;
+  const spec = ready && loaded!.ok ? loaded!.spec : null;
   const fields = React.useMemo(
     () => (runtimeId && spec ? paramFieldsFromSpec(runtimeId, spec) : []),
     [runtimeId, spec],
   );
 
-  return { fields, loading: !!runtimeId && !ready };
+  const retry = React.useCallback(() => setAttempt((n) => n + 1), []);
+
+  const status: SkillParamsStatus = !runtimeId
+    ? "idle"
+    : !ready
+      ? "loading"
+      : !loaded!.ok
+        ? "error"
+        : fields.length === 0
+          ? "empty"
+          : "ready";
+
+  return { fields, loading: !!runtimeId && !ready, status, retry };
 }
