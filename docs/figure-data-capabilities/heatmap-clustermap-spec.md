@@ -183,10 +183,16 @@ surface in the Figure-data Inputs from the `param_spec` overlay; a re-run thread
     condition strip + column reorder composing cleanly; the Row leaf-tip lever then grew the stubs across
     all four coloured row traces (the multi-trace projection), no console errors. (A `file://` Plotly
     pre-check on the real backend spec de-risked the geometry first.)
-  - **Follow-up still open (not built):** a `cut_k` that ALSO drives a dendrogram-cut block-split
-    (unify with slice 5's categorical split → an unsupervised split needing no sample sheet). The cut
-    threshold is factored (`_cut_threshold`) so this is a fill-in. Today `cut_k` = colour only; it
-    composes with the categorical `split_by` independently.
+- **Slice 7b follow-up — `cut_k`-driven block-split: BUILT (T23, right after).** New `split_by_cut`
+  bool param unifies with slice 5: when on + `cut_k ≥ 2` + no categorical `split_by`, the COLUMN
+  dendrogram is cut into k clusters (`scipy fcluster`) and the columns are block-split into them — an
+  **unsupervised** split needing NO sample sheet. A shared `_block_split` core was factored out of
+  `_split_columns` (categorical) and reused by `_split_by_cut` (blocks named "Cluster N" in leaf order);
+  `_cluster_and_split` forces column clustering for the cut, drops the column tree (the blocks replace
+  it), and keeps the row tree + its `cut_k` branch colours. Categorical `split_by` wins when both are
+  set. FE = a "Split columns by cut" switch beside "Split columns by". Verified on real iRPE (file://
+  render of the live spec): `cut_k=3` → 3 column blocks (CE4_5 reps together, CE4_4 split), the
+  condition strip splits in tandem (`matches:x`), the row tree stays coloured, no console errors.
 - **Editor fix (owner-reported live).** A clustermap's furniture axes (tree gutters, track strips, quant
   bar) have no titles, so Plotly painted a "Click to enter … axis title" placeholder over each one (8+)
   in the editor (where inline axis-title editing is on). `figure-canvas` now drops `edits.axisTitleText`
