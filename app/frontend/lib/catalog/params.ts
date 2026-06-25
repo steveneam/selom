@@ -155,6 +155,10 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       placeholder: "e.g. condition",
       help: "A sample-sheet column to block-split the columns into groups (gap + header per block). Column clustering is dropped in favour of the group order. Needs a design / sample sheet.",
     },
+    {
+      key: "split_by_cut", label: "Split columns by cut", type: "switch",
+      help: "Block-split the columns into the colour-branch clusters (gap + header per block) — unsupervised, no sample sheet. Needs Colour branches ≥ 2; ignored when Split columns by is set.",
+    },
   ],
   // Gene-set builder Phase A: apply a corpus source / a highlight panel from "Gene Sets".
   enrichment: [
