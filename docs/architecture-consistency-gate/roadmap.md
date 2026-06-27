@@ -14,6 +14,13 @@ ran. Buckets within a task are ordered; tasks run B → C → D → E, with F at
 
 > Owner: *"let me know if it needs database materialisation at some point… don't let it be
 > the blocker."*
+>
+> **⚠ DISCUSSION GATE (owner 2026-06-27):** *"prior to reaching the database work we need to
+> discuss something as there may be a change of plans in that regard, but complete all the work
+> prior until then."* → **Complete every DB-free bucket first** (B5 · Task B exit · C1–C3 · C5 ·
+> D1–D3 · E1–E2), then **STOP and raise it with the owner before starting ANY materialization
+> bucket (C4 · D4 · F1–F3)** — the DB approach itself may change, so do not begin that work or
+> pre-commit to the Supabase/R2/DuckDB shape until the discussion happens.
 
 **Everything in Tasks B, C, D1–D3, and E is database-free and can complete now.** They use
 the existing in-process / local-disk substrate. The DB/object-store materialization line is:
@@ -23,8 +30,9 @@ the existing in-process / local-disk substrate. The DB/object-store materializat
 | **No — do now** | B1–B5 · C1–C3 · D1–D3 · E1–E2 | the lane |
 | **Yes — DEFERRED, flagged, NOT a blocker** | **C4** (R2 cache tier) · **D4** (DuckDB/Parquet lane) · **F1–F3** (Supabase schema, FE-state migration) | on hold until the web/DB launch; the upstream buckets are designed so the local version drops into the materialized one with no rework (content-addressed local dir → R2 object; declared table contract → Parquet schema; FE types → SQL rows) |
 
-When a bucket starts to *want* materialization (it'll be D3 hardening, then D4), I'll stop and
-flag it — the gate is built so the work in front of it never waits on it.
+When a bucket starts to *want* materialization (it'll be D3 hardening, then D4), stop and
+flag it — the gate is built so the work in front of it never waits on it. Per the discussion
+gate above, that flag is now a **hard stop for an owner conversation**, not just a heads-up.
 
 ## Definition of done (every bucket)
 
