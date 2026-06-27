@@ -1,6 +1,6 @@
 # Selom Architecture Gate — Agile Roadmap
 
-Last updated: 2026-06-27 22:52 +10:00 — Claude.
+Last updated: 2026-06-27 23:55 +10:00 — Claude (E1 + E2 shipped — all DB-free buckets complete).
 Status: **Active lane.** Owner greenlit the gate (2026-06-25): "stick with this plan…
 go with your recommended task… this is the lane until it is mostly complete; other
 tasks/plans/pillars on hold." Companion to `plan.md` (why) + `inventory.md` (current state).
@@ -371,5 +371,39 @@ alongside/after as the proof. The deferred buckets wait for the explicit data-ar
   stamped `artifact` (kind ingested, recipe "used as-is", receipt "derived from de_good.csv"); `GET
   /artifacts/{id}/table` returned the exact CSV the skill saw; `/data/combine` of 2 files → receipt **"merged
   from {wt.csv, ko.csv}"**. Doc `docs/architecture-consistency-gate/intermediate-table-lineage.md`. · [ ] D4 ⚑
-- [ ] E1 · [ ] E2
+- [x] E1 (Plotly leak hardening; **FE; tsc/eslint/vitest + chrome-devtools heap-snapshot diff**).
+  `components/figure/figure-canvas.tsx` + new pure `lib/figure/webgl-budget.ts`. **(1) Explicit
+  teardown** — capture the Plotly graph div (`gdRef`) and on unmount explicitly remove the three
+  gesture listeners we bound directly (relayout/restyle/click) + dispose every drag wiring + null
+  the refs (the leak surface in our control); react-plotly's own `Plotly.purge` still tears down
+  the GL context/div (proven by the Task B exit), this is idempotent on top. **(2) Stable refs** —
+  `figure`/`renderData`/`config` stay `useMemo`'d so Plotly gets stable data/layout (no needless
+  `Plotly.react` churn). **(3) WebGL budget** — `MAX_GL_CONTEXTS = 8`; each GL canvas claims a slot
+  (stable `useId` token) on mount, frees on unmount, read via `useSyncExternalStore`; under budget
+  (the only case today, ≤2 panes) unchanged, over budget the overflow canvas renders SVG
+  (`toSvgTraces`) instead of losing a context. SSR audited (plotly.js `import type` only;
+  react-plotly only via `dynamic(ssr:false)`), guarded by a tree-scanning test. **Gates:**
+  `webgl-budget.test.ts` + `ssr-plotly-import.test.ts` (+16) → tsc/eslint clean (0-err, 2 baseline
+  warns), **vitest 325**. **ACCEPTANCE (heap-snapshot diff, 20 switches on the real volcano
+  fixture, no backend):** `HTMLCanvasElement` 4→4 · `Detached HTMLCanvasElement` 0→0 · WebGL
+  contexts 6→6 / 1→1 · `EventListener` 1452→1452 · `V8EventListener` 1320→1320 — all FLAT; live
+  canvas count capped at 3; console clean (only expected 404s). · [x] E2 (telemetry + test
+  hygiene; **FE+BE; vitest + BE fast-gate + ruff + browser perf**). **FE:** `lib/figure/perf.ts`
+  (render-timing ring buffer → p50/p95/peak + `window.__selomPerf` hook; FigureCanvas records the
+  commit→draw delta) + `lib/figure/payload.ts` (figure byte/point audit + advisory ceilings →
+  once-per-figure dev warning). `scripts/perf-audit.mjs` (Playwright + system Chrome, seeds a
+  synthetic project, drives N switches, reports cold/warm p50/p95/peak + peak heap + canvas budget)
+  + `test:fast`/`test:perf` npm scripts. **BE:** registered a `slow` pytest marker (`pyproject.toml`)
+  + auto-tag the heavy lanes (reproduction/golden/real-engine) by file in `conftest.py` →
+  `pytest -m "not slow"` = **695 tests in ~56 s** (vs ~14 min full); `pytest -m slow` = 357.
+  **Gates:** `perf.test.ts` + `payload.test.ts` (+15) → tsc/eslint clean, **vitest 340**; BE fast
+  gate green, ruff clean. **ACCEPTANCE recorded (cold/warm):** cold first draw ~4.6–8.2 s (dev:
+  includes route compile), warm p50 60–89 ms / p95 78–132 ms / peak 95–138 ms, peak heap
+  ~244–276 MB — measured both via chrome-devtools MCP (real fixture) and `perf-audit.mjs` (synthetic),
+  agreeing. Doc `docs/architecture-consistency-gate/perf-and-test-hygiene.md`.
 - [ ] F1 ⚑ · [ ] F2 ⚑ · [ ] F3 ⚑
+
+> **⚑⚑ ALL DB-FREE BUCKETS COMPLETE (C5 · D1 · D2 · D3 · E1 · E2).** Per the discussion gate
+> at the top of this file, **STOP and raise the data-architecture conversation with the owner
+> BEFORE starting any materialization bucket (C4 R2 tier · D4 DuckDB/Parquet · F1–F3 Supabase/
+> state-migration).** Do not pre-commit to the Supabase/R2/DuckDB shape until that talk.
