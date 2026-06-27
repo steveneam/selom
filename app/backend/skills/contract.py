@@ -91,7 +91,11 @@ def _execute(skill_id: str, data_path: str, params: dict) -> tuple[dict, dict | 
         # golden figures (taken via run_skill) are unaffected.
         table = figure.pop("table", None) if isinstance(figure, dict) else None
         _result_cache.store(key, figure, table)
-    return theme.apply(figure, skill_id), table
+    # C2 source/render split: theming is the (separately-keyed) render tier. When the compute key
+    # is known, reuse it as the source identity so the source figure isn't re-hashed; when the input
+    # was unhashable (key is None — e.g. a missing path) stay fully uncached via the plain transform.
+    themed = theme.render(figure, skill_id, source_key=key) if key is not None else theme.apply(figure, skill_id)
+    return themed, table
 
 
 def run_skill(skill_id: str, data_path: str, params: dict) -> dict:

@@ -16,6 +16,12 @@ import copy
 
 from skills.styles import DEFAULT_STYLE, get_style
 
+# Render-cache version (Task C2). The figure-envelope cache keys on
+# ``(source hash, skill_id, style, THEME_VERSION)``; bump this whenever the theme transform or the
+# style tokens change so every cached envelope misses cleanly — the same discipline as a skill's
+# ``version`` invalidating the C1 compute cache. ``apply`` itself is unaffected.
+THEME_VERSION = "1"
+
 # skill id -> figure-type polish
 _KIND = {
     "volcano": "volcano",
@@ -217,6 +223,35 @@ def apply(spec, skill_id, style=DEFAULT_STYLE):
     from skills import _capabilities
 
     return _capabilities.stamp(themed, skill_id)
+
+
+def render(spec, skill_id, style=DEFAULT_STYLE, source_key=None):
+    """Cached :func:`apply` — the figure-envelope (render) tier of the source/render split (C2).
+
+    The C1 compute cache holds the *pre-theme* source; this caches the *themed* figure keyed by
+    ``(source identity, skill_id, style, THEME_VERSION)``. Consequences:
+      * a theme/style change re-renders from the cached source **without re-running the skill**
+        (the skill compute and the theming are now two separately-keyed cache tiers),
+      * a repeat render of the same source+style is a cache hit (no re-theme).
+
+    ``source_key`` lets the ``_execute`` path pass the compute key it already has (so a large source
+    figure isn't re-hashed); ``/figures/style/apply`` omits it and the figure is hashed by content.
+    Falls straight through to :func:`apply` when the cache is disabled (tests / forced cold) or the
+    input isn't a themable spec — so behaviour is identical to calling ``apply`` directly."""
+    from skills import _result_cache
+
+    cache = _result_cache.get_cache()
+    if not cache.enabled or not isinstance(spec, dict) or "data" not in spec:
+        return apply(spec, skill_id, style)
+    key = _result_cache.render_key(
+        source_key if source_key is not None else spec, skill_id or "", style, THEME_VERSION
+    )
+    cached = cache.fetch(key)
+    if cached is not None:
+        return cached["figure"]
+    themed = apply(spec, skill_id, style)
+    cache.put(key, {"figure": themed})
+    return themed
 
 
 def _theme_for_kind(st, spec, kind):

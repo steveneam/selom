@@ -233,7 +233,27 @@ alongside/after as the proof. The deferred buckets wait for the explicit data-ar
   cache suite-wide (autouse) so the golden tests still recompute — a content-addressed cache surviving on disk
   would otherwise serve a stale figure (false green) when a skill changes without a version bump; the cache's
   own tests opt back in. ⚠ a missing input path (the golden harness's `"unused"`) is unhashable → the cache is
-  skipped entirely (no spurious collisions). **NEXT = C2** (source/render split + ETag/304). · [ ] C2 · [ ] C3 · [ ] C4 ⚑ · [ ] C5
+  skipped entirely (no spurious collisions). · [x] C2 (source/render split + ETag/304;
+  **BE; pytest-verified, no browser**; ruff clean). The split is realized by C1 caching the **pre-theme**
+  compute (the *source*) and theming being a separable *render* step. C2 adds the **figure-envelope
+  cache**: new `skills/theme.py::render(spec, skill_id, style, source_key=None)` wraps `apply` and caches
+  the themed figure keyed by `(source identity, skill_id, style, THEME_VERSION)` — so a theme/style change
+  re-renders from the cached source **without re-running the skill**, and a repeat render of the same
+  source+style is a cache hit. `source_key` lets `_execute` reuse the compute key it already holds (no
+  re-hash of a large source figure); `/figures/style/apply` omits it and hashes the figure by content.
+  New `THEME_VERSION` constant (bump on any theme/style-token change → every envelope misses cleanly, the
+  same discipline as a skill `version`). The render cache reuses the C1 store via new generic `put`/`fetch`
+  primitives (`get`/`set` are now thin wrappers); envelope keys are `render-…` prefixed (filename-safe — a
+  `:` would silently break the NTFS disk tier, **a bug the cold-disk test caught**). Wired into
+  `_execute` (compute tier → render tier) and `POST /figures/style/apply`. **ETag/304:** `GET
+  /jobs/{job_id}/result` now emits a strong content-hash `ETag` and honors `If-None-Match` → **304** (an FE
+  that already holds the figure skips the re-download). **Gates:** `test_result_cache.py` **+3** render-cache
+  tests (envelope hit on repeat · style change & THEME_VERSION bump each miss · **acceptance**: a style
+  change does NOT re-enter the runner [call-counter] · the end-to-end test now asserts BOTH tiers hit +
+  `errors==0`), `test_jobs.py` **+1** (ETag present · matching `If-None-Match` → 304 no-body · stale
+  validator → 200), full file **22**, contract/capabilities/export/legends/data_inspect/guardrails **110**,
+  golden+integration green; ruff clean. ⚠ the export/rasterize path's `theme.apply` is intentionally left
+  (a terminal raster, not an editable re-render). **NEXT = C3** (input cache + param-range 400 + exec timeout). · [ ] C3 · [ ] C4 ⚑ · [ ] C5
 - [ ] D1 · [ ] D2 · [ ] D3 · [ ] D4 ⚑
 - [ ] E1 · [ ] E2
 - [ ] F1 ⚑ · [ ] F2 ⚑ · [ ] F3 ⚑

@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import pathlib
 import shutil
@@ -6,7 +7,7 @@ import tempfile
 import uuid
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -694,12 +695,23 @@ async def job_events(job_id: str):
     return StreamingResponse(stream(), media_type="text/event-stream")
 
 
+def _content_etag(payload) -> str:
+    """A strong ETag — the content hash of a JSON-able payload (Task C2)."""
+    blob = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+    return '"' + hashlib.sha256(blob.encode("utf-8")).hexdigest() + '"'
+
+
 @app.get("/jobs/{job_id}/result")
-def job_result(job_id: str):
+def job_result(job_id: str, request: Request):
     bundle = result_store.get(job_id)
     if bundle is None:
         raise HTTPException(status_code=404, detail="result not available")
-    return bundle                                     # {figure, provenance, methods} — same shape as /run
+    # C2: a stored result is immutable, so its content hash is a stable ETag. An FE that already
+    # holds this figure sends If-None-Match and gets a 304 (no figure re-download).
+    etag = _content_etag(bundle)
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag})
+    return JSONResponse(bundle, headers={"ETag": etag})  # {figure, provenance, methods} — /run shape
 
 
 @app.get("/figures/export/presets")
@@ -766,6 +778,8 @@ class StyleApplyRequest(BaseModel):
 def apply_figure_style(req: StyleApplyRequest):
     # Live editor preview: re-skin a figure in a journal style and return the styled
     # spec (one Python source of the transform — the FE commits it as an undoable edit).
+    # C2 render tier: theme.render caches the envelope by (figure hash, skill, style, theme version),
+    # so a repeat style apply is a cache hit and no skill is re-run for a style change.
     if not isinstance(req.figure, dict) or "data" not in req.figure:
         raise HTTPException(status_code=400, detail="figure must be a Plotly spec with a data array")
-    return {"figure": theme.apply(req.figure, req.skill_id or "", req.style)}
+    return {"figure": theme.render(req.figure, req.skill_id or "", req.style)}

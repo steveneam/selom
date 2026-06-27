@@ -162,7 +162,8 @@ def test_execute_caches_and_skips_recompute(tmp_path, monkeypatch, fresh_cache):
     fig1, _ = contract.run_skill_with_table("fake", src, {})
     fig2, _ = contract.run_skill_with_table("fake", src, {})
     assert calls["n"] == 1, "the 2nd identical run must be served from cache (no recompute)"
-    assert fresh_cache.stats["mem_hits"] == 1
+    # Two tiers both hit on a fully-cached re-run: the compute fetch + the render (envelope) fetch.
+    assert fresh_cache.stats["mem_hits"] == 2
     assert fig1 == fig2  # the served figure is the themed compute result, identical
 
     # A non-default param is a clean miss -> recompute.
@@ -183,15 +184,18 @@ def test_real_skill_path_caches_end_to_end(tmp_path, monkeypatch, fresh_cache):
 
     fig1 = contract.run_skill("volcano", src, {})
     fig2 = contract.run_skill("volcano", src, {})
-    assert fresh_cache.stats["mem_hits"] == 1  # 2nd run served from cache (runner not re-entered)
+    # 2nd run is served from cache (runner not re-entered) — both tiers hit: compute + render.
+    assert fresh_cache.stats["mem_hits"] == 2
     assert fig2 == fig1                         # the themed result is identical
 
-    # And the disk tier serves a cold (empty in-proc) instance over the same dir.
+    # And the disk tier serves a cold (empty in-proc) instance over the same dir (both tiers).
     cold = ResultCache(root=fresh_cache.root, mem_max=8, enabled=True)
     _result_cache.set_cache(cold)
     fig3 = contract.run_skill("volcano", src, {})
-    assert cold.stats["disk_hits"] == 1 and cold.stats["mem_hits"] == 0
+    assert cold.stats["disk_hits"] == 2 and cold.stats["mem_hits"] == 0
     assert fig3 == fig1
+    # No silent disk-write failures (e.g. a filename-unsafe cache key on Windows).
+    assert fresh_cache.stats["errors"] == 0 and cold.stats["errors"] == 0
 
 
 def test_stub_run_with_missing_input_is_uncached(tmp_path, fresh_cache, monkeypatch):
@@ -201,3 +205,52 @@ def test_stub_run_with_missing_input_is_uncached(tmp_path, fresh_cache, monkeypa
     contract.run_skill("volcano", "unused", {})
     contract.run_skill("volcano", "unused", {})
     assert fresh_cache.stats == {"mem_hits": 0, "disk_hits": 0, "misses": 0, "sets": 0, "errors": 0}
+
+
+# --- C2: render / figure-envelope cache (the source/render split) ------------------------------
+
+def test_render_caches_the_envelope(monkeypatch, fresh_cache):
+    """A repeat render of the same (figure, skill, style) is a cache hit — theme.apply is not
+    re-run; a different style and a THEME_VERSION bump each miss cleanly."""
+    from skills import theme
+
+    applies = {"n": 0}
+    real_apply = theme.apply
+
+    def counting_apply(spec, skill_id, style=theme.DEFAULT_STYLE):
+        applies["n"] += 1
+        return real_apply(spec, skill_id, style)
+
+    monkeypatch.setattr(theme, "apply", counting_apply)
+    fig = {"data": [{"type": "scatter", "x": [1], "y": [2]}], "layout": {}}
+
+    a = theme.render(fig, "volcano", "selom")
+    b = theme.render(fig, "volcano", "selom")
+    assert applies["n"] == 1 and a == b          # 2nd identical render served from the envelope cache
+    theme.render(fig, "volcano", "nature")
+    assert applies["n"] == 2                      # a style change -> a clean miss -> re-theme
+    monkeypatch.setattr(theme, "THEME_VERSION", "2")
+    theme.render(fig, "volcano", "selom")
+    assert applies["n"] == 3                      # a theme-version bump -> a clean miss
+
+
+def test_style_change_does_not_rerun_the_skill(tmp_path, monkeypatch, fresh_cache):
+    """Acceptance: a theme/style change re-renders WITHOUT re-running the skill — the compute and
+    the render are separately-keyed tiers, so restyling never re-enters the runner."""
+    from skills import theme
+
+    calls = {"n": 0}
+
+    def fake_run(data_path, params):
+        calls["n"] += 1
+        return {"data": [{"type": "scatter", "x": [1], "y": [params["fc_threshold"]]}], "layout": {}}
+
+    monkeypatch.setattr(contract, "load_skill", lambda sid: _fake_spec("1"))
+    monkeypatch.setattr(contract, "import_module", lambda path: types.SimpleNamespace(run=fake_run))
+    src = _input(tmp_path)
+
+    fig_default, _ = contract.run_skill_with_table("fake", src, {})
+    assert calls["n"] == 1
+    restyled = theme.render(fig_default, "fake", "nature")  # the FE's /figures/style/apply flow
+    assert calls["n"] == 1                                  # the skill was NOT re-run
+    assert isinstance(restyled, dict) and "data" in restyled

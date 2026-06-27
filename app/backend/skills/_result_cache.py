@@ -141,6 +141,23 @@ def cache_key(skill_id: str, version: str, param_spec: dict, data_path, params: 
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
+def render_key(source, skill_id: str, style: str, theme_version: str) -> str:
+    """The figure-envelope (render) key (Task C2): ``(source identity, skill, style, theme_version)``.
+
+    ``source`` is either the pre-theme figure dict (hashed by content — the ``/figures/style/apply``
+    path, where the caller hands us a raw figure) or the compute key string that already identifies
+    that source (the ``_execute`` path — cheaper, no re-hash of a large figure). Prefixed ``render-``
+    so it never collides with a bare compute hash in the shared store (a filename-safe separator —
+    a ``:`` would be an invalid NTFS filename char and silently break the disk tier on Windows)."""
+    blob = json.dumps(
+        {"src": source, "skill": skill_id, "style": style, "theme": theme_version},
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    return "render-" + hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
 class ResultCache:
     """Two-tier (in-proc LRU + local-disk JSON) content-addressed store.
 
@@ -182,8 +199,11 @@ class ResultCache:
         except (OSError, ValueError, TypeError):
             self.stats["errors"] += 1
 
-    def get(self, key: str | None) -> dict | None:
-        """Return a cached ``{figure, table}`` (a private deep copy), or None on a miss."""
+    def fetch(self, key: str | None) -> dict | None:
+        """Return a private deep copy of the JSON payload at ``key``, or None on a miss.
+
+        The generic two-tier read primitive — :meth:`get` (compute entries) and the C2 render
+        cache both go through it. Counts the hit (in-proc vs disk) / miss in ``stats``."""
         if not self.enabled or key is None:
             return None
         with self._lock:
@@ -205,17 +225,25 @@ class ResultCache:
             self.stats["misses"] += 1
         return None
 
-    def set(self, key: str | None, figure, table) -> None:
+    def put(self, key: str | None, payload: dict) -> None:
+        """Store an arbitrary JSON-able payload under ``key`` (the generic write primitive)."""
         if not self.enabled or key is None:
             return
-        payload = copy.deepcopy({"figure": figure, "table": table})
+        snapshot = copy.deepcopy(payload)
         with self._lock:
             if self.mem_max:
-                self._mem[key] = payload
+                self._mem[key] = snapshot
                 self._mem.move_to_end(key)
                 self._evict()
             self.stats["sets"] += 1
-        self._disk_write(key, payload)
+        self._disk_write(key, snapshot)
+
+    def get(self, key: str | None) -> dict | None:
+        """A cached ``{figure, table}`` compute entry (a private deep copy), or None — see :meth:`fetch`."""
+        return self.fetch(key)
+
+    def set(self, key: str | None, figure, table) -> None:
+        self.put(key, {"figure": figure, "table": table})
 
     def clear(self) -> None:
         """Drop the in-proc tier and remove the disk tier (test / forced-cold hygiene)."""

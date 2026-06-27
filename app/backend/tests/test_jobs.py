@@ -67,3 +67,23 @@ def test_unknown_skill_is_404():
 def test_unknown_job_is_404():
     assert client.get("/jobs/deadbeef").status_code == 404
     assert client.get("/jobs/deadbeef/result").status_code == 404
+
+
+def test_result_etag_and_conditional_304():
+    """C2: the stored figure GET emits a strong content-hash ETag and honors If-None-Match -> 304."""
+    job = _submit().json()
+    r1 = client.get(f"/jobs/{job['id']}/result")
+    assert r1.status_code == 200
+    etag = r1.headers.get("etag")
+    assert etag and etag.startswith('"')
+
+    # A conditional GET with the same validator -> 304, no body, same ETag echoed back.
+    r2 = client.get(f"/jobs/{job['id']}/result", headers={"If-None-Match": etag})
+    assert r2.status_code == 304
+    assert r2.headers.get("etag") == etag
+    assert not r2.content
+
+    # A stale validator -> a fresh 200 with the figure.
+    r3 = client.get(f"/jobs/{job['id']}/result", headers={"If-None-Match": '"stale"'})
+    assert r3.status_code == 200
+    assert r3.json()["figure"]["data"]
