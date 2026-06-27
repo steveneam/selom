@@ -1,6 +1,6 @@
 # Selom Architecture Gate — Agile Roadmap
 
-Last updated: 2026-06-26 00:25 +10:00 — Claude.
+Last updated: 2026-06-27 18:03 +10:00 — Claude.
 Status: **Active lane.** Owner greenlit the gate (2026-06-25): "stick with this plan…
 go with your recommended task… this is the lane until it is mostly complete; other
 tasks/plans/pillars on hold." Companion to `plan.md` (why) + `inventory.md` (current state).
@@ -139,7 +139,22 @@ alongside/after as the proof. The deferred buckets wait for the explicit data-ar
   error state + Retry (no infinite spinner), in the same Inputs card; starting the backend + Retry
   rendered the real param controls (`ready`). No store-mutating probe this pass → B5 fixture untouched
   (8 figures intact). **Filed C5** (param-spec caching) per owner — the "no backend → fetch fails"
-  dependency is reducible (cache the immutable spec); B3's error/Retry is the floor. · [ ] B4 · [ ] B5
+  dependency is reducible (cache the immutable spec); B3's error/Retry is the floor.
+- [x] B4 (skill-scoped staged params + switch hygiene; tsc clean · eslint **0-err** [27 warns, **−1 vs
+  HEAD** — the removed effect's setState-in-effect warning] · vitest **288**; commit `f77e0c1`; **browser
+  live-verified 2026-06-26** on real localStorage fixtures, webpack dev, **no backend**). The reset-from-
+  figure `useEffect` (`project-workspace.tsx`, keyed only on `activeFigureId`, eslint-disabled, one-frame
+  flash) → a **derive-don't-sync during-render reset** keyed on `fdScope = dataset:skill:figure` (React's
+  "store info from previous renders" pattern); `key={fdScope}` remounts the bespoke `FigureDataPanel` on
+  any switch + the preview/inputs `PaneBoundary` resetKeys widen to `[datasetId, skillId, figureId]`.
+  **Acceptance verified live** in the two-version volcano project `p_3384a01f`: staged **fc 1→2** (counts
+  re-bucketed live 607/334→142/53) → **Re-run FAILED** (no session bytes → re-upload halt, staged fc=2
+  KEPT, **no new version** — 2 in store) → switched to the **fc=3** version (reset to 3, no banner) →
+  **back** to the fc=1 version (**reset to 1 — no stale fc=2/3**, counts back to 607/334). Plus a genuine
+  **cross-skill** switch in `p_7821cab4` (`erg_intensity_response` ↔ `erg_traces`): the Figure-data pane
+  remounted to the correct skill, **no crash / no boundary trip**, console clean (only the expected
+  param-spec 404 = B3's error state). **No store-mutating probe** (drove the real UI) → fixtures intact
+  (22 figures, volcano fc=[1,3] unchanged). · [ ] B5
 - [ ] C1 · [ ] C2 · [ ] C3 · [ ] C4 ⚑ · [ ] C5
 - [ ] D1 · [ ] D2 · [ ] D3 · [ ] D4 ⚑
 - [ ] E1 · [ ] E2
