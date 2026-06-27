@@ -57,7 +57,8 @@ new surface — it makes the existing surface unbreakable.
 | **B5** | Registry-completeness CI gate | A test asserting every `params.ts` overlay key **and** every declared `_capabilities` tool has a backing `skill.json`; promote `warnDeadKnob` drift from a dev console warn to a failing audit. | A typo'd/renamed param or capability fails CI, not just a console warn. | ~0.5 |
 
 **Task B exit:** open every skill's figure, switch dataset↔skill 20× → zero crashes, every pane a
-stable slot, no stale-param leak, a heap snapshot flat across switches (overlaps E1).
+stable slot, no stale-param leak, a heap snapshot flat across switches (overlaps E1). **✅ PASSED
+2026-06-27** — see the Progress entry below.
 
 ## Task C — Cache / source boundary  ·  lane: BE (Codex; Claude covers while away)  ·  DB-free (R2 tier deferred)
 
@@ -185,6 +186,29 @@ alongside/after as the proof. The deferred buckets wait for the explicit data-ar
   [[selom-backend-python-exec]]). **Task B code COMPLETE
   (B1–B5); NEXT = Task B EXIT smoke** (open every skill's figure, switch dataset↔skill 20× → zero crashes,
   stable slots, no stale-param leak, flat heap — overlaps E1; needs a browser pass).
+- [x] **Task B EXIT smoke** (capstone; **browser-driven via chrome-devtools MCP, 2026-06-27** on the
+  cleaned localStorage fixtures, webpack dev, **no backend** — so every analysis-input pane correctly
+  shows B3's `error` slot [param-spec describe 404], the floor, not a crash). **~150 dataset/skill/view
+  switches** driven through the REAL UI (programmatic clicks → real React handlers) across **all 5
+  skills**: `erg_traces` + `erg_intensity_response` (p_7821cab4, SVG, 2 skills × multiple datasets),
+  `volcano` (p_3384a01f, **WebGL scattergl**), `heatmap`/clustermap (p_fb5166e1, SVG + dendrogram +
+  annotation strips), and the legacy no-spec `umap` (demo-pbmc → B2 "Figure spec not stored" empty
+  state). **Acceptance, all four met:** (a) **zero crashes / zero boundary trips** — `role=alert`
+  "rest of the editor is fine" never appeared; console carried only the expected param-spec 404s, **no
+  `[error-boundary]`, no React/Plotly/WebGL errors, no "too many active WebGL contexts"**; (b) **every
+  pane a stable slot** — `data-pane-status` resolved to loading→error→ready, empty states rendered
+  ("Figure spec not stored", "Re-run to generate", "No points yet"), never `null`; (c) **no stale-param
+  leak (B4)** — staged a distinctive `fc=5` on the volcano fc=1 version, switched to the fc=3 version →
+  it showed its **own** base (3) with **no pending banner**, and returning to v1 reset to 1 (the
+  abandoned stage discarded; `fdScope` reset + `key={fdScope}` remount confirmed); (d) **heap flat
+  across switches (E1 overlap)** — measured the delta between TWO post-GC measurements *after* Plotly's
+  one-time module load (the 87→190 MB jump is that load, permanent, not a leak): **SVG/ERG 190.65 →
+  189.53 MB** over 60 switches, **WebGL/volcano 195.52 → 195.68 MB** over 48 switches; canvas count
+  capped at 3 for scattergl and returned to **0 at home** every time (react-plotly purges on unmount),
+  snapshot files flat (76.2 → 74.4 MB). Fixtures intact afterward (7 projects / 18 figures / 16
+  datasets, no re-runs since no backend). **⚑ Task B fully COMPLETE (B1–B5 + exit). NEXT = Task C
+  C1–C3 + C5** (cache/source boundary, BE/cross-lane; all DB-free — see the discussion-gate stop before
+  any materialization bucket).
 - [ ] C1 · [ ] C2 · [ ] C3 · [ ] C4 ⚑ · [ ] C5
 - [ ] D1 · [ ] D2 · [ ] D3 · [ ] D4 ⚑
 - [ ] E1 · [ ] E2
