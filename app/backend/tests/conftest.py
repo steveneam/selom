@@ -8,12 +8,49 @@ also keeps tests from writing entries into the real ``data/result_cache/``. Test
 cache itself (test_result_cache.py) opt back in by swapping in their own enabled instance.
 """
 
+import os
 import tempfile
 
 import pytest
 
 from config import settings
 from skills import _result_cache
+
+# --- E2 fast/slow test split -------------------------------------------------------------
+# A feature commit runs the fast "contract gate" — `pytest -m "not slow"` — in seconds; the
+# heavy lanes (reproduction drives over real data, golden-figure renders across every skill,
+# real-engine scverse validations) carry @slow and only run in the full/CI pass (`pytest -m
+# slow`). Auto-marked by FILE here so no per-test edits are needed — a new heavy file just
+# joins the set below. (Telemetry split, architecture-consistency Task E2.)
+_SLOW_PREFIXES = ("test_reproduction",)
+_SLOW_FILES = {
+    "test_skills_golden.py",
+    "test_styles.py",
+    "test_charts.py",
+    "test_export.py",
+    "test_iwx.py",
+    "test_gsea.py",
+    "test_ssgsea.py",
+    "test_melody.py",
+    "test_cepo.py",
+    "test_integration_skill.py",
+    "test_scrna_hvg_mixing.py",
+    "test_deg_bulk.py",
+    "test_deg_pseudobulk.py",
+    "test_diff_abundance.py",
+    "test_pseudotime_genes.py",
+    "test_reconstruct.py",
+    "test_repro_assets.py",
+}
+
+
+def pytest_collection_modifyitems(config, items):
+    """Tag the heavy lanes @slow by file (see the split note above)."""
+    slow = pytest.mark.slow
+    for item in items:
+        name = os.path.basename(str(item.fspath))
+        if name.startswith(_SLOW_PREFIXES) or name in _SLOW_FILES:
+            item.add_marker(slow)
 
 
 @pytest.fixture(autouse=True)

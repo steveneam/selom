@@ -131,3 +131,6 @@ oracle = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+markers = [
+  "slow: heavy lane (reproduction drives, golden renders, real-engine validations) — excluded from the fast contract gate. Fast gate: `pytest -m 'not slow'`; heavy lane: `pytest -m slow` (architecture-consistency Task E2).",
+]
