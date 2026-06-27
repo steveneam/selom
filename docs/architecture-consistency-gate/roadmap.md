@@ -253,7 +253,30 @@ alongside/after as the proof. The deferred buckets wait for the explicit data-ar
   `errors==0`), `test_jobs.py` **+1** (ETag present · matching `If-None-Match` → 304 no-body · stale
   validator → 200), full file **22**, contract/capabilities/export/legends/data_inspect/guardrails **110**,
   golden+integration green; ruff clean. ⚠ the export/rasterize path's `theme.apply` is intentionally left
-  (a terminal raster, not an editable re-render). **NEXT = C3** (input cache + param-range 400 + exec timeout). · [ ] C3 · [ ] C4 ⚑ · [ ] C5
+  (a terminal raster, not an editable re-render). · [x] C3 (input cache + param-range 400 + exec
+  timeout; **BE; pytest-verified, no browser**; ruff clean). Three guards on the run path:
+  **(1) parsed-input cache** — new `engine.ingest_cached(src, hint, sheet, sep)` memoizes `engine.ingest`
+  in-process keyed by the input **content hash** (+hint/sheet/sep), so the same bytes aren't re-parsed
+  across `/data/inspect` + `/run` (each uploads to its own temp path, but the bytes — hence the key —
+  match). In-process only (the payload is a live AnnData/DataFrame). On a hit the heavy payload+kind are
+  **shared read-only** (QC/profile read them; the skill run reads from `path`, a file), while
+  `source`/`qc`/`path` are **rebound per request** so one caller's metadata/file lifecycle can't corrupt
+  the shared entry — a materialized parse keeps its persistent decoded temp; a direct file rebinds to the
+  current upload. Wired into `/data/inspect` + `_inspect_for_run`. **(2) param-range validation** — new
+  `contract.validate_param_ranges(spec, params)` enforces each `param_spec`'s type / `[min,max]` /
+  `options` at the API → **400** with a clear `param_out_of_range` message (e.g. `fc_threshold=100` on a
+  `max:5` param), on both `/run` and `/skills/{id}/jobs`, **before** any heavy work; unknown/reserved
+  (`_`) keys ignored. **(3) exec timeout** — `/run` runs the skill in a worker thread under
+  `SELOM_SKILL_TIMEOUT_S` (default 120s) via `asyncio.wait_for(run_in_executor)` → a hung skill returns
+  **504** promptly and the event loop stays live instead of the whole server freezing (this also fixes the
+  prior sync-call event-loop block). ⚠ a true kill needs a subprocess worker (deferred infra) — the
+  abandoned thread finishes on its own; documented. New config `SELOM_INPUT_CACHE`/`_MAX` +
+  `SELOM_SKILL_TIMEOUT_S`; the conftest disables the input cache suite-wide (settings singleton is built at
+  import → flip the attribute, not the env). **Gates:** `test_input_cache.py` **3** (same bytes parse once ·
+  distinct input/hint miss · disabled bypass), `test_run_guards.py` **7** (range unit: numeric/option/type +
+  ignore unknown; endpoint: `/run` & jobs **400** out-of-range · happy-path **200** · hung skill **504**),
+  engine+endpoint+cache regression **124**, golden+integration green, ruff clean. **NEXT = C5**
+  (param-spec caching — FE localStorage + stamp param_spec into figure provenance). · [ ] C4 ⚑ · [ ] C5
 - [ ] D1 · [ ] D2 · [ ] D3 · [ ] D4 ⚑
 - [ ] E1 · [ ] E2
 - [ ] F1 ⚑ · [ ] F2 ⚑ · [ ] F3 ⚑

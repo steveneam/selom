@@ -12,12 +12,14 @@ complementary, not duplicates.
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
+import threading
+from collections import OrderedDict
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
 
 from engine.databundle import DataBundle, classify
-from engine.models import GENERIC_TABLE, SourceRef
+from engine.models import GENERIC_TABLE, QCReport, SourceRef
 
 
 @dataclass(frozen=True)
@@ -190,6 +192,85 @@ def ingest(
 
 def _is_dataframe(obj: Any) -> bool:
     return any(t.__name__ == "DataFrame" for t in type(obj).__mro__)
+
+
+# --- parsed-input cache (Task C3) -------------------------------------------------------------
+# An in-process memoization of :func:`ingest` keyed by the input content hash, so the same bytes
+# aren't re-parsed across ``/data/inspect`` + ``/run`` (each endpoint uploads to its own temp path,
+# but the bytes — hence the key — are identical). In-process only: the payload is a live
+# AnnData/DataFrame that can't serialize to disk. On a hit the heavy payload + kind are *shared*
+# (read-only — QC/profile read them; the skill run reads from ``path``, a file), while source/qc/path
+# are rebound per request so one caller's metadata or file lifecycle can't corrupt the shared entry.
+
+_INPUT_CACHE: "OrderedDict[tuple, tuple[DataBundle, bool]]" = OrderedDict()
+_INPUT_LOCK = threading.Lock()
+
+
+def _sha256_file(path: str | Path) -> str | None:
+    p = Path(path)
+    try:
+        if not p.is_file():
+            return None
+        h = hashlib.sha256()
+        with p.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
+
+
+def _rebind(entry: tuple[DataBundle, bool], src: str | Path) -> DataBundle:
+    """A per-request view of a cached parse. The payload/kind/meta are shared; ``source`` is a fresh
+    copy (the caller overwrites ``.filename``), ``qc`` is reset, and ``path`` is rebound: a
+    *materialized* parse keeps its persistent decoded temp; a direct file is rebound to this upload."""
+    bundle, materialized = entry
+    path = bundle.path if materialized else str(Path(src))
+    return replace(
+        bundle,
+        source=bundle.source.model_copy(deep=True),
+        qc=QCReport(),
+        meta=dict(bundle.meta),
+        path=path,
+    )
+
+
+def ingest_cached(
+    src: str | Path,
+    *,
+    hint: str | None = None,
+    sheet: str | int | None = None,
+    sep: str | None = None,
+) -> DataBundle:
+    """:func:`ingest`, memoized by ``(content sha256, hint, sheet, sep)`` (Task C3). A second call
+    on the same bytes skips the re-parse; a different file / hint / sheet misses. Falls through to a
+    plain :func:`ingest` when the cache is disabled or the input is unhashable."""
+    from config import settings
+
+    if not settings.input_cache_enabled:
+        return ingest(src, hint=hint, sheet=sheet, sep=sep)
+    sha = _sha256_file(src)
+    key = (sha, hint, str(sheet), sep) if sha else None
+    if key is not None:
+        with _INPUT_LOCK:
+            hit = _INPUT_CACHE.get(key)
+            if hit is not None:
+                _INPUT_CACHE.move_to_end(key)
+                return _rebind(hit, src)
+    bundle = ingest(src, hint=hint, sheet=sheet, sep=sep)  # already bound to this request
+    if key is not None:
+        materialized = bundle.path is not None and bundle.path != str(Path(src))
+        with _INPUT_LOCK:
+            _INPUT_CACHE[key] = (bundle, materialized)
+            _INPUT_CACHE.move_to_end(key)
+            while len(_INPUT_CACHE) > max(0, settings.input_cache_max):
+                _INPUT_CACHE.popitem(last=False)
+    return bundle
+
+
+def clear_input_cache() -> None:
+    with _INPUT_LOCK:
+        _INPUT_CACHE.clear()
 
 
 def _load_payload(path: Path, *, sheet: str | int | None = None, sep: str | None = None):

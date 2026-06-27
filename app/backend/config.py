@@ -41,6 +41,21 @@ class Settings(BaseSettings):
     def result_cache_enabled(self) -> bool:
         return self.result_cache.strip().lower() in {"on", "1", "true", "yes"}
 
+    # Parsed-input cache (Task C3) — an in-process memoization of ``engine.ingest`` keyed by the
+    # input content hash, so the same file isn't re-parsed across ``/data/inspect`` + ``/run``. The
+    # parsed payload is shared (read-only); per-request source/qc/path are rebound on each hit.
+    input_cache: str = Field(default="on", validation_alias="SELOM_INPUT_CACHE")
+    input_cache_max: int = Field(default=16, validation_alias="SELOM_INPUT_CACHE_MAX")
+
+    @property
+    def input_cache_enabled(self) -> bool:
+        return self.input_cache.strip().lower() in {"on", "1", "true", "yes"}
+
+    # Per-skill execution timeout (Task C3), seconds. A skill is run in a worker thread under this
+    # ceiling so a hung run returns 504 promptly and the event loop stays responsive instead of the
+    # whole server freezing. 0 disables. (A true kill needs a subprocess worker — deferred infra.)
+    skill_timeout_s: int = Field(default=120, validation_alias="SELOM_SKILL_TIMEOUT_S")
+
     # Reproduction-engine R oracle (validation-only, ADR 0002 — NEVER on the shipped path).
     # OFF by default: the blame instrument runs the authors' actual R tool (edgeR/fgsea) to
     # split engine-delta / upstream-delta / paper-irreproducible. Disabled -> blame degrades

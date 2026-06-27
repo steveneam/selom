@@ -12,14 +12,23 @@ import tempfile
 
 import pytest
 
+from config import settings
 from skills import _result_cache
 
 
 @pytest.fixture(autouse=True)
-def _result_cache_off():
+def _caches_off(monkeypatch):
     prev = _result_cache._default
     _result_cache.set_cache(
         _result_cache.ResultCache(root=tempfile.gettempdir(), mem_max=0, enabled=False)
     )
+    # The C3 parsed-input cache is content-addressed (staleness-safe), but keep tests parsing fresh
+    # so endpoint tests don't share state through the in-process cache. (The settings singleton is
+    # built at import, so flip the attribute, not the env var; the property reads it live per call.)
+    monkeypatch.setattr(settings, "input_cache", "off")
+    import engine
+
+    engine.clear_input_cache()
     yield
     _result_cache.set_cache(prev)
+    engine.clear_input_cache()

@@ -143,6 +143,39 @@ def defaults(spec: SkillSpec) -> dict:
 _CASTS = {"int": int, "float": float, "str": str, "bool": to_bool}
 
 
+def validate_param_ranges(spec: SkillSpec, params: dict) -> list[str]:
+    """Validate caller params against the skill's ``param_spec`` (Task C3): each must be coercible to
+    its declared type, within ``[min, max]``, and ∈ ``options``. Returns a list of human messages
+    (empty = OK). The API maps a non-empty list to **400** — an out-of-range knob is the user's error
+    to fix, not a runtime crash deep in the skill. Unknown / reserved (``_``-prefixed) keys are
+    ignored (defaults fill the rest), mirroring :func:`resolved_params`."""
+    errors: list[str] = []
+    for key, raw in params.items():
+        skey = str(key)
+        if skey.startswith("_"):
+            continue
+        entry = spec.param_spec.get(key)
+        if entry is None:
+            continue
+        cast = _CASTS.get(entry.get("type"))
+        try:
+            value = cast(raw) if cast else raw
+        except (ValueError, TypeError):
+            errors.append(f"{skey!r} must be a {entry.get('type')} (got {raw!r})")
+            continue
+        options = entry.get("options")
+        if options is not None and value not in options:
+            errors.append(f"{skey!r} must be one of {options} (got {value!r})")
+            continue
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            lo, hi = entry.get("min"), entry.get("max")
+            if lo is not None and value < lo:
+                errors.append(f"{skey!r} must be >= {lo} (got {value})")
+            if hi is not None and value > hi:
+                errors.append(f"{skey!r} must be <= {hi} (got {value})")
+    return errors
+
+
 def resolved_params(spec: SkillSpec, params: dict) -> dict:
     """Skill defaults overlaid with caller params, coerced to the param_spec types.
 

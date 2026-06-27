@@ -30,7 +30,12 @@ from jobs.queue import get_job, result_store, submit
 from jobs.store import TERMINAL
 from skills import styles, theme
 from skills._engine import to_bool
-from skills.contract import load_skill, run_bundle_with_table, run_skill_with_table
+from skills.contract import (
+    load_skill,
+    run_bundle_with_table,
+    run_skill_with_table,
+    validate_param_ranges,
+)
 from skills.registry import list_catalog, list_skill_ids
 
 app = FastAPI(title="Selom API")
@@ -357,9 +362,9 @@ def _inspect_for_run(path: str, filename: str | None):
     # just runs as before, and a genuinely-bad payload still errors honestly inside the skill. We only
     # ever BLOCK when ingest + QC succeed AND surface a real block-severity flag.
     try:
-        from engine import ingest, route_data, run_qc
+        from engine import ingest_cached, route_data, run_qc
 
-        bundle = ingest(path)
+        bundle = ingest_cached(path)  # C3: reuse the parse if /data/inspect already saw these bytes
         bundle.qc = run_qc(bundle)
         bundle.source.filename = pathlib.Path(filename or "").name or bundle.source.filename
         return bundle, bundle.qc, route_data(bundle)
@@ -375,14 +380,14 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
     # cleaning plan for that type. Product A's entry point; library-only, runs no analysis. The cheap
     # routing inventory in extract.ingest is the paper-side complement. `sheet` selects an xlsx sheet;
     # `hint` forces the modality (Kind); `profile` is the user's L3 data-type override (e.g. "erg").
-    from engine import ALL_KINDS, ingest, plan_cleaning, profile_data, route_profile, run_qc
+    from engine import ALL_KINDS, ingest_cached, plan_cleaning, profile_data, route_profile, run_qc
     from engine import compat
 
     if hint is not None and hint not in ALL_KINDS:
         raise HTTPException(status_code=400, detail=f"hint must be one of {ALL_KINDS}")
     path = _save_upload(matrix)
     try:
-        bundle = ingest(path, hint=hint, sheet=sheet)
+        bundle = ingest_cached(path, hint=hint, sheet=sheet)  # C3 parsed-input cache
         bundle.source.filename = pathlib.Path(matrix.filename or "").name  # honest name (drives L1)
         bundle.qc = run_qc(bundle)
         # The user's data-type override arrives as `profile` (the "erg" profile) OR `hint` (an engine
@@ -482,6 +487,15 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
     if design_path:
         params["_design_path"] = design_path
     spec = load_skill(skill_id)
+    # C3: enforce the param_spec ranges/options at the API — an out-of-range knob (e.g.
+    # fc_threshold=100 on a max:5 param) is a 400 the user can fix, not a crash inside the skill.
+    range_errors = validate_param_ranges(spec, params)
+    if range_errors:
+        raise HTTPException(status_code=400, detail={
+            "error": "param_out_of_range",
+            "message": "One or more parameters are outside their allowed range.",
+            "errors": range_errors,
+        })
     try:
         # Both products load through one ingest front door (engine-spine §6/§9): classify + QC, then
         # run from the same DataBundle. Fail-soft — an uninspectable upload yields no bundle and runs
@@ -508,14 +522,30 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
                 "profile": prof.model_dump() if prof is not None else None,
                 "cleaning_plan": plan.model_dump() if plan is not None else None,
             })
+        def _do_run():
+            return (run_bundle_with_table(skill_id, bundle, params) if bundle is not None
+                    else run_skill_with_table(skill_id, path, params))
+
         try:
-            figure, table = (run_bundle_with_table(skill_id, bundle, params) if bundle is not None
-                             else run_skill_with_table(skill_id, path, params))
+            # C3 exec timeout: run the skill in a worker thread under a ceiling so a hung skill
+            # returns 504 promptly and the event loop stays live, instead of pinning the server.
+            timeout = settings.skill_timeout_s
+            if timeout and timeout > 0:
+                figure, table = await asyncio.wait_for(
+                    asyncio.get_running_loop().run_in_executor(None, _do_run), timeout
+                )
+            else:
+                figure, table = _do_run()
         except ValueError as e:
             # A runner raises ValueError for a DATA problem (missing columns, no groups, an empty
             # result) — a 4xx the user can fix, NOT a 5xx outage. Surface the real cause so the FE
             # shows "missing required columns […]" instead of "the service is unavailable".
             raise HTTPException(status_code=400, detail=str(e))
+        except asyncio.TimeoutError:
+            raise HTTPException(status_code=504, detail={
+                "error": "skill_timeout",
+                "message": f"'{skill_id}' exceeded the {timeout}s execution limit and was abandoned.",
+            })
         # L3 table synthesis (docs/table-synthesis/spec.md §4 / §8 step 4): a tableless skill that
         # has a deterministic synthesizer gets a canonical Statistics table re-shaped from its OWN
         # figure (S1 read-not-recompute -> tagged synthesized:True, S3), so the FE Statistics node
@@ -665,6 +695,14 @@ async def submit_job(skill_id: str, request: Request, matrix: UploadFile):
         raise HTTPException(status_code=404, detail=f"unknown skill '{skill_id}'")
     path = _save_upload(matrix)
     params = dict(request.query_params)
+    # C3: the same param-range gate as /run — reject an out-of-range knob before enqueuing.
+    range_errors = validate_param_ranges(load_skill(skill_id), params)
+    if range_errors:
+        raise HTTPException(status_code=400, detail={
+            "error": "param_out_of_range",
+            "message": "One or more parameters are outside their allowed range.",
+            "errors": range_errors,
+        })
     job = submit(skill_id, path, params, matrix.filename)
     return job.public()
 
