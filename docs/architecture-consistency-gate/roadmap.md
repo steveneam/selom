@@ -162,7 +162,29 @@ alongside/after as the proof. The deferred buckets wait for the explicit data-ar
   **cross-skill** switch in `p_7821cab4` (`erg_intensity_response` ↔ `erg_traces`): the Figure-data pane
   remounted to the correct skill, **no crash / no boundary trip**, console clean (only the expected
   param-spec 404 = B3's error state). **No store-mutating probe** (drove the real UI) → fixtures intact
-  (22 figures, volcano fc=[1,3] unchanged). · [ ] B5
+  (22 figures, volcano fc=[1,3] unchanged).
+- [x] B5 (registry-completeness CI gate; **cross-lane — FE vitest + BE pytest**; tsc/eslint 0-err, vitest
+  **293** [+5], BE `test_capabilities` **8** [+2]; **red-then-green verified, no browser needed**). Promotes
+  the `warnDeadKnob` dev console warning to a FAILING test. **The spine** = the backend `skill.json` param_spec
+  + `list_skill_ids()`; two FE/BE mirrors are each validated against it in their own lane's fast gate
+  (reachability picks the home): **FE** `lib/catalog/registry-completeness.test.ts` reads the REAL skill.json
+  via `node:fs` (the cross-lane read IS the point — the test exists to catch FE↔BE contract drift) → every
+  `params.ts` PRESENTATION overlay key backs a real param_spec entry · every overlay skill has a backing
+  skill.json · the `dev:mock` fixture renders the same controls as live · no stale fixture key; **BE**
+  `tests/test_capabilities.py` → every `_capabilities._PROFILES` skill id ∈ the registry · every declared
+  capability tool ∈ the FE-known allow-list (mirrors `figure-model.ts` `SelomCapabilities.tools`). New export
+  `params.ts::overlayParamKeys()`. **Drift FIXED en route** (the gate's first catch): the `SKILL_PARAM_SPECS`
+  dev:mock fixture was stale — missing the heatmap clustermap controls (`cut_k`/`annotations`/`quant_track`/
+  `split_by`/`split_by_cut`) and the ERG mean/spread (`central`/`spread`/`error`/`band_*`/`boundary_lines`/
+  `error_every`), bar-significance (`wave`/`show_error`/`error`/`bar_fill`/`legend`/`comparisons`/`sig_test`/
+  `hline`/`hline_label`) + flicker `marks` controls → brought current so dev:mock matches live. **Red proof:**
+  `volcano.highlight`→`highlightz` → FE red ("overlay keys absent from the backend param_spec: volcano.highlightz");
+  volcano tool `thresholds`→`thresholdz` → BE red ("declares capability tool(s) {'thresholdz'} the FE can't
+  resolve") — both reverted, green. ⚠ ruff binary EDR-blocked this session (only the blocked
+  `.venv/Scripts/ruff.exe` resolves) → hand-verified the BE test vs the project's ruff config (no `[tool.ruff]`
+  → default select E4/E7/E9/F; E501 not selected; all new imports + `_KNOWN_TOOLS` used). **Task B code COMPLETE
+  (B1–B5); NEXT = Task B EXIT smoke** (open every skill's figure, switch dataset↔skill 20× → zero crashes,
+  stable slots, no stale-param leak, flat heap — overlaps E1; needs a browser pass).
 - [ ] C1 · [ ] C2 · [ ] C3 · [ ] C4 ⚑ · [ ] C5
 - [ ] D1 · [ ] D2 · [ ] D3 · [ ] D4 ⚑
 - [ ] E1 · [ ] E2
