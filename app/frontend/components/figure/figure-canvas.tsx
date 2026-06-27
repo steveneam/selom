@@ -1,11 +1,31 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import type { Config, Data, Layout } from "plotly.js";
 import type { FigureSpec } from "@/lib/figure-spec";
 import type { FigureStore } from "@/hooks/use-figure-store";
 import { deriveFigureModel, projectOverlay } from "@/lib/figure-model";
+import {
+  dropGl,
+  ensureGl,
+  glLoad,
+  holdsGl,
+  MAX_GL_CONTEXTS,
+  subscribeGl,
+  toSvgTraces,
+  usesWebgl,
+} from "@/lib/figure/webgl-budget";
+import { installPerfHook, recordRenderMs } from "@/lib/figure/perf";
+import { payloadWarnings } from "@/lib/figure/payload";
 import { relayoutToOps, restyleToOps } from "@/lib/plotly-edits";
 import { wireMarkDrag, type Crosshair } from "./mark-drag";
 import { wireThresholdDrag } from "./threshold-drag";
@@ -110,6 +130,10 @@ export function FigureCanvas({
   const geneLabels = model.capabilities.geneLabels;
   const heatmapTones = model.capabilities.heatmapTones;
 
+  // The render spec, memoized so Plotly is handed STABLE data/layout references across
+  // renders (E1) — a fresh object every render makes react-plotly re-run `Plotly.react`
+  // needlessly, churning the WebGL context. structuredClone keeps the store's immutable
+  // history snapshots pristine (react-plotly mutates what it receives).
   const figure = useMemo(
     () =>
       structuredClone({
@@ -123,6 +147,54 @@ export function FigureCanvas({
     [display, fixed, gesture.dragmode],
   );
 
+  // WebGL context budget (E1). A `scattergl`/`*gl` figure takes a scarce WebGL context;
+  // past the browser's ceiling the oldest context is silently LOST (blank figure). Each GL
+  // canvas claims a budget slot (keyed by a stable per-instance token) on mount and frees
+  // it on unmount; the registry is read via useSyncExternalStore so a denied overflow canvas
+  // re-upgrades the instant a slot frees. Under budget (≤ MAX_GL_CONTEXTS — the only case
+  // the current UI reaches) the claim always succeeds and nothing changes; an over-budget
+  // overflow canvas renders its GL traces as SVG instead of losing a context.
+  const glToken = useId();
+  const usesGl = useMemo(() => usesWebgl(figure.data), [figure.data]);
+  useEffect(() => {
+    if (!usesGl) return;
+    ensureGl(glToken);
+    return () => dropGl(glToken);
+  }, [usesGl, glToken]);
+  // Allowed unless this canvas uses GL and the budget can't seat it. Pre-commit (before the
+  // effect claims) a would-be holder is admitted optimistically while a slot is free; an
+  // overflow canvas (budget full, not yet a holder) is held to SVG from the first paint.
+  const glAllowed = useSyncExternalStore(
+    subscribeGl,
+    () => !usesGl || holdsGl(glToken) || glLoad() < MAX_GL_CONTEXTS,
+    () => true,
+  );
+
+  // The traces actually handed to Plotly: the GL figure as-is when allowed, else the SVG
+  // projection (overflow path only). Pure + memoized — the canonical spec is untouched.
+  const renderData = useMemo(
+    () => (usesGl && !glAllowed ? toSvgTraces(figure.data as Data[]) : figure.data),
+    [figure.data, usesGl, glAllowed],
+  );
+
+  // Render-timing telemetry (E2). Stamp the commit time when a new figure is about to draw
+  // (useLayoutEffect runs synchronously after DOM commit); bindGestures — react-plotly's
+  // onInitialized/onUpdate, fired once Plotly.react resolves — records the commit→draw delta.
+  // A relative regression signal, read by the perf audit via window.__selomPerf.
+  const renderStartRef = useRef(0);
+  useEffect(() => installPerfHook(), []);
+  useLayoutEffect(() => {
+    renderStartRef.current = performance.now();
+  }, [renderData, figure.layout]);
+
+  // Payload ceiling (E2): a once-per-figure dev warning when a figure ships more bytes/points
+  // than the advisory ceiling — non-blocking telemetry, the warnDeadKnob discipline.
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    const warnings = payloadWarnings(figure as unknown as FigureSpec);
+    if (warnings.length) console.warn(`[figure] payload over ceiling — ${warnings.join("; ")}`);
+  }, [figure]);
+
   // Handlers read the latest spec/store via a ref so the directly-bound Plotly
   // listeners stay stable while always seeing live values.
   const liveRef = useRef({ spec, store, onSelectTrace, overlay, onMarkMove, landmarkMarks, onThresholdChange, thresholds, onToggleLabel, geneLabels, heatmapTones });
@@ -135,6 +207,9 @@ export function FigureCanvas({
   const lineRef = useRef<HTMLDivElement | null>(null);
   const labelRef = useRef<HTMLDivElement | null>(null);
   const dotRef = useRef<HTMLDivElement | null>(null);
+  // The live Plotly graph div, captured each bind so the unmount teardown (E1) can
+  // explicitly remove the listeners WE bound directly onto it.
+  const gdRef = useRef<GraphDiv | null>(null);
   const dragDisposeRef = useRef<(() => void) | null>(null);
   const thresholdDisposeRef = useRef<(() => void) | null>(null);
   const colorbarDisposeRef = useRef<(() => void) | null>(null);
@@ -217,9 +292,15 @@ export function FigureCanvas({
   // subsequent render) right after `Plotly.react` resolves — binding here, removing
   // first so it's idempotent, survives any internal listener reset. One commit/gesture.
   const bindGestures = useCallback((_figure: unknown, gd: unknown) => {
+    // Render-timing (E2): this fires once Plotly has drawn — close the commit→draw window.
+    if (renderStartRef.current) {
+      recordRenderMs(performance.now() - renderStartRef.current);
+      renderStartRef.current = 0; // one sample per commit
+    }
     const el = gd as GraphDiv;
     const h = handlersRef.current;
     if (!el || typeof el.on !== "function" || !h) return;
+    gdRef.current = el;
     el.removeListener?.("plotly_relayout", h.relayout);
     el.removeListener?.("plotly_restyle", h.restyle);
     el.removeListener?.("plotly_click", h.click);
@@ -287,11 +368,29 @@ export function FigureCanvas({
     }
   }, [setCrosshair]);
 
+  // Explicit teardown on unmount (E1). react-plotly.js calls `Plotly.purge(gd)` in its own
+  // unmount, which tears down the WebGL context and Plotly's internal listeners (proven by
+  // the Task B exit: canvas count → 0 at home). We additionally, and explicitly, remove the
+  // gesture listeners WE bound directly onto the graph div and dispose every imperative drag
+  // wiring, then drop the refs — so nothing we attached can outlive the component (the leak
+  // surface in our control). Idempotent with react-plotly's purge; safe if it ran first.
   useEffect(() => () => {
+    const el = gdRef.current;
+    const h = handlersRef.current;
+    if (el && h) {
+      el.removeListener?.("plotly_relayout", h.relayout);
+      el.removeListener?.("plotly_restyle", h.restyle);
+      el.removeListener?.("plotly_click", h.click);
+    }
     dragDisposeRef.current?.();
     thresholdDisposeRef.current?.();
     colorbarDisposeRef.current?.();
     dendroTipDisposeRef.current?.();
+    dragDisposeRef.current = null;
+    thresholdDisposeRef.current = null;
+    colorbarDisposeRef.current = null;
+    dendroTipDisposeRef.current = null;
+    gdRef.current = null;
   }, []);
 
   const config = useMemo(() => {
@@ -337,7 +436,7 @@ export function FigureCanvas({
   return (
     <div ref={containerRef} className="relative size-full">
       <Plot
-        data={figure.data as unknown as Data[]}
+        data={renderData as unknown as Data[]}
         layout={figure.layout as unknown as Partial<Layout>}
         config={config as unknown as Partial<Config>}
         onInitialized={bindGestures as never}
