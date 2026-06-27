@@ -6,6 +6,21 @@ once on every figure.
 """
 
 from skills import _capabilities, theme
+from skills._capabilities import _PROFILES
+from skills.registry import list_skill_ids
+
+# The capability tools the FE editor actually resolves (lib/figure-model.ts → SelomCapabilities.tools).
+# A tool declared in a _PROFILES profile that isn't here would be silently dropped by the FE — drift.
+# Keep in sync with figure-model.ts when a new tool gate is added.
+_KNOWN_TOOLS = {
+    "landmarkMarks",
+    "modelFit",
+    "scaleBar",
+    "thresholds",
+    "geneLabels",
+    "heatmapTones",
+    "heatmapLabels",
+}
 
 
 def _spec() -> dict:
@@ -54,3 +69,22 @@ def test_apply_stamps_volcano_but_not_a_plain_skill():
     # A plain skill (kind "base") is never stamped at the central injection point.
     plain = theme.apply(_spec(), "deg")
     assert "selom" not in plain["layout"].get("meta", {})
+
+
+# --- Registry-completeness gate (architecture-consistency Task B5) ------------------------
+# Every capability profile must decorate a real skill, and every tool it declares must be one
+# the FE knows how to resolve. Promotes drift (a typo'd / renamed skill id or tool) from a silent
+# no-op to a failing test. The params half (params.ts overlay + dev:mock fixture ↔ skill.json) is
+# FE-native and lives in app/frontend/lib/catalog/registry-completeness.test.ts.
+
+
+def test_every_capability_profile_backs_a_real_skill():
+    skills = set(list_skill_ids())
+    orphans = [sid for sid in _PROFILES if sid not in skills]
+    assert not orphans, f"_capabilities profiles with no backing skill.json: {orphans}"
+
+
+def test_capability_tools_are_known_to_the_frontend():
+    for skill_id, profile in _PROFILES.items():
+        unknown = set(profile.get("tools", {})) - _KNOWN_TOOLS
+        assert not unknown, f"{skill_id} declares capability tool(s) {unknown} the FE can't resolve (sync lib/figure-model.ts)"

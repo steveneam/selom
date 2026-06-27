@@ -516,6 +516,20 @@ export function hasParamControls(catalogOrRuntimeId: string): boolean {
 }
 
 /**
+ * Every presentation-overlay key, per backend runtime slug — the surface the
+ * registry-completeness gate (B5) validates against the backend `param_spec`. Each
+ * key here MUST back to a `skills/<slug>/skill.json` param_spec entry, or the merge
+ * in `paramFieldsFromSpec` silently drops it (`warnDeadKnob`); the gate promotes that
+ * drift from a dev console warning to a failing test. Keyed by the runtime slug used
+ * to look up the spec, so the test compares like-for-like.
+ */
+export function overlayParamKeys(): Record<string, string[]> {
+  return Object.fromEntries(
+    Object.entries(PRESENTATION).map(([id, fields]) => [id, fields.map((f) => f.key)]),
+  );
+}
+
+/**
  * The fields to render right now, given the current param values — drops any `showWhen`
  * field whose gate doesn't match (e.g. Melody's `alpha` while the engine is the 2019
  * method). Shared by both surfaces (Workbench + Figure-data) so the conditional reveal is
