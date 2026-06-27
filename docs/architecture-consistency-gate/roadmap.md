@@ -66,7 +66,7 @@ The "faster / cleaner execution / caching strategy" ask. Content hash from `plan
 
 | # | Bucket | Scope | Acceptance | Size |
 | --- | --- | --- | --- | --- |
-| **C1** | Content-addressed result cache (L1+L2) | Key = `(skill_id+version, canonical(params), input_sha256)`; canonicalize params (stable serialize · sorted keys · float/precision coercion · drop-defaults); in-proc LRU + `diskcache`; invalidate by `skill_version` bump (no TTL). | An identical re-run is a measured cache hit (no recompute); a `skill_version` bump misses cleanly. | ~1 |
+| **C1** | Content-addressed result cache (L1+L2) | Key = `(skill_id+version, canonical(params), input_sha256)`; canonicalize params (stable serialize · sorted keys · float/precision coercion · drop-defaults); in-proc LRU + a **local-disk JSON tier** (dependency-free — content-addressing makes `diskcache`'s eviction/concurrency machinery unneeded for an immutable cache, and avoids a venv dep; a future R2 tier (C4) swaps the disk backend behind the same interface); invalidate by `skill_version` bump (no TTL — the version is in the key). | An identical re-run is a measured cache hit (no recompute); a `skill_version` bump misses cleanly. | ~1 |
 | **C2** | Source/render split + ETag/304 | Separate the compute cache (above) from the figure-envelope cache `(result_hash, theme_version, render_params)`; `ETag` = content hash on figure GET, honor `If-None-Match` → 304. | A theme/style/label change re-renders **without** re-running the skill; a repeat GET is a 304. | ~1 |
 | **C3** | Input cache + param-range + exec timeout | Cache the parsed input by `input_sha256`; enforce `param_spec` min/max/options at the API (400 on out-of-range); add a per-skill execution timeout. | `fc_threshold=100` on a `max:5` param → 400; a hung skill times out instead of pinning a worker; the same file isn't re-parsed across `/data/inspect` + `/run`. | ~1 |
 | **C4** | R2 object-store tier ⚑ | Promote the durable cache layer to R2 (Parquet result + JSON spec under the content hash). | — | **DEFERRED (materialization)** |
@@ -209,7 +209,31 @@ alongside/after as the proof. The deferred buckets wait for the explicit data-ar
   datasets, no re-runs since no backend). **⚑ Task B fully COMPLETE (B1–B5 + exit). NEXT = Task C
   C1–C3 + C5** (cache/source boundary, BE/cross-lane; all DB-free — see the discussion-gate stop before
   any materialization bucket).
-- [ ] C1 · [ ] C2 · [ ] C3 · [ ] C4 ⚑ · [ ] C5
+- [x] C1 (content-addressed result cache; **BE; pytest-verified, no browser**; ruff clean). New pure
+  **`skills/_result_cache.py`** — a two-tier (in-proc LRU + local-disk JSON under `data/result_cache/`)
+  content-addressed store keyed by `(skill_id+version, canonical(params), input_sha256)`. `canonical_params`
+  overlays caller params on skill defaults, coerces each to its `param_spec` type (so a string query arg
+  hash-equals the typed default), **drops any param equal to its default**, rounds floats to a stable
+  precision, and hashes reserved `_`-prefixed **file** params by content (so two runs with different
+  `_design_path` sheets don't collide). Wired into `skills/contract.py::_execute` (the one chokepoint every
+  `run_skill*`/`run_bundle*` funnels through) — it caches the **pre-theme compute output** and re-applies
+  `theme.apply` on every hit (cheap, deterministic; `theme.apply` deep-copies its input → no mutation), which
+  is forward-compatible with C2's source/render split. **Invalidation is automatic** (the version is in the
+  key → a bump is a clean miss; no TTL). Cache entries are isolated from callers in both directions
+  (deep-copy on `set` and `get`). Two config knobs (`SELOM_RESULT_CACHE=on|off`, `SELOM_RESULT_CACHE_MEM_MAX`).
+  **Dependency-free deviation from the roadmap's named `diskcache`** (owner asked "should it be installed?" —
+  no: content-addressing makes its eviction/concurrency machinery unnecessary for an immutable cache and it'd
+  mutate the EDR-fragile venv; a future R2 tier (C4) swaps the disk backend behind the same interface).
+  **Gates:** `tests/test_result_cache.py` **15** (canonicalization · key stability/version-sensitivity ·
+  input-byte tracking · two-tier round-trip + disk-survives-restart + LRU eviction + caller-isolation +
+  disabled-flag · **acceptance**: an identical re-run is a measured `mem_hits` with the runner **not**
+  re-entered (a call-counter proves no recompute), a non-default param and a `skill_version` bump each miss
+  cleanly · a real stub-engine skill caches end-to-end through the genuine `_execute`/`theme.apply`/stamp path);
+  contract+capabilities **58**, golden+integration **67** all green. New **`tests/conftest.py`** disables the
+  cache suite-wide (autouse) so the golden tests still recompute — a content-addressed cache surviving on disk
+  would otherwise serve a stale figure (false green) when a skill changes without a version bump; the cache's
+  own tests opt back in. ⚠ a missing input path (the golden harness's `"unused"`) is unhashable → the cache is
+  skipped entirely (no spurious collisions). **NEXT = C2** (source/render split + ETag/304). · [ ] C2 · [ ] C3 · [ ] C4 ⚑ · [ ] C5
 - [ ] D1 · [ ] D2 · [ ] D3 · [ ] D4 ⚑
 - [ ] E1 · [ ] E2
 - [ ] F1 ⚑ · [ ] F2 ⚑ · [ ] F3 ⚑

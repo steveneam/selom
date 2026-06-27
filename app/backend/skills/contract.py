@@ -70,16 +70,27 @@ def load_skill(skill_id: str) -> SkillSpec:
 
 
 def _execute(skill_id: str, data_path: str, params: dict) -> tuple[dict, dict | None]:
-    from skills import theme  # central publication theme — one look across every skill
+    from skills import _result_cache, theme  # central publication theme — one look across every skill
 
     spec = load_skill(skill_id)
-    mod_path, fn = spec.entrypoint.split(":")
-    run = getattr(import_module(mod_path), fn)
-    figure = run(data_path=data_path, params={**defaults(spec), **params})  # Plotly spec dict
-    # Pillar 1: a runner may attach a Statistics `table` to its figure dict. Pop it
-    # BEFORE theming so the spec the FE renders stays a pure {data, layout}, and so the
-    # golden figures (taken via run_skill) are unaffected.
-    table = figure.pop("table", None) if isinstance(figure, dict) else None
+    merged = {**defaults(spec), **params}
+    # Task C1: content-addressed result cache. The key is (skill_id+version, canonical params,
+    # input sha256) — an identical re-run is served without recomputing; a skill_version bump
+    # is a clean miss (the version is in the key). The cache holds the PRE-theme compute output;
+    # theming is re-applied below on every path (cheap, deterministic) so a future theme-only
+    # change (C2) can re-render without recomputing.
+    key, cached = _result_cache.lookup(skill_id, spec.version, spec.param_spec, data_path, merged)
+    if cached is not None:
+        figure, table = cached["figure"], cached["table"]
+    else:
+        mod_path, fn = spec.entrypoint.split(":")
+        run = getattr(import_module(mod_path), fn)
+        figure = run(data_path=data_path, params=merged)  # Plotly spec dict
+        # Pillar 1: a runner may attach a Statistics `table` to its figure dict. Pop it
+        # BEFORE theming so the spec the FE renders stays a pure {data, layout}, and so the
+        # golden figures (taken via run_skill) are unaffected.
+        table = figure.pop("table", None) if isinstance(figure, dict) else None
+        _result_cache.store(key, figure, table)
     return theme.apply(figure, skill_id), table
 
 

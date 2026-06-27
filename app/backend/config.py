@@ -30,6 +30,17 @@ class Settings(BaseSettings):
     # Oversized uploads are rejected with 413. Large-file/BAM async ingest is out of scope here.
     max_upload_mb: int = Field(default=50, validation_alias="SELOM_MAX_UPLOAD_MB")
 
+    # Content-addressed result cache (Task C1) — an in-proc LRU + a local-disk JSON tier keyed by
+    # (skill_id+version, canonical params, input sha256). Invalidation is automatic (the skill
+    # version is part of the key); there is no TTL. `off` flips to always-recompute (for a forced
+    # cold run / benchmarking). The durable R2 tier is C4 (deferred). See skills/_result_cache.py.
+    result_cache: str = Field(default="on", validation_alias="SELOM_RESULT_CACHE")
+    result_cache_mem_max: int = Field(default=64, validation_alias="SELOM_RESULT_CACHE_MEM_MAX")
+
+    @property
+    def result_cache_enabled(self) -> bool:
+        return self.result_cache.strip().lower() in {"on", "1", "true", "yes"}
+
     # Reproduction-engine R oracle (validation-only, ADR 0002 — NEVER on the shipped path).
     # OFF by default: the blame instrument runs the authors' actual R tool (edgeR/fgsea) to
     # split engine-delta / upstream-delta / paper-irreproducible. Disabled -> blame degrades
