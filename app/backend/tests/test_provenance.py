@@ -42,12 +42,14 @@ def test_build_records_typed_params_and_input(tmp_path):
     # Raw query-style param (a string) must land in the bundle coerced to its type.
     bundle = provenance.build(spec, str(f), "demo.h5ad", {"resolution": "1.5"})
 
-    assert bundle["skill"] == {
-        "id": "cluster",
-        "version": spec.version,
-        "title": spec.title,
-        "engine": "python",
-    }
+    assert bundle["skill"]["id"] == "cluster"
+    assert bundle["skill"]["version"] == spec.version
+    assert bundle["skill"]["title"] == spec.title
+    assert bundle["skill"]["engine"] == "python"
+    # C5: the figure is self-describing — it carries the immutable param_spec for its
+    # skill_version, verbatim, so the FE can render the Inputs with no describe round-trip.
+    assert bundle["skill"]["param_spec"] == spec.param_spec
+    assert "resolution" in bundle["skill"]["param_spec"]  # the knob we tuned is present
     assert bundle["params"]["resolution"] == 1.5  # coerced float, not "1.5"
     assert bundle["params"]["n_pcs"] == 50  # default filled in
     assert bundle["input"]["filename"] == "demo.h5ad"
@@ -66,4 +68,7 @@ def test_run_endpoint_returns_figure_provenance_methods():
     assert body["figure"]["data"]
     assert body["provenance"]["params"]["resolution"] == 2.0
     assert body["provenance"]["input"]["sha256"]
+    # C5: the param_spec rides along on every run so the persisted figure is self-describing.
+    assert body["provenance"]["skill"]["param_spec"]
+    assert "resolution" in body["provenance"]["skill"]["param_spec"]
     assert "resolution 2.0" in body["methods"]["text"]

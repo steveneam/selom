@@ -1146,6 +1146,14 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     canEditMarks={deriveFigureModel(figure.spec ?? activeFigure.spec).capabilities.landmarkMarks}
                     canEditThresholds={deriveFigureModel(figure.spec ?? activeFigure.spec).capabilities.thresholds}
                     figureSpec={figure.spec ?? activeFigure.spec}
+                    specSeed={
+                      // C5: seed the Inputs from THIS figure's own provenance param_spec (stamped at
+                      // run) so re-opening it shows the controls with no describe round-trip, and an
+                      // offline already-run figure stays tunable. Older figures (no param_spec) fetch.
+                      activeFigure.provenance?.skill?.param_spec
+                        ? { version: activeFigure.provenance.skill.version, spec: activeFigure.provenance.skill.param_spec }
+                        : null
+                    }
                     markLabelsShown={markLabelsShown}
                     onMarkLabelsShownChange={setMarkLabelsShown}
                     onRerun={rerunFigureWithParams}

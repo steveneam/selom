@@ -80,6 +80,13 @@ def build(spec: SkillSpec, data_path: str, filename: str | None, params: dict) -
             "version": spec.version,
             "title": spec.title,
             "engine": spec.engine,
+            # C5: the immutable param_spec for this skill_version, stamped so the figure is
+            # self-describing forever. The FE seeds the Figure-data Inputs from this (no
+            # describe round-trip on re-open; an offline already-run figure still shows its
+            # tunable inputs — a re-run still needs the backend). Grouped with id+version,
+            # which the FE keys the spec cache by. param_spec is small (a dozen knobs) and
+            # already serialized in skill.json, so this adds no meaningful weight.
+            "param_spec": spec.param_spec,
         },
         "params": resolved_params(spec, params),
         "input": {

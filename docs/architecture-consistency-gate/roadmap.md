@@ -1,6 +1,6 @@
 # Selom Architecture Gate — Agile Roadmap
 
-Last updated: 2026-06-27 18:03 +10:00 — Claude.
+Last updated: 2026-06-27 21:20 +10:00 — Claude.
 Status: **Active lane.** Owner greenlit the gate (2026-06-25): "stick with this plan…
 go with your recommended task… this is the lane until it is mostly complete; other
 tasks/plans/pillars on hold." Companion to `plan.md` (why) + `inventory.md` (current state).
@@ -275,8 +275,32 @@ alongside/after as the proof. The deferred buckets wait for the explicit data-ar
   import → flip the attribute, not the env). **Gates:** `test_input_cache.py` **3** (same bytes parse once ·
   distinct input/hint miss · disabled bypass), `test_run_guards.py` **7** (range unit: numeric/option/type +
   ignore unknown; endpoint: `/run` & jobs **400** out-of-range · happy-path **200** · hung skill **504**),
-  engine+endpoint+cache regression **124**, golden+integration green, ruff clean. **NEXT = C5**
-  (param-spec caching — FE localStorage + stamp param_spec into figure provenance). · [ ] C4 ⚑ · [ ] C5
+  engine+endpoint+cache regression **124**, golden+integration green, ruff clean. · [x] C5
+  (param-spec caching — the last DB-free Task C bucket; **cross-lane: BE pytest + FE vitest + browser**;
+  ruff/tsc/eslint clean). Two complementary fixes so the Figure-data Inputs no longer depend on a live
+  describe round-trip. **(B, cross-lane — self-describing figure):** `provenance.build` now stamps the
+  immutable `param_spec` into the figure's `skill` block (`bundle["skill"]["param_spec"]`, grouped with
+  id+version the FE keys by) — every run's figure carries its own spec forever. FE `SkillProvenance.skill`
+  gained an optional `param_spec`; `useSkillParams(skillId, seed?)` takes that provenance spec as a `seed`
+  and renders the inputs from it **synchronously with NO fetch** (the spec is immutable per skill_version).
+  **(A, FE-only — local cache):** new pure `lib/catalog/param-spec-cache.ts` (single key
+  `selom.paramSpecs.v1` → `{[slug]:{version,spec}}`, SSR-safe, fail-soft); `fetchParamSpec` persists every
+  successful describe and, on failure/offline, **falls back to the cached spec** (ok:true) so an
+  already-run skill stays tunable offline — B3's loading→error/Retry floor only applies when nothing is
+  seeded/cached. `useSkillParams` also seeds instantly from the cache (no loading flash) and warms it from
+  the provenance seed. Wired through `FigureDataPanel` (`specSeed` prop) from the open figure's provenance.
+  **Gates:** BE `test_provenance.py` updated (+param_spec asserts on `build` + the `/run` bundle),
+  provenance/jobs/run-design/run-guardrail/contract/capabilities **60** green, golden **66** unaffected
+  (provenance is outside `_execute`/theme), ruff clean; FE new `param-spec-cache.test.ts` (round-trip ·
+  version-overwrite · SSR/corrupt/quota fail-soft) + `use-skill-params.test.ts` (persist-on-success ·
+  offline cache-fallback · B3 floor when nothing cached) → tsc clean · eslint 0-err · **vitest 309** (+11).
+  **BROWSER-VERIFIED (live BE :8010 + FE webpack, real eyg28 PDE6B_FS d210 DE CSV):** a fresh volcano run
+  stamped `provenance.skill.param_spec` (keys fc/fdr/top_n/highlight); opening Figure-data rendered the
+  INPUTS (thresholds 607↑/334↓ + Highlight genes) with **zero `GET /api/skills/volcano` describe calls**
+  (network log) and warmed `selom.paramSpecs.v1`; then **backend killed + full page reload** → the figure
+  still showed tunable inputs offline (no error slot, no spinner), Re-run present (still needs the backend).
+  Verified in a NAMED throwaway project ("C5 verify — volcano param-spec cache …"); curated fixtures
+  untouched. · [ ] C4 ⚑
 - [ ] D1 · [ ] D2 · [ ] D3 · [ ] D4 ⚑
 - [ ] E1 · [ ] E2
 - [ ] F1 ⚑ · [ ] F2 ⚑ · [ ] F3 ⚑

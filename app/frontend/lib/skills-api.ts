@@ -1,9 +1,19 @@
 import type { FigureSpec } from "./figure-spec";
 import type { DataFit } from "@/lib/reproduction/data-fit";
+import type { BackendParamSpec } from "./catalog/params";
 
 /** Per-figure reproducibility bundle (backend provenance.py — charter B4). */
 export interface SkillProvenance {
-  skill: { id: string; version: string; title: string; engine: string };
+  skill: {
+    id: string;
+    version: string;
+    title: string;
+    engine: string;
+    /** C5: the immutable param_spec for this skill_version, stamped at run so the figure is
+     *  self-describing — the Figure-data Inputs seed from it with no describe round-trip.
+     *  Optional: a figure run before C5 (or a mock without it) simply falls back to fetching. */
+    param_spec?: BackendParamSpec;
+  };
   params: Record<string, string | number | boolean>;
   input: { filename: string | null; sha256: string; n_bytes: number };
   environment: {

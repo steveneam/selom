@@ -10,7 +10,7 @@ import { DataFitVerdict } from "@/components/reproduction/data-fit-panel";
 import { Button } from "@/components/ui/button";
 import { PaneShell } from "@/components/ui/pane-shell";
 import { isFieldDisabled, visibleParamFields, type ParamField } from "@/lib/catalog/params";
-import { useSkillParams } from "@/lib/catalog/use-skill-params";
+import { useSkillParams, type ParamSpecSeed } from "@/lib/catalog/use-skill-params";
 import type { PaneState } from "@/lib/ui/pane-state";
 import type { FigureSpec } from "@/lib/figure-spec";
 import type { SkillParams } from "@/lib/skills-api";
@@ -40,6 +40,7 @@ export function FigureDataPanel({
   canEditMarks = false,
   canEditThresholds = false,
   figureSpec,
+  specSeed = null,
   markLabelsShown = true,
   onMarkLabelsShownChange,
   onRerun,
@@ -67,6 +68,10 @@ export function FigureDataPanel({
   canEditThresholds?: boolean;
   /** The active figure spec — supplies the volcano points for the threshold editor's live count. */
   figureSpec?: FigureSpec | null;
+  /** C5: the figure's own provenance `param_spec` (+ its version) — when present the Inputs render
+   *  from it instantly with no describe round-trip, and stay tunable offline (re-run still needs the
+   *  backend). Absent it, the spec is fetched (with a local-cache seed/fallback). */
+  specSeed?: ParamSpecSeed | null;
   /** Live state of the "show a/b labels" toggle — drives an instant client-side restyle of the
    *  preview (the parent owns it so the preview can react without a re-run). */
   markLabelsShown?: boolean;
@@ -78,7 +83,7 @@ export function FigureDataPanel({
   /** From the data-check routing card: take over and pick a skill manually. */
   onPickManually: () => void;
 }) {
-  const { fields: schema, status: paramsStatus, retry: retryParams } = useSkillParams(skillId);
+  const { fields: schema, status: paramsStatus, retry: retryParams } = useSkillParams(skillId, specSeed);
   // Params are CONTROLLED by the parent (so a dot drag and this panel write the same staged params).
   const setParams = onParamsChange;
   // The Inputs pane as a stable PaneState (Task B3): loading → skeleton (not a vanished pane); a
