@@ -180,9 +180,9 @@ alongside/after as the proof. The deferred buckets wait for the explicit data-ar
   `hline`/`hline_label`) + flicker `marks` controls → brought current so dev:mock matches live. **Red proof:**
   `volcano.highlight`→`highlightz` → FE red ("overlay keys absent from the backend param_spec: volcano.highlightz");
   volcano tool `thresholds`→`thresholdz` → BE red ("declares capability tool(s) {'thresholdz'} the FE can't
-  resolve") — both reverted, green. ⚠ ruff binary EDR-blocked this session (only the blocked
-  `.venv/Scripts/ruff.exe` resolves) → hand-verified the BE test vs the project's ruff config (no `[tool.ruff]`
-  → default select E4/E7/E9/F; E501 not selected; all new imports + `_KNOWN_TOOLS` used). **Task B code COMPLETE
+  resolve") — both reverted, green. ruff **clean** (`-m ruff` / direct `.venv/Scripts/ruff.exe` are
+  EDR-blocked → ran via the documented copy-to-TEMP workaround `cp .venv/Scripts/ruff.exe $TEMP && $TEMP/ruff.exe`
+  [[selom-backend-python-exec]]). **Task B code COMPLETE
   (B1–B5); NEXT = Task B EXIT smoke** (open every skill's figure, switch dataset↔skill 20× → zero crashes,
   stable slots, no stale-param leak, flat heap — overlaps E1; needs a browser pass).
 - [ ] C1 · [ ] C2 · [ ] C3 · [ ] C4 ⚑ · [ ] C5
