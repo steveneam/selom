@@ -15,17 +15,23 @@ export function ParamControl({
   field,
   value,
   onChange,
+  disabled = false,
 }: {
   field: ParamField;
   value: SkillParams[string] | undefined;
   onChange: (v: SkillParams[string]) => void;
+  /** Render greyed + non-interactive (a `enabledWhen` gate isn't satisfied). The control stays
+   *  visible so its capability is discoverable; it just can't be changed until the gate matches. */
+  disabled?: boolean;
 }) {
   const v = value ?? field.default;
+  // Standard disabled affordance (MD): reduced opacity + cursor change + semantic disabled.
+  const disabledWrap = disabled ? "opacity-50" : "";
 
   if (field.type === "switch") {
     const on = Boolean(v);
     return (
-      <label className="flex items-center justify-between gap-3 sm:col-span-2">
+      <label className={cn("flex items-center justify-between gap-3 sm:col-span-2", disabledWrap)}>
         <span>
           <span className="block text-xs font-medium text-foreground">{field.label}</span>
           {field.help && <span className="block text-[11px] text-muted-foreground">{field.help}</span>}
@@ -35,10 +41,12 @@ export function ParamControl({
           role="switch"
           aria-checked={on}
           aria-label={field.label}
+          disabled={disabled}
           onClick={() => onChange(!on)}
           className={cn(
             "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-colors",
             on ? "bg-primary" : "bg-input",
+            disabled && "cursor-not-allowed",
           )}
         >
           <span
@@ -54,12 +62,16 @@ export function ParamControl({
 
   if (field.type === "select") {
     return (
-      <label className="block sm:col-span-2">
+      <label className={cn("block sm:col-span-2", disabledWrap)}>
         <span className="text-xs font-medium text-foreground">{field.label}</span>
         <select
           value={String(v)}
+          disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          className="mt-1 h-9 w-full rounded-md border border-input bg-background/60 px-2.5 text-sm text-foreground outline-none focus-visible:border-ring/60 focus-visible:ring-2 focus-visible:ring-ring/30"
+          className={cn(
+            "mt-1 h-9 w-full rounded-md border border-input bg-background/60 px-2.5 text-sm text-foreground outline-none focus-visible:border-ring/60 focus-visible:ring-2 focus-visible:ring-ring/30",
+            disabled && "cursor-not-allowed",
+          )}
         >
           {field.options?.map((o) => (
             <option key={o.value} value={o.value} className="bg-card text-foreground">
@@ -78,7 +90,7 @@ export function ParamControl({
     const decimals =
       field.step != null && field.step < 1 ? (String(field.step).split(".")[1]?.length ?? 1) : 0;
     return (
-      <label className="block sm:col-span-2">
+      <label className={cn("block sm:col-span-2", disabledWrap)}>
         <span className="flex items-center justify-between">
           <span className="text-xs font-medium text-foreground">{field.label}</span>
           <span className="tabular text-xs text-primary">{Number(v).toFixed(decimals)}</span>
@@ -90,8 +102,9 @@ export function ParamControl({
           step={field.step}
           value={Number(v)}
           aria-label={field.label}
+          disabled={disabled}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="mt-1.5 w-full accent-[var(--primary)]"
+          className={cn("mt-1.5 w-full accent-[var(--primary)]", disabled && "cursor-not-allowed")}
         />
         {field.help && <span className="mt-1 block text-[11px] text-muted-foreground">{field.help}</span>}
       </label>
@@ -99,7 +112,7 @@ export function ParamControl({
   }
 
   return (
-    <label className="block">
+    <label className={cn("block", disabledWrap)}>
       {/* Reserve two lines for the label so a wrapped label (e.g. "Scale bar — amplitude (µV)")
           and a one-line label ("Scale bar — time (ms)") keep their inputs aligned in the 2-col grid. */}
       <span className="block min-h-8 text-xs font-medium leading-4 text-foreground">{field.label}</span>
@@ -110,8 +123,12 @@ export function ParamControl({
         max={field.max}
         step={field.step}
         placeholder={field.placeholder}
+        disabled={disabled}
         onChange={(e) => onChange(field.type === "number" ? Number(e.target.value) : e.target.value)}
-        className="mt-1 h-9 w-full rounded-md border border-input bg-background/60 px-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:border-ring/60 focus-visible:ring-2 focus-visible:ring-ring/30"
+        className={cn(
+          "mt-1 h-9 w-full rounded-md border border-input bg-background/60 px-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:border-ring/60 focus-visible:ring-2 focus-visible:ring-ring/30",
+          disabled && "cursor-not-allowed",
+        )}
       />
       {field.help && <span className="mt-1 block text-[11px] text-muted-foreground">{field.help}</span>}
     </label>

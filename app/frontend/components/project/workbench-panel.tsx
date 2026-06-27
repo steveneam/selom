@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
 import { skillColor, skillIcon } from "@/lib/catalog/modality";
-import { visibleParamFields } from "@/lib/catalog/params";
+import { isFieldDisabled, visibleParamFields } from "@/lib/catalog/params";
 import { useSkillParams } from "@/lib/catalog/use-skill-params";
 import { getSkill } from "@/lib/catalog/seed";
 import type { SkillParams } from "@/lib/skills-api";
@@ -197,6 +197,7 @@ export function WorkbenchPanel({
                       key={f.key}
                       field={f}
                       value={params[f.key]}
+                      disabled={isFieldDisabled(schema, f, params)}
                       onChange={(v) => setParams((p) => ({ ...p, [f.key]: v }))}
                     />
                   ))}

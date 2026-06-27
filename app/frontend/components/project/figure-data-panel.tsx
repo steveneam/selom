@@ -9,7 +9,7 @@ import { DataCheckPanel } from "./data-check";
 import { DataFitVerdict } from "@/components/reproduction/data-fit-panel";
 import { Button } from "@/components/ui/button";
 import { PaneShell } from "@/components/ui/pane-shell";
-import { visibleParamFields, type ParamField } from "@/lib/catalog/params";
+import { isFieldDisabled, visibleParamFields, type ParamField } from "@/lib/catalog/params";
 import { useSkillParams } from "@/lib/catalog/use-skill-params";
 import type { PaneState } from "@/lib/ui/pane-state";
 import type { FigureSpec } from "@/lib/figure-spec";
@@ -158,6 +158,7 @@ export function FigureDataPanel({
               key={f.key}
               field={f}
               value={params[f.key]}
+              disabled={isFieldDisabled(schema, f, params)}
               onChange={(v) => setParams((p) => ({ ...p, [f.key]: v }))}
             />
           ))}

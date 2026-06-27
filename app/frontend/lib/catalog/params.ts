@@ -53,6 +53,16 @@ export interface ParamField {
    * relevant. See `visibleParamFields`.
    */
   showWhen?: { key: string; equals: string | number | boolean };
+  /**
+   * Conditional *enablement* (vs `showWhen`'s conditional visibility): the field always
+   * RENDERS, but is shown disabled (greyed, non-interactive) until another field equals
+   * `equals`. Use for a capability-signaling control that should stay DISCOVERABLE even when
+   * inert — e.g. the ERG trace grid's Spread / Error-metric knobs, which only act when
+   * "Trace shows" is Mean of replicates but should advertise that the SEM/SD/band options
+   * exist. Cosmetic fine-tuning that would only clutter the panel stays on `showWhen` (hidden).
+   * See `isFieldDisabled`.
+   */
+  enabledWhen?: { key: string; equals: string | number | boolean };
 }
 
 /**
@@ -73,6 +83,9 @@ export interface ParamPresentation {
   help?: string;
   options?: { value: string; label: string }[];
   showWhen?: { key: string; equals: string | number | boolean };
+  /** Show-but-disable gate (see `ParamField.enabledWhen`): the control always renders, greyed
+   *  until the named field matches `equals`. For discoverable-but-inert capability controls. */
+  enabledWhen?: { key: string; equals: string | number | boolean };
 }
 
 const PRESENTATION: Record<string, ParamPresentation[]> = {
@@ -225,9 +238,11 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
         { value: "mean", label: "Mean of replicates" },
         { value: "none", label: "Individual traces only (no mean)" },
       ],
-      help: "Representative draws one exemplar recording per cell (the back-compatible default). Mean averages the n eye/animal recordings at each time. Individual draws every replicate at equal weight with no averaged line — combine several files first (multi-file) for a real cohort n.",
+      help: "Representative draws one exemplar recording per cell (the back-compatible default). Mean averages the n eye/animal recordings at each time — and unlocks the Spread / Error options below (shaded band, SEM vs SD). Individual draws every replicate at equal weight with no averaged line — combine several files first (multi-file) for a real cohort n.",
     },
     {
+      // Always visible (enabledWhen, not showWhen) so the band/SEM/SD capability is discoverable
+      // even on a single representative trace; greyed until "Trace shows" = Mean of replicates.
       key: "spread", label: "Spread", type: "select",
       options: [
         { value: "band", label: "Shaded band" },
@@ -236,10 +251,11 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
         { value: "both", label: "Band + error bars" },
         { value: "none", label: "None (mean only)" },
       ],
-      help: "How the variability across replicates is drawn behind/around the mean trace.",
-      showWhen: { key: "central", equals: "mean" },
+      help: "How the variability across replicates is drawn behind/around the mean trace. Needs Trace shows = Mean of replicates.",
+      enabledWhen: { key: "central", equals: "mean" },
     },
     {
+      // Always visible (enabledWhen) — the SEM-vs-SD toggle is a headline capability; greyed until Mean.
       key: "error", label: "Error metric", type: "select",
       options: [
         { value: "sem", label: "SEM (standard error)" },
@@ -247,8 +263,8 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
         { value: "ci95", label: "95% CI" },
         { value: "minmax", label: "Range (min–max)" },
       ],
-      help: "What the band/error bars span. SEM is the default; SD shows biological spread; 95% CI is the most defensible.",
-      showWhen: { key: "central", equals: "mean" },
+      help: "What the band/error bars span. SEM is the default; SD shows biological spread; 95% CI is the most defensible. Needs Trace shows = Mean of replicates.",
+      enabledWhen: { key: "central", equals: "mean" },
     },
     {
       key: "boundary_lines", label: "Band edges", type: "select",
@@ -486,6 +502,7 @@ function mergeField(pres: ParamPresentation, ps: BackendParam): ParamField {
     help: pres.help ?? ps.note,
     options: resolveOptions(pres, ps),
     showWhen: pres.showWhen,
+    enabledWhen: pres.enabledWhen,
   };
 }
 
@@ -538,10 +555,26 @@ export function overlayParamKeys(): Record<string, string[]> {
  * bool `false` and the select's string `"false"` are the same gate value).
  */
 export function visibleParamFields(schema: ParamField[], params: SkillParams): ParamField[] {
-  return schema.filter((f) => {
-    if (!f.showWhen) return true;
-    const gate = f.showWhen;
-    const current = params[gate.key] ?? schema.find((x) => x.key === gate.key)?.default;
-    return current === gate.equals || String(current) === String(gate.equals);
-  });
+  return schema.filter((f) => !f.showWhen || gateMatches(f.showWhen, schema, params));
+}
+
+/**
+ * Whether a rendered field should be shown DISABLED right now — true when it declares an
+ * `enabledWhen` gate that the current params don't satisfy (the field still renders; the control
+ * is greyed + non-interactive). The companion to `visibleParamFields`: `showWhen` hides, `enabledWhen`
+ * disables. Reads the gate field's effective value (current param or its default) with the same
+ * loose comparison, so a backend bool and a select's string are the same gate value.
+ */
+export function isFieldDisabled(schema: ParamField[], field: ParamField, params: SkillParams): boolean {
+  return field.enabledWhen ? !gateMatches(field.enabledWhen, schema, params) : false;
+}
+
+/** Does the current (or default) value of the gate's field match its `equals`? Loose compare. */
+function gateMatches(
+  gate: { key: string; equals: string | number | boolean },
+  schema: ParamField[],
+  params: SkillParams,
+): boolean {
+  const current = params[gate.key] ?? schema.find((x) => x.key === gate.key)?.default;
+  return current === gate.equals || String(current) === String(gate.equals);
 }

@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   hasParamControls,
+  isFieldDisabled,
   paramFieldsFromSpec,
   visibleParamFields,
   type BackendParamSpec,
@@ -129,6 +130,44 @@ describe("scRNA fields mirror honoured runner params", () => {
   it("cluster keeps resolution (the runner honours it) plus the graph knobs", () => {
     const keys = paramFieldsFromSpec("selom.cluster", SKILL_PARAM_SPECS.cluster).map((f) => f.key);
     expect(keys).toEqual(expect.arrayContaining(["resolution", "n_neighbors", "n_pcs", "normalize"]));
+  });
+});
+
+describe("enabledWhen — show-but-disable keeps the ERG spread/SEM capability discoverable", () => {
+  const fields = paramFieldsFromSpec("erg_traces", SKILL_PARAM_SPECS.erg_traces);
+
+  it("keeps Spread + Error metric VISIBLE even when Trace shows ≠ Mean (so SEM/SD/band are discoverable)", () => {
+    const visibleRep = visibleParamFields(fields, { central: "representative" }).map((f) => f.key);
+    expect(visibleRep).toEqual(expect.arrayContaining(["spread", "error"]));
+  });
+
+  it("disables Spread + Error metric until Trace shows = Mean of replicates", () => {
+    const spread = fields.find((f) => f.key === "spread")!;
+    const error = fields.find((f) => f.key === "error")!;
+    expect(spread.enabledWhen).toEqual({ key: "central", equals: "mean" });
+    expect(isFieldDisabled(fields, spread, { central: "representative" })).toBe(true);
+    expect(isFieldDisabled(fields, spread, { central: "none" })).toBe(true);
+    expect(isFieldDisabled(fields, spread, { central: "mean" })).toBe(false);
+    expect(isFieldDisabled(fields, error, { central: "mean" })).toBe(false);
+  });
+
+  it("uses the gate field's default when unset (central defaults to representative → disabled)", () => {
+    const spread = fields.find((f) => f.key === "spread")!;
+    expect(isFieldDisabled(fields, spread, {})).toBe(true);
+  });
+
+  it("keeps the cosmetic fine-tuning HIDDEN until Mean (showWhen — no clutter on a single trace)", () => {
+    const repKeys = visibleParamFields(fields, { central: "representative" }).map((f) => f.key);
+    for (const k of ["band_alpha", "band_color", "boundary_lines", "error_every"]) {
+      expect(repKeys).not.toContain(k);
+    }
+    const meanKeys = visibleParamFields(fields, { central: "mean" }).map((f) => f.key);
+    expect(meanKeys).toEqual(expect.arrayContaining(["spread", "error", "band_alpha", "boundary_lines"]));
+  });
+
+  it("a field without an enabledWhen gate is never disabled", () => {
+    const filter = fields.find((f) => f.key === "filter")!;
+    expect(isFieldDisabled(fields, filter, { central: "representative" })).toBe(false);
   });
 });
 
