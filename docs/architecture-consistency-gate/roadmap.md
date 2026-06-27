@@ -1,6 +1,6 @@
 # Selom Architecture Gate — Agile Roadmap
 
-Last updated: 2026-06-27 22:05 +10:00 — Claude.
+Last updated: 2026-06-27 22:52 +10:00 — Claude.
 Status: **Active lane.** Owner greenlit the gate (2026-06-25): "stick with this plan…
 go with your recommended task… this is the lane until it is mostly complete; other
 tasks/plans/pillars on hold." Companion to `plan.md` (why) + `inventory.md` (current state).
@@ -326,6 +326,50 @@ alongside/after as the proof. The deferred buckets wait for the explicit data-ar
   replaced a count reshuffle). **BROWSER-VERIFIED** (live BE :8010 + FE webpack): a real 6×6 bulk-counts CSV
   → volcano → **blocked pre-run, NO figure, NO stack trace**, the clear message rendered in the UI ("This
   data doesn't fit volcano: missing a fold-change column… Swap in a file…"); the eyg28 DE table → volcano →
-  200 (no false block). Doc `docs/architecture-consistency-gate/skill-input-contract.md`. · [ ] D2 · [ ] D3 · [ ] D4 ⚑
+  200 (no false block). Doc `docs/architecture-consistency-gate/skill-input-contract.md`. · [x] D2
+  (frame-validation at stage seams; **BE; pytest + live-HTTP + BROWSER**; ruff clean, dependency-free — NO
+  pandera). New pure **`engine/frame_schema.py`** = a lightweight `lazy`-style frame-schema collector (the
+  pandera shape without the venv dep — C1 "no diskcache" precedent + [[selom-uv-sync-footgun]]). **The clean
+  3-layer story, one source of truth each:** QC = is-the-data-clean (coarse, whole-frame) · **D1** = are the
+  *named* columns/modality present (presence → 422) · **D2** = do those *present, required* columns carry
+  *usable* data (depth → **400 `frame_validation_failed`**). The seam check (`main.py` /run, after D1, before
+  the runner) flags a **positively-determined** structural defect among the columns D1 already confirmed
+  present: `empty_column` (all-null / all-blank), `non_numeric_column` (a required fc/sig column with no
+  parseable number — a column with ≥1 number is NOT flagged, the runner coerces it), `duplicate_column`.
+  Lazy (every defect in one 400) · honest (only inspects D1-present columns, never re-reports a missing one) ·
+  overridable (same escape hatch). The per-skill rules are **derived from D1's `compat._SCHEMA`** + the
+  classifier synonym sets (single-sourced — D1 reads presence, D2 reads usability of the same resolved
+  column). Also a named **result-seam** schema (`validate_result_table`: rectangular StatsTable) guarded by a
+  test over the native-table skills (the output-seam ratchet) — NOT a raising hot-path gate (a malformed
+  *output* is a runner bug, not a user 400). FE = ZERO change (rides D1's already-fixed `runSkill`
+  `detail.message` read-once path, which is status-agnostic → a 400 surfaces verbatim). **Gates:**
+  `test_frame_schema.py` (19: empty/non-numeric/duplicate, lazy-vs-strict, missing-is-D1, single-sourced
+  numeric-group derivation, result-seam + native-table ratchet) + `test_frame_validation.py` (5 endpoint:
+  empty fc → 400 at the seam · good DE → 200 no false block · override bypasses · missing cols = D1's 422 ·
+  uncontracted not seam-checked); run-path + golden regression unaffected; **full suite 1051 pass**. **LIVE
+  (BE :8010 real engine):** an empty-fold-change DE table → volcano → **400** naming `log2FoldChange`,
+  override → 200. **BROWSER:** dropped the same file in a named project, applied Volcano → the exact message
+  rendered as a `role=alert` ("…a fold-change column ('log2FoldChange') is empty — every value is missing…"),
+  **NO figure, NO crash**, console clean (only the expected 400 log). Doc
+  `docs/architecture-consistency-gate/frame-validation.md`. · [x] D3 (intermediate-table lineage, local;
+  **BE; pytest + live-HTTP**; ruff clean, dependency-free). New pure **`engine/lineage.py`** = a
+  content-addressed, immutable local artifact store (the C1-cache discipline; the **D4 precursor** — the
+  local-dir backend swaps for DuckDB/Parquet behind one `materialize`/`get_table`/`get_meta`/`lineage`
+  interface, exactly as C1's disk tier swaps for R2). A stage's table is written under its own SHA-256
+  (`data/artifacts/<id>.csv`) + a `<id>.meta.json` sidecar carrying **parent-hash lineage** (`ParentRef` —
+  a source file by SHA, or a prior artifact by id), the **cleaning recipe** (the plan steps), and a computed
+  **`receipt`** ("merged from {A, B, C}" / "derived from X"). Immutable + idempotent (a re-materialize of the
+  same bytes returns the existing record → the reproducibility guarantee); a single-cell **matrix** is
+  recorded **meta-only** (shape + lineage, no multi-GB CSV). Wired: `/run` stamps the ingested table's
+  `artifact` into the response (fail-soft) · `/data/combine` materializes the merged cohort + its
+  merge-receipt (input SHAs captured before the temp uploads are cleaned) · new `GET /artifacts/{id}` (meta +
+  lineage walk) + `GET /artifacts/{id}/table` (inspect the matrix the skill saw). Config `SELOM_ARTIFACTS`;
+  conftest disables it suite-wide (tests opt back in). **Gates:** `test_lineage.py` (11: shape/hash ·
+  reproducible+immutable · round-trip the bytes · disk survives a new store · "merged from {…}" receipt ·
+  artifact-parent lineage walk · matrix meta-only · disabled-store · 3 endpoint: /run stamp + inspect
+  round-trip + combine receipt); **full suite 1051 pass**. **LIVE (BE :8010 real engine):** a volcano run
+  stamped `artifact` (kind ingested, recipe "used as-is", receipt "derived from de_good.csv"); `GET
+  /artifacts/{id}/table` returned the exact CSV the skill saw; `/data/combine` of 2 files → receipt **"merged
+  from {wt.csv, ko.csv}"**. Doc `docs/architecture-consistency-gate/intermediate-table-lineage.md`. · [ ] D4 ⚑
 - [ ] E1 · [ ] E2
 - [ ] F1 ⚑ · [ ] F2 ⚑ · [ ] F3 ⚑

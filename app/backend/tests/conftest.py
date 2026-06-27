@@ -29,6 +29,14 @@ def _caches_off(monkeypatch):
     import engine
 
     engine.clear_input_cache()
+    # The D3 intermediate-table lineage store writes content-addressed CSVs under data/artifacts/; in
+    # the suite it stays off so tests hitting /run don't litter the real store. Tests that exercise it
+    # (test_lineage.py) swap in their own enabled instance. Off via a disabled temp-dir store.
+    from engine import lineage
+
+    prev_store = lineage._default
+    lineage.set_store(lineage.ArtifactStore(root=tempfile.gettempdir(), enabled=False))
     yield
     _result_cache.set_cache(prev)
+    lineage.set_store(prev_store)
     engine.clear_input_cache()

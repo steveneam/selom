@@ -51,6 +51,17 @@ class Settings(BaseSettings):
     def input_cache_enabled(self) -> bool:
         return self.input_cache.strip().lower() in {"on", "1", "true", "yes"}
 
+    # Intermediate-table lineage (Task D3) — content-addressed materialization of the table a skill
+    # consumes (and a combined cohort table) under ``data/artifacts/``, with parent-hash lineage + the
+    # cleaning recipe / merge receipt. Lets the user "inspect the matrix the skill saw" and makes a
+    # cleaned re-run reproducible (the id IS the content hash). `off` disables materialization. The
+    # durable DuckDB/Parquet tier is D4 (deferred). See engine/lineage.py.
+    artifacts: str = Field(default="on", validation_alias="SELOM_ARTIFACTS")
+
+    @property
+    def artifacts_enabled(self) -> bool:
+        return self.artifacts.strip().lower() in {"on", "1", "true", "yes"}
+
     # Per-skill execution timeout (Task C3), seconds. A skill is run in a worker thread under this
     # ceiling so a hung run returns 504 promptly and the event loop stays responsive instead of the
     # whole server freezing. 0 disables. (A true kill needs a subprocess worker — deferred infra.)

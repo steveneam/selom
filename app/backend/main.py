@@ -441,8 +441,13 @@ async def combine_data(files: list[UploadFile] = File(...), labels: str | None =
     paths = [_save_upload(f) for f in files]
     bundle = None
     try:
+        from engine import lineage
+
         bundle = ingest_many(paths, labels=label_list)
         csv_bytes = pathlib.Path(bundle.path).read_bytes()
+        # D3 — capture each input file's content SHA NOW, while the uploads still exist (the finally
+        # below deletes them), so the merged artifact's lineage can name "merged from {A, B, C}".
+        parent_refs = [lineage.source_parent(p, f.filename or "") for p, f in zip(paths, files)]
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     finally:
@@ -462,11 +467,50 @@ async def combine_data(files: list[UploadFile] = File(...), labels: str | None =
             {c: int(df[df["condition"].astype(str) == c]["sample_id"].nunique()) for c in conds}
             if "sample_id" in df.columns else {}),
     }
+    # D3 — materialize the merged cohort table as a content-addressed artifact: parents = the input
+    # files (each by content SHA, captured above), so its lineage renders "merged from {A, B, C}".
+    art = lineage.materialize(
+        df, kind=lineage.KIND_COMBINED, filename=bundle.source.filename, parents=parent_refs,
+        recipe_note=f"merged {bundle.meta.get('n_files')} file(s) into {len(conds)} condition(s)")
+    if art is not None:
+        summary["artifact_id"] = art.artifact_id
+        summary["receipt"] = art.receipt
     return Response(
         content=csv_bytes, media_type="text/csv",
         headers={"X-Combine-Summary": json.dumps(summary),
                  "Access-Control-Expose-Headers": "X-Combine-Summary",
                  "Content-Disposition": f'attachment; filename="{bundle.source.filename}"'})
+
+
+@app.get("/artifacts/{artifact_id}")
+def get_artifact(artifact_id: str):
+    # D3 — the lineage record for a materialized intermediate table: its metadata (shape, recipe,
+    # parents, the "merged from {…}" receipt) + the ancestor chain. "Inspect the matrix the skill saw".
+    from engine import lineage
+
+    meta = lineage.get_meta(artifact_id)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="artifact not found")
+    return {"meta": meta.model_dump(),
+            "lineage": [m.model_dump() for m in lineage.lineage(artifact_id)]}
+
+
+@app.get("/artifacts/{artifact_id}/table")
+def get_artifact_table(artifact_id: str):
+    # D3 — the materialized table bytes themselves (CSV): the exact matrix a skill consumed, for
+    # download/inspection. A meta-only matrix artifact has no table bytes (404 with a clear note).
+    from engine import lineage
+
+    data = lineage.get_table(artifact_id)
+    if data is None:
+        meta = lineage.get_meta(artifact_id)
+        note = (meta.note if meta is not None else "artifact table not found")
+        raise HTTPException(status_code=404, detail=note)
+    meta = lineage.get_meta(artifact_id)
+    fname = (meta.filename if meta is not None else "") or f"{artifact_id}.csv"
+    return Response(
+        content=data, media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'})
 
 
 @app.post("/skills/{skill_id}/run")
@@ -545,6 +589,24 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
                     "data_fit": data_fit_obj.model_dump(),
                     "routing": routing.model_dump() if routing is not None else None,
                 })
+        # D2 — frame-validation at the skill seam (docs/architecture-consistency-gate/
+        # frame-validation.md): once D1 confirms the required columns are PRESENT, check they carry
+        # USABLE data — a present-but-empty / all-text fold-change column passes D1 yet becomes a
+        # silently-degenerate figure (or a downstream crash) inside the runner. A certain structural
+        # defect is a clear 400 at the seam (lazy — every defect listed at once), not a stack trace.
+        # Honest: only inspects columns D1 already confirmed present; overridable (same escape hatch).
+        if bundle is not None and not override:
+            from engine import frame_schema
+
+            frame_errs = frame_schema.check_skill_input(skill_id, bundle.payload)
+            if frame_errs:
+                raise HTTPException(status_code=400, detail={
+                    "error": "frame_validation_failed",
+                    "message": frame_schema.frame_validation_message(frame_errs, skill_id),
+                    "skill_id": skill_id,
+                    "stage": frame_schema.STAGE_SKILL_INPUT,
+                    "violations": [v.model_dump() for v in frame_errs],
+                })
         def _do_run():
             return (run_bundle_with_table(skill_id, bundle, params) if bundle is not None
                     else run_skill_with_table(skill_id, path, params))
@@ -583,6 +645,18 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
         # confidence band Product B shows — "is the data I'm running good/compatible for this
         # analysis?" Computed once above for the D1 contract gate; reused here (no second load/score).
         data_fit = data_fit_obj.model_dump() if data_fit_obj is not None else None
+        # D3 — materialize the intermediate table the skill actually consumed as a content-addressed
+        # artifact (parent = the source file, recipe = the cleaning plan), so the FE can "inspect the
+        # matrix the skill saw" via GET /artifacts/{id}. Fail-soft + bounded (a single-cell matrix is
+        # recorded meta-only) — a lineage write never breaks a run. See engine/lineage.py.
+        artifact = None
+        if bundle is not None:
+            from engine import lineage
+
+            meta = lineage.materialize_bundle(
+                bundle, recipe=(plan.steps if plan is not None else None),
+                recipe_note=(plan.note if plan is not None else ""))
+            artifact = meta.model_dump() if meta is not None else None
         # B4 publish-confidence: every figure ships with its reproducibility bundle +
         # auto methods-text. Pillar 1 adds the Statistics `table` (None for purely-visual
         # skills). Additive — the FE still reads `.figure`.
@@ -593,6 +667,7 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
             "figure_legend": legends.build(spec, params, figure=figure, table=table),
             "guardrails": guardrails.build(spec, path, params),
             "table": table,                              # Statistics node (Pillar 1) | None
+            "artifact": artifact,                        # D3 lineage record of the matrix the skill saw
             # The surfaced is-my-data-clean verdict + suggested next steps for THIS run (P1c/P3a),
             # plus the layered data-type label + dynamic cleaning plan. `kind`=unknown / nulls when
             # the upload couldn't be inspected (fail-soft).
