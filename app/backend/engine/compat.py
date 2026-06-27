@@ -188,7 +188,8 @@ def _frame_signature(payload: Any) -> tuple[list[str], int]:
 # enrichment) or a ranked gene list (gsea). Matrix/count skills are checked by modality alone (their
 # Kind IS the precise signal). Column groups are matched by case-insensitive substring against the
 # synonym sets reused from the classifier (``engine.databundle._LOGFC`` / ``_PVAL``) so header
-# variants (``avg_log2FC``, ``p_val_adj``, ``adj.P.Val``) all resolve. See ``skill-table-schemas.md``.
+# variants (``avg_log2FC``, ``p_val_adj``, ``adj.P.Val``) all resolve. See
+# ``docs/architecture-consistency-gate/skill-input-contract.md`` (D1).
 from engine.databundle import _LOGFC, _PVAL  # noqa: E402 — kept beside its only consumer
 
 # Gene/feature label column synonyms — the row key a DE / ranked table is expected to carry.
@@ -363,6 +364,22 @@ def fit(skill_id: str, fa: FileAssessment) -> DataFit:
     need = " / ".join(sorted(_KIND_LABEL.get(k, k) for k in required))
     return _mk(fa, skill_id, compatible=False, base=_WRONG, verdict="wrong_modality",
                reason=f"this is {label}, but {skill_id} needs {need}")
+
+
+# --- pre-run data-contract gate (D1) --------------------------------------------------------
+
+
+def contract_message(df: DataFit) -> str:
+    """A clear, actionable pre-run message for a data-contract block (D1) — frames the fit verdict's
+    reason with a next step. Co-located with the verdict semantics (``fit``/``_check_schema``) so the
+    wording stays in sync with what actually gated. Used by ``POST /run`` when a skill is fed a
+    certain mismatch (missing required columns / wrong payload class) to surface a 4xx the user can
+    act on, instead of a runtime stack trace inside the skill. See ``skill-input-contract.md``."""
+    reason = df.reason or f"this file isn't what {df.skill_id} needs"
+    return (
+        f"This data doesn't fit {df.skill_id}: {reason}. "
+        "Swap in a file with what this analysis needs, or pick a skill that matches this data."
+    )
 
 
 # --- ranking + matcher entry points ---------------------------------------------------------

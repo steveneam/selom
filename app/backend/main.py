@@ -522,6 +522,29 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
                 "profile": prof.model_dump() if prof is not None else None,
                 "cleaning_plan": plan.model_dump() if plan is not None else None,
             })
+        # D1 — declared data-contract gate (docs/architecture-consistency-gate/skill-input-contract.md):
+        # before entering the runner, check the dropped data carries what THIS skill needs — the
+        # column groups / modality the skill declares in engine.compat. A CERTAIN mismatch (missing
+        # required columns, or the wrong payload class) is a clear pre-run 422 the user can act on,
+        # NOT a runtime stack trace inside the skill. The fit is computed once here and reused for the
+        # response's data_fit (single source). Honest: only a positively-determined incompatibility
+        # gates (compatible is False); an unreadable / modality-unclear file stays optimistic and runs.
+        # Overridable (override=true) — the same escape hatch as the QC gate — for a rare classifier or
+        # column-synonym miss; the runner's own ValueError→400 then covers any skill without a contract.
+        data_fit_obj = None
+        if bundle is not None:
+            from engine import compat
+
+            data_fit_obj = compat.fit(skill_id, compat.assess_bundle(bundle))
+            if data_fit_obj.gated and not override:
+                raise HTTPException(status_code=422, detail={
+                    "error": "data_contract_failed",
+                    "message": compat.contract_message(data_fit_obj),
+                    "skill_id": skill_id,
+                    "kind": bundle.kind,
+                    "data_fit": data_fit_obj.model_dump(),
+                    "routing": routing.model_dump() if routing is not None else None,
+                })
         def _do_run():
             return (run_bundle_with_table(skill_id, bundle, params) if bundle is not None
                     else run_skill_with_table(skill_id, path, params))
@@ -558,12 +581,8 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
             table = synthesize_table(skill_id, figure)
         # Data-fit for THIS skill on the user's own data (Slice 2, product-agnostic): the same
         # confidence band Product B shows — "is the data I'm running good/compatible for this
-        # analysis?" Reuses the already-ingested bundle (no second load); None when uninspectable.
-        data_fit = None
-        if bundle is not None:
-            from engine import compat
-
-            data_fit = compat.fit(skill_id, compat.assess_bundle(bundle)).model_dump()
+        # analysis?" Computed once above for the D1 contract gate; reused here (no second load/score).
+        data_fit = data_fit_obj.model_dump() if data_fit_obj is not None else None
         # B4 publish-confidence: every figure ships with its reproducibility bundle +
         # auto methods-text. Pillar 1 adds the Statistics `table` (None for purely-visual
         # skills). Additive — the FE still reads `.figure`.

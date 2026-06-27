@@ -192,24 +192,35 @@ export async function runSkill(
 
   const res = await fetch(url, { method: "POST", body: fd });
   if (!res.ok) {
-    // The "is-my-data-clean?" guardrail (HTTP 422): a structured block verdict the caller
-    // turns into a reviewable card + a "run anyway" override (D-e5), not a generic failure.
+    // The response body is a one-shot stream — read it ONCE and share it across every branch
+    // below (reading it twice throws "body already used", which silently swallowed the real
+    // message before — a non-data_check 422 fell back to the generic text). null = non-JSON body.
+    let body: { detail?: unknown } | null = null;
+    try {
+      body = (await res.json()) as { detail?: unknown };
+    } catch {
+      /* non-JSON error body */
+    }
+    // The "is-my-data-clean?" guardrail (HTTP 422): a structured block verdict the caller turns
+    // into a reviewable card + a "run anyway" override (D-e5), not a generic failure.
     if (res.status === 422) {
-      const blocked = await readDataCheckBlock(res);
+      const blocked = readDataCheckBlock(body);
       if (blocked) throw blocked;
     }
-    // Prefer the backend's own explanation; otherwise speak plainly (the user is
-    // a bench scientist, not an ops engineer) and always point at a next step.
+    // A typed gate's `detail.message` (D1 data_contract_failed, C3 param_out_of_range) is a full,
+    // self-framed sentence with its own next step — surface it AS-IS. Wrapping it in "Couldn't run …
+    // Please try again." reads wrong (a data mismatch isn't fixed by retrying) and doubles the period.
+    const d = body?.detail;
+    if (d && typeof d === "object" && typeof (d as { message?: unknown }).message === "string") {
+      throw new Error((d as { message: string }).message);
+    }
+    // Otherwise speak plainly and point at a next step. A bare string detail (a runner's terse
+    // ValueError) rides inside the friendly frame; an opaque failure gets the generic text.
     let detail =
       res.status >= 500
         ? "the analysis service is temporarily unavailable"
         : `the request was rejected (${res.status})`;
-    try {
-      const body = await res.json();
-      if (typeof body?.detail === "string") detail = body.detail;
-    } catch {
-      /* non-JSON error body */
-    }
+    if (typeof d === "string") detail = d;
     throw new Error(`Couldn't run this skill — ${detail}. Please try again.`);
   }
 
@@ -230,24 +241,23 @@ export async function runSkill(
   };
 }
 
-/** Parse a 422 body into a {@link DataCheckError} when it carries the engine's block verdict. */
-async function readDataCheckBlock(res: Response): Promise<DataCheckError | null> {
-  try {
-    const body = await res.json();
-    const d = body?.detail;
-    if (d && typeof d === "object" && d.error === "data_check_failed") {
-      const message =
-        typeof d.message === "string"
-          ? d.message
-          : "This data has a blocking problem for analysis.";
-      return new DataCheckError(message, {
-        kind: String(d.kind ?? "unknown"),
-        qc: (d.qc as DataQcReport | null) ?? null,
-        routing: (d.routing as DataRouting | null) ?? null,
-      });
-    }
-  } catch {
-    /* non-JSON / unexpected shape — fall through to the generic error */
+/** Map an already-parsed 422 body into a {@link DataCheckError} when it carries the engine's QC
+ *  block verdict (`data_check_failed`). Takes the parsed body — NOT the Response — so the caller
+ *  reads the one-shot stream once and shares it (re-reading it threw, swallowing the real message).
+ *  Returns null for any other error shape (e.g. D1 `data_contract_failed`), which the caller then
+ *  surfaces via its `detail.message`. */
+function readDataCheckBlock(body: { detail?: unknown } | null): DataCheckError | null {
+  const d = body?.detail as
+    | { error?: string; message?: unknown; kind?: unknown; qc?: unknown; routing?: unknown }
+    | undefined;
+  if (d && typeof d === "object" && d.error === "data_check_failed") {
+    const message =
+      typeof d.message === "string" ? d.message : "This data has a blocking problem for analysis.";
+    return new DataCheckError(message, {
+      kind: String(d.kind ?? "unknown"),
+      qc: (d.qc as DataQcReport | null) ?? null,
+      routing: (d.routing as DataRouting | null) ?? null,
+    });
   }
   return null;
 }

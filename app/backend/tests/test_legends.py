@@ -101,7 +101,10 @@ def test_run_response_carries_a_figure_legend(monkeypatch):
 
     monkeypatch.setenv("SELOM_SKILLS_ENGINE", "stub")
     c = TestClient(app)
-    r = c.post("/skills/volcano/run", files={"matrix": ("m.csv", b"gene,WT,KO\nA,1,2\n", "text/csv")})
+    # A DE-results table (logFC + padj) — what volcano actually reads. (A raw counts table would now
+    # be blocked pre-run by the D1 data-contract gate; the stub only ever ignored the columns.)
+    de = b"gene,log2FoldChange,padj\nA,2.0,0.001\nB,-1.5,0.02\n"
+    r = c.post("/skills/volcano/run", files={"matrix": ("m.csv", de, "text/csv")})
     assert r.status_code == 200
     legend = r.json()["figure_legend"]
     assert legend["text"].startswith("Volcano plot of differential expression")

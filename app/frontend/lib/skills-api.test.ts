@@ -84,4 +84,20 @@ describe("runSkill — is-my-data-clean guardrail", () => {
     await expect(p).rejects.toThrow(/Couldn't run this skill/);
     await expect(p.catch((e) => e)).resolves.not.toBeInstanceOf(DataCheckError);
   });
+
+  it("surfaces a typed gate's detail.message as-is (D1 data_contract_failed)", async () => {
+    // The D1 data-contract gate returns a structured 422 whose `message` is a full, self-framed
+    // sentence with a next step — show it verbatim (NOT inside the "Couldn't run … try again." frame,
+    // which reads wrong for a data mismatch). NB: this stub's json() is re-callable, so it can't
+    // reproduce the one-shot-stream double-read that broke this live — that needed a real browser.
+    const message =
+      "This data doesn't fit volcano: missing a fold-change column. Swap in a matching file.";
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve(jsonRes(422, { detail: { error: "data_contract_failed", message } })),
+    );
+    const p = runSkill("volcano", new File(["x"], "counts.csv"));
+    await expect(p).rejects.toThrow(/doesn't fit volcano/);
+    await expect(p).rejects.not.toThrow(/Couldn't run this skill/); // shown as-is, not wrapped
+    await expect(p.catch((e) => e)).resolves.not.toBeInstanceOf(DataCheckError);
+  });
 });

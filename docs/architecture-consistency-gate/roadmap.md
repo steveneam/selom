@@ -1,6 +1,6 @@
 # Selom Architecture Gate — Agile Roadmap
 
-Last updated: 2026-06-27 21:20 +10:00 — Claude.
+Last updated: 2026-06-27 22:05 +10:00 — Claude.
 Status: **Active lane.** Owner greenlit the gate (2026-06-25): "stick with this plan…
 go with your recommended task… this is the lane until it is mostly complete; other
 tasks/plans/pillars on hold." Companion to `plan.md` (why) + `inventory.md` (current state).
@@ -301,6 +301,31 @@ alongside/after as the proof. The deferred buckets wait for the explicit data-ar
   still showed tunable inputs offline (no error slot, no spinner), Re-run present (still needs the backend).
   Verified in a NAMED throwaway project ("C5 verify — volcano param-spec cache …"); curated fixtures
   untouched. · [ ] C4 ⚑
-- [ ] D1 · [ ] D2 · [ ] D3 · [ ] D4 ⚑
+- [x] D1 (declared table contract per skill → enforced pre-run gate; **cross-lane: BE pytest + FE vitest +
+  browser**; ruff/tsc/eslint clean). The per-skill INPUT contract already existed in `engine/compat.py`
+  (s52 data-fit scorer): `_REQS` (modality class) + `_SCHEMA` (named column groups — fold-change /
+  significance / gene, matched by the classifier's synonym sets). **It was advisory** (a 0-100 score on
+  the data-fit/intake surface + the reproduction matcher) — the own-data `POST /run` path did NOT gate on
+  it, so a certain mismatch fell through to the runner (a `KeyError` → 500, or a misleading figure). **D1
+  promotes it to an enforced pre-run gate + guards the declarations from drift.** **The gate** (`main.py`
+  /run, after the QC gate, before the runner): compute `compat.fit(skill, bundle)` once; if `gated and not
+  override` → **422 `data_contract_failed`** with `compat.contract_message` (names the missing columns +
+  the next step) + the `data_fit` dump + routing; reuse the same fit for the response (single load/score).
+  Honest (only `compatible is False` blocks; unreadable/unclear stays optimistic) · overridable (the QC
+  gate's `override=true` escape hatch) · complementary (an uncontracted skill — e.g. ERG — is never gated
+  here; its runner's `ValueError→400` covers it). **FE:** `runSkill` now surfaces a typed gate's
+  `detail.message` as-is (self-framed, no "Couldn't run…try again" wrapper) — **and reads the 422 body
+  ONCE** (a double `res.json()` threw → silently fell back to the generic "rejected (422)"; the fetch mock
+  hid it, the browser caught it → [[fetch-body-read-once-browser-verify]]). **The guard (ratchet):**
+  `test_skill_input_contract.py` — every `_REQS`/`_SCHEMA` skill ships (no drift), a column contract
+  declares something checkable, a contracted skill's modality admits a table class (mirrors the OUTPUT
+  `test_skill_table_contract.py`). **Gates:** BE `test_data_contract.py` (counts→422 naming the columns ·
+  DE table→200 no false block · override bypasses · uncontracted not gated) + `test_skill_input_contract.py`
+  + the run-path regression **76** green, contract/inspect/capabilities/table-contract **70**, golden **66**,
+  ruff clean; FE tsc/eslint clean · **vitest 309** (+1 skills-api typed-message case; net 309 — the +1
+  replaced a count reshuffle). **BROWSER-VERIFIED** (live BE :8010 + FE webpack): a real 6×6 bulk-counts CSV
+  → volcano → **blocked pre-run, NO figure, NO stack trace**, the clear message rendered in the UI ("This
+  data doesn't fit volcano: missing a fold-change column… Swap in a file…"); the eyg28 DE table → volcano →
+  200 (no false block). Doc `docs/architecture-consistency-gate/skill-input-contract.md`. · [ ] D2 · [ ] D3 · [ ] D4 ⚑
 - [ ] E1 · [ ] E2
 - [ ] F1 ⚑ · [ ] F2 ⚑ · [ ] F3 ⚑
