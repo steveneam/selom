@@ -168,13 +168,21 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // no longer transient React state.
   const activeFigure = activeFigureId ? figures.find((f) => f.id === activeFigureId) : undefined;
   const fdBaseParams = (activeFigure?.provenance?.params ?? {}) as SkillParams;
-  // Reset the staged params + label toggle from the open figure whenever it changes (incl. after a
-  // re-run, which opens a new version → no pending changes).
-  React.useEffect(() => {
-    const p = (activeFigure?.provenance?.params as SkillParams | undefined) ?? {};
-    setFdParams({ ...p });
-    setMarkLabelsShown(p.mark_labels === undefined ? true : String(p.mark_labels) === "true");
-  }, [activeFigureId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The staged Figure-data inputs are scoped to the (dataset · skill · figure) the open figure was
+  // produced by — not just its figure id (inventory §5.4 / gate Spine 3). Switching skill/dataset, or
+  // opening another figure, must restart from THAT figure's own params; a stale fc from skill A must
+  // never carry into a skill-B run, and a failed re-run must not strand another skill's staged value.
+  // Derive-don't-sync: reset the staged state DURING render when the scope key changes (React's
+  // "store information from previous renders" pattern) instead of in an effect — the old effect lagged
+  // a paint (a one-frame flash of the prior staged marks/thresholds on the new figure) and keyed only
+  // on the figure id. The label toggle re-derives from the same base params.
+  const fdScope = `${activeFigure?.datasetId ?? "_"}:${activeFigure?.skillId ?? "_"}:${activeFigureId ?? "_"}`;
+  const [fdScopeKey, setFdScopeKey] = React.useState(fdScope);
+  if (fdScopeKey !== fdScope) {
+    setFdScopeKey(fdScope);
+    setFdParams({ ...fdBaseParams });
+    setMarkLabelsShown(fdBaseParams.mark_labels === undefined ? true : String(fdBaseParams.mark_labels) === "true");
+  }
   // Are there staged input changes pending a re-run? (drag / time edit / dots toggle / any input.)
   const fdDirty = React.useMemo(() => {
     const keys = new Set([...Object.keys(fdBaseParams), ...Object.keys(fdParams)]);
@@ -1095,7 +1103,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                           <PaneBoundary
                             label="preview"
                             title="This preview couldn't be drawn"
-                            resetKeys={[activeFigure.id, previewSpec]}
+                            resetKeys={[activeFigure.datasetId, activeFigure.skillId, activeFigure.id, previewSpec]}
                           >
                             <FigureCanvas
                               spec={(previewSpec ?? figure.spec ?? activeFigure.spec)!}
@@ -1116,10 +1124,16 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                 <div className="w-[360px] shrink-0 overflow-y-auto pr-1">
                   {/* Isolated (Task B1): the Figure-data inputs are bespoke per skill — if a control
                       throws on an unexpected param/spec shape, the inputs pane fails alone, not the
-                      whole stage. The figure id resets it on a switch (it already re-keys on id). */}
-                  <PaneBoundary label="figure-data" title="These inputs couldn't be shown" resetKeys={[activeFigure.id]}>
+                      whole stage. resetKeys clear a stuck boundary on a dataset/skill/figure switch.
+                      Task B4: key={fdScope} (dataset:skill:figure) REMOUNTS the bespoke inputs on any
+                      such switch, so no staged control state from another skill can survive it. */}
+                  <PaneBoundary
+                    label="figure-data"
+                    title="These inputs couldn't be shown"
+                    resetKeys={[activeFigure.datasetId, activeFigure.skillId, activeFigure.id]}
+                  >
                   <FigureDataPanel
-                    key={activeFigure.id}
+                    key={fdScope}
                     skillId={activeFigure.skillId}
                     skillName={getSkill(activeFigure.skillId)?.name ?? activeFigure.skillId}
                     baseParams={activeFigure.provenance?.params ?? {}}
