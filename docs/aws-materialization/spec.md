@@ -1,12 +1,15 @@
 # Selom — AWS Materialization Foundation (M-001) — Implementation Spec
 
-Status: **Amended in place as we build.** M-001 **steps 1–5 are BUILT** — all four
-content-addressed stores now ride the one `ObjectStore` seam (plan §6): result store
-(`storage/results.py`), result-cache durable tier (`skills/_result_cache.py`), artifact/lineage
-store (`engine/lineage.py`), and the reproduction Ledger via the new `LedgerStore` seam
-(`reproduction.py`). Each ships behind `SELOM_OBJECT_STORE` (local default unchanged; `s3` flips
-all four), verified on the live dev bucket + moto-backed parity in the fast suite. Steps 6–8
-(presigned upload · auth/tenancy/RLS+FE · split deploy) remain spec. Created 2026-06-28.
+Status: **Amended in place as we build.** M-001 **steps 1–5 BUILT** — all four content-addressed
+stores ride the one `ObjectStore` seam (plan §6): result store (`storage/results.py`), result-cache
+durable tier (`skills/_result_cache.py`), artifact/lineage store (`engine/lineage.py`), and the
+reproduction Ledger via the new `LedgerStore` seam (`reproduction.py`); behind `SELOM_OBJECT_STORE`
+(local default unchanged; `s3` flips all four), verified on the live dev bucket + moto parity.
+**Step 2 (statelessness) BUILT** — `SqlJobStore` on the `analysis_jobs` table behind
+`make_job_store` (`SELOM_JOB_STORE=memory|sql`), SQLAlchemy-portable (SQLite dev/test · Aurora
+Postgres prod) + Alembic; **Aurora provisioning deferred** to the prod-deploy step (owner
+2026-06-28 — build now, provision later), validated on SQLite incl. a cross-instance read. Steps
+6–8 (presigned upload · auth/tenancy/RLS+FE · split deploy) remain spec. Created 2026-06-28.
 
 Parent / source of truth: `docs/aws-materialization/plan.md` (locked decisions §1, topology §2,
 schema §4, S3 layout §5, migration order §6, QR-hardened must-cover §3). This spec implements the
@@ -451,7 +454,18 @@ self-identifies"). So:
 
 ## 4. The three genuinely-new seams
 
-### 4.1 Statelessness — `analysis_jobs` Postgres table replaces the in-memory `JobStore`
+### 4.1 Statelessness — `analysis_jobs` table replaces the in-memory `JobStore` ✅ BUILT
+
+> **BUILT (step 2, SQLite-validated; Aurora deferred).** Implemented as `SqlJobStore`
+> (`jobs/sql_store.py`) — generalized from "PgJobStore" to a **SQLAlchemy-portable** store so the
+> dev/test path runs on stdlib SQLite and prod on Aurora Postgres behind the SAME code (plan D6),
+> selected by `make_job_store(settings)` (`SELOM_JOB_STORE=memory|sql`). The `analysis_jobs` table
+> lives in `db/schema.py`; Alembic owns the migration (`alembic/versions/0001_create_analysis_jobs.py`,
+> verified via the CLI + `command.upgrade` on SQLite). Step-2 scope is this table only — the
+> cross-table FKs (users/intermediate_tables) + RLS land in step 7; `user_id` ships now as a
+> nullable forward-compatible column. The cross-instance guarantee + the config-driven app path are
+> covered by `tests/test_job_store.py`. **Aurora is provisioned at the prod-deploy step** (owner
+> 2026-06-28: build now, provision later) — no AWS DB cost yet.
 
 **Problem (cited):** `jobs/store.py:81` is a **process-wide singleton dict**
 (`job_store = JobStore()`); `jobs/queue.py:24` builds one `result_store` per process. On Lambda, a
@@ -809,8 +823,9 @@ Build-phase order; each step is independently shippable behind the config flag (
 unchanged until flipped):
 
 1. ✅ **Result store → S3** — adapter over `ObjectStore`; near config-only. Proves the seam. **BUILT.**
-2. **Jobs → Postgres `analysis_jobs`** — `PgJobStore` (§4.1). Kills the statelessness blocker;
-   required before any multi-instance deploy. *(Next — needs Aurora; the DB lift.)*
+2. ✅ **Jobs → SQL `analysis_jobs`** — `SqlJobStore` (§4.1), SQLAlchemy-portable + Alembic;
+   `SELOM_JOB_STORE=memory|sql`. **BUILT** (SQLite-validated incl. cross-instance + the app path);
+   **Aurora provisioning deferred** to the prod-deploy step.
 3. ✅ **Result-cache durable tier → S3** — `_disk_read/_disk_write` → `_obj_read/_obj_write` over the
    `ObjectStore` (key `cache/result/{key}.json`; the named C4). **BUILT.**
 4. ✅ **Artifact/lineage store → S3** — `ArtifactStore` over `ObjectStore` (keys
@@ -868,9 +883,11 @@ B — **Schema**
 - [ ] `intermediate_tables.artifact_id` is the sha PK (matches `lineage.py:270`);
       `analysis_jobs` carries `result_cache_key` + `result_json_s3_key` + `artifact_id`.
 
-C — **Statelessness**
-- [ ] `PgJobStore` replaces the in-memory singleton (`jobs/store.py:81`); a job created on one
-      instance is readable (`GET /jobs/{id}`) from another. Polling, not SSE, in prod.
+C — **Statelessness** ✅ (code; Aurora deferred)
+- [x] `SqlJobStore` (SQLAlchemy-portable) replaces the in-memory singleton behind `make_job_store`;
+      a job created on one instance is readable from another (cross-instance test + the config-driven
+      app path, `tests/test_job_store.py`). Validated on SQLite; Aurora provisioned at prod-deploy.
+      Polling, not SSE, in prod (unchanged). Step 7 adds the users FK + RLS + the JWT `user_id`.
 
 D — **Presigned upload**
 - [ ] Upload bypasses API Gateway (presigned PUT direct to S3); no whole-file buffer in a handler
