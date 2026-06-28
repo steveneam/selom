@@ -118,7 +118,7 @@ two machine-+human halves of the answer; both ride on every `/run` and job resul
   (b) **Kaleido journal export** PNG/SVG/PDF — kaleido≥1.3 + plotly≥6.1.1 + **system Chromium** in a Docker image
   (`KALEIDO_CHROME_PATH`; RISKS #2 / DECISIONS #7) — lands with the deploy image (B8-adjacent); scope a CPU-Docker path or defer.
 
-## Integration backlog (owner-directed 2026-06-12) — see `../docs/integrations.md`
+## Integration backlog (owner-directed 2026-06-12) — see `../docs/external-integrations.md`
 
 Done this session: **heatmap hierarchical row-ordering** (item 2 below) + **`gseapy` dropped** from `[omics]` (item 1's
 SCA cleanup). Remaining:

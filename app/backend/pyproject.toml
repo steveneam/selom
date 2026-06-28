@@ -73,7 +73,7 @@ pdf = [
 # backend's deliberate pandas>=3.0 + anndata>=0.12 stack — adding it makes `uv` unsolvable.
 # Integration path: run OmicVerse in an ISOLATED worker/env (its own venv or container, the
 # §6.5C/E per-skill-env model) and call it out-of-process; do NOT downgrade the main stack.
-# Tracked: RISKS #9, plans/v2-backend.md backlog, docs/integrations.md.
+# Tracked: RISKS #9, plans/v2-backend.md backlog, docs/external-integrations.md.
 # SCA: `gseapy` was DROPPED at B3 because enrichment uses an in-house hypergeometric ORA
 # (DECISIONS #9) — it was simply unused, NOT an "AGPL surface" (corrected 2026-06-16:
 # gseapy is BSD-3, not AGPL — the old note conflated gseapy=code with MSigDB=restricted

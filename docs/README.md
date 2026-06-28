@@ -27,7 +27,7 @@ the docs convention in `docs/repo-structure/plan.md` §1.3).
 | `rpgrip1-figrepro.md` · `dorgau-figrepro/` · `erg-module/findings-2026-06-23.md` | Figure-repro records |
 | `lit-synthesizer-scope.md` · `skill-keyword-index/` · `table-synthesis/spec.md` | Shipped-feature scopes |
 | `selom-integrate/` · `harmony-reimplementation-scope.md` · `harmony2-scope/` | Melody (shipped) — consolidation candidate |
-| `osca-sc-workflow-study.md` · `external-tools-study.md` · `skill-audit/` · `competitors/` | Studies & audits |
+| `osca-sc-workflow-study.md` · `external-tools-study.md` · `external-integrations.md` · `skill-audit/` · `competitors/` | Studies & audits (OmicVerse/sklearn/R-oracle porting research) |
 | `erg-manual-marks/` · `diagnosys-erg/` · `erg-module/spec.md` · `gene-set-builder-design.md` | Feature specs (shipped) |
 | `stack-and-graphing-notes.md` · `skill-gaps.md` · `hani-skill-gap-roadmap.md` · `p1-skills-scope.md` | Notes / scoping |
 
@@ -39,8 +39,14 @@ the docs convention in `docs/repo-structure/plan.md` §1.3).
 | `command-center/design.md` | C/B platform — parked, largely superseded by `pillars/plan.md` |
 | `journal-styles/` · `extract-reproduction-bridge/` · `workspace-library/` | Parked specs |
 
-## Known cleanups (see `repo-structure/plan.md` §2C)
+## Buckets are logical, not physical
 
-- `integrations.md` (old "External Integrations") collides by name with
-  `aws-materialization/integrations.md` → rename the old one to `external-integrations.md`.
-- Bucket the **record** rows above under a `docs/records/` tree (gated move).
+The **record** rows above are *not* moved into a `docs/records/` tree: those docs are
+referenced by ~40 code files across both lanes (docstring/comment path pointers, heavily in
+the active ERG + skill-keyword-index clusters), so a physical move would churn live code for
+no functional gain — same value/risk call as the skipped `src/` move (`repo-structure/plan.md`
+§2C/§4). This index *is* the bucketing; keep it current instead.
+
+`external-integrations.md` (OmicVerse / scikit-learn / R-oracle porting research) is the old
+"External Integrations" doc, renamed 2026-06-29 to stop colliding with
+`aws-materialization/integrations.md` (the GitHub↔AWS↔Vercel backbone).

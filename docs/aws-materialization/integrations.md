@@ -2,7 +2,7 @@
 
 > **What this is.** The DevOps/runtime wiring between the three platforms Selom runs on:
 > GitHub (source + CI/CD), AWS (backend + data), Vercel (frontend). Distinct from
-> `docs/integrations.md` (bioinformatics tool integrations — OmicVerse etc.). Companion to
+> `docs/external-integrations.md` (bioinformatics tool integrations — OmicVerse etc.). Companion to
 > the materialization `plan.md`/`spec.md`; the IaC lives in `infra/` (CDK Python).
 >
 > _Filed 2026-06-28 22:xx +10:00 · build phase, AWS-setup stage._

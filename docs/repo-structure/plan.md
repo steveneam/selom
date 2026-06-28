@@ -160,11 +160,25 @@ Stale top-level docs actively mislead every new session — highest ROI for agen
 - **CODEX.md** — fix "plan of record" pointer off `plans/v2-backend.md`. *(done)*
 - **plans/README.md + v2-*.md** — superseded banners. *(done)*
 - **docs/README.md** — new index for the 72-file tree. *(done)*
-- *(gated with moves)* resolve `docs/integrations.md` ↔ `docs/aws-materialization/integrations.md`
-  name collision (rename the old one to `external-integrations.md`); merge
-  `AGENTS.md` ≈ `.context/READ-ME-FIRST.md`; bucket completed records under `docs/records/`.
+- **`integrations.md` name collision** — renamed the old "External Integrations" doc to
+  `docs/external-integrations.md` (resolves the clash with `aws-materialization/integrations.md`);
+  ~8 cross-refs updated (ROADMAP, plans/v2-backend, build-charter, competitors/omicsbox,
+  aws-materialization/integrations, pyproject comment). *(done 2026-06-29)*
+- **`AGENTS.md` ≈ `.context/READ-ME-FIRST.md`** — de-duplicated: `AGENTS.md` is the single
+  canonical entry; `.context/READ-ME-FIRST.md` is now a thin pointer to it (no inbound refs). *(done 2026-06-29)*
+- **Bucket completed records under `docs/records/` — RE-SCOPED, NOT done.** Measured blast
+  radius: the record docs are referenced by **~40 code files across BOTH lanes** (docstring/
+  comment path pointers), heavily in the *active* ERG cluster (`erg-module/`, `erg-manual-marks/`,
+  `diagnosys-erg/` ← ~18 backend/FE files) and the flagship `skill-keyword-index/` (extract/
+  routing). A physical move would invalidate all of them — the same poor value/risk that got
+  `src/` SKIPPED (§4). **Decision: keep records *logically* bucketed in `docs/README.md`
+  (already done) and do NOT physically move them.** The README's spec/record/parked buckets
+  give agents the live-vs-done signal without churning code-comment pointers. (If a future
+  session does want the physical tree, do it per-cluster *when that cluster's code is the
+  active build area*, so the pointer churn lands where someone is already working — same rule
+  as §3.)
 
-Cleanup: delete the empty gitignored root `node_modules/` (`.vite` only — local cruft).
+Cleanup: the empty gitignored root `node_modules/` is already gone — nothing to delete.
 
 ### 2D. Structure guard
 Build the two guard tests in §1.4 **with the moves** so they enforce the new target state.

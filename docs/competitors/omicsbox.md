@@ -5,7 +5,7 @@
 > level, plus the **prioritized Skill-Foundry backlog** it implies for Selom.
 > Owner-directed (2026-06-12): "look at every link and line… so we can reverse
 > engineer what workflow / tools / things Selom needs." Companion to
-> `docs/integrations.md` (porting sources), `docs/command-center/design.md §6.5`
+> `docs/external-integrations.md` (porting sources), `docs/command-center/design.md §6.5`
 > (toolchain) and `docs/build-charter.md` (sequencing). API-reuse cross-refs the
 > sibling **eamos** project. Binding decisions still land in `agent_handoff/DECISIONS.md`.
 >
@@ -123,7 +123,7 @@ table** and owns the analysis→figure last mile.
 ## 7. The 🟢 last-mile Skill-Foundry backlog (prioritized, mapped)
 
 Each OmicsBox last-mile tool → a Selom skill, mapped to its **porting source** (primary =
-OmicVerse `ov.*` isolated worker per `integrations.md §1.1` / §3; license-clean primitives =
+OmicVerse `ov.*` isolated worker per `external-integrations.md §1.1` / §3; license-clean primitives =
 scanpy / scikit-learn; validation = the R-oracle, ADR 0002 / RISKS #7). "Status" = against the
 live `GET /skills` registry.
 

@@ -49,14 +49,14 @@ runnable shown honestly).
 (cheap, do-now); **(B)** Verified runners via the existing `[omics]` extra
 (`uv sync`: scverse + plotly/kaleido) **+ OmicVerse as a second engine / primary
 Skill-Foundry source, run OUT-OF-PROCESS in an isolated env** (it pins `pandas<3`, so it
-can't share the backend venv — see `docs/integrations.md` + RISKS #9); **(C)** ClawBio
+can't share the backend venv — see `docs/external-integrations.md` + RISKS #9); **(C)** ClawBio
 runnable via `pip install clawbio` + Miniforge/mamba per-skill `environment.yml` +
 bioconda; **(D)** bioSkills long tail via the bioconda CLI toolchain (samtools/STAR/GATK4/
 Snakemake/Nextflow…) promoted through the Skill Foundry; **(E)** Community sandbox via
 Docker + mamba images (v2, deferred). A+B immediate, C next, D/E incremental. License-clean
 primitives (sklearn — clustering-quality guardrails, hierarchical ordering) are in core.
 
-**Integrations research:** `docs/integrations.md` — OmicVerse (engine/Foundry source,
+**Integrations research:** `docs/external-integrations.md` — OmicVerse (engine/Foundry source,
 isolated), scikit-learn (now core), R4DS/Quarto+ggplot2 (B4 methods-text/repro + R oracle),
 Hermes (aggregator pattern + catalog-count true-up). MCP: context7 (docs), OmicVerse/JARVIS
 (isolated worker boundary).
