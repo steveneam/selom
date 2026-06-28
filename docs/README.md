@@ -39,13 +39,13 @@ the docs convention in `docs/repo-structure/plan.md` §1.3).
 | `command-center/design.md` | C/B platform — parked, largely superseded by `pillars/plan.md` |
 | `journal-styles/` · `extract-reproduction-bridge/` · `workspace-library/` | Parked specs |
 
-## Buckets are logical, not physical
+## Buckets are logical (the physical `docs/records/` move is a deferred task)
 
-The **record** rows above are *not* moved into a `docs/records/` tree: those docs are
-referenced by ~40 code files across both lanes (docstring/comment path pointers, heavily in
-the active ERG + skill-keyword-index clusters), so a physical move would churn live code for
-no functional gain — same value/risk call as the skipped `src/` move (`repo-structure/plan.md`
-§2C/§4). This index *is* the bucketing; keep it current instead.
+The **record** rows above are not *yet* moved into a `docs/records/` tree — that physical
+move is **deferred to its own focused session** (it touches ~80 inbound code-comment/docstring
+path pointers across both lanes, heavily in the active ERG + skill-keyword-index clusters; see
+`repo-structure/plan.md` §2C). Until then, this index *is* the bucketing (spec / record /
+parked) — keep it current.
 
 `external-integrations.md` (OmicVerse / scikit-learn / R-oracle porting research) is the old
 "External Integrations" doc, renamed 2026-06-29 to stop colliding with

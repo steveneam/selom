@@ -11,27 +11,30 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
-| **STRUCTURE-REFACTOR** | 2026-06-29 | `b6e3b38..c70635e` | `main.py`→`routers/` + finish lib/ feature-dirs + conventions/guards/plan; Vercel git-email fix |
+| **FOUNDATION-FINISH** | 2026-06-29 | `21c1177..6004a75` | docs name-collision rename + orientation de-dup; raise free-tier quota defaults (unblocks dogfood); scoped FE-3 / BE-pkgs / FE-hooks |
+| STRUCTURE-REFACTOR | 2026-06-29 | `b6e3b38..c70635e` | `main.py`→`routers/` + finish lib/ feature-dirs + conventions/guards/plan; Vercel git-email fix |
 | 7C-STATE | 2026-06-29 | `bc2375f..b6e3b38` | FE state → Postgres (optimistic-cache stores, client-authoritative ids) |
 | DEPLOY-BACKBONE | 2026-06-28 | `…318795d` | GitHub↔AWS↔Vercel CI backbone + reflect-checkpoint + pre-7c hardening |
 | AWS-MAT-1..5 | 2026-06-28 | (git) | S3 object-store seam · jobs→SQL · tenant schema · Clerk auth · step-6 prep |
 | older | — | (git / `archive/`) | `git log` · `agent_handoff/archive/` |
 
-## ▸ LIVE · STRUCTURE-REFACTOR · 2026-06-29 02:35 +10:00 · origin/main @ `c70635e` (pushed) · Claude (FE+BE), Opus 4.8 xhigh
+## ▸ LIVE · FOUNDATION-FINISH · 2026-06-29 03:50 +10:00 · local @ `<handoff>` — **3 commits AHEAD of origin/main `a5e3ff9`, NOT pushed** (owner pushes) · Claude (FE+BE), Opus 4.8 xhigh
 
-- **Shipped:** repo-structure refactor, 4 commits — narrative in `git log b6e3b38..c70635e` + `docs/repo-structure/plan.md`. Conventions codified (CLAUDE.md/CODEX.md) + 2 guard tests (no `@app` routes in `main.py`; no flat `*-api.ts`/barrels in lib/) + memory [[selom-repo-structure-conventions]].
-- **Gates:** FE tsc+eslint clean · vitest **353** | BE fast gate **846 pass / 1 skip** · ruff clean.
-- **Verified live (FE :3000→BE :8010):** home / project / figure-editor (Plotly volcano + JSON-Patch + inspector) / reproduction (live `/api/papers`) render, **0 console errors**; BE boots all 11 routers + `/health /ready /skills /papers /gene-sets` → 200; **Vercel deploy Ready**.
+- **Shipped (2 code commits):** docs name-collision fix `21c1177` (`docs/integrations.md`→`external-integrations.md` + 8 cross-refs; `.context/READ-ME-FIRST.md`→thin pointer to `AGENTS.md`) · raise free-tier quota defaults `6004a75` (3/10/1GiB → **50 proj / 200 ds / 50 GiB**; schema + Alembic `0002` in sync — `0002` not yet applied to live PG, edited in place). ⚠ `server_default` only applies at INSERT → an existing `dev.db` user row keeps the OLD caps; recreate `dev.db` (`SELOM_DB_AUTO_CREATE`) or `UPDATE users SET …` to pick up the new limits.
+- **Gates:** BE fast gate **846 pass / 1 skip** · ruff clean. (No FE files touched → FE gates not implicated; FE last green @ vitest 353.)
+- **Scoped, not built — 3 implementation-ready reports** (parallel subagent fan-out): FE-3 upload wiring · BE `reproduction/`+`companions/` pkgs · FE `project-workspace.tsx`→hooks. Key facts folded into NEXT/DEFERRED.
+- **Decision (owner 2026-06-29):** the `docs/records/` *physical* move is **deferred to its own session** — it's ~80 cross-lane code-pointer edits, not the cheap finisher first scoped (now in DEFERRED + plan §2C). The `integrations.md` rename + AGENTS de-dup parts ARE done.
 
-## ▸ NEXT
+## ▸ NEXT (owner sequences — said "stop here, I'll sequence")
 
-- **7c follow-ups:** (1) raise free/dev quota defaults (3 proj / 10 ds → 402 blocks real dogfood); (2) **FE-3** — wire the upload flow (intake→presigned PUT→confirm→parse→run-dataset; the run-dataset endpoint is built + tested).
-- **Step 8 (split deploy):** zip Lambda (API) + Fargate (compute) · Aurora min=0 ACU + Alembic head (incl. `0004`) · live Clerk · S3→EventBridge→Step Functions→Fargate + cron T2 · BYPASSRLS sweep · CORS · GitHub→AWS OIDC role (owner-pending; runbook `infra/README.md`) → kill the static `selom-dev` key · flip `API_PROXY_TARGET` to the deployed API. (Full detail: `docs/aws-materialization/plan.md` + the demoted DEPLOY-BACKBONE/7C blocks below.)
+- **7c-(b) FE-3 upload wiring** (~1.5–2d, FE lane) — drive intake→presigned PUT→confirm→parse→**run-from-`dataset_id`** so the upload→run loop closes (works post-reload, no re-upload). Backend is built+tested. Scope: new `lib/uploads/api.ts` (intake/uploadBytes/confirm/parse orchestrator) + `runSkillByDataset` in `lib/skills/api.ts` + `Dataset.status`/server-id adoption (`sync.ts`/`types.ts`/`store.ts`) + data-panel & run-flow rewire + MSW + vitest. **Traps:** local-PUT (relative url) vs S3-POST (absolute, fields-before-file) branch; `intake` MINTS the `dataset_id` (adopt it, don't keep the client uid); omit `content_sha256` at intake (let `parse` stamp the real sha); 402 quota rollback.
+- **Step 8 (split deploy):** zip Lambda (API) + Fargate (compute) · Aurora min=0 ACU + Alembic head (incl. `0004`) · live Clerk · S3→EventBridge→Step Functions→Fargate + cron T2 · BYPASSRLS sweep · CORS · GitHub→AWS OIDC role (owner-pending; runbook `infra/README.md`) → kill the static `selom-dev` key · flip `API_PROXY_TARGET`. (Full detail: `docs/aws-materialization/plan.md` + demoted blocks below.)
 
-## ▸ DEFERRED (specced, not built — `docs/repo-structure/plan.md` §3)
+## ▸ DEFERRED (specced/scoped, not built)
 
-- Physical docs reorg (records/ archive + `integrations.md` rename — ~8-file cross-ref churn).
-- BE `reproduction/` + `companions/` packages; FE `project-workspace.tsx` → hooks.
+- **`docs/records/` physical move** — owner: do the FULL move, **not this session**. ~80 inbound code-comment/docstring path pointers across both lanes (active ERG + skill-keyword-index clusters); own focused contract-frozen task (`git mv` + scripted pointer rewrite + grep for stale paths). Plan `docs/repo-structure/plan.md` §2C.
+- **BE `reproduction/` + `companions/` packages** (~0.5d, plan §3A/§3B) — contract-frozen fold; a re-exporting `reproduction/__init__.py` (star-export of `core.__all__`) keeps the ~14 `import reproduction as R` consumers unchanged. ⚠ **one behavioral edit:** `papers_api.py:40` `__import__(…)` → `importlib.import_module(…)` (dotted module names). ⚠ scope the `reproduction_runs` find-replace to import lines only (it's also a DB table name). Do when reproduction is the active area.
+- **FE `project-workspace.tsx` → hooks** (~0.5–1d, plan §3C) — extract `useWorkspaceView` (first — owns the routing state the others write), then `useFigureCrud`, then `useFigureRun`, into `components/project/hooks/` (NOT `lib/`; inject view setters). `figure` store stays at root. Verify = `npx tsc --noEmit` (no `typecheck` script) + eslint + vitest + **e2e** (`figure-gestures`/`data-check-routing` are the only tests that render it) + browser smoke.
 
 ## ▸ ENV / landmines
 

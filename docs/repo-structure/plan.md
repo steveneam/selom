@@ -166,17 +166,18 @@ Stale top-level docs actively mislead every new session — highest ROI for agen
   aws-materialization/integrations, pyproject comment). *(done 2026-06-29)*
 - **`AGENTS.md` ≈ `.context/READ-ME-FIRST.md`** — de-duplicated: `AGENTS.md` is the single
   canonical entry; `.context/READ-ME-FIRST.md` is now a thin pointer to it (no inbound refs). *(done 2026-06-29)*
-- **Bucket completed records under `docs/records/` — RE-SCOPED, NOT done.** Measured blast
-  radius: the record docs are referenced by **~40 code files across BOTH lanes** (docstring/
-  comment path pointers), heavily in the *active* ERG cluster (`erg-module/`, `erg-manual-marks/`,
-  `diagnosys-erg/` ← ~18 backend/FE files) and the flagship `skill-keyword-index/` (extract/
-  routing). A physical move would invalidate all of them — the same poor value/risk that got
-  `src/` SKIPPED (§4). **Decision: keep records *logically* bucketed in `docs/README.md`
-  (already done) and do NOT physically move them.** The README's spec/record/parked buckets
-  give agents the live-vs-done signal without churning code-comment pointers. (If a future
-  session does want the physical tree, do it per-cluster *when that cluster's code is the
-  active build area*, so the pointer churn lands where someone is already working — same rule
-  as §3.)
+- **Bucket completed records under `docs/records/` — DEFERRED to its own session (owner
+  2026-06-29: do the full move, just not this session).** Measured blast radius: the record
+  docs are referenced by **~80 code files across BOTH lanes** (docstring/comment path
+  pointers), heavily in the *active* ERG cluster (`erg-module/`, `erg-manual-marks/`,
+  `diagnosys-erg/`) and the flagship `skill-keyword-index/` (extract/routing) — so it is **not**
+  the cheap finisher it was first scoped as. It is a real contract-frozen refactor: `git mv`
+  each record doc → `docs/records/<…>/`, then update every inbound path pointer (code comments
+  + docstrings + sibling docs) — script the bulk find-replace, verify by `tsc`/`ruff`/fast-gate
+  + a grep for stale `docs/<moved>` paths. Do it as **one focused task** (ideally when one of
+  those clusters' code is the active build area, so the churn lands where someone's already
+  working). **Interim:** the README's spec/record/parked buckets are the *logical* bucketing —
+  they give agents the live-vs-done signal until the physical tree lands.
 
 Cleanup: the empty gitignored root `node_modules/` is already gone — nothing to delete.
 
