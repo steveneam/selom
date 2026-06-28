@@ -144,3 +144,50 @@ def test_submit_runs_a_job_over_the_sql_store(tmp_path, monkeypatch):
 
     # a fresh instance (cold) sees the succeeded job — the statelessness acceptance
     assert SqlJobStore(engine=sa.create_engine(url)).get(job.id).status is JobStatus.SUCCEEDED
+
+
+# --- M2 idempotency -----------------------------------------------------------------------------
+
+def test_in_memory_find_succeeded_is_tenant_scoped():
+    from jobs.store import JobStatus as JS
+    from jobs.store import JobStore
+
+    s = JobStore()
+    j = s.create("umap", {}, user_id="t", result_cache_key="K")
+    assert s.find_succeeded("K", "t") is None              # not succeeded yet
+    s.update(j.id, status=JS.SUCCEEDED, result_url="/r")
+    assert s.find_succeeded("K", "t").id == j.id           # now reusable
+    assert s.find_succeeded("K", "other") is None          # tenant-scoped
+    assert s.find_succeeded("nope", "t") is None            # unknown key
+
+
+def test_job_idempotency_reuses_succeeded_over_sql(tmp_path, monkeypatch):
+    """SELOM_JOB_IDEMPOTENCY on: a duplicate submit (same skill+params+input content) reuses the
+    prior SUCCEEDED job — same id, no second row, no recompute (the Lambda-retry dedup)."""
+    monkeypatch.setenv("SELOM_SKILLS_ENGINE", "stub")
+    from jobs import queue
+
+    url = _sqlite_url(tmp_path)
+    monkeypatch.setattr(queue, "job_store", SqlJobStore(url=url, create=True))
+    monkeypatch.setattr(queue.settings, "job_idempotency", True)
+
+    content = "a,b\n1,2\n3,4\n"
+    src1 = tmp_path / "m1.csv"
+    src2 = tmp_path / "m2.csv"  # identical content -> identical input sha -> identical cache key
+    src1.write_text(content, encoding="utf-8")
+    src2.write_text(content, encoding="utf-8")
+
+    j1 = queue.submit("volcano", str(src1), {}, filename="m.csv", user_id="t")
+    assert j1.status is JobStatus.SUCCEEDED and j1.result_cache_key  # key stamped
+    j2 = queue.submit("volcano", str(src2), {}, filename="m.csv", user_id="t")
+    assert j2.id == j1.id  # reused — no recompute
+
+    # exactly one row carries that cache key (no duplicate job)
+    from db.schema import analysis_jobs
+
+    with sa.create_engine(url).connect() as conn:
+        n = conn.execute(
+            sa.select(sa.func.count()).select_from(analysis_jobs)
+            .where(analysis_jobs.c.result_cache_key == j1.result_cache_key)
+        ).scalar()
+    assert n == 1

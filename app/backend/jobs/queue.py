@@ -65,6 +65,20 @@ def execute_job(job_id: str, data_path: str, params: dict, user_id: str | None =
             pass
 
 
+def _content_keys(skill_id: str, data_path: str, params: dict) -> tuple[str | None, str | None]:
+    """``(result_cache_key, input_sha256)`` for this run — the M2 submission idempotency key, or
+    ``(None, None)`` if the input is unhashable. Best-effort: never blocks a submit."""
+    try:
+        from skills._result_cache import _file_sha256, cache_key  # lazy: keep the import graph light
+        from skills.contract import load_skill
+
+        spec = load_skill(skill_id)
+        ckey = cache_key(skill_id, spec.version, spec.param_spec, data_path, params)
+        return ckey, _file_sha256(data_path)
+    except Exception:  # noqa: BLE001 — idempotency metadata is advisory; a failure must not block the run
+        return None, None
+
+
 def submit(
     skill_id: str,
     data_path: str,
@@ -78,7 +92,22 @@ def submit(
     ``user_id`` defaults to the configured dev tenant so the inline/offline path is unchanged; the
     HTTP endpoint passes the verified ``ctx.user_id`` (never a request param)."""
     uid = user_id or settings.dev_user_id
-    job = job_store.create(skill_id, params, filename, user_id=uid, email=email or settings.dev_user_email)
+    ckey, input_sha = _content_keys(skill_id, data_path, params)
+    # M2 idempotency (opt-in): a duplicate/retried submit (same skill+version+params+input) reuses the
+    # prior SUCCEEDED job instead of creating a second row + recomputing. OFF by default → inline dev
+    # path unchanged. The columns are stamped on create regardless (metadata / future dedup).
+    if settings.job_idempotency and ckey:
+        existing = job_store.find_succeeded(ckey, uid)
+        if existing is not None and existing.result_url:
+            try:
+                pathlib.Path(data_path).unlink(missing_ok=True)  # we won't run, so clean the temp here
+            except OSError:
+                pass
+            return existing
+    job = job_store.create(
+        skill_id, params, filename, user_id=uid, email=email or settings.dev_user_email,
+        result_cache_key=ckey, input_sha256=input_sha,
+    )
     if settings.queue == "arq":
         _enqueue_arq(job.id, skill_id, data_path, params, uid)
     else:

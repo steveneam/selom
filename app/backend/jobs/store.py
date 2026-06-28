@@ -38,6 +38,8 @@ class Job:
     result_url: str | None = None
     error: str | None = None
     user_id: str | None = None   # the verified tenant (materialization 7b); not in the FE wire shape
+    result_cache_key: str | None = None  # content cache key (M2 idempotent reuse); not in the wire shape
+    input_sha256: str | None = None      # input content hash (M2); not in the wire shape
 
     def public(self) -> dict:
         """The wire shape the FE polls (GET /jobs/{id})."""
@@ -63,6 +65,8 @@ class JobStore:
         filename: str | None = None,
         user_id: str | None = None,
         email: str | None = None,  # noqa: ARG002 — in-memory mode has no users table
+        result_cache_key: str | None = None,
+        input_sha256: str | None = None,
     ) -> Job:
         now = time.time()
         job = Job(
@@ -74,6 +78,8 @@ class JobStore:
             updated_at=now,
             filename=filename,
             user_id=user_id,
+            result_cache_key=result_cache_key,
+            input_sha256=input_sha256,
         )
         self._jobs[job.id] = job
         return job
@@ -86,6 +92,17 @@ class JobStore:
         if user_id is not None and job.user_id is not None and job.user_id != user_id:
             return None
         return job
+
+    def find_succeeded(self, cache_key: str, user_id: str | None = None) -> Job | None:
+        """Most-recent SUCCEEDED job with this content cache key for the tenant (M2 reuse), or None."""
+        if not cache_key:
+            return None
+        hits = [
+            j for j in self._jobs.values()
+            if j.result_cache_key == cache_key and j.status is JobStatus.SUCCEEDED
+            and (user_id is None or j.user_id is None or j.user_id == user_id)
+        ]
+        return max(hits, key=lambda j: j.updated_at) if hits else None
 
     def update(self, job_id: str, user_id: str | None = None, **changes) -> Job:  # noqa: ARG002
         job = self._jobs[job_id]

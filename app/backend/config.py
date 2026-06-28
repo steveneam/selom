@@ -100,6 +100,13 @@ class Settings(BaseSettings):
     # applies the Alembic migration instead (never auto-create against Aurora).
     db_auto_create: bool = Field(default=False, validation_alias="SELOM_DB_AUTO_CREATE")
 
+    # Job idempotency (M2). When ON, `submit` short-circuits to an existing SUCCEEDED job with the
+    # same content cache key (skill+version+params+input sha) instead of creating a duplicate job +
+    # recomputing — the cross-instance dedup a Lambda retry needs. OFF by default so the inline dev
+    # path is unchanged (single-process, no retry duplication); prod (SQL store) turns it on. The
+    # result_cache_key/input_sha256 columns are stamped on every job regardless (metadata).
+    job_idempotency: bool = Field(default=False, validation_alias="SELOM_JOB_IDEMPOTENCY")
+
     # Auth / tenancy (materialization step 7b). `dev` (default) trusts a fixed dev user_id so the
     # inner loop stays offline + single-tenant — nothing changes locally. `clerk` verifies the
     # Clerk JWT (issuer + JWKS) and derives the tenant from the verified `sub` claim, never a

@@ -40,6 +40,8 @@ def _row_to_job(row) -> Job:
         result_url=row.result_url,
         error=row.error,
         user_id=row.user_id,
+        result_cache_key=row.result_cache_key,
+        input_sha256=row.input_sha256,
     )
 
 
@@ -69,6 +71,8 @@ class SqlJobStore:
         filename: str | None = None,
         user_id: str | None = None,
         email: str | None = None,
+        result_cache_key: str | None = None,
+        input_sha256: str | None = None,
     ) -> Job:
         now = datetime.now(timezone.utc)
         jid = uuid.uuid4().hex
@@ -84,11 +88,31 @@ class SqlJobStore:
                     status=JobStatus.QUEUED.value,
                     params=params or {},
                     filename=filename,
+                    result_cache_key=result_cache_key,
+                    input_sha256=input_sha256,
                     created_at=now,
                     updated_at=now,
                 )
             )
             return _select_one(conn, jid, user_id)
+
+    def find_succeeded(self, cache_key: str, user_id: str | None = None) -> Job | None:
+        """Most-recent SUCCEEDED job with this content cache key for the tenant (M2 reuse), or None.
+        Indexed by idx_jobs_cachekey; cross-instance, so a Lambda retry reuses a prior result."""
+        if not cache_key:
+            return None
+        with self.engine.connect() as conn:
+            if user_id:
+                set_tenant(conn, user_id)
+            stmt = (
+                sa.select(analysis_jobs)
+                .where(analysis_jobs.c.result_cache_key == cache_key)
+                .where(analysis_jobs.c.status == JobStatus.SUCCEEDED.value)
+            )
+            if user_id is not None:
+                stmt = stmt.where(analysis_jobs.c.user_id == user_id)
+            row = conn.execute(stmt.order_by(analysis_jobs.c.updated_at.desc()).limit(1)).first()
+            return _row_to_job(row) if row is not None else None
 
     def get(self, job_id: str, user_id: str | None = None) -> Job | None:
         with self.engine.connect() as conn:
