@@ -11,8 +11,11 @@
 
 import * as React from "react";
 
-import { REPRO_LEDGERS, REPRO_PAPERS } from "./fixture";
 import type { Attribution, Ledger, PaperSummary } from "./types";
+
+// The embedded real-data fixture (~67 KB) is the offline fallback only. It is lazy-loaded
+// inside the fetch `.catch()` so it never ships in this route's initial JS when the backend
+// is reachable (the normal path). See docs/repo-structure/plan.md §2B.
 
 const PAPERS_URL = "/api/papers";
 
@@ -96,7 +99,7 @@ interface Loaded<T> {
 
 /** The index spectrum: live papers, falling back to the real-data fixture offline. */
 export function usePapers(): Loaded<PaperSummary[]> {
-  const [data, setData] = React.useState<PaperSummary[]>(REPRO_PAPERS);
+  const [data, setData] = React.useState<PaperSummary[]>([]);
   const [live, setLive] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   React.useEffect(() => {
@@ -107,8 +110,10 @@ export function usePapers(): Loaded<PaperSummary[]> {
         setData(papers);
         setLive(true);
       })
-      .catch(() => {
-        /* backend unreachable -> keep the embedded fixture */
+      .catch(async () => {
+        // backend unreachable -> lazy-load the embedded real-data fixture
+        const { REPRO_PAPERS } = await import("./fixture");
+        if (on) setData(REPRO_PAPERS);
       })
       .finally(() => on && setLoading(false));
     return () => {
@@ -120,13 +125,12 @@ export function usePapers(): Loaded<PaperSummary[]> {
 
 /** One paper's full ledger: live, falling back to the fixture (or null if unknown). */
 export function useLedger(slug: string): Loaded<Ledger | null> {
-  const fallback = REPRO_LEDGERS[slug] ?? null;
-  const [data, setData] = React.useState<Ledger | null>(fallback);
+  const [data, setData] = React.useState<Ledger | null>(null);
   const [live, setLive] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   React.useEffect(() => {
     let on = true;
-    setData(REPRO_LEDGERS[slug] ?? null);
+    setData(null);
     setLive(false);
     setLoading(true);
     fetchLedger(slug)
@@ -135,8 +139,10 @@ export function useLedger(slug: string): Loaded<Ledger | null> {
         setData(ledger);
         setLive(true);
       })
-      .catch(() => {
-        /* offline -> embedded fixture (already set) */
+      .catch(async () => {
+        // offline -> lazy-load the embedded fixture for this paper
+        const { REPRO_LEDGERS } = await import("./fixture");
+        if (on) setData(REPRO_LEDGERS[slug] ?? null);
       })
       .finally(() => on && setLoading(false));
     return () => {
