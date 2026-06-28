@@ -152,10 +152,15 @@ def test_local_put_rejects_non_uploads_key(env):
 # --- quota (spec §12) -------------------------------------------------------------------------
 
 def test_project_quota(env):
-    client, _v, _repo, _store, _eng = env
-    for i in range(3):  # default max_projects = 3
-        assert client.post("/projects", json={"name": f"P{i}"}).status_code == 200
-    r = client.post("/projects", json={"name": "P4"})
+    client, _v, _repo, _store, engine = env
+    from db.schema import users
+
+    # create the tenant row, then pin its cap (test independent of the free-tier default)
+    assert client.post("/projects", json={"name": "P0"}).status_code == 200
+    with engine.begin() as conn:
+        conn.execute(sa.update(users).where(users.c.user_id == "A").values(max_projects=2))
+    assert client.post("/projects", json={"name": "P1"}).status_code == 200  # fills the cap (2/2)
+    r = client.post("/projects", json={"name": "P2"})  # exceeds
     assert r.status_code == 402
     assert r.json()["detail"]["limit"] == "max_projects"
 

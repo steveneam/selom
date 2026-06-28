@@ -103,9 +103,9 @@ users = sa.Table(
     sa.Column("stripe_customer_id", sa.Text, nullable=True),
     sa.Column("is_subscribed", sa.Boolean, nullable=False, server_default=sa.false()),
     sa.Column("tier", sa.Text, nullable=False, server_default="free"),
-    sa.Column("max_projects", sa.Integer, nullable=False, server_default=sa.text("3")),
-    sa.Column("max_datasets", sa.Integer, nullable=False, server_default=sa.text("10")),
-    sa.Column("max_storage_bytes", sa.BigInteger, nullable=False, server_default=sa.text("1073741824")),
+    sa.Column("max_projects", sa.Integer, nullable=False, server_default=sa.text("50")),
+    sa.Column("max_datasets", sa.Integer, nullable=False, server_default=sa.text("200")),
+    sa.Column("max_storage_bytes", sa.BigInteger, nullable=False, server_default=sa.text("53687091200")),  # 50 GiB
     sa.Column("local_import_at", sa.DateTime(timezone=True), nullable=True),  # 7c one-time localStorage import marker
     _created_at(),
     sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
