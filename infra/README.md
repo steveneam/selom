@@ -28,7 +28,35 @@ fits an AWS-only Python stack; CDKTF is archived and Terraform moved to BSL.
   Use a temporary admin profile (or root with MFA) for `bootstrap` + the `SelomGithubOidc`
   deploy only.
 
-## One-time setup (admin creds)
+## When is this needed?
+
+**Not until step 8 (the deploy pipeline).** The GitHub Actions CI checks use no AWS, and
+local dev needs none of this. Create the OIDC provider + role whenever you're ready to wire
+keyless deploys — there's no rush.
+
+## Simplest one-time setup — AWS Console (no installs)
+
+This machine has no AWS CLI, so the click-through console is the easiest path. Log in to the
+[AWS Console](https://console.aws.amazon.com/) as **root** (the account you created with MFA),
+region **ap-southeast-2**, then:
+
+1. **Create the GitHub identity provider:** IAM → **Identity providers** → **Add provider** →
+   *OpenID Connect* → Provider URL `https://token.actions.githubusercontent.com` → **Get
+   thumbprint** → Audience `sts.amazonaws.com` → **Add provider**.
+2. **Create the role:** IAM → **Roles** → **Create role** → Trusted entity = **Web identity** →
+   Identity provider `token.actions.githubusercontent.com`, Audience `sts.amazonaws.com`,
+   GitHub organization `steveneam`, repository `selom`, branch `main` → **Next** → (skip
+   permissions for now — added at step 8) → name it **`selom-github-deploy`** → **Create role**.
+3. **Wire it to GitHub:** copy the role ARN → GitHub repo → Settings → Secrets and variables →
+   Actions → **Variables** → `AWS_DEPLOY_ROLE_ARN = arn:aws:iam::417673081852:role/selom-github-deploy`.
+
+That's it — no terminal, no installs. (Or ask Claude to do steps 1–2 via a boto3 script if you
+grant a temporary admin credential.)
+
+## Alternative — via CDK (needs Node + admin creds in your terminal)
+
+Once you want CDK as the IaC home for the step-8 infra (Aurora/Lambda/Fargate/S3), run from a
+PowerShell terminal in this `infra/` folder with an **admin** AWS profile active:
 
 ```bash
 cd infra
