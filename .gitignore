@@ -49,6 +49,8 @@ app/backend/gene_sets/corpus/hgnc_symbols.json
 app/backend/gene_sets/corpus/ensembl_symbols.json
 
 # ── Assistant-local (tracked .claude/ otherwise) ────────
+# Internal dev-ops AWS access checklist — kept local, not part of the product repo.
+docs/aws-materialization/aws-access-setup.md
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 # impeccable — 3rd-party design skill, vendored locally; reinstall with
