@@ -100,19 +100,30 @@ class UploadRepo:
 
     # --- projects -----------------------------------------------------------------------------
     def create_project(self, user_id: str, email: str | None, name: str,
-                       color: str = "blue") -> dict:
+                       color: str = "blue", project_id: str | None = None) -> dict:
+        # ``project_id`` is the FE's client-authoritative id (sub-spec §2.2): the optimistic store
+        # mints it, routes to it synchronously, then POSTs it here. Idempotent on (tenant, id) so a
+        # retried optimistic write / import returns the existing row, never a duplicate. Omit it →
+        # the server mints one (the step-6 default, unchanged).
         def _work():
             with self.engine.begin() as conn:
                 set_tenant(conn, user_id)
                 upsert_user(conn, user_id, email or f"{user_id}@unknown.local")
+                tq = TenantQuery(conn, user_id)
+                if project_id is not None:
+                    existing = tq.get(projects, project_id)
+                    if existing is not None:
+                        return _project_public(existing)  # idempotent re-POST
                 q = self._quota(conn, user_id)
                 used = self._count(conn, projects, user_id)
                 if q is not None and used >= q.max_projects:
                     raise QuotaExceeded("max_projects", used, int(q.max_projects),
                                         f"Project limit reached ({q.max_projects}).")
-                tq = TenantQuery(conn, user_id)
                 ws_id = self._ensure_workspace(conn, tq, user_id)
-                pid = tq.insert(projects, name=name, color=color or "blue", workspace_id=ws_id)
+                values = {"name": name, "color": color or "blue", "workspace_id": ws_id}
+                if project_id is not None:
+                    values["id"] = project_id
+                pid = tq.insert(projects, **values)
                 return _project_public(tq.get(projects, pid))
         return run_with_db_retry(_work)
 

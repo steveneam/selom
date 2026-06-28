@@ -201,6 +201,10 @@ repro/{run_id}.json                                      reproduction Ledger
    **parsed output is CSV** (`data/{sha256}.csv`) per §16 Q5 (parquet deferred to the substrate). The
    S3-event/cron triggers + the BYPASSRLS sweep role are deploy infra (step 8).
 7c. **FE localStorage → Postgres** behind the existing store interfaces (types pre-shaped).
+   **Sub-spec written (DRAFT, owner review): `docs/aws-materialization/7c-frontend-state-migration.md`** —
+   resolves the sync/async store impedance (optimistic cache + **client-authoritative ids**), the ~6
+   missing tenant repos/endpoints (`/workspace/*` namespaced to dodge the `/papers`·`/gene-sets`·
+   `/reproduction-runs` read-route collisions), the idempotent localStorage import, and run-from-`dataset_id`.
 8. **Split deploy** (light zip + heavy Docker Lambda); secrets → Secrets Manager; SSE → polling/WS.
 
 Steps 1–5 (the four-store seam) + step 2 (jobs → SQL) + **7a (schema)** + **7b (auth/tenancy)** +

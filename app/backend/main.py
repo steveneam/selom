@@ -31,6 +31,7 @@ from jobs.queue import get_job, result_store, submit
 from jobs.store import TERMINAL
 from storage.object_store import get_object_store
 from uploads import QuotaExceeded, get_upload_repo, materialize_dataset
+from library import get_library_repo
 from skills import styles, theme
 from skills._engine import to_bool
 from skills.contract import (
@@ -906,9 +907,18 @@ def _uploads_repo():
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+def _library_repo():
+    """FastAPI dependency → the LibraryRepo (figures + the account library), 503 when no DB."""
+    try:
+        return get_library_repo()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 class ProjectCreate(BaseModel):
     name: str
     color: str = "blue"
+    id: str | None = None                 # client-authoritative id (sub-spec §2.2); omit → server mints
 
 
 class IntakeRequest(BaseModel):
@@ -929,7 +939,7 @@ def create_project(body: ProjectCreate, repo=Depends(_uploads_repo),
     if not name:
         raise HTTPException(status_code=400, detail="project name is required")
     try:
-        return repo.create_project(ctx.user_id, ctx.email, name, body.color)
+        return repo.create_project(ctx.user_id, ctx.email, name, body.color, body.id)
     except QuotaExceeded as exc:
         raise HTTPException(status_code=402, detail=exc.to_dict()) from exc
 
@@ -1087,3 +1097,84 @@ def apply_figure_style(req: StyleApplyRequest):
     if not isinstance(req.figure, dict) or "data" not in req.figure:
         raise HTTPException(status_code=400, detail="figure must be a Plotly spec with a data array")
     return {"figure": theme.render(req.figure, req.skill_id or "", req.style)}
+
+
+# ── figures CRUD (sub-spec §3, BE-1) ──────────────────────────────────────────────────────────
+# The durable produced figure (db/schema.py figures; types.ts Figure) — backs the FE projectStore
+# figure mutators. Declared AFTER the static /figures/* routes above so /figures/{figure_id} can't
+# shadow /figures/styles or /figures/export (FastAPI matches in declaration order; sub-spec §3.2).
+# Tenant = ctx.user_id only (§6.2); the figure id is client-authoritative + idempotent (§2.2).
+
+
+class FigureBody(BaseModel):
+    # The FE Figure on the wire (snake_case + opaque JSONB blobs the FE owns). The FE store adapter
+    # owns the single camel↔snake translation; created_at is server-stamped, not honoured from input.
+    model_config = {"extra": "ignore"}
+    id: str | None = None
+    project_id: str
+    dataset_id: str | None = None
+    skill_id: str | None = None
+    job_id: str | None = None
+    title: str = "Untitled figure"
+    spec: dict | None = None
+    provenance: dict | None = None
+    methods: dict | None = None
+    legend: dict | None = None
+    guardrails: list | None = None
+    table_stats: dict | None = None
+    data_check: dict | None = None
+    data_fit: dict | None = None
+    parent_figure_id: str | None = None
+    variant_label: str | None = None
+    frozen: bool = False
+
+
+class FigurePatch(BaseModel):
+    # Partial update — only the editable fields (sub-spec §3.3); unset fields are left untouched.
+    model_config = {"extra": "ignore"}
+    title: str | None = None
+    spec: dict | None = None
+    frozen: bool | None = None
+    variant_label: str | None = None
+
+
+@app.get("/figures")
+def list_figures(project_id: str | None = None, repo=Depends(_library_repo),
+                 ctx: AuthContext = Depends(require_user)):
+    return {"figures": repo.list_figures(ctx.user_id, project_id)}
+
+
+@app.post("/figures")
+def create_figure(body: FigureBody, repo=Depends(_library_repo),
+                  ctx: AuthContext = Depends(require_user)):
+    try:
+        return repo.upsert_figure(ctx.user_id, ctx.email, body.model_dump())
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="unknown project") from exc
+
+
+@app.get("/figures/{figure_id}")
+def get_figure(figure_id: str, repo=Depends(_library_repo),
+               ctx: AuthContext = Depends(require_user)):
+    fig = repo.get_figure(ctx.user_id, figure_id)
+    if fig is None:
+        raise HTTPException(status_code=404, detail="unknown figure")
+    return fig
+
+
+@app.patch("/figures/{figure_id}")
+def patch_figure(figure_id: str, body: FigurePatch, repo=Depends(_library_repo),
+                 ctx: AuthContext = Depends(require_user)):
+    fig = repo.update_figure(ctx.user_id, figure_id, body.model_dump(exclude_unset=True))
+    if fig is None:
+        raise HTTPException(status_code=404, detail="unknown figure")
+    return fig
+
+
+@app.delete("/figures/{figure_id}")
+def delete_figure(figure_id: str, repo=Depends(_library_repo),
+                  ctx: AuthContext = Depends(require_user)):
+    removed = repo.delete_figure(ctx.user_id, figure_id)
+    if removed == 0:
+        raise HTTPException(status_code=404, detail="unknown figure")
+    return {"ok": True, "id": figure_id}

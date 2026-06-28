@@ -106,6 +106,7 @@ users = sa.Table(
     sa.Column("max_projects", sa.Integer, nullable=False, server_default=sa.text("3")),
     sa.Column("max_datasets", sa.Integer, nullable=False, server_default=sa.text("10")),
     sa.Column("max_storage_bytes", sa.BigInteger, nullable=False, server_default=sa.text("1073741824")),
+    sa.Column("local_import_at", sa.DateTime(timezone=True), nullable=True),  # 7c one-time localStorage import marker
     _created_at(),
     sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
 )
@@ -230,6 +231,7 @@ figures = sa.Table(
     sa.Column("table_stats", JSON_PORTABLE, nullable=True),
     sa.Column("data_check", JSON_PORTABLE, nullable=True),
     sa.Column("data_fit", JSON_PORTABLE, nullable=True),
+    sa.Column("guardrails", JSON_PORTABLE, nullable=True),  # SkillGuardrail[] (types.ts Figure.guardrails) — 7c
     sa.Column("parent_figure_id", sa.String(36), sa.ForeignKey("figures.id", ondelete="SET NULL")),
     sa.Column("variant_label", sa.Text, nullable=True),
     sa.Column("frozen", sa.Boolean, nullable=False, server_default=sa.false()),  # the "paper" tag
