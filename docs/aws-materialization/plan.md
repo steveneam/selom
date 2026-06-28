@@ -7,9 +7,12 @@ seam; verified live on the dev S3 bucket) **+ step 2 (jobs → SQL `analysis_job
 the prod-deploy step) **+ step 7a (the tenant schema) shipped** (the 12 tables in `db/schema.py` +
 Alembic `0002`; RLS Postgres-only; SQLite-validated). **Reorder (owner 2026-06-28):** the 6-vs-7
 fork resolved to **schema+auth-first** — step 6's upload endpoints are inseparable from the
-`datasets`/`users` tables + JWT `user_id`, and a Clerk account is now available, so step 7 comes
-first and step 6 is built once on the real foundation. **Next = step 7b** (Clerk auth →
-`TenantQuery` + RLS enforcement + isolation test; Aurora provisioned here). Created 2026-06-28.
+`datasets`/`users` tables + JWT `user_id`, and a Clerk account is now available, so step 7 came
+first and step 6 was built once on the real foundation. **Steps 1–5 · 7a · 7b · 6 SHIPPED**
+(step 6: presigned-POST upload + parsed-matrix + the `ingest.py` temp-leak fix + T2 reconciliation;
+parsed output **CSV** per §16 Q5, parquet deferred). **Next = step 7c** (FE localStorage → Postgres
+behind the existing store interfaces), then step 8 (split deploy + provision Aurora + live Clerk).
+Created 2026-06-28.
 Supersedes the roadmap's planned Supabase + Cloudflare R2 materialization shape. Companion to
 memory `selom-aws-materialization-decision`.
 
@@ -169,12 +172,18 @@ repro/{run_id}.json                                      reproduction Ledger
    `skill_requests` folded in) · `SqlJobStore.create` stamps the tenant + the jobs endpoints scope by
    `ctx.user_id` · Acceptance E (`tests/test_tenant_isolation.py`) green, DB-RLS step Postgres-gated.
    The `presign_put` seam method (spec §1.1) shipped here too.
-6. **Presigned S3 upload + parsed-parquet** (the genuine flow rewrite; now on the real schema +
-   JWT `user_id`). The order-independent `presign_put` seam method is a small slice ahead of it.
+6. ✅ **Presigned S3 upload + parsed-matrix** (the genuine flow rewrite; on the real `datasets`/`users`
+   tables + JWT `user_id`). **SHIPPED** — the `uploads/` package (keys · `UploadRepo` · service) +
+   intake/confirm/parse/projects/datasets endpoints; presigned **POST** (signed `content-length-range`)
+   live-verified on the dev bucket; the `ingest.py` temp leak fixed holistically (content-addressed
+   managed decode temps + C3-eviction cleanup); T2 reconciliation (heal + sweep) built+tested;
+   **parsed output is CSV** (`data/{sha256}.csv`) per §16 Q5 (parquet deferred to the substrate). The
+   S3-event/cron triggers + the BYPASSRLS sweep role are deploy infra (step 8).
 7c. **FE localStorage → Postgres** behind the existing store interfaces (types pre-shaped).
 8. **Split deploy** (light zip + heavy Docker Lambda); secrets → Secrets Manager; SSE → polling/WS.
 
-Steps 1–5 (the four-store seam) + step 2 (jobs → SQL) + **step 7a (the tenant schema)** are SHIPPED.
+Steps 1–5 (the four-store seam) + step 2 (jobs → SQL) + **7a (schema)** + **7b (auth/tenancy)** +
+**6 (presigned upload + parsed-matrix)** are SHIPPED; **7c (FE) is next**, then 8 (deploy).
 **Reorder rationale (owner 2026-06-28):** the original order put step 6 (upload) before step 7
 (auth/schema), but step 6's *value* — the intake/confirm endpoints — can't exist without step 7's
 `datasets`/`users` tables + `user_id`, and the temp-leak rework is entangled with the C3

@@ -499,6 +499,23 @@ config-seam shape as `make_object_store`.
 
 ### 4.2 Presigned S3 PUT upload — replaces direct multipart
 
+> **BUILT (step 6, SQLite + LocalObjectStore-validated; live S3 round-trip on the dev bucket).** The
+> `uploads/` package: `keys.py` (server-derived, traversal-safe key construction — T1), `repo.py`
+> (`UploadRepo`: projects + datasets + quota behind `TenantQuery`, mirroring `SqlJobStore`), and
+> `service.py` (the leak-free server-side parse + T2 reconciliation). HTTP surface in `main.py`:
+> `POST /projects` · `GET /projects` · `POST /uploads/intake` · `PUT /uploads/local/{key}` (the dev
+> stand-in for the S3 direct PUT) · `POST /uploads/{id}/confirm` · `POST /uploads/{id}/parse` ·
+> `GET /datasets` · `GET /datasets/{id}` — each `Depends(require_user)`, the tenant only ever
+> `ctx.user_id` (no request model carries a `user_id`, §6.2). Upload is a **presigned POST**
+> (`generate_presigned_post`, not a bare PUT) so the `content-length-range` ceiling is *signed into*
+> the URL — the size cap is enforced **before** any byte lands (replacing `main.py`'s post-read
+> buffer cap). **Parsed output stays CSV** (`data/{sha256}.csv`) per the owner gate (§16 Q5: adopt
+> parquet/DuckDB only when the substrate lands) — the column is `datasets.parquet_s3_key`, its
+> eventual target; a non-tabular (AnnData) payload keeps no CSV. Tests: `test_uploads` (10),
+> `test_uploads_reconcile` (4), `test_ingest_temp_lifecycle` (4). **Live S3 (dev bucket):** presigned
+> POST upload + `head_size` + `list_keys` + an oversized POST correctly **denied 400** by the signed
+> `content-length-range`. Uploads require a DB (`SELOM_DATABASE_URL`); a missing one is a clean 503.
+
 **Problem (cited):**
 - `main.py:158 _save_capped` does `data = await upload.read()` (whole file buffered in memory) and
   checks the cap **after** (`:165`) — inventory.md confirms "size cap checked *after* the file is
@@ -522,13 +539,19 @@ config-seam shape as `make_object_store`.
 3. Confirm: `POST /uploads/{dataset_id}/confirm` → server `head`s the key, flips `status='ready'`,
    stamps `current_sha256` + `size_bytes`. (T2 covers the failure path below.)
 
-**Parsing moves server-side, leak-free:** the heavy Lambda reads the S3 object via a **streamed**
-download to a `tempfile` it owns and deletes in a `finally` (matching `queue.py:54`'s existing
-`data_path.unlink` discipline), then ingests. The `delete=False` temps in `ingest.py:177`/`:351`
-must be wrapped so the caller deletes them, or rewritten to stream the parsed parquet to
-`data/{sha256}.parquet` and drop the local temp — **stop leaking temps** is an explicit acceptance
-criterion (§10). Parsed output is written content-addressed to `data/{sha256}.parquet` (the D8
-substrate, adopted as an extra per plan §7 deferral — pyarrow/duckdb only when the substrate lands).
+**Parsing moves server-side, leak-free (BUILT):** `service.materialize_dataset` reads the object,
+writes it to a `tempfile` it **owns and deletes in a `finally`** (the discipline the old temps
+lacked), ingests, and writes the parsed matrix content-addressed to `data/{sha256}.csv`. The
+`delete=False` temps in `ingest.py:177`/`:351` were the cited leak — fixed **holistically** (not a
+naive `finally`, since `bundle.path` is reused across requests by the C3 cache): one process-managed
+dir (atexit backstop) + **content-addressed** decode temps (re-decoding the same bytes reuses one
+file instead of multiplying per invocation — the actual Lambda leak) + eviction-tied deletion so the
+C3 cache owns and frees its temps. **Parsed output stays CSV** until the D8 substrate lands (owner
+gate §16 Q5; pyarrow/duckdb deferred per plan §7) — the `datasets.parquet_s3_key` column holds the
+`.csv` key now, its `.parquet` target later, a one-line swap when the substrate truly lands. A
+non-tabular (AnnData) payload writes no CSV (the substrate is tabular-only for now — honest, not
+silently wrong). *(A streamed download for very large objects is a later refinement of the `get_bytes`
+seam; the current contract returns whole bytes, fine at present scale + the local dev path.)*
 
 ### 4.3 Auth / users / tenancy — Clerk JWT → Lambda authorizer
 
@@ -632,6 +655,13 @@ schema rule (no Pydantic request model has a `user_id` field).
 
 ### 6.3 S3 prefix isolation — a presigned URL can't touch another tenant's prefix
 
+> **BUILT (step 6).** Keys are built server-side from `ctx.user_id` in `uploads/keys.py`
+> (`safe_filename` strips any `../` / separator so the client-supplied filename can't widen the
+> prefix); `intake` signs exactly that key. Live-verified on the dev bucket: a presigned POST writes
+> only its signed key, and an oversized POST is denied 400 by the signed `content-length-range`. The
+> **bucket policy / IAM condition backstop** (TLS + KMS + known-prefix `Deny`) is part of the
+> deploy-time IAM (§11), applied when the prod bucket + roles stand up (step 8).
+
 - **Server-side key derivation (primary):** the `uploads/{user_id}/...` key is built from the JWT
   `user_id` (§3). A presigned URL's signature **covers the exact key** — the client cannot change
   the key without invalidating the signature. So a presigned PUT/GET is *single-object scoped* and
@@ -665,6 +695,15 @@ This test is **green = a hard merge gate**. It is the acceptance proof for R-3.
 ---
 
 ## 7. T2 — Presigned upload failure path (orphan reconciliation)
+
+> **BUILT (step 6, logic + tests; the S3-event + cron WIRING is deploy infra, step 8).** Row-first
+> ordering is enforced by `intake` (the `pending_upload` row exists before the presign). `repo.heal_
+> from_key` is the S3-event path (parses the tenant FROM the key, flips `pending`→`ready`, idempotent);
+> `service.sweep_orphans` is the scheduled job (heals a landed-but-unconfirmed row, prunes a stale
+> pending row past `SELOM_UPLOAD_TTL_HOURS`, deletes an object with no row). The cross-tenant sweep
+> queries are system-scoped — they need a **BYPASSRLS role on Postgres** (resolved at the deploy step;
+> SQLite has no RLS). Covered by `test_uploads_reconcile` (heal both directions + sweep all three
+> cases + TTL respect).
 
 **The orphan:** client PUTs to S3 successfully, but the `POST /uploads/{id}/confirm` fails (network
 drop, client crash) → an object exists with no `ready` row; or a `pending_upload` row exists with no
@@ -873,10 +912,13 @@ unchanged until flipped):
    part of step 2's Postgres schema (still pending).
 7a. ✅ **Tenant schema** — the 12 tables (§2.3) in `db/schema.py` + Alembic `0002`; RLS Postgres-
    only; SQLite-validated. **BUILT** (pulled ahead of step 6 — see the reorder note below).
-6. **Presigned S3 upload + parsed-parquet** — the one genuine flow rewrite (§4.2). Now lands
-   **after** 7a/7b, on the real `datasets`/`users` tables + JWT `user_id` (the intake/confirm
-   endpoints are structurally inseparable from them; the temp-leak rework is entangled with the C3
-   parsed-input cache). The order-independent `presign_put` seam method is the next small slice.
+6. ✅ **Presigned S3 upload + parsed-matrix** — the one genuine flow rewrite (§4.2). **BUILT** on the
+   real `datasets`/`users` tables + JWT `user_id`: the `uploads/` package (keys · `UploadRepo` ·
+   service) + intake/confirm/parse/projects/datasets endpoints; presigned **POST** (signed
+   `content-length-range`, live-verified on the dev bucket); the `ingest.py` temp leak fixed
+   holistically (content-addressed managed decode temps + C3-eviction cleanup); T2 heal+sweep
+   built+tested; **parsed output CSV** (`data/{sha256}.csv`, §16 Q5 — parquet deferred to the
+   substrate). S3-event/cron triggers + the BYPASSRLS sweep role are deploy infra (step 8).
 7b. **Clerk auth → `TenantQuery` + RLS enforcement + isolation test** (§4.3, §6) — Aurora is
    provisioned here; `analysis_jobs` gains its users FK + RLS + a non-null tenant.
 7c. **FE localStorage → Postgres** behind the existing store interfaces (§10) — types pre-shaped.
@@ -942,12 +984,14 @@ C — **Statelessness** ✅ (code; Aurora deferred)
       app path, `tests/test_job_store.py`). Validated on SQLite; Aurora provisioned at prod-deploy.
       Polling, not SSE, in prod (unchanged). Step 7 adds the users FK + RLS + the JWT `user_id`.
 
-D — **Presigned upload**
-- [ ] Upload bypasses API Gateway (presigned PUT direct to S3); no whole-file buffer in a handler
-      (replaces `main.py:164 _save_capped`); the size cap is enforced *before* bytes land
-      (`Content-Length-Range`), not after.
-- [ ] **No leaked temp files** — the `delete=False` temps (`ingest.py:177`, `:351`) are owned +
-      deleted, or replaced by streamed `data/{sha256}.parquet`.
+D — **Presigned upload** ✅ (step 6; CSV-now per §16 Q5)
+- [x] Upload bypasses API Gateway (presigned **POST** direct to S3; the size ceiling is *signed into*
+      the URL via `content-length-range`, enforced **before** bytes land — verified live on the dev
+      bucket: an oversized POST is denied 400). No whole-file buffer in a handler (the old
+      `_save_capped` post-read cap is replaced for this path).
+- [x] **No leaked temp files** — the `delete=False` temps (`ingest.py:177`, `:351`) are owned +
+      deleted: one process-managed dir + content-addressed decode temps + C3-eviction-tied deletion
+      (`test_ingest_temp_lifecycle`). Parsed matrix → `data/{sha256}.csv` (`.parquet` deferred, Q5).
 
 E — **Tenancy (T1, hard gate)**
 - [ ] `TenantQuery` makes an unscoped query unconstructable; the tenant comes only from the verified
@@ -956,11 +1000,12 @@ E — **Tenancy (T1, hard gate)**
       body-supplied `user_id` is overwritten; the DB-RLS layer blocks a raw-SQL bypass.
 - [ ] S3 keys are JWT-derived; the bucket policy denies non-TLS / non-KMS / wrong-prefix access.
 
-F — **Resilience (T2/T3)**
-- [ ] Orphan reconciliation: the S3-event path brings a `pending_upload` row to `ready` even when
-      the confirm POST never arrives; the sweep removes both orphan classes.
-- [ ] Aurora min-ACU floor set (or scale-to-0 + retry/backoff) with the cost trade documented; the
-      DB layer retries the "resuming" error class.
+F — **Resilience (T2/T3)** — T2 ✅ (step 6, logic+tests; event/cron wiring = step 8) · T3 ✅ (7b)
+- [x] Orphan reconciliation: `heal_from_key` brings a `pending_upload` row to `ready` even when the
+      confirm POST never arrives; `sweep_orphans` removes both orphan classes (`test_uploads_reconcile`).
+      The S3-event + cron triggers are deploy infra (step 8); the BYPASSRLS sweep role lands there too.
+- [x] Aurora retry/backoff (`db/retry.py`) retries the "resuming" class (7b); the min-ACU-floor vs
+      scale-to-0 cost trade is documented (§8) — the provisioning choice is made when the cluster lands.
 
 G — **Deploy + FE + cost**
 - [ ] Light zip vs heavy Docker/ECR split (§5); light lane import-audited (no scverse/Kaleido at
