@@ -12,12 +12,13 @@ from __future__ import annotations
 
 from library.base import TenantRepo
 from library.figures import FigureMixin
+from library.import_state import ImportMixin
 from library.papers import PaperMixin
 from library.workspace import GeneSetMixin, InstallMixin, WorkspaceMixin
 
 
 class LibraryRepo(
-    FigureMixin, WorkspaceMixin, GeneSetMixin, InstallMixin, PaperMixin, TenantRepo
+    FigureMixin, WorkspaceMixin, GeneSetMixin, InstallMixin, PaperMixin, ImportMixin, TenantRepo
 ):
     """Tenant CRUD for the FE stores (figures + the account library) behind ``TenantQuery``.
 

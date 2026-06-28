@@ -392,6 +392,51 @@ def _save_upload(matrix: UploadFile) -> str:
     return str(path)
 
 
+def _dataset_to_temp(repo, store, user_id: str, dataset_id: str) -> tuple[str, str]:
+    # Run-from-dataset_id (sub-spec §5): the bytes already live in the object store, so fetch them to
+    # a temp instead of re-uploading. Prefer the parsed matrix (parquet_s3_key — a .csv key for now,
+    # Q5); fall back to the raw upload. Raises KeyError (unknown dataset) / FileNotFoundError (no
+    # bytes — an imported metadata-only row, or an object that never landed → 409 "re-upload").
+    ds = repo.get_dataset(user_id, dataset_id)
+    if ds is None:
+        raise KeyError(dataset_id)
+    key = ds.get("parquet_s3_key") or ds.get("upload_s3_key")
+    if not key:
+        raise FileNotFoundError("dataset has no stored bytes (re-upload to materialize)")
+    name = pathlib.Path(ds.get("filename") or "").name or "data"
+    stem = pathlib.Path(name).stem or "data"
+    suffix = pathlib.Path(key).suffix or pathlib.Path(name).suffix or ".csv"
+    dest = pathlib.Path(tempfile.mkdtemp()) / f"{stem}{suffix}"
+    if not store.download_to_path(key, str(dest)):
+        raise FileNotFoundError("stored object not found (re-upload to materialize)")
+    return str(dest), name
+
+
+def _stringify_params(params: dict | None) -> dict:
+    # The multipart run path takes params as query strings (all str; the runners coerce). The
+    # dataset/JSON path may carry real numbers/bools, so normalise to the same string shape.
+    out: dict = {}
+    for k, v in (params or {}).items():
+        out[k] = ("true" if v else "false") if isinstance(v, bool) else str(v)
+    return out
+
+
+def _uploads_repo():
+    """FastAPI dependency → the UploadRepo, or a 503 when no database is configured."""
+    try:
+        return get_upload_repo()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+def _library_repo():
+    """FastAPI dependency → the LibraryRepo (figures + the account library), 503 when no DB."""
+    try:
+        return get_library_repo()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 def _inspect_for_run(path: str, filename: str | None):
     # The engine front door for an own-data run (P1c/P3a): ingest -> classify -> "is-my-data-clean?"
     # QC -> routing. Returns the classified `DataBundle`, its `QCReport`, and the `DataRouting`.
@@ -568,6 +613,17 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
     design_path = _save_upload(design) if design is not None else None
     if design_path:
         params["_design_path"] = design_path
+    return await _execute_skill_run(skill_id, path, matrix.filename, params, override, design_path)
+
+
+async def _execute_skill_run(
+    skill_id: str, path: str, filename: str | None, params: dict,
+    override: bool, design_path: str | None,
+):
+    # Shared run body for the multipart /run and the run-from-dataset_id path (sub-spec §5): one
+    # ingest → gates (QC / D1 / D2) → run → response. `filename` is the dropped name (or the dataset
+    # filename) used for provenance + the engine's derived sample labels. `override` is already popped
+    # from params by the caller; `design_path` (multipart only) is cleaned up in the finally.
     spec = load_skill(skill_id)
     # C3: enforce the param_spec ranges/options at the API — an out-of-range knob (e.g.
     # fc_threshold=100 on a max:5 param) is a 400 the user can fix, not a crash inside the skill.
@@ -582,7 +638,7 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
         # Both products load through one ingest front door (engine-spine §6/§9): classify + QC, then
         # run from the same DataBundle. Fail-soft — an uninspectable upload yields no bundle and runs
         # the path-based way (byte-identical), so the guardrail never breaks a previously-valid run.
-        bundle, qc, routing = _inspect_for_run(path, matrix.filename)
+        bundle, qc, routing = _inspect_for_run(path, filename)
         # The layered data-type label + dynamic cleaning plan ride the run too (cheap — the bundle
         # is already in memory), and upgrade the modality routing to be profile-aware (e.g. an ERG
         # table suggests the electrophysiology skills, not the generic table options).
@@ -700,7 +756,7 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
         # skills). Additive — the FE still reads `.figure`.
         return {
             "figure": figure,                            # Plotly JSON -> frontend
-            "provenance": provenance.build(spec, path, matrix.filename, params),
+            "provenance": provenance.build(spec, path, filename, params),
             "methods": methods.build(spec, params),
             "figure_legend": legends.build(spec, params, figure=figure, table=table),
             "guardrails": guardrails.build(spec, path, params),
@@ -842,6 +898,58 @@ async def submit_job(
     return job.public()
 
 
+class RunDatasetRequest(BaseModel):
+    dataset_id: str
+    params: dict = {}
+    override: bool = False
+
+
+@app.post("/skills/{skill_id}/run-dataset")
+async def run_dataset(skill_id: str, body: RunDatasetRequest, repo=Depends(_uploads_repo),
+                      ctx: AuthContext = Depends(require_user)):
+    # Run-from-dataset_id (sub-spec §5): the bytes are already in the store from the upload flow, so
+    # no multipart re-upload. Reuses the EXACT run pipeline (QC / D1 / D2 gates, theme, table synth)
+    # via _execute_skill_run; provenance's input sha is the dataset's real hash (staleness goes live).
+    if skill_id not in set(list_skill_ids()):
+        raise HTTPException(status_code=404, detail=f"unknown skill '{skill_id}'")
+    try:
+        path, filename = _dataset_to_temp(repo, get_object_store(), ctx.user_id, body.dataset_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="unknown dataset") from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    try:
+        return await _execute_skill_run(
+            skill_id, path, filename, _stringify_params(body.params), body.override, None)
+    finally:
+        shutil.rmtree(pathlib.Path(path).parent, ignore_errors=True)
+
+
+@app.post("/skills/{skill_id}/jobs-dataset")
+async def submit_job_dataset(skill_id: str, body: RunDatasetRequest, repo=Depends(_uploads_repo),
+                             ctx: AuthContext = Depends(require_user)):
+    # Async (heavy-lane) twin of run-dataset — enqueue from a stored dataset. The worker owns the
+    # temp's lifetime (same as the multipart /jobs path); cleaned by the C3 managed-temp/atexit path.
+    if skill_id not in set(list_skill_ids()):
+        raise HTTPException(status_code=404, detail=f"unknown skill '{skill_id}'")
+    try:
+        path, filename = _dataset_to_temp(repo, get_object_store(), ctx.user_id, body.dataset_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="unknown dataset") from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    params = _stringify_params(body.params)
+    range_errors = validate_param_ranges(load_skill(skill_id), params)
+    if range_errors:
+        raise HTTPException(status_code=400, detail={
+            "error": "param_out_of_range",
+            "message": "One or more parameters are outside their allowed range.",
+            "errors": range_errors,
+        })
+    job = submit(skill_id, path, params, filename, user_id=ctx.user_id, email=ctx.email)
+    return job.public()
+
+
 @app.get("/jobs/{job_id}")
 def job_status(job_id: str, ctx: AuthContext = Depends(require_user)):
     job = get_job(job_id, ctx.user_id)  # scoped: another tenant's job id → 404
@@ -897,22 +1005,6 @@ def job_result(job_id: str, request: Request, ctx: AuthContext = Depends(require
 # tenant from the verified claim (ctx.user_id) — NEVER a request param (spec §6.2); no request model
 # below carries a user_id. Uploads require a DB (the datasets/users tables): a missing
 # SELOM_DATABASE_URL surfaces as a clean 503, not a silent default.
-
-
-def _uploads_repo():
-    """FastAPI dependency → the UploadRepo, or a 503 when no database is configured."""
-    try:
-        return get_upload_repo()
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-
-def _library_repo():
-    """FastAPI dependency → the LibraryRepo (figures + the account library), 503 when no DB."""
-    try:
-        return get_library_repo()
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 class ProjectCreate(BaseModel):
@@ -1026,6 +1118,22 @@ def get_dataset(dataset_id: str, repo=Depends(_uploads_repo),
     if ds is None:
         raise HTTPException(status_code=404, detail="unknown dataset")
     return ds
+
+
+class ImportStateRequest(BaseModel):
+    # The decoded localStorage blobs (FE camelCase shapes): selom.projects.v1 + selom.workspace.v1.
+    projects: dict | None = None
+    workspace: dict | None = None
+
+
+@app.post("/import/local-state")
+def import_local_state(body: ImportStateRequest, repo=Depends(_library_repo),
+                       ctx: AuthContext = Depends(require_user)):
+    # One-time localStorage → Postgres import (sub-spec §4): atomic, dependency-ordered, idempotent
+    # (skip-if-exists on the client id). Safe to retry — converges to the same state. Stamps
+    # users.local_import_at so the FE prompt doesn't reappear (Q1).
+    counts = repo.import_local_state(ctx.user_id, ctx.email, body.projects, body.workspace)
+    return {"ok": True, "imported": counts}
 
 
 @app.get("/figures/export/presets")
