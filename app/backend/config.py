@@ -2,8 +2,8 @@
 
 Everything heavy is OFF by default so a fresh `uv sync` + `uvicorn` runs the full
 job API with zero infra: jobs execute inline, results land on the local filesystem.
-Set ``SELOM_QUEUE=arq`` (+ Redis) and the ``R2_*`` vars (+ Cloudflare R2) to flip on
-the distributed/cloud path. Env-var names match the repo-root ``.env.example``.
+Set ``SELOM_QUEUE=arq`` (+ Redis) and ``SELOM_OBJECT_STORE=s3`` (+ an AWS bucket) to
+flip on the distributed/cloud path. Env-var names match the repo-root ``.env.example``.
 """
 
 import pathlib
@@ -78,27 +78,16 @@ class Settings(BaseSettings):
     def oracle_enabled(self) -> bool:
         return self.oracle.strip().lower() in {"r", "1", "true", "on"}
 
-    # Cloudflare R2 result store — canonical names shared with .env.example. All set -> R2;
-    # otherwise the local filesystem store is used.
-    r2_account_id: str = Field(default="", validation_alias="R2_ACCOUNT_ID")
-    r2_access_key_id: str = Field(default="", validation_alias="R2_ACCESS_KEY_ID")
-    r2_secret_access_key: str = Field(default="", validation_alias="R2_SECRET_ACCESS_KEY")
-    r2_bucket: str = Field(default="", validation_alias="R2_BUCKET")
-    r2_presign_ttl: int = Field(default=3600, validation_alias="R2_PRESIGN_TTL")
-
-    @property
-    def r2_endpoint_url(self) -> str:
-        # R2's S3 endpoint is derived from the account id.
-        return f"https://{self.r2_account_id}.r2.cloudflarestorage.com" if self.r2_account_id else ""
-
-    @property
-    def use_r2(self) -> bool:
-        return bool(
-            self.r2_account_id
-            and self.r2_access_key_id
-            and self.r2_secret_access_key
-            and self.r2_bucket
-        )
+    # Object store — the single byte-IO seam every content-addressed store rides on
+    # (result · cache disk tier · lineage · ledger). `local` (default) keeps bytes on the
+    # filesystem under data_dir so the dev path never needs AWS (plan D6); `s3` flips to
+    # regional AWS S3 (boto3, lazy-imported). AWS creds come from the standard chain
+    # (~/.aws/credentials in dev, the Lambda execution role in prod) — not Selom env vars.
+    # See storage/object_store.py + docs/aws-materialization/spec.md §1.
+    object_store: str = Field(default="local", validation_alias="SELOM_OBJECT_STORE")  # local | s3
+    s3_bucket: str = Field(default="", validation_alias="SELOM_S3_BUCKET")
+    s3_region: str = Field(default="", validation_alias="SELOM_S3_REGION")
+    s3_presign_ttl: int = Field(default=3600, validation_alias="SELOM_S3_PRESIGN_TTL")
 
 
 settings = Settings()

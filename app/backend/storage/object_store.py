@@ -1,0 +1,154 @@
+"""Object store — the single byte-IO seam every content-addressed store rides on.
+
+One ``ObjectStore`` Protocol, two interchangeable backends selected **once** by config
+(``SELOM_OBJECT_STORE``), exactly as ``make_result_store`` selected Local↔R2 before:
+
+  * ``LocalObjectStore`` (default) — bytes under ``data_dir``; the dev path never needs
+    AWS (plan D6). ``presign_get`` returns ``None`` — in dev the app serves bytes through
+    its own routes (e.g. ``GET /jobs/{id}/result``), so each adapter supplies its own URL.
+  * ``S3ObjectStore`` — boto3 ``s3`` client (regional AWS S3). boto3 is lazy-imported so
+    the light core install never needs it; credentials come from the standard AWS chain
+    (``~/.aws/credentials`` in dev, the Lambda execution role in prod) — not Selom env vars.
+
+The four content-addressed stores (result · result-cache disk tier · lineage · ledger)
+converge onto this one seam — one boto3 surface to harden, one place for retry/backoff
+(T3) and prefix/IAM (T1). See docs/aws-materialization/spec.md §1.
+
+RISKS #5: boto3 >=1.36 breaks S3-compatible checksums unless the client sets
+``request_checksum_calculation='when_required'`` — applied below.
+"""
+
+from __future__ import annotations
+
+import pathlib
+from typing import Protocol
+
+
+class ObjectStore(Protocol):
+    def get_bytes(self, key: str) -> bytes | None:
+        """Return the object's bytes, or None if absent."""
+        ...
+
+    def put_bytes(
+        self, key: str, data: bytes, content_type: str = "application/octet-stream"
+    ) -> None:
+        """Write bytes at ``key`` (content-addressed keys make an overwrite idempotent)."""
+        ...
+
+    def head(self, key: str) -> bool:
+        """True if the object exists (a cross-process completion probe)."""
+        ...
+
+    def delete(self, key: str) -> None:
+        """Remove the object if present (a no-op if absent)."""
+        ...
+
+    def presign_get(self, key: str, ttl: int) -> str | None:
+        """A time-limited GET URL (S3), or ``None`` for the local backend — in dev the
+        app serves bytes through its own routes, so the adapter supplies the URL."""
+        ...
+
+
+class LocalObjectStore:
+    """Filesystem backend rooted at ``data_dir``; keys map to nested paths."""
+
+    def __init__(self, root: pathlib.Path) -> None:
+        self.root = pathlib.Path(root)
+
+    def _path(self, key: str) -> pathlib.Path:
+        return self.root / key
+
+    def get_bytes(self, key: str) -> bytes | None:
+        p = self._path(key)
+        return p.read_bytes() if p.exists() else None
+
+    def put_bytes(
+        self, key: str, data: bytes, content_type: str = "application/octet-stream"
+    ) -> None:
+        p = self._path(key)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(data)
+
+    def head(self, key: str) -> bool:
+        return self._path(key).exists()
+
+    def delete(self, key: str) -> None:
+        self._path(key).unlink(missing_ok=True)
+
+    def presign_get(self, key: str, ttl: int) -> str | None:
+        return None  # dev: the app serves bytes; the adapter supplies its own route
+
+
+class S3ObjectStore:
+    """AWS S3 backend (regional). boto3 is imported lazily so the light core never needs it."""
+
+    def __init__(self, settings) -> None:
+        import boto3
+        from botocore.config import Config
+
+        self.bucket = settings.s3_bucket
+        self.client = boto3.client(
+            "s3",
+            region_name=settings.s3_region or None,  # None -> boto3 resolves from the chain
+            config=Config(
+                request_checksum_calculation="when_required",   # RISKS #5
+                response_checksum_validation="when_supported",
+                retries={"max_attempts": 5, "mode": "standard"},  # T3 transient-error backoff
+            ),
+        )
+
+    def get_bytes(self, key: str) -> bytes | None:
+        try:
+            obj = self.client.get_object(Bucket=self.bucket, Key=key)
+        except self.client.exceptions.NoSuchKey:
+            return None
+        return obj["Body"].read()
+
+    def put_bytes(
+        self, key: str, data: bytes, content_type: str = "application/octet-stream"
+    ) -> None:
+        self.client.put_object(
+            Bucket=self.bucket, Key=key, Body=data, ContentType=content_type
+        )
+
+    def head(self, key: str) -> bool:
+        try:
+            self.client.head_object(Bucket=self.bucket, Key=key)
+        except Exception:
+            return False
+        return True
+
+    def delete(self, key: str) -> None:
+        self.client.delete_object(Bucket=self.bucket, Key=key)
+
+    def presign_get(self, key: str, ttl: int) -> str | None:
+        return self.client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": self.bucket, "Key": key},
+            ExpiresIn=ttl,
+        )
+
+
+def make_object_store(settings) -> ObjectStore:
+    if settings.object_store.strip().lower() == "s3":
+        return S3ObjectStore(settings)
+    return LocalObjectStore(settings.data_dir)
+
+
+# Lazy process default + a test seam (mirrors get_cache/set_cache, get_store/set_store) so
+# the cache · lineage · ledger adapters share one backend and tests inject an in-memory one.
+_object_store: ObjectStore | None = None
+
+
+def get_object_store() -> ObjectStore:
+    global _object_store
+    if _object_store is None:
+        from config import settings
+
+        _object_store = make_object_store(settings)
+    return _object_store
+
+
+def set_object_store(store: ObjectStore | None) -> None:
+    global _object_store
+    _object_store = store
