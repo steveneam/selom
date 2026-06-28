@@ -310,7 +310,44 @@ kill :8000**. Verify on real data + the live FE+BE, not `dev:mock` [[verify-on-r
 
 ---
 
-## 10. Risks
+## 10b. Verification (2026-06-29) — SHIPPED
+
+Built in 7 commits (BE-1 `7956575` · BE-2 `f533e09` · BE-3 `947abe8` · project/dataset PATCH+DELETE
+`551ef56` · FE-1 `30fa35d` · FE-2 `90a183b` · proxy env `97402a1`). Gates: backend fast gate **839
+passed / 1 skipped**, ruff clean; FE **tsc + eslint clean, vitest 351**.
+
+**Live dogfood (FE :3000 → backend :8010, SQLite `dev.db` + `LocalObjectStore` + dev auth):**
+- ✅ Optimistic create in the real UI → **persisted to the DB** (`onServer:true`), routed on the
+  client id (full-uuid `uid()`).
+- ✅ **Reload-from-server**: removed a project from the localStorage mirror, reloaded → it
+  **reappeared** from the server reconcile with its renamed value + rendered in the rail (the
+  headline acceptance: survives a reload independent of the mirror).
+- ✅ Figure-spec PATCH persists (cold read shows the edited `layout.title`).
+- ✅ **Import idempotent** — POST `/import/local-state` twice: 1st imported the blob, 2nd imported 0;
+  on first load it migrated the owner's **real 8-project localStorage** into the DB faithfully,
+  non-destructively.
+- ✅ **402 quota rollback verified live** — an over-quota create returned `402 quota_exceeded` and the
+  optimistic project was reverted by `onPermanentFail`.
+- ✅ Paper(+supplement) / workspace gene-set / project- & workspace-scoped install round-trips (curl).
+- ✅ Zero console errors throughout.
+
+**Findings / follow-ups (flagged, not silent):**
+1. **Quota defaults too low for dogfood.** `users.max_projects=3` / `max_datasets=10` (launch-gate
+   placeholders) block new creates for a real dogfood account (which already has 10 projects). The
+   import bypasses quota (correct — migrating existing data), but `create_project`/`create_dataset`
+   enforce it. **Action:** raise the dev/free defaults (or defer the gate) before serious dogfood —
+   they're "build now, gate at launch" numbers, but 3/10 is below even one real session.
+2. **run-from-dataset_id FE adoption deferred** (sub-spec §1 non-goals / §5). The endpoint is built +
+   tested (byte-identical to multipart), but datasets are metadata-only in 7c (no S3 upload wired),
+   so the FE still drives skills via multipart `/run`. Closing the loop end-to-end needs the **upload
+   flow wired in the FE** (intake → presigned PUT → confirm → parse → run-dataset) — a clean FE-3.
+3. **Fixture drift from the verify** ([[selom-fe-probe-autopersist-gotcha]]): reconcile wrote
+   server rows back into the owner's localStorage, refreshing `createdAt` timestamps + zeroing dataset
+   `size_bytes` on the kept fixtures (content/specs intact). Test entities + the import marker were
+   cleaned out; the cosmetic timestamp/size drift on the 8 kept fixtures was not restorable (no
+   pre-verify snapshot — the lesson: snapshot localStorage before any live-store verify).
+
+## 11. Risks
 
 - **R1 — silent divergence cache vs server.** Mitigation: server-authoritative reconcile on
   focus/after-drain; pending-write rows protected; `useSyncStatus()` surfaces saving/offline/error.

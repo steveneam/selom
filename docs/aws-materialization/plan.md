@@ -10,8 +10,9 @@ fork resolved to **schema+auth-first** — step 6's upload endpoints are insepar
 `datasets`/`users` tables + JWT `user_id`, and a Clerk account is now available, so step 7 came
 first and step 6 was built once on the real foundation. **Steps 1–5 · 7a · 7b · 6 SHIPPED**
 (step 6: presigned-POST upload + parsed-matrix + the `ingest.py` temp-leak fix + T2 reconciliation;
-parsed output **CSV** per §16 Q5, parquet deferred). **Next = step 7c** (FE localStorage → Postgres
-behind the existing store interfaces), then step 8 (split deploy + provision Aurora + live Clerk).
+parsed output **CSV** per §16 Q5, parquet deferred) **+ step 7c (FE state → Postgres) SHIPPED +
+live-verified 2026-06-29** (sub-spec `7c-frontend-state-migration.md`). **Next = step 8** (split deploy
++ provision Aurora + live Clerk + S3-event/Step-Functions triggers + flip `API_PROXY_TARGET`).
 Created 2026-06-28.
 Supersedes the roadmap's planned Supabase + Cloudflare R2 materialization shape. Companion to
 memory `selom-aws-materialization-decision`.
@@ -200,15 +201,20 @@ repro/{run_id}.json                                      reproduction Ledger
    managed decode temps + C3-eviction cleanup); T2 reconciliation (heal + sweep) built+tested;
    **parsed output is CSV** (`data/{sha256}.csv`) per §16 Q5 (parquet deferred to the substrate). The
    S3-event/cron triggers + the BYPASSRLS sweep role are deploy infra (step 8).
-7c. **FE localStorage → Postgres** behind the existing store interfaces (types pre-shaped).
-   **Sub-spec written (DRAFT, owner review): `docs/aws-materialization/7c-frontend-state-migration.md`** —
-   resolves the sync/async store impedance (optimistic cache + **client-authoritative ids**), the ~6
-   missing tenant repos/endpoints (`/workspace/*` namespaced to dodge the `/papers`·`/gene-sets`·
-   `/reproduction-runs` read-route collisions), the idempotent localStorage import, and run-from-`dataset_id`.
+7c. ✅ **FE localStorage → Postgres** behind the existing store interfaces. **SHIPPED + live-verified
+   2026-06-29** (sub-spec `docs/aws-materialization/7c-frontend-state-migration.md`, §10b): optimistic
+   cache + **client-authoritative ids** (projectStore + workspaceStore rewritten behind the unchanged
+   interface; write queue with coalesce/grace-delete/rollback; reconcile union-merge) · figures CRUD +
+   the account-library repos (`/workspace/*` namespaced) · project/dataset PATCH+DELETE + metadata
+   `POST /datasets` · idempotent `POST /import/local-state` (auto-runs once on load) · run-from-`dataset_id`
+   endpoint built+tested (FE adoption deferred to the upload-wiring FE-3 — datasets are metadata-only
+   in 7c). Backend fast gate 839/1-skip, FE vitest 351, all green. **⚠ raise the free/dev quota
+   defaults (3 projects / 10 datasets) before serious dogfood** (§10b finding 1).
 8. **Split deploy** (light zip + heavy Docker Lambda); secrets → Secrets Manager; SSE → polling/WS.
 
 Steps 1–5 (the four-store seam) + step 2 (jobs → SQL) + **7a (schema)** + **7b (auth/tenancy)** +
-**6 (presigned upload + parsed-matrix)** are SHIPPED; **7c (FE) is next**, then 8 (deploy).
+**6 (presigned upload + parsed-matrix)** + **7c (FE state → Postgres)** are SHIPPED; **step 8 (deploy)
+is next**.
 **Reorder rationale (owner 2026-06-28):** the original order put step 6 (upload) before step 7
 (auth/schema), but step 6's *value* — the intake/confirm endpoints — can't exist without step 7's
 `datasets`/`users` tables + `user_id`, and the temp-leak rework is entangled with the C3
