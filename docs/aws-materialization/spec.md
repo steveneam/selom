@@ -8,8 +8,17 @@ reproduction Ledger via the new `LedgerStore` seam (`reproduction.py`); behind `
 **Step 2 (statelessness) BUILT** — `SqlJobStore` on the `analysis_jobs` table behind
 `make_job_store` (`SELOM_JOB_STORE=memory|sql`), SQLAlchemy-portable (SQLite dev/test · Aurora
 Postgres prod) + Alembic; **Aurora provisioning deferred** to the prod-deploy step (owner
-2026-06-28 — build now, provision later), validated on SQLite incl. a cross-instance read. Steps
-6–8 (presigned upload · auth/tenancy/RLS+FE · split deploy) remain spec. Created 2026-06-28.
+2026-06-28 — build now, provision later), validated on SQLite incl. a cross-instance read.
+**Step 7a (the tenant schema) BUILT** — the remaining 12 tables (§2.3) added to `db/schema.py` +
+Alembic `0002_create_tenant_schema` (RLS Postgres-only, dialect-gated; SQLite-validated; the
+Alembic and `create_all` paths proven drift-free), `tests/test_tenant_schema.py`. **Reorder
+(owner 2026-06-28):** the step-6/step-7 fork resolved to **schema+auth-first** — the upload
+*endpoints* are structurally inseparable from the `datasets`/`users` tables + JWT `user_id`, and
+the temp-leak rework is entangled with the C3 parsed-input cache; with a Clerk account now
+available there's no reason to build step 6 against a stub. Remaining order: **7b** (Clerk auth →
+`TenantQuery` + RLS enforcement + isolation test) · **6b** (upload intake/confirm + parsed-parquet
++ temp redesign + T1/T2, on the real schema) · **7c** (FE → API) · **8** (split deploy). The one
+order-independent step-6 sliver — `presign_put` on the seam — folds in next. Created 2026-06-28.
 
 Parent / source of truth: `docs/aws-materialization/plan.md` (locked decisions §1, topology §2,
 schema §4, S3 layout §5, migration order §6, QR-hardened must-cover §3). This spec implements the
@@ -833,14 +842,24 @@ unchanged until flipped):
 5. ✅ **Reproduction Ledger → S3** — new `LedgerStore` seam (`ObjectStoreLedgerStore`, key
    `repro/{slug}/ledger.json`). **BUILT** on the S3 side; the `reproduction_runs` pointer row is
    part of step 2's Postgres schema (still pending).
-6. **Presigned S3 upload + parsed-parquet** — the one genuine flow rewrite (§4.2); do after 1–5.
-7. **Auth + users/billing + RLS, then FE localStorage → Postgres** (§4.3, §6, §10) — the largest
-   product lift; FE types are pre-shaped.
+7a. ✅ **Tenant schema** — the 12 tables (§2.3) in `db/schema.py` + Alembic `0002`; RLS Postgres-
+   only; SQLite-validated. **BUILT** (pulled ahead of step 6 — see the reorder note below).
+6. **Presigned S3 upload + parsed-parquet** — the one genuine flow rewrite (§4.2). Now lands
+   **after** 7a/7b, on the real `datasets`/`users` tables + JWT `user_id` (the intake/confirm
+   endpoints are structurally inseparable from them; the temp-leak rework is entangled with the C3
+   parsed-input cache). The order-independent `presign_put` seam method is the next small slice.
+7b. **Clerk auth → `TenantQuery` + RLS enforcement + isolation test** (§4.3, §6) — Aurora is
+   provisioned here; `analysis_jobs` gains its users FK + RLS + a non-null tenant.
+7c. **FE localStorage → Postgres** behind the existing store interfaces (§10) — types pre-shaped.
 8. **Split deploy** (light zip + heavy Docker/ECR Lambda, §5); secrets → Secrets Manager; SSE →
    polling.
 
-Steps 1–5 are backend swaps the code was built to absorb; 6 is the rewrite; 7 is the product/auth
-lift; 8 is the deploy.
+Steps 1–5 are backend swaps the code was built to absorb; **7a is the schema (built)**; 7b is the
+auth/tenancy enforcement; 6 is the upload rewrite (reordered to ride on the real schema); 7c is the
+FE swap; 8 is the deploy. **Reorder rationale (owner 2026-06-28):** the original §6 put step 6
+before step 7, but step 6's *value* (the upload endpoints) can't exist without step 7's schema +
+`user_id`, and a Clerk account is now available — so schema+auth come first and step 6 is built once
+on the real foundation rather than against a stub.
 
 ---
 
@@ -877,11 +896,16 @@ A — **Store seam** ✅ (steps 1–5)
 - [x] §14 parity suite green on both backends + the **real boto3 path** (moto) for all four stores;
       live round-trip on the dev bucket `selom-dev-objectstore-apse2` passed for steps 1–5.
 
-B — **Schema**
-- [ ] All tenant tables from §2.3 created with FKs, indexes, and the RLS enable+policy block on every
-      one; `user_id` present + `NOT NULL` on every row-owning table.
-- [ ] `intermediate_tables.artifact_id` is the sha PK (matches `lineage.py:270`);
-      `analysis_jobs` carries `result_cache_key` + `result_json_s3_key` + `artifact_id`.
+B — **Schema** ✅ (step 7a; RLS verified-on-real-Postgres when Aurora lands in 7b)
+- [x] All tenant tables from §2.3 created with FKs, indexes, and the RLS enable+policy block on every
+      one (RLS emitted **Postgres-only**, dialect-gated — SQLite has none); `user_id` present +
+      `NOT NULL` on every net-new row-owning table (`analysis_jobs.user_id` stays nullable + FK/RLS-
+      free until 7b backfills the tenant). PKs are app-supplied uuid hex (the `analysis_jobs`
+      precedent), not a `gen_random_uuid()` server default — one portable schema, no dialect-divergent
+      defaults. SQLite-validated (`tests/test_tenant_schema.py`); the Alembic + `create_all` paths are
+      proven drift-free. RLS *enforcement* is exercised by the 7b isolation test on real Postgres.
+- [x] `intermediate_tables.artifact_id` is the sha PK (matches `lineage.py:270`);
+      `analysis_jobs` carries `result_cache_key` + `result_json_s3_key` + `artifact_id` (from step 2).
 
 C — **Statelessness** ✅ (code; Aurora deferred)
 - [x] `SqlJobStore` (SQLAlchemy-portable) replaces the in-memory singleton behind `make_job_store`;

@@ -4,9 +4,14 @@ Status: **Active build plan — amended in place.** The discussion gate is passe
 §6 order — **steps 1–5 shipped** (all four content-addressed stores ride the one `ObjectStore`
 seam; verified live on the dev S3 bucket) **+ step 2 (jobs → SQL `analysis_jobs`) shipped**
 (SQLAlchemy-portable `SqlJobStore` + Alembic; SQLite-validated, **Aurora provisioning deferred** to
-the prod-deploy step). **Next = step 6** (presigned upload + parsed-parquet — the one genuine flow
-rewrite). Created 2026-06-28. Supersedes the roadmap's planned Supabase + Cloudflare R2
-materialization shape. Companion to memory `selom-aws-materialization-decision`.
+the prod-deploy step) **+ step 7a (the tenant schema) shipped** (the 12 tables in `db/schema.py` +
+Alembic `0002`; RLS Postgres-only; SQLite-validated). **Reorder (owner 2026-06-28):** the 6-vs-7
+fork resolved to **schema+auth-first** — step 6's upload endpoints are inseparable from the
+`datasets`/`users` tables + JWT `user_id`, and a Clerk account is now available, so step 7 comes
+first and step 6 is built once on the real foundation. **Next = step 7b** (Clerk auth →
+`TenantQuery` + RLS enforcement + isolation test; Aurora provisioned here). Created 2026-06-28.
+Supersedes the roadmap's planned Supabase + Cloudflare R2 materialization shape. Companion to
+memory `selom-aws-materialization-decision`.
 
 > This doc consolidates: the persistence→schema **audit**, the package **eval**, the planner
 > **architect blueprint** (16 decisions / 7 risks / 3 milestone specs), and the planner
@@ -155,13 +160,21 @@ repro/{run_id}.json                                      reproduction Ledger
 3. ✅ **Result-cache durable tier → S3** (the named C4; `_disk_read/_write` → the `ObjectStore`). **SHIPPED.**
 4. ✅ **Artifact/lineage store → S3** (the named D4; `artifact_id` is already the key). **SHIPPED.**
 5. ✅ **Reproduction Ledger → S3** (the new `LedgerStore` seam the others already had). **SHIPPED** (S3 side; the Postgres pointer row lands with step 2).
-6. **Presigned S3 upload + parsed-parquet** (the one genuine flow rewrite; do after 1–5).
-7. **Auth + users/billing + RLS, then FE localStorage → Postgres** (largest product lift; types pre-shaped).
+7a. ✅ **Tenant schema** (the 12 tables §4 + Alembic `0002`; RLS Postgres-only; SQLite-validated).
+   **SHIPPED** — pulled ahead of step 6 (see the reorder note below).
+7b. **Clerk auth + `TenantQuery` + RLS enforcement + users/billing** (Aurora provisioned here;
+   `analysis_jobs` gains its users FK + RLS + a non-null tenant; the isolation test gates merge).
+6. **Presigned S3 upload + parsed-parquet** (the genuine flow rewrite; now on the real schema +
+   JWT `user_id`). The order-independent `presign_put` seam method is a small slice ahead of it.
+7c. **FE localStorage → Postgres** behind the existing store interfaces (types pre-shaped).
 8. **Split deploy** (light zip + heavy Docker Lambda); secrets → Secrets Manager; SSE → polling/WS.
 
-Steps 1–5 (the four-store seam) + step 2 (jobs → SQL) are SHIPPED — the backend swaps the code was
-built to absorb, plus the statelessness store. **6 is the genuine flow rewrite (presigned upload);
-7 is the product/auth lift (where Aurora is provisioned + RLS/users/the JWT `user_id` land).**
+Steps 1–5 (the four-store seam) + step 2 (jobs → SQL) + **step 7a (the tenant schema)** are SHIPPED.
+**Reorder rationale (owner 2026-06-28):** the original order put step 6 (upload) before step 7
+(auth/schema), but step 6's *value* — the intake/confirm endpoints — can't exist without step 7's
+`datasets`/`users` tables + `user_id`, and the temp-leak rework is entangled with the C3
+parsed-input cache; with a Clerk account now available there's no reason to build step 6 against a
+stub. So **schema (7a) + auth (7b) come first, then step 6 is built once** on the real foundation.
 
 ---
 
