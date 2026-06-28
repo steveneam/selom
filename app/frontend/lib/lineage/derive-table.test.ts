@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { deriveTable } from "./derive-table";
-import type { FigureSpec } from "@/lib/figure-spec";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
 
 describe("deriveTable (FE fallback, D3)", () => {
   it("derives [label, value] from a labelled bar trace, using the axis titles as headers", () => {

@@ -32,7 +32,7 @@ import {
   type SkillMatchExport,
 } from "@/lib/skill-match/export";
 import type { FeasibilityMap, FigureRoute, PaperMetadata } from "@/lib/skill-match/types";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 
 /** A translucent fill + readable border/text from one accent hex (the repo's Badge house style). */
 function tint(hex: string): React.CSSProperties {

@@ -1,6 +1,6 @@
-import type { FigureSpec } from "./figure-spec";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
 import type { DataFit } from "@/lib/reproduction/data-fit";
-import type { BackendParamSpec } from "./catalog/params";
+import type { BackendParamSpec } from "@/lib/catalog/params";
 
 /** Per-figure reproducibility bundle (backend provenance.py — charter B4). */
 export interface SkillProvenance {

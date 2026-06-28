@@ -1,5 +1,5 @@
 import type { CleaningStep, Guardrail, Modality, QcReport } from "@/lib/projects/types";
-import type { DataQcReport, DataRouting } from "@/lib/skills-api";
+import type { DataQcReport, DataRouting } from "@/lib/skills/api";
 
 /**
  * The real engine front door for own-data intake — `POST /api/data/inspect`.

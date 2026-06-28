@@ -14,7 +14,7 @@
  * so a version mismatch degrades to "the line just doesn't drag" (the numeric editor is the fallback).
  */
 
-import type { FigureSpec } from "@/lib/figure-spec";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
 import { clampThresholds, readThresholds, yCut, type VolcanoThresholds } from "@/lib/volcano/thresholds";
 
 interface PlotlyAxis {

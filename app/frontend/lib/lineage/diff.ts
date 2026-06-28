@@ -4,7 +4,7 @@
  * No React, no storage — just data in, deltas out, so the logic is unit-testable and
  * the compare surface is a thin renderer over it.
  */
-import type { StatsTable } from "@/lib/skills-api";
+import type { StatsTable } from "@/lib/skills/api";
 
 export type ParamValue = string | number | boolean;
 

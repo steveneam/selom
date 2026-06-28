@@ -16,7 +16,7 @@
  * mismatch degrades to "the stub just doesn't drag" (the lever is the fallback) — never a broken canvas.
  */
 
-import type { FigureSpec } from "@/lib/figure-spec";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
 import type { FigureStore } from "@/hooks/use-figure-store";
 import {
   hasColTree,

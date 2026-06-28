@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import { CATEGORY_GROUPS, humanizeCategory } from "@/lib/catalog/modality";
 import { useCatalog } from "@/lib/catalog/registry";
 import type { SkillCatalogEntry, SkillSource, SkillTier } from "@/lib/catalog/types";

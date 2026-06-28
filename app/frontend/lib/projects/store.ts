@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { mockQcReport } from "@/lib/intake/mock";
 import { api } from "@/lib/api/client";
-import type { FigureSpec } from "@/lib/figure-spec";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
 import type { Dataset, Figure, GeneSet, Modality, Project, ProjectState, SkillInstall } from "./types";
 import {
   fromApiDataset, fromApiFigure, fromApiGeneSet, fromApiInstall, fromApiProject,

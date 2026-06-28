@@ -3,10 +3,10 @@
 import * as React from "react";
 import { Play, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import { type ParamField } from "@/lib/catalog/params";
 import { useSkillParams } from "@/lib/catalog/use-skill-params";
-import type { SkillParams } from "@/lib/skills-api";
+import type { SkillParams } from "@/lib/skills/api";
 import type { ParamValue } from "@/lib/lineage/diff";
 
 const MAX_VALUES = 6;

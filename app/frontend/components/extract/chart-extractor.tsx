@@ -17,7 +17,7 @@ import {
   type CalibrationState,
   type ChartForm,
 } from "@/lib/extract/calibrate";
-import { extractChart, type ExtractChartResponse } from "@/lib/extract-api";
+import { extractChart, type ExtractChartResponse } from "@/lib/extract/api";
 import { CalibrationCanvas, type ActiveRef } from "./calibration-canvas";
 import { ExtractControls, type ExtractOptionsState } from "./extract-controls";
 

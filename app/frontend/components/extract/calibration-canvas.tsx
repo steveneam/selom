@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import type { AxisKey, CalibrationState } from "@/lib/extract/calibrate";
 import { toFraction } from "@/lib/extract/calibrate";
 

@@ -15,8 +15,8 @@
  * could not. So rename + highlight compose on one `ticktext` array.
  */
 
-import type { FigureSpec, PlotlyTrace } from "@/lib/figure-spec";
-import { set, type Operation } from "@/lib/patch";
+import type { FigureSpec, PlotlyTrace } from "@/lib/figure/figure-spec";
+import { set, type Operation } from "@/lib/figure/patch";
 
 /** Which axis a label set lives on: `x` = samples (columns), `y` = genes (rows). */
 export type LabelAxis = "x" | "y";

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { ArrowRight, ShieldAlert } from "lucide-react";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import type { Modality, QcReport } from "@/lib/projects/types";
 
 /**

@@ -5,8 +5,8 @@ import { Eye, EyeOff, Grid2x2, LineChart } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Section, SwitchField } from "./controls";
 import type { FigureStore } from "@/hooks/use-figure-store";
-import type { FigureSpec } from "@/lib/figure-spec";
-import { COLORWAYS } from "@/lib/figure-spec";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
+import { COLORWAYS } from "@/lib/figure/figure-spec";
 import {
   type FigureModel,
   type Series,
@@ -14,9 +14,9 @@ import {
   overlayAxisOp,
   seriesColorOps,
   seriesVisibilityOps,
-} from "@/lib/figure-model";
-import { set } from "@/lib/patch";
-import { cn } from "@/lib/cn";
+} from "@/lib/figure/figure-model";
+import { set } from "@/lib/figure/patch";
+import { cn } from "@/lib/ui/cn";
 
 /**
  * One editable SERIES — one or more traces sharing an identity (the ERG grid's 42 line

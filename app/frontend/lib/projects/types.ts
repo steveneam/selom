@@ -7,8 +7,8 @@
  * No component imports Supabase directly — everything goes through `ProjectStore`.
  */
 
-import type { FigureSpec } from "@/lib/figure-spec";
-import type { DataCheck, FigureLegend, SkillGuardrail, SkillMethods, SkillProvenance, StatsTable } from "@/lib/skills-api";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
+import type { DataCheck, FigureLegend, SkillGuardrail, SkillMethods, SkillProvenance, StatsTable } from "@/lib/skills/api";
 import type { DataFit } from "@/lib/reproduction/data-fit";
 
 export type Modality = "scRNA-seq" | "bulk RNA-seq" | "proteomics" | "unknown";

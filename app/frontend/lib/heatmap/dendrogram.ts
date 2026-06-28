@@ -14,8 +14,8 @@
  * re-flows the shared cross-domain of the other, so both stay aligned to the heatmap.
  */
 
-import type { FigureSpec, PlotlyTrace } from "@/lib/figure-spec";
-import { getAt, set, type Operation } from "@/lib/patch";
+import type { FigureSpec, PlotlyTrace } from "@/lib/figure/figure-spec";
+import { getAt, set, type Operation } from "@/lib/figure/patch";
 
 /** Breathing room between a tree gutter and the heatmap (matches the backend's 0.16 vs 0.14). */
 const GAP = 0.02;

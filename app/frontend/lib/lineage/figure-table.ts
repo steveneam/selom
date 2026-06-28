@@ -1,6 +1,6 @@
 import { deriveTable } from "./derive-table";
 import type { Figure } from "@/lib/projects/types";
-import type { StatsTable } from "@/lib/skills-api";
+import type { StatsTable } from "@/lib/skills/api";
 
 /**
  * The Statistics table for a figure (Pillar 1): its stored backend `table`, or a

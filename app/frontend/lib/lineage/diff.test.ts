@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { changedParams, diffParams, diffTables } from "./diff";
-import type { StatsTable } from "@/lib/skills-api";
+import type { StatsTable } from "@/lib/skills/api";
 
 describe("diffParams", () => {
   it("reports same / changed / added / removed per key, sorted + order-independent", () => {

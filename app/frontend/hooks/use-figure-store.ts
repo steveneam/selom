@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useMemo, useReducer } from "react";
-import type { FigureSpec } from "@/lib/figure-spec";
-import { normalizeSpec } from "@/lib/figure-spec";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
+import { normalizeSpec } from "@/lib/figure/figure-spec";
 import { validateFigureContract } from "@/lib/figure/contract";
-import { applyPatches, type Operation } from "@/lib/patch";
+import { applyPatches, type Operation } from "@/lib/figure/patch";
 
 /**
  * Holds the figure spec (source of truth) plus undo/redo.

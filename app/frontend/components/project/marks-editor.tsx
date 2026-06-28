@@ -4,7 +4,7 @@ import * as React from "react";
 import { RotateCcw, Crosshair } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import {
   clearManualMark,
   manualMarkCount,
@@ -18,7 +18,7 @@ import {
   type MarkRole,
   type SeededMark,
 } from "@/lib/erg/marks";
-import type { SkillParams } from "@/lib/skills-api";
+import type { SkillParams } from "@/lib/skills/api";
 
 /**
  * Marks editor (docs/erg-manual-marks/spec.md R5) — the numeric half of the operator override, in

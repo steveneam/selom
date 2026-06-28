@@ -19,7 +19,7 @@ import {
   Trash2,
   type LucideIcon,
 } from "lucide-react";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import { StaleBadge } from "./stale-badge";
 import { getSkill } from "@/lib/catalog/seed";
 import { datasetChipName, datasetDisplayName } from "@/lib/lineage/family";

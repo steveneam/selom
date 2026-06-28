@@ -11,9 +11,9 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { Config, Data, Layout } from "plotly.js";
-import type { FigureSpec } from "@/lib/figure-spec";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
 import type { FigureStore } from "@/hooks/use-figure-store";
-import { deriveFigureModel, projectOverlay } from "@/lib/figure-model";
+import { deriveFigureModel, projectOverlay } from "@/lib/figure/figure-model";
 import {
   dropGl,
   ensureGl,
@@ -26,7 +26,7 @@ import {
 } from "@/lib/figure/webgl-budget";
 import { installPerfHook, recordRenderMs } from "@/lib/figure/perf";
 import { payloadWarnings } from "@/lib/figure/payload";
-import { relayoutToOps, restyleToOps } from "@/lib/plotly-edits";
+import { relayoutToOps, restyleToOps } from "@/lib/figure/plotly-edits";
 import { wireMarkDrag, type Crosshair } from "./mark-drag";
 import { wireThresholdDrag } from "./threshold-drag";
 import { wireColorbarDrag } from "./colorbar-drag";

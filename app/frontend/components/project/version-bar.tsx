@@ -3,9 +3,9 @@
 import * as React from "react";
 import { GitBranch, GitCompare, Lock, LockOpen, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import { SweepForm } from "./sweep-form";
-import type { SkillParams } from "@/lib/skills-api";
+import type { SkillParams } from "@/lib/skills/api";
 import type { ParamValue } from "@/lib/lineage/diff";
 import type { Figure } from "@/lib/projects/types";
 

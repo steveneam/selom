@@ -1,4 +1,4 @@
-import type { FigureSpec } from "@/lib/figure-spec";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
 
 /**
  * Figure payload audit (architecture-consistency Task E2).

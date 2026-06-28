@@ -2,9 +2,9 @@
 
 import { Section, SelectField, SliderField, SwitchField, TextField } from "./controls";
 import type { FigureStore } from "@/hooks/use-figure-store";
-import type { FigureSpec } from "@/lib/figure-spec";
-import { FONT_FAMILIES } from "@/lib/figure-spec";
-import { getAt, remove, set } from "@/lib/patch";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
+import { FONT_FAMILIES } from "@/lib/figure/figure-spec";
+import { getAt, remove, set } from "@/lib/figure/patch";
 
 export function PagePanel({ store, spec }: { store: FigureStore; spec: FigureSpec }) {
   const title = getAt<string>(spec, "/layout/title/text", "")!;

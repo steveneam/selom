@@ -13,8 +13,8 @@
  * panel's `apply` and `figure-model`'s `seriesColorOps`).
  */
 
-import type { FigureSpec, PlotlyTrace } from "@/lib/figure-spec";
-import { set, type Operation } from "@/lib/patch";
+import type { FigureSpec, PlotlyTrace } from "@/lib/figure/figure-spec";
+import { set, type Operation } from "@/lib/figure/patch";
 
 /** A heatmap's current colour-mapping state (the diverging tones, not the z data). */
 export interface HeatmapTones {

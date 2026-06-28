@@ -1,4 +1,4 @@
-import type { ExportPreset } from "@/lib/export-api";
+import type { ExportPreset } from "@/lib/figure/export";
 
 /** Mirror of export.PRESETS (app/backend/export.py) for offline `dev:mock`. */
 export const EXPORT_PRESETS: ExportPreset[] = [

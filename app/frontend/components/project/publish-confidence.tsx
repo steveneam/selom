@@ -3,7 +3,7 @@
 import * as React from "react";
 import { AlertTriangle, BadgeCheck, Captions, Check, ChevronDown, Copy, FileText, FlaskConical, Info, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { FigureLegend, SkillGuardrail, SkillMethods, SkillProvenance } from "@/lib/skills-api";
+import type { FigureLegend, SkillGuardrail, SkillMethods, SkillProvenance } from "@/lib/skills/api";
 
 /**
  * Publish-confidence panel (charter B4) — the answer to "is THIS the right,

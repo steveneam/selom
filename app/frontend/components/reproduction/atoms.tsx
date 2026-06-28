@@ -2,7 +2,7 @@ import * as React from "react";
 
 import { ATTRIBUTION_META, tierLabel } from "@/lib/reproduction/api";
 import type { Attribution } from "@/lib/reproduction/types";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 
 /**
  * Shared atoms for the Reproduction view. The tier/verdict palette is dynamic hex from the

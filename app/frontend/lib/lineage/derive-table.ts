@@ -1,5 +1,5 @@
-import type { FigureSpec } from "@/lib/figure-spec";
-import type { StatsTable } from "@/lib/skills-api";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
+import type { StatsTable } from "@/lib/skills/api";
 
 /**
  * FE fallback (Pillar 1, Decision D3): derive a minimal Statistics table from a

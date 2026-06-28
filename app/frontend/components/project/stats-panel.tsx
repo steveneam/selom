@@ -4,8 +4,8 @@ import * as React from "react";
 import { ArrowDown, ArrowUp, ChevronDown, Download, Search, Sparkles, Table2, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/cn";
-import type { StatsTable } from "@/lib/skills-api";
+import { cn } from "@/lib/ui/cn";
+import type { StatsTable } from "@/lib/skills/api";
 
 /**
  * The gene-labelling surface for a volcano's Statistics table (generalization-spec §H): a Label

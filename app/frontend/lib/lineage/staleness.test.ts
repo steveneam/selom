@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { figureStaleness, skillVersionGates, stalenessLabel, type LiveTriggerSet } from "./staleness";
 import type { Figure } from "@/lib/projects/types";
-import type { SkillProvenance } from "@/lib/skills-api";
+import type { SkillProvenance } from "@/lib/skills/api";
 
 /** A figure carrying a baseline provenance bundle; overrides merge over the defaults. */
 function figProv(over: Partial<SkillProvenance> = {}): Figure {

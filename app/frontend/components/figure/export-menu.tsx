@@ -4,8 +4,8 @@ import * as React from "react";
 import { AlertCircle, Download, Loader2, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { exportFigure, fetchExportPresets, resolveExportDimensions, type ExportFormat, type ExportPreset } from "@/lib/export-api";
-import type { FigureSpec } from "@/lib/figure-spec";
+import { exportFigure, fetchExportPresets, resolveExportDimensions, type ExportFormat, type ExportPreset } from "@/lib/figure/export";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
 
 const FORMATS: { id: ExportFormat; label: string; hint: string }[] = [
   { id: "png", label: "PNG", hint: "raster" },

@@ -4,7 +4,7 @@ import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import { Boxes, Folder, FolderPlus, Home, Search, Sparkles, Store } from "lucide-react";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import { useCatalog } from "@/lib/catalog/registry";
 import { getSkill } from "@/lib/catalog/seed";
 import { skillColor, skillIcon } from "@/lib/catalog/modality";

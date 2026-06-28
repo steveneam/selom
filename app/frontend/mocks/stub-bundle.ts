@@ -1,4 +1,4 @@
-import type { DataCheck, FigureLegend, SkillGuardrail, SkillMethods, SkillProvenance, StatsTable } from "@/lib/skills-api";
+import type { DataCheck, FigureLegend, SkillGuardrail, SkillMethods, SkillProvenance, StatsTable } from "@/lib/skills/api";
 import type { DataFit } from "@/lib/reproduction/data-fit";
 
 /**

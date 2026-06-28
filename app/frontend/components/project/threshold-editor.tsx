@@ -9,8 +9,8 @@ import {
   gatherPoints,
   readThresholds,
 } from "@/lib/volcano/thresholds";
-import type { FigureSpec } from "@/lib/figure-spec";
-import type { SkillParams } from "@/lib/skills-api";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
+import type { SkillParams } from "@/lib/skills/api";
 
 /**
  * Threshold editor (docs/figure-data-capabilities/generalization-spec.md §F) — the numeric half of the

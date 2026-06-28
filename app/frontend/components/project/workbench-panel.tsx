@@ -8,12 +8,12 @@ import { ParamControl } from "./param-control";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import { skillColor, skillIcon } from "@/lib/catalog/modality";
 import { isFieldDisabled, visibleParamFields } from "@/lib/catalog/params";
 import { useSkillParams } from "@/lib/catalog/use-skill-params";
 import { getSkill } from "@/lib/catalog/seed";
-import type { SkillParams } from "@/lib/skills-api";
+import type { SkillParams } from "@/lib/skills/api";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 
 const DND_TYPE = "application/x-selom-skill";

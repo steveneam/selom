@@ -14,8 +14,8 @@
  * symbol). `top_n` stays the auto-suggest seed; the amber `highlight` gene-set panel stays separate.
  */
 
-import type { FigureSpec, PlotlyLayout, PlotlyTrace } from "@/lib/figure-spec";
-import { remove, set, type Operation } from "@/lib/patch";
+import type { FigureSpec, PlotlyLayout, PlotlyTrace } from "@/lib/figure/figure-spec";
+import { remove, set, type Operation } from "@/lib/figure/patch";
 
 /** A plotted point that can carry a gene label: its data coordinates + the gene symbol. */
 export interface GeneLabelPoint {

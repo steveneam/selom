@@ -13,8 +13,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { FigureStore } from "@/hooks/use-figure-store";
-import type { Operation } from "@/lib/patch";
-import { cn } from "@/lib/cn";
+import type { Operation } from "@/lib/figure/patch";
+import { cn } from "@/lib/ui/cn";
 
 /** A panel section: small caps heading + grouped controls. */
 export function Section({

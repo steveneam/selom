@@ -13,7 +13,7 @@
  * "the bar just doesn't drag" (the Style sliders are the fallback) — never a throw.
  */
 
-import type { FigureSpec } from "@/lib/figure-spec";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
 import type { FigureStore } from "@/hooks/use-figure-store";
 import {
   clampToExtent,

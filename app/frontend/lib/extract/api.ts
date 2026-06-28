@@ -1,5 +1,5 @@
-import type { FigureSpec } from "./figure-spec";
-import type { StatsTable } from "./skills-api";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
+import type { StatsTable } from "@/lib/skills/api";
 
 /** The recovered series the backend returns (extract/chart_to_data.RecoveredSeries). */
 export interface RecoveredSeries {

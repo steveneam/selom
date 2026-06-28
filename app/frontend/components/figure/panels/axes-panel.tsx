@@ -2,8 +2,8 @@
 
 import { Section, SelectField, SwitchField, TextField } from "./controls";
 import type { FigureStore } from "@/hooks/use-figure-store";
-import type { FigureSpec } from "@/lib/figure-spec";
-import { getAt, set } from "@/lib/patch";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
+import { getAt, set } from "@/lib/figure/patch";
 
 const SCALE_OPTIONS = [
   { value: "-", label: "Auto" },

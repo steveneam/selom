@@ -11,7 +11,7 @@
  * Pure + dependency-free so it unit-tests in node-env vitest; the figure store + the Style panel consume it.
  */
 
-import type { FigureSpec, PlotlyLayout, PlotlyTrace } from "@/lib/figure-spec";
+import type { FigureSpec, PlotlyLayout, PlotlyTrace } from "@/lib/figure/figure-spec";
 
 /** The render-safe floor: an object Plotly can draw (a blank plot) and the model can derive from. */
 export const EMPTY_FIGURE: FigureSpec = { data: [], layout: {} };

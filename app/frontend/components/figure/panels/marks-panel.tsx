@@ -5,7 +5,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Section, SwitchField, TextField } from "./controls";
 import type { FigureStore } from "@/hooks/use-figure-store";
-import type { FigureSpec } from "@/lib/figure-spec";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
 import {
   annotationItems,
   annotationTextOp,
@@ -13,8 +13,8 @@ import {
   scalebarResizeOps,
   scalebarVisibilityOps,
   type FigureModel,
-} from "@/lib/figure-model";
-import { cn } from "@/lib/cn";
+} from "@/lib/figure/figure-model";
+import { cn } from "@/lib/ui/cn";
 
 /**
  * Marks — generic, owner-controlled layout primitives (P3 §3.5). The scale bar is found

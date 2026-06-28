@@ -3,7 +3,7 @@
 import * as React from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { type LucideIcon, UploadCloud } from "lucide-react";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 
 /**
  * A prominent, obvious drag-and-drop target with clear state changes:

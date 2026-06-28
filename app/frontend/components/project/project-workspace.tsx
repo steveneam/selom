@@ -33,7 +33,7 @@ import {
   setManualMark,
   type MarkRole,
 } from "@/lib/erg/marks";
-import { deriveFigureModel } from "@/lib/figure-model";
+import { deriveFigureModel } from "@/lib/figure/figure-model";
 import { applyStagedThresholds, readThresholds, type VolcanoThresholds } from "@/lib/volcano/thresholds";
 import {
   captureLabels,
@@ -54,8 +54,8 @@ import { figureTable } from "@/lib/lineage/figure-table";
 import { versionFamily } from "@/lib/lineage/versions";
 import type { ParamValue } from "@/lib/lineage/diff";
 import { datasetDisplayName, familyColorMap } from "@/lib/lineage/family";
-import { readStyleStamp } from "@/lib/figure-spec";
-import { DataCheckError, runSkill, runtimeSkillId, type DataCheck, type SkillParams, type SkillProvenance } from "@/lib/skills-api";
+import { readStyleStamp } from "@/lib/figure/figure-spec";
+import { DataCheckError, runSkill, runtimeSkillId, type DataCheck, type SkillParams, type SkillProvenance } from "@/lib/skills/api";
 import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
 import { pushUndo } from "@/lib/workspace/undo";
 

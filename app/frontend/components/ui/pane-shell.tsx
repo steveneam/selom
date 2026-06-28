@@ -14,7 +14,7 @@
  */
 
 import type { ReactNode } from "react";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import type { PaneState } from "@/lib/ui/pane-state";
 import { hasData, isDegraded } from "@/lib/ui/pane-state";
 

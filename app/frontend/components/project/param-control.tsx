@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import type { ParamField } from "@/lib/catalog/params";
-import type { SkillParams } from "@/lib/skills-api";
+import type { SkillParams } from "@/lib/skills/api";
 
 /**
  * One inline parameter control (range / number / text / switch / select), driven by a

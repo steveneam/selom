@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Boxes, CheckCircle2, Database, Paintbrush, ShieldCheck, type LucideIcon } from "lucide-react";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import { Stagger, StaggerItem } from "@/components/ui/motion";
 
 /**

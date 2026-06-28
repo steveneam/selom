@@ -13,7 +13,7 @@
  * every access is guarded so a version mismatch degrades to "the dot just doesn't drag" — never a
  * broken canvas — with the numeric panel as the always-present fallback.
  */
-import type { FigureSpec, PlotlyTrace } from "@/lib/figure-spec";
+import type { FigureSpec, PlotlyTrace } from "@/lib/figure/figure-spec";
 import { readSeededMarks, roleTag, snapToSample, type MarkRole } from "@/lib/erg/marks";
 
 export interface Crosshair {

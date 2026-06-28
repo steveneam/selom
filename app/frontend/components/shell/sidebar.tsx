@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { BookMarked, Crosshair, Dna, Home, ListChecks, PanelLeftClose, PanelLeftOpen, Plus, ScanSearch, Settings, Store } from "lucide-react";
 import { SelomMark, SelomWordmark } from "@/components/brand/selom-mark";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import { projectStore, useProjects } from "@/lib/projects/store";
 
 export function Sidebar({

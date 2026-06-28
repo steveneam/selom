@@ -1,5 +1,5 @@
-import type { FigureStyle } from "@/lib/styles-api";
-import type { FigureSpec } from "@/lib/figure-spec";
+import type { FigureStyle } from "@/lib/figure/styles";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
 
 /** Mirror of skills/styles.py STYLES for offline `dev:mock`. */
 export const FIGURE_STYLES: FigureStyle[] = [

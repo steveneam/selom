@@ -14,7 +14,7 @@
  * ORIENTATION, so neither couples to trace/shape order.
  */
 
-import type { FigureSpec, PlotlyLayout, PlotlyTrace } from "@/lib/figure-spec";
+import type { FigureSpec, PlotlyLayout, PlotlyTrace } from "@/lib/figure/figure-spec";
 
 /** The volcano's two thresholds in their natural units (NOT y_cut). */
 export interface VolcanoThresholds {

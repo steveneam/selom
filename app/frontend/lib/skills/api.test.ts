@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  * which provides `fetch`/`FormData`/`File`; we stub `fetch` to assert the wire contract.
  */
 
-import { DataCheckError, runSkill } from "./skills-api";
+import { DataCheckError, runSkill } from "./api";
 
 function jsonRes(status: number, body: unknown): Response {
   return {

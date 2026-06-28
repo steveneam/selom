@@ -10,8 +10,8 @@
  * transient view state (zoom, pan, autosize, dragmode, axis ranges) so a single
  * drag becomes exactly one undo entry.
  */
-import { getAt, set, type Operation } from "@/lib/patch";
-import type { FigureSpec } from "@/lib/figure-spec";
+import { getAt, set, type Operation } from "@/lib/figure/patch";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
 
 /** Layout keys that represent a persisted reposition/retext gesture. */
 function isEditableLayoutKey(key: string): boolean {

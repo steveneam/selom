@@ -1,6 +1,6 @@
 import { http, HttpResponse } from "msw";
 import { CATALOG } from "@/lib/catalog/seed";
-import type { FigureSpec } from "@/lib/figure-spec";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
 import { stubUmapFigure } from "./stub-figure";
 import { mockBundle, mockDataCheck, mockDataFit, mockLegend, mockTable } from "./stub-bundle";
 import { compileFixture, getFixtureSet, searchFixture } from "./gene-sets-fixture";

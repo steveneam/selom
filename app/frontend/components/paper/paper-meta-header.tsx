@@ -4,7 +4,7 @@ import * as React from "react";
 import { ArrowUpRight } from "lucide-react";
 
 import { headerCitation, type PaperMeta } from "@/lib/paper/metadata";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 
 /**
  * The ONE paper-metadata header, used identically across every surface that shows a paper at the top

@@ -8,7 +8,7 @@ import { CleaningReport } from "./cleaning-report";
 import { DataTypeStrip } from "./data-type-strip";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import { modalityColor } from "@/lib/catalog/modality";
 import { datasetDisplayName } from "@/lib/lineage/family";
 import { detectModality, proposeForModality, type IntakeProposal } from "@/lib/intake/mock";

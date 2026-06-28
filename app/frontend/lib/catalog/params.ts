@@ -1,5 +1,5 @@
-import { runtimeSkillId } from "@/lib/skills-api";
-import type { SkillParams } from "@/lib/skills-api";
+import { runtimeSkillId } from "@/lib/skills/api";
+import type { SkillParams } from "@/lib/skills/api";
 
 /**
  * Skill parameter controls — derived from the backend, decorated by the frontend.

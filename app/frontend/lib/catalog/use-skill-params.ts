@@ -17,7 +17,7 @@
 
 import * as React from "react";
 
-import { runtimeSkillId } from "@/lib/skills-api";
+import { runtimeSkillId } from "@/lib/skills/api";
 import { paramFieldsFromSpec, type BackendParamSpec, type ParamField } from "./params";
 import { readCachedSpec, writeCachedSpec } from "./param-spec-cache";
 

@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { type LucideIcon, ArrowRight, Check, FlaskConical, Gauge, ScanSearch } from "lucide-react";
 
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import { Button } from "@/components/ui/button";
 
 /**

@@ -5,7 +5,7 @@ import { Check, Download, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import { humanizeCategory, modalityColor, skillColor, skillIcon } from "@/lib/catalog/modality";
 import type { SkillCatalogEntry, SkillSource } from "@/lib/catalog/types";
 

@@ -5,7 +5,7 @@ import { FileText, Layers, Palette, Ruler, Shapes, Tags } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { FigureStore } from "@/hooks/use-figure-store";
-import { annotationItems, deriveFigureModel, seriesForTrace } from "@/lib/figure-model";
+import { annotationItems, deriveFigureModel, seriesForTrace } from "@/lib/figure/figure-model";
 import { StylePanel } from "./panels/style-panel";
 import { AxesPanel } from "./panels/axes-panel";
 import { LegendPanel } from "./panels/legend-panel";

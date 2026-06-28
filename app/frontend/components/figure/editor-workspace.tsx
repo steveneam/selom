@@ -7,7 +7,7 @@ import { PropertyPanel } from "./property-panel";
 import { SkillCard } from "./skill-card";
 import { Button } from "@/components/ui/button";
 import { PaneBoundary } from "@/components/ui/error-boundary";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import type { FigureStore } from "@/hooks/use-figure-store";
 import type { MarkRole } from "@/lib/erg/marks";
 import type { GeneLabelPoint } from "@/lib/volcano/labels";

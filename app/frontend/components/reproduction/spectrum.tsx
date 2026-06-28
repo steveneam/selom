@@ -7,7 +7,7 @@ import { ArrowUpRight } from "lucide-react";
 import { shortName, tierLabel, usePapers } from "@/lib/reproduction/api";
 import { authorSummary, citationLine } from "@/lib/paper/metadata";
 import type { PaperCell, PaperSummary } from "@/lib/reproduction/types";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 
 /**
  * The index "reproducibility spectrum" — the three dogfood papers ordered ascending

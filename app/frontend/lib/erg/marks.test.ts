@@ -18,7 +18,7 @@ import {
   snapToSample,
   type SeededMark,
 } from "./marks";
-import type { FigureSpec } from "@/lib/figure-spec";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
 
 describe("live preview transforms (no re-run)", () => {
   // A line trace (0) + its a/b dot trace (1) with the meta.selom.marks hint binding the dots.

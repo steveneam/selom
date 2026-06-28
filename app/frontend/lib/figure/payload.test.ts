@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { FigureSpec } from "@/lib/figure-spec";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
 
 import {
   figurePayload,

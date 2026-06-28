@@ -19,7 +19,7 @@
  * dataset flags every figure built on it without any cascade engine.
  */
 import type { Figure } from "@/lib/projects/types";
-import type { SkillProvenance } from "@/lib/skills-api";
+import type { SkillProvenance } from "@/lib/skills/api";
 
 export type StaleFactor = "data" | "params" | "skill" | "env";
 

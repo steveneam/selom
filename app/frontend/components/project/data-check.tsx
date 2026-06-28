@@ -13,9 +13,9 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import { getSkill } from "@/lib/catalog/seed";
-import type { DataCheck, DataRouting, QcFlag, SuggestedStep } from "@/lib/skills-api";
+import type { DataCheck, DataRouting, QcFlag, SuggestedStep } from "@/lib/skills/api";
 
 /**
  * "Is-my-data-clean?" verdict (P1c / P3a — the native moat for non-bioinformaticians).

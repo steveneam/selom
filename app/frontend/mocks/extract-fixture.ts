@@ -1,5 +1,5 @@
-import type { FigureSpec } from "@/lib/figure-spec";
-import type { ExtractChartResponse } from "@/lib/extract-api";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
+import type { ExtractChartResponse } from "@/lib/extract/api";
 
 /**
  * Offline stand-in for POST /extract/chart. The live backend recovers the series from

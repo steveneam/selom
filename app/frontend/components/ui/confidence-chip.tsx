@@ -1,7 +1,7 @@
 import * as React from "react";
 import { ShieldCheck, ShieldQuestion, ShieldX, type LucideIcon } from "lucide-react";
 
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import { TONE_COLOR, type ConfidenceTone } from "@/lib/ui/confidence";
 
 export type ChipSize = "xs" | "sm" | "md";

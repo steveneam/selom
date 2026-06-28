@@ -4,7 +4,7 @@ import * as React from "react";
 import { ArrowRight, GitCompare, Lock, Sparkles, X } from "lucide-react";
 import { FigureCanvas } from "@/components/figure/figure-canvas";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import { getSkill } from "@/lib/catalog/seed";
 import { changedParams, diffParams, diffTables, type DeltaStatus } from "@/lib/lineage/diff";
 import { datasetChipName } from "@/lib/lineage/family";

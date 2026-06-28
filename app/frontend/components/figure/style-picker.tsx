@@ -3,9 +3,9 @@
 import * as React from "react";
 import { AlertCircle, Loader2, Palette } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { applyStyle, fetchStyles, type FigureStyle } from "@/lib/styles-api";
-import { stampStyle } from "@/lib/figure-spec";
-import type { Operation } from "@/lib/patch";
+import { applyStyle, fetchStyles, type FigureStyle } from "@/lib/figure/styles";
+import { stampStyle } from "@/lib/figure/figure-spec";
+import type { Operation } from "@/lib/figure/patch";
 import type { FigureStore } from "@/hooks/use-figure-store";
 
 /**

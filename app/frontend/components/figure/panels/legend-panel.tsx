@@ -2,9 +2,9 @@
 
 import { Section, SelectField, SwitchField } from "./controls";
 import type { FigureStore } from "@/hooks/use-figure-store";
-import type { FigureSpec } from "@/lib/figure-spec";
-import { LEGEND_POSITIONS } from "@/lib/figure-spec";
-import { getAt, legendPosOps, set } from "@/lib/patch";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
+import { LEGEND_POSITIONS } from "@/lib/figure/figure-spec";
+import { getAt, legendPosOps, set } from "@/lib/figure/patch";
 
 const ORIENTATION = [
   { value: "v", label: "Vertical" },

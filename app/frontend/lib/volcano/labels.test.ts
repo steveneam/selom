@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { FigureSpec } from "@/lib/figure-spec";
-import { applyPatches } from "@/lib/patch";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
+import { applyPatches } from "@/lib/figure/patch";
 
 import {
   captureLabels,

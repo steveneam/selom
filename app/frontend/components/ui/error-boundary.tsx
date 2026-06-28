@@ -18,7 +18,7 @@
  */
 
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/ui/cn";
 import { keysChanged } from "@/lib/ui/reset-keys";
 
 interface ErrorBoundaryProps {

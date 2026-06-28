@@ -12,8 +12,8 @@ import { PaneShell } from "@/components/ui/pane-shell";
 import { isFieldDisabled, visibleParamFields, type ParamField } from "@/lib/catalog/params";
 import { useSkillParams, type ParamSpecSeed } from "@/lib/catalog/use-skill-params";
 import type { PaneState } from "@/lib/ui/pane-state";
-import type { FigureSpec } from "@/lib/figure-spec";
-import type { SkillParams } from "@/lib/skills-api";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
+import type { SkillParams } from "@/lib/skills/api";
 import type { SeededMark } from "@/lib/erg/marks";
 import type { Figure } from "@/lib/projects/types";
 

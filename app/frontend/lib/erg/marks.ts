@@ -10,7 +10,7 @@
  * skill re-measures the amplitude AT the chosen time. This module owns that round-trip.
  */
 
-import type { FigureSpec } from "@/lib/figure-spec";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
 
 export type MarkRole = "a" | "b" | "n1" | "p1";
 export type MarkSource = "auto" | "manual" | "device";

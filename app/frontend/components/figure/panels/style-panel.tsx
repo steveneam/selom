@@ -4,9 +4,9 @@ import * as React from "react";
 import { ColorField, Section, SelectField, SliderField, SwitchField } from "./controls";
 import { Input } from "@/components/ui/input";
 import type { FigureStore } from "@/hooks/use-figure-store";
-import type { FigureSpec } from "@/lib/figure-spec";
-import { COLORBAR_POSITIONS, COLORWAYS, findColorbarTrace } from "@/lib/figure-spec";
-import { type FigureModel, seriesColorOps } from "@/lib/figure-model";
+import type { FigureSpec } from "@/lib/figure/figure-spec";
+import { COLORBAR_POSITIONS, COLORWAYS, findColorbarTrace } from "@/lib/figure/figure-spec";
+import { type FigureModel, seriesColorOps } from "@/lib/figure/figure-model";
 import { heatmapColorscaleState } from "@/lib/figure/contract";
 import { readTones, toneOps, zExtent } from "@/lib/heatmap/colorscale";
 import {
@@ -34,8 +34,8 @@ import {
   tipLengthOps,
   type TipAxis,
 } from "@/lib/heatmap/dendrogram";
-import { getAt, set, type Operation } from "@/lib/patch";
-import { cn } from "@/lib/cn";
+import { getAt, set, type Operation } from "@/lib/figure/patch";
+import { cn } from "@/lib/ui/cn";
 
 /** One decimal place for the colour-scale sliders. */
 const r1 = (n: number) => Math.round(n * 10) / 10;
