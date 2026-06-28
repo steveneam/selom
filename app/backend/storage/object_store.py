@@ -40,8 +40,16 @@ class ObjectStore(Protocol):
         """True if the object exists (a cross-process completion probe)."""
         ...
 
+    def head_size(self, key: str) -> int | None:
+        """The object's size in bytes, or ``None`` if absent (the upload-confirm landing check)."""
+        ...
+
     def delete(self, key: str) -> None:
         """Remove the object if present (a no-op if absent)."""
+        ...
+
+    def list_keys(self, prefix: str) -> list[str]:
+        """Every object key under ``prefix`` (the T2 sweep spots an object with no row, spec §7)."""
         ...
 
     def presign_get(self, key: str, ttl: int) -> str | None:
@@ -87,8 +95,19 @@ class LocalObjectStore:
     def head(self, key: str) -> bool:
         return self._path(key).exists()
 
+    def head_size(self, key: str) -> int | None:
+        p = self._path(key)
+        return p.stat().st_size if p.exists() else None
+
     def delete(self, key: str) -> None:
         self._path(key).unlink(missing_ok=True)
+
+    def list_keys(self, prefix: str) -> list[str]:
+        base = self._path(prefix)
+        if not base.exists():
+            return []
+        files = [base] if base.is_file() else (p for p in base.rglob("*") if p.is_file())
+        return [p.relative_to(self.root).as_posix() for p in files]
 
     def presign_get(self, key: str, ttl: int) -> str | None:
         return None  # dev: the app serves bytes; the adapter supplies its own route
@@ -132,14 +151,24 @@ class S3ObjectStore:
         )
 
     def head(self, key: str) -> bool:
+        return self.head_size(key) is not None
+
+    def head_size(self, key: str) -> int | None:
         try:
-            self.client.head_object(Bucket=self.bucket, Key=key)
+            obj = self.client.head_object(Bucket=self.bucket, Key=key)
         except Exception:
-            return False
-        return True
+            return None
+        return int(obj.get("ContentLength", 0))
 
     def delete(self, key: str) -> None:
         self.client.delete_object(Bucket=self.bucket, Key=key)
+
+    def list_keys(self, prefix: str) -> list[str]:
+        keys: list[str] = []
+        paginator = self.client.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
+            keys.extend(obj["Key"] for obj in page.get("Contents", []))
+        return keys
 
     def presign_get(self, key: str, ttl: int) -> str | None:
         return self.client.generate_presigned_url(

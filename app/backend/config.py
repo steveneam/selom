@@ -112,5 +112,9 @@ class Settings(BaseSettings):
     clerk_jwks_url: str = Field(default="", validation_alias="SELOM_CLERK_JWKS_URL")  # default: {issuer}/.well-known/jwks.json
     clerk_audience: str = Field(default="", validation_alias="SELOM_CLERK_AUDIENCE")  # optional aud claim check
 
+    # Presigned upload (materialization step 6). A `pending_upload` datasets row whose object never
+    # landed (the client PUT failed) is swept after this TTL (spec §7/T2 reverse-orphan). Hours.
+    upload_ttl_hours: int = Field(default=24, validation_alias="SELOM_UPLOAD_TTL_HOURS")
+
 
 settings = Settings()

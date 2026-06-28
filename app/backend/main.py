@@ -29,6 +29,8 @@ from litsynth import lookup as citations_lookup
 from auth import AuthContext, require_user
 from jobs.queue import get_job, result_store, submit
 from jobs.store import TERMINAL
+from storage.object_store import get_object_store
+from uploads import QuotaExceeded, get_upload_repo, materialize_dataset
 from skills import styles, theme
 from skills._engine import to_bool
 from skills.contract import (
@@ -852,6 +854,134 @@ def job_result(job_id: str, request: Request, ctx: AuthContext = Depends(require
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers={"ETag": etag})
     return JSONResponse(bundle, headers={"ETag": etag})  # {figure, provenance, methods} — /run shape
+
+
+# --- Projects + presigned uploads + datasets (materialization step 6, spec §4.2/§6/§7) --------
+# The genuine flow rewrite: a client uploads bytes straight to S3 via a presigned PUT (bypassing the
+# API Gateway body cap); the server only ever holds pointers + tenant rows. Every handler derives the
+# tenant from the verified claim (ctx.user_id) — NEVER a request param (spec §6.2); no request model
+# below carries a user_id. Uploads require a DB (the datasets/users tables): a missing
+# SELOM_DATABASE_URL surfaces as a clean 503, not a silent default.
+
+
+def _uploads_repo():
+    """FastAPI dependency → the UploadRepo, or a 503 when no database is configured."""
+    try:
+        return get_upload_repo()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+class ProjectCreate(BaseModel):
+    name: str
+    color: str = "blue"
+
+
+class IntakeRequest(BaseModel):
+    project_id: str
+    filename: str
+    size_bytes: int                       # the client declares the size (browser file.size); caps the PUT
+    content_sha256: str | None = None     # optional client-declared hash (the parse recomputes the truth)
+
+
+class ConfirmRequest(BaseModel):
+    sha256: str | None = None             # optional; size comes from the object head, not the client
+
+
+@app.post("/projects")
+def create_project(body: ProjectCreate, repo=Depends(_uploads_repo),
+                   ctx: AuthContext = Depends(require_user)):
+    name = (body.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="project name is required")
+    try:
+        return repo.create_project(ctx.user_id, ctx.email, name, body.color)
+    except QuotaExceeded as exc:
+        raise HTTPException(status_code=402, detail=exc.to_dict()) from exc
+
+
+@app.get("/projects")
+def list_projects(repo=Depends(_uploads_repo), ctx: AuthContext = Depends(require_user)):
+    return {"projects": repo.list_projects(ctx.user_id)}
+
+
+@app.post("/uploads/intake")
+def upload_intake(body: IntakeRequest, repo=Depends(_uploads_repo),
+                  ctx: AuthContext = Depends(require_user)):
+    # Row-first (spec §7): the pending_upload datasets row is created BEFORE the presigned URL, so an
+    # object can never exist without a row to reconcile against. The key is server-derived from the
+    # JWT user_id (T1) — the presign signs exactly it, so the client can't write outside its prefix.
+    if body.size_bytes <= 0:
+        raise HTTPException(status_code=400, detail="size_bytes must be > 0 (the declared file size)")
+    try:
+        result = repo.intake(ctx.user_id, ctx.email, body.project_id, body.filename,
+                             body.content_sha256, body.size_bytes)
+    except QuotaExceeded as exc:
+        raise HTTPException(status_code=402, detail=exc.to_dict()) from exc
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="unknown project") from exc
+    # The PUT is capped at the declared size (content-length-range), so a 1 MB intake can't smuggle a
+    # 10 GB file (replaces main.py's old post-read buffer cap).
+    upload = get_object_store().presign_put(result["key"], settings.s3_presign_ttl, body.size_bytes)
+    return {"dataset": result["dataset"], "upload": upload}
+
+
+@app.put("/uploads/local/{key:path}")
+async def upload_local_put(key: str, request: Request):
+    # Dev-only stand-in for the S3 direct PUT: the LocalObjectStore presign returns this in-app route
+    # (there's no S3 to PUT to offline). The presigned URL IS the credential in the S3 model, so this
+    # mirrors that — but it only ever accepts the known uploads/ prefix, never an arbitrary key.
+    if not key.startswith("uploads/"):
+        raise HTTPException(status_code=400, detail="local upload key must be under uploads/")
+    body = await request.body()
+    get_object_store().put_bytes(key, body)
+    return {"ok": True, "key": key, "size": len(body)}
+
+
+@app.post("/uploads/{dataset_id}/confirm")
+def upload_confirm(dataset_id: str, body: ConfirmRequest, repo=Depends(_uploads_repo),
+                   ctx: AuthContext = Depends(require_user)):
+    # Flip pending_upload → ready once the object has landed. S3 is the source of truth for "did it
+    # land" — we head the key (server-derived from the row) and stamp the real size. A dropped confirm
+    # still self-heals via the S3-event path (spec §7); this is the latency-optimised happy path.
+    ds = repo.get_dataset(ctx.user_id, dataset_id)
+    if ds is None:
+        raise HTTPException(status_code=404, detail="unknown dataset")
+    size = get_object_store().head_size(ds["upload_s3_key"])
+    if size is None:
+        raise HTTPException(status_code=409, detail="object not found in store (upload not completed)")
+    return repo.confirm(ctx.user_id, dataset_id, size_bytes=size, sha256=body.sha256)
+
+
+@app.post("/uploads/{dataset_id}/parse")
+def upload_parse(dataset_id: str, repo=Depends(_uploads_repo),
+                 ctx: AuthContext = Depends(require_user)):
+    # Server-side, leak-free parse (spec §4.2): read the raw object, ingest, write the parsed matrix
+    # to data/{sha256}.csv (CSV until the parquet substrate lands, owner gate Q5), stamp the pointer.
+    try:
+        ds = materialize_dataset(repo, get_object_store(), ctx.user_id, dataset_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:  # an unloadable file is an honest 400 (mirrors /data/inspect)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if ds is None:
+        raise HTTPException(status_code=404, detail="unknown dataset")
+    return ds
+
+
+@app.get("/datasets")
+def list_datasets(project_id: str | None = None, repo=Depends(_uploads_repo),
+                  ctx: AuthContext = Depends(require_user)):
+    return {"datasets": repo.list_datasets(ctx.user_id, project_id)}
+
+
+@app.get("/datasets/{dataset_id}")
+def get_dataset(dataset_id: str, repo=Depends(_uploads_repo),
+                ctx: AuthContext = Depends(require_user)):
+    ds = repo.get_dataset(ctx.user_id, dataset_id)
+    if ds is None:
+        raise HTTPException(status_code=404, detail="unknown dataset")
+    return ds
 
 
 @app.get("/figures/export/presets")

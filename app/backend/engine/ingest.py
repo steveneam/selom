@@ -172,12 +172,7 @@ def ingest(
     # so the CSV-reading skills run unchanged. `source` (provenance) still points at the original.
     run_path = str(path)
     if loader.materialize and _is_dataframe(payload):
-        import tempfile
-
-        tmp = tempfile.NamedTemporaryFile(suffix=".csv", delete=False)
-        tmp.close()
-        payload.to_csv(tmp.name, index=False)
-        run_path = tmp.name
+        run_path = _materialize_csv(payload)  # content-addressed, managed temp (leak-free, acceptance D)
     # An ERG-format loader pins the modality to the neutral GENERIC_TABLE (ERG isn't an omics Kind)
     # and records the format signal for profile_data; a caller `hint` still wins.
     kind = classify(payload, hint=hint or (GENERIC_TABLE if loader.erg else None), source=source)
@@ -192,6 +187,72 @@ def ingest(
 
 def _is_dataframe(obj: Any) -> bool:
     return any(t.__name__ == "DataFrame" for t in type(obj).__mro__)
+
+
+# --- materialized decode temps (Task C3 / materialization step 6, acceptance D) ----------------
+# A path-based skill can't re-read a decoded binary format (.iwxdata ZIP) or a combined cohort frame
+# from the original file, so :func:`ingest` writes the decoded DataFrame to a CSV and points
+# ``DataBundle.path`` at it. Those temps used ``delete=False`` and were never cleaned — a
+# per-invocation leak on Lambda's ephemeral disk (spec §4.2 / acceptance D). The fix is holistic, NOT
+# a naive ``finally`` (the temp is referenced by ``bundle.path`` and REUSED across requests by the C3
+# cache, so deleting it at the end of ``ingest`` would break the next cached run):
+#
+#   1. ONE process-managed dir, removed at interpreter exit — a hard backstop so nothing outlives the
+#      process / a Lambda instance teardown.
+#   2. CONTENT-ADDRESSED names (``{sha}.csv``) — re-decoding the same bytes REUSES the file instead of
+#      writing a fresh one every invocation (this is what kills the cited per-invocation growth).
+#   3. Eviction-tied deletion — when the C3 cache drops the entry that owns a temp, the temp is
+#      deleted (unless another live entry shares the identical content), bounding disk in a warm,
+#      long-lived process too.
+
+_MATERIALIZED_DIR: Path | None = None
+_MATERIALIZED_DIR_LOCK = threading.Lock()
+
+
+def _materialized_dir() -> Path:
+    global _MATERIALIZED_DIR
+    if _MATERIALIZED_DIR is None:
+        with _MATERIALIZED_DIR_LOCK:
+            if _MATERIALIZED_DIR is None:
+                import atexit
+                import shutil
+                import tempfile
+
+                d = Path(tempfile.mkdtemp(prefix="selom-decoded-"))
+                atexit.register(lambda: shutil.rmtree(d, ignore_errors=True))
+                _MATERIALIZED_DIR = d
+    return _MATERIALIZED_DIR
+
+
+def _materialize_csv(df) -> str:
+    """Write ``df`` to a CONTENT-ADDRESSED CSV in the managed dir, reusing it when those exact bytes
+    already landed (a repeated decode doesn't multiply temps). Atomic write-then-replace (like
+    ``LocalObjectStore.put_bytes``) so a concurrent reader never sees a torn file."""
+    import os
+
+    payload = df.to_csv(index=False).encode("utf-8")
+    sha = hashlib.sha256(payload).hexdigest()
+    target = _materialized_dir() / f"{sha}.csv"
+    if not target.exists():
+        tmp = target.with_name(f"{sha}.{os.getpid()}.tmp")
+        tmp.write_bytes(payload)
+        os.replace(tmp, target)
+    return str(target)
+
+
+def _is_managed_temp(path: str | None) -> bool:
+    return bool(path) and _MATERIALIZED_DIR is not None and Path(path).parent == _MATERIALIZED_DIR
+
+
+def _release_materialized(path: str | None) -> None:
+    """Delete a managed materialized temp once NO remaining cache entry references it. Call under
+    ``_INPUT_LOCK`` (after the owning entry has been popped)."""
+    if not _is_managed_temp(path):
+        return
+    for bundle, materialized in _INPUT_CACHE.values():
+        if materialized and bundle.path == path:
+            return  # still owned by another live cache entry — keep it
+    Path(path).unlink(missing_ok=True)
 
 
 # --- parsed-input cache (Task C3) -------------------------------------------------------------
@@ -264,12 +325,17 @@ def ingest_cached(
             _INPUT_CACHE[key] = (bundle, materialized)
             _INPUT_CACHE.move_to_end(key)
             while len(_INPUT_CACHE) > max(0, settings.input_cache_max):
-                _INPUT_CACHE.popitem(last=False)
+                _evicted, (evicted_bundle, was_materialized) = _INPUT_CACHE.popitem(last=False)
+                if was_materialized:
+                    _release_materialized(evicted_bundle.path)  # free the decode temp it owned
     return bundle
 
 
 def clear_input_cache() -> None:
     with _INPUT_LOCK:
+        for bundle, materialized in _INPUT_CACHE.values():
+            if materialized and _is_managed_temp(bundle.path):
+                Path(bundle.path).unlink(missing_ok=True)
         _INPUT_CACHE.clear()
 
 
@@ -346,18 +412,14 @@ def ingest_many(
         order_map.setdefault(c, len(order_map))
     combined["condition_order"] = combined["condition"].astype(str).map(order_map)
 
-    import tempfile
-
-    tmp = tempfile.NamedTemporaryFile(suffix=".csv", delete=False)
-    tmp.close()
-    combined.to_csv(tmp.name, index=False)
+    run_path = _materialize_csv(combined)  # content-addressed, managed temp (leak-free, acceptance D)
     source = SourceRef(filename=f"combined_{len(paths)}_files.csv", n_bytes=0, sha256="")
     kind = classify(combined, hint=hint or GENERIC_TABLE, source=source)
     return DataBundle(
         payload=combined,
         kind=kind,
         source=source,
-        path=tmp.name,
+        path=run_path,
         meta={"erg_format": "combined", "n_files": len(paths),
               "conditions": list(order_map.keys())},
     )
