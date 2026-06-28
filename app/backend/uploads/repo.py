@@ -233,6 +233,37 @@ class UploadRepo:
                 return {"dataset": _dataset_public(row), "key": key}
         return run_with_db_retry(_work)
 
+    def create_dataset(self, user_id: str, email: str | None, project_id: str, filename: str,
+                       dataset_id: str | None = None, modality: str | None = None,
+                       qc: dict | None = None, current_sha256: str | None = None) -> dict:
+        """Create a metadata-only dataset row (FE ``addDataset``) — a dropped file the FE classifies via
+        /data/inspect but doesn't (yet) upload to the store. Client-authoritative id + idempotent;
+        status=``ready`` with no ``upload_s3_key`` (a run-dataset on it returns "re-upload"). Quota-gated.
+        Coexists with ``intake`` (the real presigned-upload path); this is the no-bytes metadata twin."""
+        def _work():
+            with self.engine.begin() as conn:
+                set_tenant(conn, user_id)
+                upsert_user(conn, user_id, email or f"{user_id}@unknown.local")
+                tq = TenantQuery(conn, user_id)
+                if dataset_id is not None:
+                    existing = tq.get(datasets, dataset_id)
+                    if existing is not None:
+                        return _dataset_public(existing)  # idempotent re-POST
+                if tq.get(projects, project_id) is None:
+                    raise KeyError(project_id)
+                q = self._quota(conn, user_id)
+                used = self._count(conn, datasets, user_id)
+                if q is not None and used >= q.max_datasets:
+                    raise QuotaExceeded("max_datasets", used, int(q.max_datasets),
+                                        f"Dataset limit reached ({q.max_datasets}).")
+                values = {"project_id": project_id, "filename": filename, "modality": modality,
+                          "qc": qc, "current_sha256": current_sha256, "status": READY, "size_bytes": 0}
+                if dataset_id is not None:
+                    values["id"] = dataset_id
+                did = tq.insert(datasets, **values)
+                return _dataset_public(tq.get(datasets, did))
+        return run_with_db_retry(_work)
+
     def confirm(self, user_id: str, dataset_id: str, size_bytes: int | None = None,
                 sha256: str | None = None) -> dict | None:
         """Flip a ``pending_upload`` row to ``ready`` once the object has landed. Idempotent (a

@@ -1128,6 +1128,30 @@ def upload_parse(dataset_id: str, repo=Depends(_uploads_repo),
     return ds
 
 
+class DatasetCreate(BaseModel):
+    model_config = {"extra": "ignore"}
+    id: str | None = None                 # client-authoritative id (sub-spec §2.2)
+    project_id: str
+    filename: str
+    modality: str | None = None
+    qc: dict | None = None
+    current_sha256: str | None = None
+
+
+@app.post("/datasets")
+def create_dataset(body: DatasetCreate, repo=Depends(_uploads_repo),
+                   ctx: AuthContext = Depends(require_user)):
+    # Metadata-only dataset (FE addDataset) — the classified file the FE doesn't upload to the store.
+    # The real presigned-upload path is POST /uploads/intake; this is its no-bytes twin.
+    try:
+        return repo.create_dataset(ctx.user_id, ctx.email, body.project_id, body.filename,
+                                   body.id, body.modality, body.qc, body.current_sha256)
+    except QuotaExceeded as exc:
+        raise HTTPException(status_code=402, detail=exc.to_dict()) from exc
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="unknown project") from exc
+
+
 @app.get("/datasets")
 def list_datasets(project_id: str | None = None, repo=Depends(_uploads_repo),
                   ctx: AuthContext = Depends(require_user)):
@@ -1378,6 +1402,7 @@ class PaperBody(BaseModel):
 
 
 class InstallBody(BaseModel):
+    id: str | None = None                 # client-authoritative id (sub-spec §2.2)
     skill_id: str
     project_id: str | None = None         # null ⇒ workspace-wide install
 
@@ -1444,7 +1469,7 @@ def list_skill_installs(project_id: str | None = None, repo=Depends(_library_rep
 def install_skill(body: InstallBody, repo=Depends(_library_repo),
                   ctx: AuthContext = Depends(require_user)):
     try:
-        return repo.install_skill(ctx.user_id, ctx.email, body.skill_id, body.project_id)
+        return repo.install_skill(ctx.user_id, ctx.email, body.skill_id, body.project_id, body.id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="unknown project") from exc
 

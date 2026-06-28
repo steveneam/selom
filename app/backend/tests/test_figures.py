@@ -112,6 +112,26 @@ def test_project_patch_isolation(env):
     assert client.delete("/projects/p1").status_code == 404
 
 
+# ── metadata datasets (FE addDataset; POST /datasets) ───────────────────────────────────────────
+def test_dataset_metadata_create_and_idempotent(env):
+    client, _ = env
+    pid = _project(client, pid="p1")
+    r = client.post("/datasets", json={
+        "id": "d1", "project_id": pid, "filename": "pbmc.csv", "modality": "scRNA-seq"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["id"] == "d1" and body["status"] == "ready" and body["upload_s3_key"] is None
+    # idempotent re-POST (retried optimistic write) → same row, no duplicate
+    client.post("/datasets", json={"id": "d1", "project_id": pid, "filename": "pbmc.csv"})
+    assert len(client.get("/datasets").json()["datasets"]) == 1
+
+
+def test_dataset_metadata_create_unknown_project_404(env):
+    client, _ = env
+    r = client.post("/datasets", json={"id": "d1", "project_id": "nope", "filename": "x.csv"})
+    assert r.status_code == 404
+
+
 # ── figure CRUD ───────────────────────────────────────────────────────────────────────────────
 def test_figure_create_get_round_trips(env):
     client, _ = env

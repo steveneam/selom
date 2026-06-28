@@ -105,9 +105,11 @@ class InstallMixin:
         return run_with_db_retry(_work)
 
     def install_skill(self, user_id: str, email: str | None, skill_id: str,
-                      project_id: str | None = None) -> dict:
+                      project_id: str | None = None, install_id: str | None = None) -> dict:
         """Install a skill into a project (``project_id`` set) or workspace-wide (``project_id`` null →
-        ``workspace_id`` set). Idempotent on the scope — a re-install returns the existing row."""
+        ``workspace_id`` set). Idempotent on the scope — a re-install returns the existing row. The
+        client-authoritative ``install_id`` (sub-spec §2.2) keeps the optimistic local row and the
+        server row in sync so reconcile can't duplicate the install."""
         def _work():
             with self.engine.begin() as conn:
                 set_tenant(conn, user_id)
@@ -124,10 +126,11 @@ class InstallMixin:
                                 if r.project_id is None]
                 if existing:
                     return _install_public(existing[0])  # idempotent
-                new_id = tq.insert(skill_installs, skill_id=skill_id,
-                                   project_id=project_id, workspace_id=ws_id)
-                row = tq.get(skill_installs, new_id)
-                return _install_public(row)
+                values = {"skill_id": skill_id, "project_id": project_id, "workspace_id": ws_id}
+                if install_id:
+                    values["id"] = install_id
+                new_id = tq.insert(skill_installs, **values)
+                return _install_public(tq.get(skill_installs, new_id))
         return run_with_db_retry(_work)
 
     def uninstall_skill(self, user_id: str, skill_id: str,
