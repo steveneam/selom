@@ -100,6 +100,15 @@ def test_local_url_is_in_app_route(tmp_path):
     assert rs.put("job-xyz", _BUNDLE) == "/jobs/job-xyz/result"
 
 
+def test_local_presign_put_is_in_app_shape(tmp_path):
+    # The local upload presign returns the same {url, fields} shape as S3 so the FE upload code is
+    # backend-agnostic; the key is bound (T1 — server-derived, not client input).
+    out = LocalObjectStore(tmp_path).presign_put("uploads/A/p/d/x.csv", ttl=300, max_bytes=1024)
+    assert set(out) == {"url", "fields"}
+    assert out["fields"]["key"] == "uploads/A/p/d/x.csv"
+    assert out["fields"]["max_bytes"] == 1024
+
+
 def test_s3_shaped_url_is_presigned():
     rs = ObjectStoreResultStore(InMemoryObjectStore(), presign_ttl=900)
     url = rs.put("job-xyz", _BUNDLE)
@@ -212,6 +221,12 @@ def test_real_s3objectstore_against_moto():
         assert store.get_bytes("results/x.json") == b'{"k": 1}'
         url = store.presign_get("results/x.json", 300)
         assert url and url.startswith("https://") and "results/x.json" in url
+        # presign_put: a POST policy ({url, fields}) with the key bound + a size ceiling signed in.
+        post = store.presign_put("uploads/A/p/d/x.csv", 300, 1_000_000)
+        assert post["url"].startswith("https://") and post["fields"]["key"] == "uploads/A/p/d/x.csv"
+        # the size ceiling is signed into the policy (field name varies by sig version)
+        assert "policy" in post["fields"]
+        assert any("signature" in k.lower() for k in post["fields"])
         store.delete("results/x.json")
         assert store.head("results/x.json") is False
 

@@ -42,7 +42,8 @@ def test_make_job_store_selects_sql(tmp_path):
 
 def test_sql_store_create_get_update_roundtrip(tmp_path):
     store = SqlJobStore(url=_sqlite_url(tmp_path), create=True)
-    job = store.create("volcano", {"fc_threshold": 2.0}, filename="de.csv")
+    job = store.create("volcano", {"fc_threshold": 2.0}, filename="de.csv", user_id="t-user")
+    assert job.user_id == "t-user"  # the tenant is stamped on the job (7b)
     assert job.status is JobStatus.QUEUED
     assert job.skill_id == "volcano" and job.filename == "de.csv"
     assert job.params == {"fc_threshold": 2.0}
@@ -60,7 +61,7 @@ def test_sql_store_create_get_update_roundtrip(tmp_path):
 def test_sql_store_wire_shape_is_epoch_floats(tmp_path):
     """public() must stay FE-compatible: created_at/updated_at are epoch numbers, not ISO strings."""
     store = SqlJobStore(url=_sqlite_url(tmp_path), create=True)
-    job = store.create("cluster", {})
+    job = store.create("cluster", {}, user_id="t-user")
     pub = store.get(job.id).public()
     assert isinstance(pub["created_at"], float) and isinstance(pub["updated_at"], float)
     assert pub["status"] == "queued" and pub["skill_id"] == "cluster"
@@ -70,7 +71,7 @@ def test_sql_store_wire_shape_is_epoch_floats(tmp_path):
 
 def test_update_bumps_updated_at(tmp_path):
     store = SqlJobStore(url=_sqlite_url(tmp_path), create=True)
-    job = store.create("pca", {})
+    job = store.create("pca", {}, user_id="t-user")
     after = store.update(job.id, status=JobStatus.RUNNING)
     assert after.updated_at >= job.created_at
 
@@ -82,7 +83,7 @@ def test_a_fresh_instance_sees_a_job_created_by_another(tmp_path):
     the same database — what an in-memory dict (a fresh, empty JobStore) could never do."""
     url = _sqlite_url(tmp_path)
     instance_a = SqlJobStore(engine=sa.create_engine(url), create=True)
-    job = instance_a.create("umap", {"n_neighbors": 15})
+    job = instance_a.create("umap", {"n_neighbors": 15}, user_id="t-user")
     instance_a.update(job.id, status=JobStatus.SUCCEEDED, result_url="/jobs/u/result")
 
     # a "cold" second instance — its own engine, no shared in-process state

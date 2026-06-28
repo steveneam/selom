@@ -19,10 +19,12 @@ from __future__ import annotations
 from config import settings
 
 
-async def run_skill_job(ctx, job_id: str, skill_id: str, data_path: str, params: dict) -> None:
+async def run_skill_job(
+    ctx, job_id: str, skill_id: str, data_path: str, params: dict, user_id: str | None = None
+) -> None:
     from jobs.queue import execute_job
 
-    execute_job(job_id, data_path, params)
+    execute_job(job_id, data_path, params, user_id)
 
 
 class WorkerSettings:

@@ -37,6 +37,7 @@ class Job:
     filename: str | None = None  # original upload name, for the B4 provenance bundle
     result_url: str | None = None
     error: str | None = None
+    user_id: str | None = None   # the verified tenant (materialization 7b); not in the FE wire shape
 
     def public(self) -> dict:
         """The wire shape the FE polls (GET /jobs/{id})."""
@@ -55,7 +56,14 @@ class JobStore:
     def __init__(self) -> None:
         self._jobs: dict[str, Job] = {}
 
-    def create(self, skill_id: str, params: dict, filename: str | None = None) -> Job:
+    def create(
+        self,
+        skill_id: str,
+        params: dict,
+        filename: str | None = None,
+        user_id: str | None = None,
+        email: str | None = None,  # noqa: ARG002 — in-memory mode has no users table
+    ) -> Job:
         now = time.time()
         job = Job(
             id=uuid.uuid4().hex,
@@ -65,14 +73,21 @@ class JobStore:
             created_at=now,
             updated_at=now,
             filename=filename,
+            user_id=user_id,
         )
         self._jobs[job.id] = job
         return job
 
-    def get(self, job_id: str) -> Job | None:
-        return self._jobs.get(job_id)
+    def get(self, job_id: str, user_id: str | None = None) -> Job | None:
+        """Fetch a job. When ``user_id`` is given, scope to that tenant (a cross-tenant poll → None)."""
+        job = self._jobs.get(job_id)
+        if job is None:
+            return None
+        if user_id is not None and job.user_id is not None and job.user_id != user_id:
+            return None
+        return job
 
-    def update(self, job_id: str, **changes) -> Job:
+    def update(self, job_id: str, user_id: str | None = None, **changes) -> Job:  # noqa: ARG002
         job = self._jobs[job_id]
         for key, value in changes.items():
             setattr(job, key, value)

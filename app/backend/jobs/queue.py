@@ -28,17 +28,20 @@ result_store: ResultStore = make_result_store(settings)
 job_store = make_job_store(settings)
 
 
-def execute_job(job_id: str, data_path: str, params: dict) -> None:
-    """Run the job's skill to completion, updating the store. Never raises."""
+def execute_job(job_id: str, data_path: str, params: dict, user_id: str | None = None) -> None:
+    """Run the job's skill to completion, updating the store. Never raises.
+
+    ``user_id`` (the job's tenant) is threaded to every store call so the worker's reads/writes stay
+    tenant-scoped under Postgres RLS — on SQLite (no RLS) it's harmless."""
     import guardrails
     import methods
     import provenance
     from skills.contract import load_skill, run_skill_with_table  # lazy: keeps import graph light
 
-    job = job_store.get(job_id)
+    job = job_store.get(job_id, user_id)
     if job is None:
         return
-    job_store.update(job_id, status=JobStatus.RUNNING)
+    job_store.update(job_id, user_id=user_id, status=JobStatus.RUNNING)
     try:
         spec = load_skill(job.skill_id)
         figure, table = run_skill_with_table(job.skill_id, data_path, params)
@@ -52,9 +55,9 @@ def execute_job(job_id: str, data_path: str, params: dict) -> None:
             "table": table,
         }
         url = result_store.put(job_id, bundle)
-        job_store.update(job_id, status=JobStatus.SUCCEEDED, result_url=url)
+        job_store.update(job_id, user_id=user_id, status=JobStatus.SUCCEEDED, result_url=url)
     except Exception as exc:  # surface a clean message; never leak a 500 stack to the job
-        job_store.update(job_id, status=JobStatus.FAILED, error=str(exc))
+        job_store.update(job_id, user_id=user_id, status=JobStatus.FAILED, error=str(exc))
     finally:
         try:
             pathlib.Path(data_path).unlink(missing_ok=True)
@@ -62,30 +65,42 @@ def execute_job(job_id: str, data_path: str, params: dict) -> None:
             pass
 
 
-def submit(skill_id: str, data_path: str, params: dict, filename: str | None = None) -> Job:
-    """Create a job and either run it inline or hand it to the arq worker."""
-    job = job_store.create(skill_id, params, filename)
+def submit(
+    skill_id: str,
+    data_path: str,
+    params: dict,
+    filename: str | None = None,
+    user_id: str | None = None,
+    email: str | None = None,
+) -> Job:
+    """Create a tenant-owned job and either run it inline or hand it to the arq worker.
+
+    ``user_id`` defaults to the configured dev tenant so the inline/offline path is unchanged; the
+    HTTP endpoint passes the verified ``ctx.user_id`` (never a request param)."""
+    uid = user_id or settings.dev_user_id
+    job = job_store.create(skill_id, params, filename, user_id=uid, email=email or settings.dev_user_email)
     if settings.queue == "arq":
-        _enqueue_arq(job.id, skill_id, data_path, params)
+        _enqueue_arq(job.id, skill_id, data_path, params, uid)
     else:
-        execute_job(job.id, data_path, params)
-    return job_store.get(job.id)
+        execute_job(job.id, data_path, params, uid)
+    return job_store.get(job.id, uid)
 
 
-def get_job(job_id: str) -> Job | None:
-    """Job state for polling. In arq mode, detect out-of-process completion via the
-    shared result store (the worker writes there before the API would otherwise know)."""
-    job = job_store.get(job_id)
+def get_job(job_id: str, user_id: str | None = None) -> Job | None:
+    """Job state for polling, scoped to the requesting tenant (a cross-tenant poll → None → 404).
+    In arq mode, detect out-of-process completion via the shared result store (the worker writes
+    there before the API would otherwise know)."""
+    job = job_store.get(job_id, user_id)
     if job is None:
         return None
     if job.status not in TERMINAL and settings.queue == "arq":
         url = result_store.url_if_exists(job_id)
         if url:
-            job_store.update(job_id, status=JobStatus.SUCCEEDED, result_url=url)
-    return job_store.get(job_id)
+            job_store.update(job_id, user_id=user_id, status=JobStatus.SUCCEEDED, result_url=url)
+    return job_store.get(job_id, user_id)
 
 
-def _enqueue_arq(job_id: str, skill_id: str, data_path: str, params: dict) -> None:
+def _enqueue_arq(job_id: str, skill_id: str, data_path: str, params: dict, user_id: str | None = None) -> None:
     """Fire-and-forget enqueue to arq over Redis (DECISIONS #6). Lazy-imported so the
     light core never needs arq/redis. Requires the `[jobs]` extra + a running worker."""
     import asyncio
@@ -95,7 +110,7 @@ def _enqueue_arq(job_id: str, skill_id: str, data_path: str, params: dict) -> No
 
     async def _go() -> None:
         pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
-        await pool.enqueue_job("run_skill_job", job_id, skill_id, data_path, params)
+        await pool.enqueue_job("run_skill_job", job_id, skill_id, data_path, params, user_id)
         await pool.close()
 
     asyncio.run(_go())

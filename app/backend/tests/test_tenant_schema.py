@@ -20,11 +20,11 @@ from sqlalchemy.exc import IntegrityError
 
 _BACKEND = pathlib.Path(__file__).resolve().parent.parent
 
-# The full schema = analysis_jobs (0001) + the 13 tenant tables (0002).
+# The full schema = analysis_jobs (0001) + the 13 tenant tables (0002) + skill_requests (0003).
 _TENANT_TABLES = {
     "users", "workspaces", "projects", "datasets", "intermediate_tables", "artifact_parents",
     "reproduction_runs", "figures", "papers", "supplements", "cleaning_recipes", "gene_sets",
-    "skill_installs",
+    "skill_installs", "skill_requests",
 }
 _ALL_TABLES = _TENANT_TABLES | {"analysis_jobs"}
 

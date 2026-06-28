@@ -49,6 +49,15 @@ class ObjectStore(Protocol):
         app serves bytes through its own routes, so the adapter supplies the URL."""
         ...
 
+    def presign_put(self, key: str, ttl: int, max_bytes: int) -> dict:
+        """A presigned POST policy for a direct client→store upload (spec §1.1/§4.2): ``{url, fields}``.
+
+        The server derives ``key`` from the verified tenant (``uploads/{user_id}/…``) and signs it
+        EXACTLY, so the client can't write outside its prefix (T1); a ``content-length-range``
+        condition caps the size *before* the bytes land (replacing the post-read cap). The local
+        backend returns an in-app upload-route shape (dev never needs AWS)."""
+        ...
+
 
 class LocalObjectStore:
     """Filesystem backend rooted at ``data_dir``; keys map to nested paths."""
@@ -83,6 +92,11 @@ class LocalObjectStore:
 
     def presign_get(self, key: str, ttl: int) -> str | None:
         return None  # dev: the app serves bytes; the adapter supplies its own route
+
+    def presign_put(self, key: str, ttl: int, max_bytes: int) -> dict:
+        # Dev: there's no S3 to PUT to — the step-6 intake serves an in-app upload route. The shape
+        # mirrors S3's {url, fields} so the FE upload code is backend-agnostic.
+        return {"url": f"/uploads/local/{key}", "fields": {"key": key, "max_bytes": max_bytes}}
 
 
 class S3ObjectStore:
@@ -131,6 +145,16 @@ class S3ObjectStore:
         return self.client.generate_presigned_url(
             "get_object",
             Params={"Bucket": self.bucket, "Key": key},
+            ExpiresIn=ttl,
+        )
+
+    def presign_put(self, key: str, ttl: int, max_bytes: int) -> dict:
+        # POST policy (not a PUT query URL) so the size ceiling is signed in: the client cannot PUT
+        # more than max_bytes, and the key is fixed (T1 prefix isolation — server-derived, not input).
+        return self.client.generate_presigned_post(
+            Bucket=self.bucket,
+            Key=key,
+            Conditions=[["content-length-range", 0, max_bytes]],
             ExpiresIn=ttl,
         )
 

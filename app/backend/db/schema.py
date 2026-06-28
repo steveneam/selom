@@ -28,12 +28,13 @@ metadata = sa.MetaData()
 # JSONB on Postgres, JSON (text) on SQLite — same Python dict round-trip either way.
 JSON_PORTABLE = sa.JSON().with_variant(JSONB, "postgresql")
 
-# Every row-owning tenant table gets RLS in migration 0002 (Postgres only); listed here so the
-# migration and any audit share one source of truth for "which tables are tenant-scoped".
+# Every row-owning tenant table gets RLS on Postgres (0002 for the original 13; 0003 adds
+# skill_requests + tightens analysis_jobs); listed here so the migrations and any audit share one
+# source of truth for "which tables are tenant-scoped".
 TENANT_TABLES = (
     "users", "workspaces", "projects", "datasets", "intermediate_tables", "artifact_parents",
     "reproduction_runs", "figures", "papers", "supplements", "cleaning_recipes", "gene_sets",
-    "skill_installs",
+    "skill_installs", "skill_requests", "analysis_jobs",
 )
 
 
@@ -57,12 +58,16 @@ def _created_at() -> sa.Column:
 # analysis_jobs — REPLACES the in-memory JobStore (jobs/store.py). Poll-safe across instances:
 # any worker reads the row, not a local dict. Mirrors the Job dataclass + the content-addressed
 # pointer columns (result_cache_key / result_json_s3_key / artifact_id) that later steps populate.
+# The tenant `user_id` stays nullable + FK-free HERE (the SQLite dev/test path mirrors what the
+# Alembic SQLite path builds); migration 0003 adds the users FK + NOT NULL + RLS on **Postgres**
+# only (the Aurora enforcement target), matching the 0002 RLS-is-Postgres-only precedent. The app
+# layer is the primary guarantee: SqlJobStore.create always stamps the verified tenant + upserts
+# the user, so a job is never written without an owner regardless of the dialect.
 analysis_jobs = sa.Table(
     "analysis_jobs",
     metadata,
     sa.Column("id", sa.String(64), primary_key=True),       # uuid4 hex (matches Job.id today)
-    # tenant key — forward-compatible; step 7 adds the users FK + RLS (nullable until auth lands).
-    sa.Column("user_id", sa.Text, nullable=True),
+    sa.Column("user_id", sa.Text, nullable=True),           # tenant — 0003 tightens to NOT NULL+FK on PG
     sa.Column("project_id", sa.String(64), nullable=True),
     sa.Column("dataset_id", sa.String(64), nullable=True),
     sa.Column("skill_id", sa.Text, nullable=False),
@@ -333,4 +338,23 @@ skill_installs = sa.Table(
         "skill_id",
         unique=True,
     ),
+)
+
+# 14. skill_requests — the M-003 AI-skills "safe slice" admin queue. An edge-case skill request
+#     captured from the AI chat: fingerprint(task+data) drives reuse-via-existing-skill; an
+#     un-matched request is queued for a human ("we build it properly next time"). The summary is
+#     REDACTED + length-capped (S1 — it may hold tenant PII), never the raw query. Tenant-scoped.
+skill_requests = sa.Table(
+    "skill_requests",
+    metadata,
+    _pk(),
+    _user_fk(),
+    sa.Column("fingerprint", sa.Text, nullable=False),       # content-hash of (task + data shape) → reuse dedup
+    sa.Column("summary", sa.Text, nullable=False, server_default=""),  # redacted, length-capped (S1)
+    sa.Column("matched_skill_id", sa.Text, nullable=True),   # the reused skill, if the fingerprint matched
+    sa.Column("status", sa.Text, nullable=False, server_default="new"),  # new|reviewed|built|rejected
+    _created_at(),
+    sa.Index("idx_skill_requests_user", "user_id"),
+    sa.Index("idx_skill_requests_fingerprint", "fingerprint"),
+    sa.Index("idx_skill_requests_status", "status"),
 )
