@@ -98,3 +98,14 @@ def test_run_dataset_no_object_409(client):
         "project_id": pid, "filename": "x.csv", "size_bytes": 10}).json()["dataset"]["id"]
     r = client.post("/skills/deg/run-dataset", json={"dataset_id": ds_id})
     assert r.status_code == 409
+
+
+def test_dataset_patch_and_delete(client):
+    ds_id = _uploaded_dataset(client)
+    # FE updateDatasetProfile / renameDataset → PATCH
+    r = client.patch(f"/datasets/{ds_id}", json={"label": "My counts", "modality": "bulk RNA-seq"})
+    assert r.status_code == 200, r.text
+    assert r.json()["label"] == "My counts" and r.json()["modality"] == "bulk RNA-seq"
+    # FE removeDataset → DELETE
+    assert client.delete(f"/datasets/{ds_id}").status_code == 200
+    assert client.get(f"/datasets/{ds_id}").status_code == 404

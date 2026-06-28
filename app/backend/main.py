@@ -1041,6 +1041,29 @@ def list_projects(repo=Depends(_uploads_repo), ctx: AuthContext = Depends(requir
     return {"projects": repo.list_projects(ctx.user_id)}
 
 
+class ProjectPatch(BaseModel):
+    model_config = {"extra": "ignore"}
+    name: str | None = None
+    color: str | None = None
+
+
+@app.patch("/projects/{project_id}")
+def update_project(project_id: str, body: ProjectPatch, repo=Depends(_uploads_repo),
+                   ctx: AuthContext = Depends(require_user)):
+    proj = repo.update_project(ctx.user_id, project_id, **body.model_dump(exclude_unset=True))
+    if proj is None:
+        raise HTTPException(status_code=404, detail="unknown project")
+    return proj
+
+
+@app.delete("/projects/{project_id}")
+def delete_project(project_id: str, repo=Depends(_uploads_repo),
+                   ctx: AuthContext = Depends(require_user)):
+    if repo.delete_project(ctx.user_id, project_id) == 0:
+        raise HTTPException(status_code=404, detail="unknown project")
+    return {"ok": True, "id": project_id}
+
+
 @app.post("/uploads/intake")
 def upload_intake(body: IntakeRequest, repo=Depends(_uploads_repo),
                   ctx: AuthContext = Depends(require_user)):
@@ -1118,6 +1141,31 @@ def get_dataset(dataset_id: str, repo=Depends(_uploads_repo),
     if ds is None:
         raise HTTPException(status_code=404, detail="unknown dataset")
     return ds
+
+
+class DatasetPatch(BaseModel):
+    model_config = {"extra": "ignore"}
+    label: str | None = None
+    modality: str | None = None
+    qc: dict | None = None
+    current_sha256: str | None = None
+
+
+@app.patch("/datasets/{dataset_id}")
+def update_dataset(dataset_id: str, body: DatasetPatch, repo=Depends(_uploads_repo),
+                   ctx: AuthContext = Depends(require_user)):
+    ds = repo.update_dataset(ctx.user_id, dataset_id, **body.model_dump(exclude_unset=True))
+    if ds is None:
+        raise HTTPException(status_code=404, detail="unknown dataset")
+    return ds
+
+
+@app.delete("/datasets/{dataset_id}")
+def delete_dataset(dataset_id: str, repo=Depends(_uploads_repo),
+                   ctx: AuthContext = Depends(require_user)):
+    if repo.delete_dataset(ctx.user_id, dataset_id) == 0:
+        raise HTTPException(status_code=404, detail="unknown dataset")
+    return {"ok": True, "id": dataset_id}
 
 
 class ImportStateRequest(BaseModel):

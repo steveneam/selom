@@ -88,6 +88,30 @@ def test_project_create_is_idempotent_on_id(env):
     assert ids.count("p_dup") == 1
 
 
+def test_project_rename(env):
+    client, _ = env
+    _project(client, pid="p1", name="Old")
+    r = client.patch("/projects/p1", json={"name": "New"})
+    assert r.status_code == 200 and r.json()["name"] == "New"
+
+
+def test_project_delete_cascades_figures(env):
+    client, _ = env
+    pid = _project(client, pid="p1")
+    _figure(client, pid, fid="f1")
+    assert client.delete("/projects/p1").status_code == 200
+    assert client.get("/projects").json()["projects"] == []
+    assert client.get("/figures/f1").status_code == 404  # cascaded (explicit child delete on SQLite)
+
+
+def test_project_patch_isolation(env):
+    client, verifier = env
+    _project(client, pid="p1", name="A's")
+    verifier.user_id = "B"
+    assert client.patch("/projects/p1", json={"name": "hax"}).status_code == 404
+    assert client.delete("/projects/p1").status_code == 404
+
+
 # ── figure CRUD ───────────────────────────────────────────────────────────────────────────────
 def test_figure_create_get_round_trips(env):
     client, _ = env

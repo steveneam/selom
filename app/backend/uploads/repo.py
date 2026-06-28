@@ -135,6 +135,61 @@ class UploadRepo:
                 return [_project_public(r) for r in rows]
         return run_with_db_retry(_work)
 
+    def update_project(self, user_id: str, project_id: str, **changes) -> dict | None:
+        """Rename / recolor a project (FE ``renameProject``). ``None`` ⇒ not this tenant's project."""
+        patch = {k: v for k, v in changes.items() if k in ("name", "color") and v is not None}
+
+        def _work():
+            with self.engine.begin() as conn:
+                set_tenant(conn, user_id)
+                tq = TenantQuery(conn, user_id)
+                if tq.get(projects, project_id) is None:
+                    return None
+                if patch:
+                    tq.update(projects, project_id, **patch)
+                return _project_public(tq.get(projects, project_id))
+        return run_with_db_retry(_work)
+
+    def delete_project(self, user_id: str, project_id: str) -> int:
+        """Delete a project and its children (FE ``deleteProject``). On Postgres the FKs cascade;
+        SQLite doesn't enforce FKs, so delete the project-scoped children explicitly to avoid orphans
+        on the dev path. Workspace-scoped assets (gene sets, papers) are NOT project-owned → untouched."""
+        from db.schema import cleaning_recipes, figures, skill_installs
+
+        def _work():
+            with self.engine.begin() as conn:
+                set_tenant(conn, user_id)
+                tq = TenantQuery(conn, user_id)
+                if tq.get(projects, project_id) is None:
+                    return 0
+                for fig in tq.select(figures, project_id=project_id):
+                    tq.delete(figures, fig.id)
+                for ds in tq.select(datasets, project_id=project_id):
+                    for rec in tq.select(cleaning_recipes, dataset_id=ds.id):
+                        tq.delete(cleaning_recipes, rec.id)
+                    tq.delete(datasets, ds.id)
+                for inst in tq.select(skill_installs, project_id=project_id):
+                    tq.delete(skill_installs, inst.id)
+                return tq.delete(projects, project_id)
+        return run_with_db_retry(_work)
+
+    def update_dataset(self, user_id: str, dataset_id: str, **changes) -> dict | None:
+        """Patch a dataset's user-facing fields (FE ``renameDataset`` / ``updateDatasetProfile`` /
+        ``markDatasetUpdated``): label · modality · qc · current_sha256. ``None`` ⇒ not this tenant's."""
+        patch = {k: v for k, v in changes.items()
+                 if k in ("label", "modality", "qc", "current_sha256") and v is not None}
+
+        def _work():
+            with self.engine.begin() as conn:
+                set_tenant(conn, user_id)
+                tq = TenantQuery(conn, user_id)
+                if tq.get(datasets, dataset_id) is None:
+                    return None
+                if patch:
+                    tq.update(datasets, dataset_id, **patch)
+                return _dataset_public(tq.get(datasets, dataset_id))
+        return run_with_db_retry(_work)
+
     def _ensure_workspace(self, conn: sa.Connection, tq: TenantQuery, user_id: str) -> str:
         existing = conn.execute(
             sa.select(workspaces.c.id).where(workspaces.c.user_id == user_id).limit(1)
