@@ -1,0 +1,46 @@
+# Backend fast-contract gate — runs on every PR/push touching app/backend.
+# Mirrors the local gate (`ruff check` + `pytest -m "not slow"`) on a clean Linux
+# checkout, so the EDR/venv-stub workarounds that only bite on the Windows dev box
+# (memory: selom-backend-python-exec) never apply here — plain `uv` works.
+#
+# NOTE: the extra closure below is the LIGHT fast-gate set (no `omics` — scvi-tools/
+# torch are multi-GB and only the `slow`-marked tests need them). If a non-slow test
+# turns out to need an extra not listed here, add it to the `uv sync` line.
+name: backend-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/backend/**"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "app/backend/**"
+      - ".github/workflows/backend-ci.yml"
+
+defaults:
+  run:
+    working-directory: app/backend
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (+ pinned Python via .python-version)
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "app/backend/uv.lock"
+
+      - name: Install dependencies (light fast-gate closure)
+        run: uv sync --extra dev --extra db --extra jobs --extra scrna --extra pdf
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Fast test gate (pytest -m "not slow")
+        run: uv run pytest -m "not slow"
