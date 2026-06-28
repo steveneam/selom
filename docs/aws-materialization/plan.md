@@ -162,8 +162,13 @@ repro/{run_id}.json                                      reproduction Ledger
 5. ✅ **Reproduction Ledger → S3** (the new `LedgerStore` seam the others already had). **SHIPPED** (S3 side; the Postgres pointer row lands with step 2).
 7a. ✅ **Tenant schema** (the 12 tables §4 + Alembic `0002`; RLS Postgres-only; SQLite-validated).
    **SHIPPED** — pulled ahead of step 6 (see the reorder note below).
-7b. **Clerk auth + `TenantQuery` + RLS enforcement + users/billing** (Aurora provisioned here;
-   `analysis_jobs` gains its users FK + RLS + a non-null tenant; the isolation test gates merge).
+7b. ✅ **Clerk auth + `TenantQuery` + RLS enforcement + users/billing** — **SHIPPED** (SQLite-validated;
+   live Clerk keys + Aurora provisioning pending owner). `auth/` seam (dev + hand-rolled-RS256 clerk
+   modes) · `db/tenant.py` `TenantQuery`/`set_tenant`/`upsert_user` · `db/retry.py` (Aurora resume
+   backoff) · Alembic `0003` (analysis_jobs users-FK + RLS + NOT NULL on Postgres; M-003
+   `skill_requests` folded in) · `SqlJobStore.create` stamps the tenant + the jobs endpoints scope by
+   `ctx.user_id` · Acceptance E (`tests/test_tenant_isolation.py`) green, DB-RLS step Postgres-gated.
+   The `presign_put` seam method (spec §1.1) shipped here too.
 6. **Presigned S3 upload + parsed-parquet** (the genuine flow rewrite; now on the real schema +
    JWT `user_id`). The order-independent `presign_put` seam method is a small slice ahead of it.
 7c. **FE localStorage → Postgres** behind the existing store interfaces (types pre-shaped).

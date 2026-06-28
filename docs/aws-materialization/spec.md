@@ -532,6 +532,17 @@ substrate, adopted as an extra per plan §7 deferral — pyarrow/duckdb only whe
 
 ### 4.3 Auth / users / tenancy — Clerk JWT → Lambda authorizer
 
+> **BUILT (step 7b, SQLite-validated; live Clerk keys + Aurora provisioning pending).** Auth behind
+> a config seam (`auth/context.py`, mirroring `make_object_store`/`make_job_store`): `dev` mode (a
+> fixed offline tenant, the unchanged default) + `clerk` mode (`auth/clerk.py` — hand-rolled RS256
+> over the JWKS, dependency-free so the light Lambda zip stays small; the classic JWT attacks all
+> fail closed, covered by `tests/test_auth.py`). The tenant is always the verified `sub`, never a
+> request param (§6.2). `ClerkVerifier` also honours a Lambda-authorizer-injected `user_id` (prod).
+> `require_user` is the FastAPI dependency; `upsert_user` provisions the row on first request.
+> **Wired into the jobs endpoints** (the only tenant-scoped HTTP surface today); the other handlers
+> adopt it as their server-side rows are born (step 6 / 7c). Flipping to live Clerk needs only the
+> issuer/JWKS config (`SELOM_AUTH_MODE=clerk`, `SELOM_CLERK_ISSUER`).
+
 **Problem (cited):** there is **no `user_id` anywhere today** (inventory.md §3). All state is
 single-tenant.
 
@@ -572,6 +583,16 @@ Plan §2 + R-4. The split is by **dependency weight**, not by domain:
 ---
 
 ## 6. T1 — Structural tenant isolation (acceptance-gating)
+
+> **BUILT (step 7b).** `db/tenant.py` `TenantQuery` (§6.1) — bound to one tenant at construction;
+> every select/insert/update/delete injects the `user_id` predicate; `insert` overwrites a forged
+> `user_id`; `update` can't reassign ownership; no unscoped method exists. `set_tenant` emits the
+> `SET LOCAL app.user_id` RLS backstop (Postgres-only, parameterized via `set_config`). The 0002/0003
+> policies are the DB layer. **Acceptance E (`tests/test_tenant_isolation.py`) is GREEN** on the
+> SQLite fast lane: the app-layer guarantee (steps 1–5 of §6.4) over the jobs endpoints + every
+> tenant table; the DB-RLS bypass (step 6) is Postgres-gated and runs when `SELOM_TEST_DATABASE_URL`
+> points at a real Postgres (Aurora / local PG). The S3 prefix isolation (§6.3) lands with step 6's
+> presigned upload (`presign_put` seam method shipped here).
 
 Four mechanisms; **all four** required (this is plan R-3, the headline production risk).
 
@@ -673,6 +694,14 @@ brings the row to `ready`; and "row pending, no PUT" asserts the sweep removes i
 ---
 
 ## 8. T3 — Aurora Serverless v2 cold-start
+
+> **Client retry/backoff BUILT (step 7b);** the cluster itself is **not provisioned yet** (owner
+> call pending — see the resume note). `db/retry.py` `run_with_db_retry` wraps a unit of DB work in
+> a bounded exponential backoff (3 tries, 2→4→8 s) that retries ONLY the transient resume class
+> (`is_transient` matches "is resuming" / "server closed the connection" / … against the driver
+> message); a real error is re-raised immediately. `pool_pre_ping` (db/engine.py) recycles a
+> known-dead pooled connection. The min-ACU-floor-vs-scale-to-0 decision (below) is a provisioning
+> choice made when the cluster stands up.
 
 **The risk (plan T3 / R-1):** Aurora Serverless v2 scaling **from 0 ACU** adds 10–30 s of latency to
 the first query after idle. A user's first request after a quiet period would hang or time out.
