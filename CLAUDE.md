@@ -54,6 +54,27 @@ Selom is the owner's product and work. Every artifact is authored by the owner �
 - **Surgical changes** — touch only what the task needs; no drive-by rewrites.
 - **Goal-driven verify** — confirm the change does what it should, in the running app.
 
+## Repo structure conventions
+
+Keep the tree clean as we grow. Full plan + rationale: `docs/repo-structure/plan.md`.
+Backstopped by `app/frontend/lib/structure.guard.test.ts` (fails if FE rules drift).
+
+- **Split on responsibility, not a line count.** Extract orchestration into hooks
+  (`useX`) rather than capping lines. Cohesive files (incl. 300–600-line presentational
+  components with co-located private subcomponents) stay whole.
+- **Frontend (`app/frontend`):**
+  - Every `lib/` module lives in a feature dir — **no flat `*-api.ts` at `lib/` root.**
+    Feature endpoint → `lib/<feature>/api.ts`; shared HTTP transport → `lib/api/`; UI
+    utils → `lib/ui/`; figure domain → `lib/figure/`.
+  - **No barrel `index.ts` re-export hubs** in `lib/` (they cause eager-import dev-server
+    slowdown). Import the concrete module path.
+  - Heavy/WebGL libs only via `dynamic(…, { ssr:false })`; keep
+    `lib/figure/ssr-plotly-import.test.ts` green. Large data fixtures are lazy-loaded.
+- **Backend (Codex lane, for reference):** routes live in `routers/<domain>.py`
+  (`APIRouter`); `main.py` only wires `include_router` — no route handlers in `main.py`.
+  Keep the flat-import style; do **not** introduce `src/`.
+- New feature = new dir/router, registered in one line.
+
 ## Notes
 
 - This repo runs on **Opus 4.8** (xhigh effort) — owner-directed 2026-06-13, pinned in `.claude/settings.json` (`model=claude-opus-4-8`, `effortLevel=xhigh`); superseded the prior Fable 5 default.

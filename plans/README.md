@@ -1,5 +1,9 @@
 # Selom build plans — start here
 
+> **HISTORICAL (2026-06-29).** The v2 P0 plans below are superseded by the current
+> backlog: **`docs/pillars/plan.md`** + **`docs/aws-materialization/plan.md`**. The
+> two-lanes / contract-seam description remains accurate; the P0 sequencing does not.
+
 Selom is a no-code multi-omics figure SaaS: a **Python FastAPI backend** runs
 omics skills and emits editable **Plotly** figure specs; a **Next.js frontend**
 uploads data, renders the figure, and lets the user edit it no-code.

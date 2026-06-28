@@ -1,5 +1,8 @@
 # v2 — Backend lane (Codex owns `app/backend/`)
 
+> **HISTORICAL (2026-06-29).** Superseded by `docs/pillars/plan.md` +
+> `docs/aws-materialization/plan.md`. Kept for the original P0 framing only.
+
 FastAPI service that runs omics skills and returns editable Plotly figure specs.
 Python 3.12, uv-managed. Frontend talks to this over `NEXT_PUBLIC_API_BASE`.
 

@@ -1,5 +1,8 @@
 # v2 — Frontend lane (Claude owns `app/frontend/`)
 
+> **HISTORICAL (2026-06-29).** Superseded by `docs/pillars/plan.md` +
+> `docs/aws-materialization/plan.md`. Kept for the original P0 framing only.
+
 Next.js 16 (App Router) + React 19 + Tailwind v4 + shadcn/ui. Renders the
 editable Plotly figure the backend returns and lets the user edit it no-code.
 Talks to the backend over `NEXT_PUBLIC_API_BASE` (default `http://localhost:8000`).
