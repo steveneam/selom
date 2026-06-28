@@ -5,9 +5,9 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-import main
 from config import settings
 from main import app
+from routers import _run as _run_module
 from skills.contract import load_skill, validate_param_ranges
 
 client = TestClient(app)
@@ -73,9 +73,9 @@ def test_run_times_out_on_a_hung_skill(monkeypatch):
         time.sleep(3)
         return {"data": [], "layout": {}}, None
 
-    # main bound these at import, so patch them on the main module (the closure reads the globals).
-    monkeypatch.setattr(main, "run_bundle_with_table", hang)
-    monkeypatch.setattr(main, "run_skill_with_table", hang)
+    # patch on routers._run — the closure in _execute_skill_run reads the module globals there.
+    monkeypatch.setattr(_run_module, "run_bundle_with_table", hang)
+    monkeypatch.setattr(_run_module, "run_skill_with_table", hang)
 
     r = client.post("/skills/volcano/run?override=true", files={"matrix": _CSV})
     assert r.status_code == 504
