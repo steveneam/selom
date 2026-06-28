@@ -54,9 +54,30 @@ Read these in order before doing any work:
    `## Log Edit-Lock` line in `CURRENT.md`, stamp your section, and read the REAL
    clock with PowerShell `Get-Date -Format "yyyy-MM-dd HH:mm zzz"` — never guess a
    time. Release the lock when done.
-9. **`CURRENT.md` updates at MAJOR boundaries only, REPLACE never stack.** Minor
-   progress goes to each agent's rolling log (under `PROGRESS/` or the agent's own
-   log), not into `CURRENT.md`.
+9. **`CURRENT.md` updates at MAJOR boundaries only, REPLACE never stack** — and it is
+   a thin, slot-based pointer, not a per-session essay (see "CURRENT.md shape"). Minor
+   progress goes to each agent's rolling log, not into `CURRENT.md`.
+
+---
+
+## CURRENT.md shape (lean)
+
+`CURRENT.md` is a thin, slot-based pointer. The per-session NARRATIVE (what shipped,
+file-by-file) already lives in commit messages + the plan/spec docs — **do not duplicate
+it here**. Keep these sections and overwrite them in place each session:
+
+- **▸ SESSIONS** — one row per session, newest first: `CODENAME · date · sha-range · one-line`.
+  Scan this instead of reading prose; a finished LIVE block collapses to ONE new row here.
+- **▸ LIVE** — header `CODENAME · date · sha (push state) · agent`, then ~3 bullets: **Shipped**
+  (one line + the commit range to read), **Gates**, **Verified-live** (the deltas git can't show).
+- **▸ NEXT** · **▸ DEFERRED** · **▸ ENV / landmines** · **▸ READ FIRST** — short bullet lists.
+- **## Codex — Last Task & Resume** — the other agent's section (rule 2: never edit it).
+
+**Session tag:** every session has a short ALL-CAPS **CODENAME** (e.g. `STRUCTURE-REFACTOR`)
++ date + sha. That tuple is the session's identifier across `CURRENT.md`, commits, and
+`archive/`. Detail beyond the bullets → the commit range (`git log <a>..<b>`) or a write-once
+`archive/<date>-<codename>.md` — never a growing inline comment. The win: updating the handoff
+= overwrite ~6 short slots + add one SESSIONS row, not author-then-demote a dense paragraph.
 
 ---
 
