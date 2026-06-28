@@ -10,10 +10,13 @@ const nextConfig: NextConfig = {
     proxyClientMaxBodySize: "512mb",
   },
   async rewrites() {
+    // The backend URL is env-configurable so local dogfood can target a non-:8000 port and step-8
+    // deploy can point at the deployed API, with the :8000 default unchanged for the normal inner loop.
+    const target = process.env.API_PROXY_TARGET || "http://localhost:8000";
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:8000/:path*",
+        destination: `${target}/:path*`,
       },
     ];
   },
