@@ -44,6 +44,12 @@ class ObjectStore(Protocol):
         """The object's size in bytes, or ``None`` if absent (the upload-confirm landing check)."""
         ...
 
+    def download_to_path(self, key: str, dest) -> bool:
+        """Stream the object to local file ``dest`` (never buffers the whole object in memory) —
+        the large-omics parse path reads from here, not ``get_bytes`` (spec §4.2). True if
+        downloaded, False if absent."""
+        ...
+
     def delete(self, key: str) -> None:
         """Remove the object if present (a no-op if absent)."""
         ...
@@ -98,6 +104,17 @@ class LocalObjectStore:
     def head_size(self, key: str) -> int | None:
         p = self._path(key)
         return p.stat().st_size if p.exists() else None
+
+    def download_to_path(self, key: str, dest) -> bool:
+        import shutil
+
+        p = self._path(key)
+        if not p.exists():
+            return False
+        dest = pathlib.Path(dest)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(p, dest)
+        return True
 
     def delete(self, key: str) -> None:
         self._path(key).unlink(missing_ok=True)
@@ -154,11 +171,34 @@ class S3ObjectStore:
         return self.head_size(key) is not None
 
     def head_size(self, key: str) -> int | None:
+        from botocore.exceptions import ClientError
+
         try:
             obj = self.client.head_object(Bucket=self.bucket, Key=key)
-        except Exception:
-            return None
+        except ClientError as e:
+            # Map "absent" (404/NotFound/NoSuchKey) → None; RE-RAISE everything else.
+            # Swallowing all exceptions made a throttle/403/5xx look identical to "not there",
+            # so upload-confirm returned a misleading 409 on a transient error (the hardest
+            # class to diagnose in prod). Distinguish absent from broken.
+            code = e.response.get("Error", {}).get("Code", "")
+            if code in ("404", "NotFound", "NoSuchKey"):
+                return None
+            raise
         return int(obj.get("ContentLength", 0))
+
+    def download_to_path(self, key: str, dest) -> bool:
+        from botocore.exceptions import ClientError
+
+        dest = pathlib.Path(dest)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self.client.download_file(self.bucket, key, str(dest))  # streams to disk
+        except ClientError as e:
+            code = e.response.get("Error", {}).get("Code", "")
+            if code in ("404", "NotFound", "NoSuchKey"):
+                return False
+            raise
+        return True
 
     def delete(self, key: str) -> None:
         self.client.delete_object(Bucket=self.bucket, Key=key)

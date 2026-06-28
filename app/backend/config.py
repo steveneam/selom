@@ -8,7 +8,7 @@ flip on the distributed/cloud path. Env-var names match the repo-root ``.env.exa
 
 import pathlib
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent  # D:/selom
@@ -115,6 +115,22 @@ class Settings(BaseSettings):
     # Presigned upload (materialization step 6). A `pending_upload` datasets row whose object never
     # landed (the client PUT failed) is swept after this TTL (spec §7/T2 reverse-orphan). Hours.
     upload_ttl_hours: int = Field(default=24, validation_alias="SELOM_UPLOAD_TTL_HOURS")
+
+    @model_validator(mode="after")
+    def _validate_backend_combos(self):
+        """Fail fast at boot if a non-local backend is selected without its required setting,
+        instead of a cryptic boto/SQL/JWKS error on the first request that touches it. The
+        default (local/memory/dev) trips none of these, so the offline inner loop is unaffected."""
+        problems = []
+        if self.object_store.strip().lower() == "s3" and not self.s3_bucket.strip():
+            problems.append("SELOM_OBJECT_STORE=s3 requires SELOM_S3_BUCKET")
+        if self.job_store.strip().lower() == "sql" and not self.database_url.strip():
+            problems.append("SELOM_JOB_STORE=sql requires SELOM_DATABASE_URL")
+        if self.auth_mode.strip().lower() == "clerk" and not self.clerk_issuer.strip():
+            problems.append("SELOM_AUTH_MODE=clerk requires SELOM_CLERK_ISSUER")
+        if problems:
+            raise ValueError("Invalid Selom configuration — " + "; ".join(problems))
+        return self
 
 
 settings = Settings()

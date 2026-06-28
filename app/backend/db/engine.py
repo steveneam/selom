@@ -13,6 +13,8 @@ paused, so the first query after idle reconnects instead of erroring.
 
 from __future__ import annotations
 
+import os
+
 import sqlalchemy as sa
 
 _engines: dict[str, sa.Engine] = {}
@@ -23,7 +25,18 @@ def make_engine(url: str) -> sa.Engine:
         raise ValueError("a database URL is required (set SELOM_DATABASE_URL for SELOM_JOB_STORE=sql)")
     eng = _engines.get(url)
     if eng is None:
-        eng = sa.create_engine(url, pool_pre_ping=True, future=True)
+        if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+            # On Lambda each warm container keeps its OWN pool; idle connections multiply under
+            # concurrency and Aurora reaps them, so a default QueuePool causes a connection storm.
+            # NullPool (connect-per-use) is the serverless-correct choice (RDS Proxy is the
+            # alternative — spec §8). pre_ping is redundant when every connect is already fresh.
+            from sqlalchemy.pool import NullPool
+
+            eng = sa.create_engine(url, poolclass=NullPool, future=True)
+        else:
+            # Long-lived dev server / container: a pooled engine, pre-pinged so a connection the
+            # serverless DB dropped while paused (T3 Aurora resume) reconnects on next use.
+            eng = sa.create_engine(url, pool_pre_ping=True, future=True)
         _engines[url] = eng
     return eng
 

@@ -32,6 +32,21 @@ class InMemoryObjectStore:
     def head(self, key: str) -> bool:
         return key in self._data
 
+    def head_size(self, key: str) -> int | None:
+        v = self._data.get(key)
+        return len(v) if v is not None else None
+
+    def download_to_path(self, key: str, dest) -> bool:
+        import pathlib
+
+        v = self._data.get(key)
+        if v is None:
+            return False
+        dest = pathlib.Path(dest)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(v)
+        return True
+
     def delete(self, key: str) -> None:
         self._data.pop(key, None)
 
@@ -77,6 +92,61 @@ def test_delete_removes(store):
     assert store.head("results/k.json") is False
     assert store.get_bytes("results/k.json") is None
     store.delete("results/k.json")  # delete-absent is a no-op
+
+
+def test_head_size_matches(store):
+    assert store.head_size("results/s.json") is None
+    store.put_bytes("results/s.json", b"12345")
+    assert store.head_size("results/s.json") == 5
+
+
+def test_download_to_path_streams(store, tmp_path):
+    dest = tmp_path / "out" / "f.csv"
+    assert store.download_to_path("data/x.csv", dest) is False  # absent -> False, no file
+    assert not dest.exists()
+    store.put_bytes("data/x.csv", b"a,b\n1,2\n")
+    assert store.download_to_path("data/x.csv", dest) is True
+    assert dest.read_bytes() == b"a,b\n1,2\n"                     # streamed byte-identical
+
+
+# --- head_size error semantics (M3): "absent" -> None, but a broken call MUST raise -----------
+# Swallowing every exception made a throttle/403/5xx look identical to "not there", so
+# upload-confirm returned a misleading 409 on a transient error. Distinguish absent from broken.
+
+
+def _stub_s3_store(raiser):
+    from storage.object_store import S3ObjectStore
+
+    store = S3ObjectStore.__new__(S3ObjectStore)  # bypass __init__ (no boto3 client/creds)
+    store.bucket = "b"
+
+    class _Client:
+        def head_object(self, **kw):
+            raise raiser()
+
+    store.client = _Client()
+    return store
+
+
+def test_head_size_404_is_none():
+    pytest.importorskip("botocore")
+    from botocore.exceptions import ClientError
+
+    store = _stub_s3_store(
+        lambda: ClientError({"Error": {"Code": "404", "Message": "Not Found"}}, "HeadObject")
+    )
+    assert store.head_size("k") is None
+
+
+def test_head_size_reraises_non_404():
+    pytest.importorskip("botocore")
+    from botocore.exceptions import ClientError
+
+    store = _stub_s3_store(
+        lambda: ClientError({"Error": {"Code": "403", "Message": "Forbidden"}}, "HeadObject")
+    )
+    with pytest.raises(ClientError):
+        store.head_size("k")  # a 403 is NOT "absent" — it must surface, not return None
 
 
 # --- Result adapter parity over the seam -----------------------------------------------------
@@ -219,8 +289,18 @@ def test_real_s3objectstore_against_moto():
         assert store.head("results/x.json") is True
         store.put_bytes("results/x.json", b'{"k": 1}')  # idempotent re-write
         assert store.get_bytes("results/x.json") == b'{"k": 1}'
+        assert store.head_size("results/x.json") == len(b'{"k": 1}')
         url = store.presign_get("results/x.json", 300)
         assert url and url.startswith("https://") and "results/x.json" in url
+        # download_to_path streams to disk (the large-omics parse reads from here, not get_bytes)
+        import pathlib
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            dest = pathlib.Path(td) / "x.json"
+            assert store.download_to_path("results/x.json", dest) is True
+            assert dest.read_bytes() == b'{"k": 1}'
+            assert store.download_to_path("results/absent.json", dest.with_name("absent")) is False
         # presign_put: a POST policy ({url, fields}) with the key bound + a size ceiling signed in.
         post = store.presign_put("uploads/A/p/d/x.csv", 300, 1_000_000)
         assert post["url"].startswith("https://") and post["fields"]["key"] == "uploads/A/p/d/x.csv"
