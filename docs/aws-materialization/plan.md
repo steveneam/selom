@@ -1,9 +1,10 @@
 # Selom — AWS Materialization + AI-layer Plan
 
 Status: **Active build plan — amended in place.** The discussion gate is passed; building in
-§6 order (step 1 shipped). Created 2026-06-28. Supersedes the roadmap's planned
-Supabase + Cloudflare R2 materialization shape. Companion to memory
-`selom-aws-materialization-decision`.
+§6 order — **steps 1–5 shipped** (all four content-addressed stores ride the one `ObjectStore`
+seam; verified live on the dev S3 bucket). **Next = step 2** (jobs → Postgres) — the Aurora/DB
+lift. Created 2026-06-28. Supersedes the roadmap's planned Supabase + Cloudflare R2
+materialization shape. Companion to memory `selom-aws-materialization-decision`.
 
 > This doc consolidates: the persistence→schema **audit**, the package **eval**, the planner
 > **architect blueprint** (16 decisions / 7 risks / 3 milestone specs), and the planner
@@ -147,16 +148,17 @@ repro/{run_id}.json                                      reproduction Ledger
 
 ## 6. Lowest-risk migration sequence (build phase — gated on prerequisites §8)
 
-1. **Result store → S3** (`R2ResultStore` already exists; near config-only — proves the seam).
-2. **Jobs → Postgres `analysis_jobs`** (kills the statelessness blocker; required before multi-instance).
-3. **Result-cache disk tier → S3** (the named C4; swap `_disk_read/_write` behind `put/fetch`).
-4. **Artifact/lineage store → S3** (the named D4; `artifact_id` is already the key).
-5. **Reproduction Ledger → S3/Postgres** (write the backend the others already have).
-6. **Presigned S3 upload + parsed-parquet** (the one genuine flow rewrite; do after 1–4).
+1. ✅ **Result store → S3** (near config-only — proves the seam). **SHIPPED.**
+2. **Jobs → Postgres `analysis_jobs`** (kills the statelessness blocker; required before multi-instance). **← NEXT** (needs Aurora).
+3. ✅ **Result-cache durable tier → S3** (the named C4; `_disk_read/_write` → the `ObjectStore`). **SHIPPED.**
+4. ✅ **Artifact/lineage store → S3** (the named D4; `artifact_id` is already the key). **SHIPPED.**
+5. ✅ **Reproduction Ledger → S3** (the new `LedgerStore` seam the others already had). **SHIPPED** (S3 side; the Postgres pointer row lands with step 2).
+6. **Presigned S3 upload + parsed-parquet** (the one genuine flow rewrite; do after 1–5).
 7. **Auth + users/billing + RLS, then FE localStorage → Postgres** (largest product lift; types pre-shaped).
 8. **Split deploy** (light zip + heavy Docker Lambda); secrets → Secrets Manager; SSE → polling/WS.
 
-Steps 1–5 are backend swaps the code was built to absorb; 6 is the rewrite; 7 is the product/auth lift.
+Steps 1–5 (the four-store seam) are SHIPPED — backend swaps the code was built to absorb; 6 is the
+rewrite; 7 is the product/auth lift. The DB-free seam work is done; step 2 begins the Aurora/DB lift.
 
 ---
 

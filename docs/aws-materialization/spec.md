@@ -1,7 +1,12 @@
 # Selom — AWS Materialization Foundation (M-001) — Implementation Spec
 
-Status: **Amended in place as we build.** M-001 **step 1 (result store → S3) is BUILT**
-(plan §6 — `storage/object_store.py` + `storage/results.py`); the rest is spec. Created 2026-06-28.
+Status: **Amended in place as we build.** M-001 **steps 1–5 are BUILT** — all four
+content-addressed stores now ride the one `ObjectStore` seam (plan §6): result store
+(`storage/results.py`), result-cache durable tier (`skills/_result_cache.py`), artifact/lineage
+store (`engine/lineage.py`), and the reproduction Ledger via the new `LedgerStore` seam
+(`reproduction.py`). Each ships behind `SELOM_OBJECT_STORE` (local default unchanged; `s3` flips
+all four), verified on the live dev bucket + moto-backed parity in the fast suite. Steps 6–8
+(presigned upload · auth/tenancy/RLS+FE · split deploy) remain spec. Created 2026-06-28.
 
 Parent / source of truth: `docs/aws-materialization/plan.md` (locked decisions §1, topology §2,
 schema §4, S3 layout §5, migration order §6, QR-hardened must-cover §3). This spec implements the
@@ -31,7 +36,7 @@ Evidence the codebase already honours this:
 | Result store | `storage/results.py:24` (`ResultStore` Protocol) · `:110` (`make_result_store` Local↔R2) | already a Protocol with an S3-API twin; AWS = a third backend |
 | Result cache | `skills/_result_cache.py:184` (`_disk_read`) · `:193` (`_disk_write`) · `:202` (`fetch`) · `:228` (`put`) | a clean disk-IO boundary; the docstring already names "a future durable R2 tier (C4)" |
 | Lineage | `engine/lineage.py:138` (`ArtifactStore`) · `:161` (`put`) · `:177` (`get_table`) · `:184` (`get_meta`); `artifact_id` = sha at `:270`/`:280` | content-hash PK; docstring names "the D4 object-store tier swaps the backend behind this interface" |
-| Ledger | `reproduction.py:971` (`save_ledger`) · `:980` (`load_ledger`) · `:965` (`_default_root`) | the **only** store with **no abstraction** — direct `path.write_text` / `model_validate_json`. The one we must build a seam for. |
+| Ledger | `reproduction.py` `LedgerStore` / `ObjectStoreLedgerStore` + `save_ledger`/`load_ledger` | was the **only** store with no abstraction (direct `path.write_text`); step 5 gave it the `LedgerStore` seam over the ObjectStore (the `root=` arg still writes a direct filesystem path for back-compat). |
 
 Three things are **genuinely new** (no seam exists): statelessness (`jobs/store.py:81` in-memory
 singleton), presigned upload (`main.py:158`/`:343` buffer whole files; `engine/ingest.py:177`/`:351`
@@ -803,16 +808,16 @@ Schema carries the fields now; numbers are gated at launch (plan §7 deferral; L
 Build-phase order; each step is independently shippable behind the config flag (local default
 unchanged until flipped):
 
-1. **Result store → S3** — adapter over `ObjectStore` (`R2ResultStore` already exists,
-   `results.py:58`); near config-only. Proves the seam.
+1. ✅ **Result store → S3** — adapter over `ObjectStore`; near config-only. Proves the seam. **BUILT.**
 2. **Jobs → Postgres `analysis_jobs`** — `PgJobStore` (§4.1). Kills the statelessness blocker;
-   required before any multi-instance deploy.
-3. **Result-cache disk tier → S3** — swap `_disk_read/_disk_write` (`_result_cache.py:184`/`193`)
-   for the `ObjectStore` backend (the named C4).
-4. **Artifact/lineage store → S3** — `ArtifactStore` over `ObjectStore` (the named D4;
-   `artifact_id` is already the key, `lineage.py:270`).
-5. **Reproduction Ledger → S3/Postgres** — build the `LedgerStore` seam (§1.2) the other three
-   already have; pointer row in `reproduction_runs`.
+   required before any multi-instance deploy. *(Next — needs Aurora; the DB lift.)*
+3. ✅ **Result-cache durable tier → S3** — `_disk_read/_disk_write` → `_obj_read/_obj_write` over the
+   `ObjectStore` (key `cache/result/{key}.json`; the named C4). **BUILT.**
+4. ✅ **Artifact/lineage store → S3** — `ArtifactStore` over `ObjectStore` (keys
+   `artifacts/{id}.csv` + `.meta.json`; the named D4). **BUILT.**
+5. ✅ **Reproduction Ledger → S3** — new `LedgerStore` seam (`ObjectStoreLedgerStore`, key
+   `repro/{slug}/ledger.json`). **BUILT** on the S3 side; the `reproduction_runs` pointer row is
+   part of step 2's Postgres schema (still pending).
 6. **Presigned S3 upload + parsed-parquet** — the one genuine flow rewrite (§4.2); do after 1–5.
 7. **Auth + users/billing + RLS, then FE localStorage → Postgres** (§4.3, §6, §10) — the largest
    product lift; FE types are pre-shaped.
@@ -846,12 +851,16 @@ for prod (`s3`). This is the structural guarantee behind plan D6 ("the dev path 
 
 ## 15. Acceptance criteria
 
-A — **Store seam**
-- [ ] One `ObjectStore` Protocol with `Local`/`S3` backends, selected by `settings.object_store`
-      (mirrors `make_result_store`, `results.py:110`).
-- [ ] All four stores (result, result-cache disk tier, lineage, **Ledger**) route bytes through it;
-      the Ledger gains the `LedgerStore` seam it lacks today (`reproduction.py:971`).
-- [ ] §14 parity suite green on both `local` and `s3` backends.
+A — **Store seam** ✅ (steps 1–5)
+- [x] One `ObjectStore` Protocol with `Local`/`S3` backends, selected by `settings.object_store`
+      (mirrors `make_result_store`). `LocalObjectStore.put_bytes` is atomic (write-temp + replace) so
+      the cache/artifact torn-read guarantee survives the seam.
+- [x] All four stores (result, result-cache durable tier, lineage, **Ledger**) route bytes through
+      it; the Ledger gained the `LedgerStore` seam (`ObjectStoreLedgerStore`, key
+      `repro/{slug}/ledger.json`) it lacked. `save_ledger`/`load_ledger` keep their `root=` direct-
+      filesystem path (back-compat); only the no-`root` default flows through the seam.
+- [x] §14 parity suite green on both backends + the **real boto3 path** (moto) for all four stores;
+      live round-trip on the dev bucket `selom-dev-objectstore-apse2` passed for steps 1–5.
 
 B — **Schema**
 - [ ] All tenant tables from §2.3 created with FKs, indexes, and the RLS enable+policy block on every
