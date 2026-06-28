@@ -1,33 +1,36 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { api } from "@/lib/api/client";
 import type { GeneSet, ProjectState, SkillInstall } from "@/lib/projects/types";
 import type { SavedPaper, SavedSupplement, WorkspaceSkill, WorkspaceState } from "./types";
+import {
+  fromApiGeneSet, fromApiPaper, queue, reconcileFetchWorkspace, toApiGeneSet, toApiPaper,
+} from "./sync";
 
 /**
- * Mock `WorkspaceStore` — the localStorage-backed implementation of the project- and
- * data-AGNOSTIC Workspace Library (docs/workspace-library/spec.md §4).
+ * `WorkspaceStore` — the optimistic, API-backed Workspace Library (AWS materialization step 7c).
  *
- * A near-copy of `projectStore`'s proven pattern so the swap to a real account/DB+auth
- * backend is an impl change, not a caller rewrite (the persistence seam, spec §4): every
- * caller only ever touches `workspaceStore` / `useWorkspace` (spec I1). SSR-safe — the
- * seed is the server snapshot and the first client snapshot, so hydration matches; the
- * persisted state (and the one-time migration from project scope) loads once on the
- * client via `hydrate()` (spec I2).
+ * Same sync-read / async-write shape as `projectStore` (sub-spec §2.2): the in-memory `state` stays
+ * the synchronous source of truth (unchanged interface), each mutator writes through to a
+ * localStorage mirror and enqueues the durable API write, and `hydrate()` reconciles against the
+ * server. Paper mutations (supplements, data map, run id) re-upsert the WHOLE paper — the backend
+ * reconciles its supplement children in one call — coalesced per paper so an edit burst is one POST.
  */
 
 const KEY = "selom.workspace.v1";
-/** The project-store key the one-time migration reads from (spec §6). */
+/** The project-store key the one-time *local* migration reads from (the mirror seed; spec §6). */
 const PROJECTS_KEY = "selom.projects.v1";
+const DELETE_GRACE_MS = 7000;
 
 function uid(prefix: string): string {
-  // Browser-only mutator path; safe to use crypto here.
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
-  return `${prefix}_${Math.floor(Math.random() * 1e9).toString(36)}`;
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `${prefix}_${crypto.randomUUID().replace(/-/g, "")}`;
+  }
+  return `${prefix}_${Math.floor(Math.random() * 1e9).toString(36)}${Math.floor(Math.random() * 1e9).toString(36)}`;
 }
 
-/** Deterministic empty seed (stable → no SSR/hydration mismatch). The Library starts empty;
- *  the first `hydrate()` migrates any project-scoped gene sets + installs in (spec §6). */
+/** Deterministic empty seed (stable → no SSR/hydration mismatch). */
 function seed(): WorkspaceState {
   return { papers: [], geneSets: [], skills: [] };
 }
@@ -54,11 +57,16 @@ function setState(next: WorkspaceState) {
   emit();
 }
 
+/** Enqueue a coalesced whole-paper upsert (per paper id). */
+function pushPaper(p: SavedPaper) {
+  queue.enqueue({ coalesceKey: `paper:${p.id}`, run: () => api.post("/workspace/papers", toApiPaper(p)) });
+}
+
 /**
- * One-time, NON-DESTRUCTIVE migration (spec §6, I4): lift the assets that used to hang off a
- * project into the account-level workspace. The projectStore copies are read, never deleted —
- * callers stop reading them once they point at the workspace (a tracked follow-up, not a
- * big-bang rewrite). Returns a fresh seed if there's nothing to migrate.
+ * One-time, NON-DESTRUCTIVE *local* migration (mirror seed only): lift project-scoped gene sets +
+ * installs into the workspace mirror so the FE renders them instantly. The durable server-side
+ * migration is the backend import (`importLocalStateOnce`). The projectStore copies are read, never
+ * deleted.
  */
 function migrateFromProjects(): WorkspaceState {
   const next = seed();
@@ -66,8 +74,6 @@ function migrateFromProjects(): WorkspaceState {
     const raw = localStorage.getItem(PROJECTS_KEY);
     if (!raw) return next;
     const projects = JSON.parse(raw) as Partial<ProjectState>;
-    // Gene sets: lift all of them, deduped on the source catalog id (createdFrom) so the
-    // same panel saved into two projects collapses to one workspace entry.
     const seenFrom = new Set<string>();
     for (const g of projects.geneSets ?? []) {
       if (g.createdFrom != null) {
@@ -76,7 +82,6 @@ function migrateFromProjects(): WorkspaceState {
       }
       next.geneSets.push(g);
     }
-    // Installs: the union of skill ids across every project becomes the workspace skill library.
     const seenSkill = new Set<string>();
     for (const i of (projects.installs ?? []) as SkillInstall[]) {
       if (seenSkill.has(i.skillId)) continue;
@@ -88,6 +93,29 @@ function migrateFromProjects(): WorkspaceState {
   }
   return next;
 }
+
+function mergeById<T extends { id: string }>(local: T[], server: T[]): T[] {
+  const byId = new Map<string, T>();
+  for (const r of local) byId.set(r.id, r);
+  for (const r of server) byId.set(r.id, r);
+  return [...byId.values()];
+}
+
+async function reconcile() {
+  if (queue.pending > 0) return; // a write is in flight — don't clobber the newer local row
+  try {
+    const srv = await reconcileFetchWorkspace();
+    setState({
+      papers: mergeById(state.papers, srv.papers),
+      geneSets: mergeById(state.geneSets, srv.geneSets),
+      skills: mergeById(state.skills, srv.skills),
+    });
+  } catch {
+    /* offline / backend down — the mirror already rendered; a later focus retries */
+  }
+}
+
+let focusBound = false;
 
 export const workspaceStore = {
   subscribe(cb: () => void): () => void {
@@ -101,8 +129,7 @@ export const workspaceStore = {
     return state;
   },
 
-  /** Load persisted state on the client (once); on a first run, run the project→workspace
-   *  migration. Safe post-hydration (the `hydrated` flag makes it a no-op thereafter). */
+  /** Load the mirror (or run the local project→workspace migration on a first run), then reconcile. */
   hydrate() {
     if (hydrated || typeof window === "undefined") return;
     hydrated = true;
@@ -111,16 +138,10 @@ export const workspaceStore = {
       if (raw) {
         const parsed = JSON.parse(raw) as Partial<WorkspaceState>;
         if (parsed && typeof parsed === "object") {
-          // Tolerate snapshots persisted before a collection existed.
-          state = {
-            papers: parsed.papers ?? [],
-            geneSets: parsed.geneSets ?? [],
-            skills: parsed.skills ?? [],
-          };
+          state = { papers: parsed.papers ?? [], geneSets: parsed.geneSets ?? [], skills: parsed.skills ?? [] };
           emit();
         }
       } else {
-        // First run on this client — migrate project-scoped assets in, then persist.
         state = migrateFromProjects();
         persist();
         emit();
@@ -128,49 +149,47 @@ export const workspaceStore = {
     } catch {
       /* ignore corrupt storage */
     }
+    void reconcile();
+    if (!focusBound && typeof window.addEventListener === "function") {
+      focusBound = true;
+      window.addEventListener("focus", () => void reconcile());
+    }
   },
 
   // ── papers ───────────────────────────────────────────────────────────────
-  /** Save a Skill-Match result. Idempotent on `doi || filename` (spec I3): re-saving the
-   *  same paper updates the existing record in place, never duplicates. Returns the saved row. */
+  /** Save a Skill-Match result. Idempotent on `doi || filename` (spec I3). */
   savePaper(p: Omit<SavedPaper, "id" | "savedAt">): SavedPaper {
-    const dedupKey = (x: { doi?: string | null; filename: string }) =>
-      (x.doi && x.doi.trim()) || x.filename;
+    const dedupKey = (x: { doi?: string | null; filename: string }) => (x.doi && x.doi.trim()) || x.filename;
     const key = dedupKey(p);
     const existing = state.papers.find((x) => dedupKey(x) === key);
-    const saved: SavedPaper = {
-      ...p,
-      id: existing?.id ?? uid("paper"),
-      savedAt: Date.now(),
-    };
+    const saved: SavedPaper = { ...p, id: existing?.id ?? uid("paper"), savedAt: Date.now() };
     setState({
       ...state,
-      papers: existing
-        ? state.papers.map((x) => (x.id === existing.id ? saved : x))
-        : [saved, ...state.papers],
+      papers: existing ? state.papers.map((x) => (x.id === existing.id ? saved : x)) : [saved, ...state.papers],
     });
+    pushPaper(saved);
     return saved;
   },
   /** Remove a saved paper, returning the removed record so the caller can offer an Undo. */
   removePaper(id: string): SavedPaper | undefined {
     const removed = state.papers.find((p) => p.id === id);
-    if (removed) setState({ ...state, papers: state.papers.filter((p) => p.id !== id) });
+    if (removed) {
+      setState({ ...state, papers: state.papers.filter((p) => p.id !== id) });
+      queue.enqueue({ key: `del:paper:${id}`, graceMs: DELETE_GRACE_MS, run: () => api.del(`/workspace/papers/${id}`) });
+    }
     return removed;
   },
   /** Re-insert a removed paper (Undo). No-op if it's already present. */
   restorePaper(paper: SavedPaper) {
     if (state.papers.some((p) => p.id === paper.id)) return;
     setState({ ...state, papers: [paper, ...state.papers] });
+    if (queue.cancel(`del:paper:${paper.id}`)) return; // Undo within grace — the DELETE never fired
+    pushPaper(paper);
   },
 
-  // ── paper supplements (Reproduction stage 2; docs/workspace-library/spec.md §10) ──────────
-  /** Attach supplementary files to a saved paper (metadata only — no bytes, spec I5). Deduped on
-   *  filename within the paper so re-dropping the same file is a no-op. Returns the updated paper
-   *  (or undefined if the paper isn't in the Library). */
-  addPaperSupplements(
-    paperId: string,
-    items: Omit<SavedSupplement, "id" | "addedAt">[],
-  ): SavedPaper | undefined {
+  // ── paper supplements ───────────────────────────────────────────────────────────────────────
+  /** Attach supplementary files to a saved paper (metadata only — no bytes, spec I5). */
+  addPaperSupplements(paperId: string, items: Omit<SavedSupplement, "id" | "addedAt">[]): SavedPaper | undefined {
     const paper = state.papers.find((p) => p.id === paperId);
     if (!paper) return undefined;
     const have = new Set((paper.supplements ?? []).map((s) => s.filename.toLowerCase()));
@@ -184,19 +203,18 @@ export const workspaceStore = {
     if (added.length === 0) return paper;
     const updated: SavedPaper = { ...paper, supplements: [...(paper.supplements ?? []), ...added] };
     setState({ ...state, papers: state.papers.map((p) => (p.id === paperId ? updated : p)) });
+    pushPaper(updated);
     return updated;
   },
-  /** Stamp the live-reproduction run id once a paper's drive succeeds (live-reproduction-spec §7).
-   *  The Score stage reads it to fetch + render the driven ledger. No-op if the paper is gone. */
+  /** Stamp the live-reproduction run id once a paper's drive succeeds. */
   setPaperReproductionRun(paperId: string, runId: string) {
     const paper = state.papers.find((p) => p.id === paperId);
     if (!paper || paper.reproductionRunId === runId) return;
     const updated: SavedPaper = { ...paper, reproductionRunId: runId };
     setState({ ...state, papers: state.papers.map((p) => (p.id === paperId ? updated : p)) });
+    pushPaper(updated);
   },
-  /** Persist the per-panel data-picker overrides (Slice 2 R4): panel_key → supplement filename.
-   *  Replaces the whole map (the picker owns the full set each save). Empty → clears it. No-op if
-   *  the paper is gone or the map is unchanged. */
+  /** Persist the per-panel data-picker overrides (panel_key → supplement filename). */
   setPaperDataMap(paperId: string, dataMap: Record<string, string>) {
     const paper = state.papers.find((p) => p.id === paperId);
     if (!paper) return;
@@ -204,33 +222,33 @@ export const workspaceStore = {
     if (JSON.stringify(paper.dataMap ?? null) === JSON.stringify(next ?? null)) return;
     const updated: SavedPaper = { ...paper, dataMap: next };
     setState({ ...state, papers: state.papers.map((p) => (p.id === paperId ? updated : p)) });
+    pushPaper(updated);
   },
   /** Detach one supplement from a paper by its id. */
   removePaperSupplement(paperId: string, supplementId: string) {
     const paper = state.papers.find((p) => p.id === paperId);
     if (!paper || !paper.supplements) return;
-    const updated: SavedPaper = {
-      ...paper,
-      supplements: paper.supplements.filter((s) => s.id !== supplementId),
-    };
+    const updated: SavedPaper = { ...paper, supplements: paper.supplements.filter((s) => s.id !== supplementId) };
     setState({ ...state, papers: state.papers.map((p) => (p.id === paperId ? updated : p)) });
+    pushPaper(updated);
   },
 
   // ── gene sets ──────────────────────────────────────────────────────────────
   /** Save a gene set into the workspace (idempotent on the source catalog id). */
   saveGeneSet(set: Omit<GeneSet, "id" | "projectId" | "createdAt">): GeneSet {
-    const existing = state.geneSets.find(
-      (g) => g.createdFrom != null && g.createdFrom === set.createdFrom,
-    );
+    const existing = state.geneSets.find((g) => g.createdFrom != null && g.createdFrom === set.createdFrom);
     if (existing) return existing;
-    // projectId is vestigial at the workspace level (spec D1); keep the field shape for the
-    // GeneSet type + the later DB row, but it no longer scopes anything.
     const g: GeneSet = { ...set, id: uid("gs"), projectId: "", createdAt: Date.now() };
     setState({ ...state, geneSets: [g, ...state.geneSets] });
+    queue.enqueue({
+      run: () => api.post("/workspace/gene-sets", toApiGeneSet(g)),
+      onPermanentFail: () => setState({ ...state, geneSets: state.geneSets.filter((x) => x.id !== g.id) }),
+    });
     return g;
   },
   removeGeneSet(id: string) {
     setState({ ...state, geneSets: state.geneSets.filter((g) => g.id !== id) });
+    queue.enqueue({ key: `del:gs:${id}`, graceMs: DELETE_GRACE_MS, run: () => api.del(`/workspace/gene-sets/${id}`) });
   },
 
   // ── skills ───────────────────────────────────────────────────────────────
@@ -238,9 +256,14 @@ export const workspaceStore = {
     if (state.skills.some((s) => s.skillId === skillId)) return;
     const s: WorkspaceSkill = { id: uid("ws"), skillId, installedAt: Date.now() };
     setState({ ...state, skills: [...state.skills, s] });
+    queue.enqueue({
+      run: () => api.post("/skill-installs", { id: s.id, skill_id: skillId }), // no project → workspace-wide
+      onPermanentFail: () => setState({ ...state, skills: state.skills.filter((x) => x.id !== s.id) }),
+    });
   },
   uninstallSkill(skillId: string) {
     setState({ ...state, skills: state.skills.filter((s) => s.skillId !== skillId) });
+    queue.enqueue({ run: () => api.del(`/skill-installs?skill_id=${encodeURIComponent(skillId)}`) });
   },
 };
 
@@ -258,3 +281,5 @@ export const wselect = {
 export function useWorkspace(): WorkspaceState {
   return useSyncExternalStore(workspaceStore.subscribe, workspaceStore.getSnapshot, workspaceStore.getServerSnapshot);
 }
+
+export { fromApiPaper, fromApiGeneSet };

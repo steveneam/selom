@@ -179,7 +179,7 @@ export const projectStore = {
       /* ignore corrupt storage */
     }
     void reconcile();
-    if (!focusBound) {
+    if (!focusBound && typeof window.addEventListener === "function") {
       focusBound = true;
       window.addEventListener("focus", () => void reconcile());
     }

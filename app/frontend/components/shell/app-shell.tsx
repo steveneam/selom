@@ -8,6 +8,7 @@ import { CommandPalette } from "./command-palette";
 import { UndoToast } from "./undo-toast";
 import { projectStore } from "@/lib/projects/store";
 import { workspaceStore } from "@/lib/workspace/store";
+import { importLocalStateOnce } from "@/lib/api/import-local-state";
 
 /**
  * The persistent command-center frame: project rail + header + main stage.
@@ -29,6 +30,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // Load persisted projects + the rail-collapse preference on the client, once.
   React.useEffect(() => {
+    // One-time localStorage → Postgres import (idempotent, marker-gated) so existing dogfood work is
+    // migrated to the account DB; fire-and-forget before hydrate (a later reconcile pulls server truth).
+    void importLocalStateOnce();
     projectStore.hydrate();
     // After projects (so the one-time workspace migration reads a persisted snapshot).
     workspaceStore.hydrate();

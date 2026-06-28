@@ -1,11 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Unit tests for the Workspace-Library store (the localStorage mock + the project→workspace
+ * Unit tests for the Workspace-Library store (the local cache behavior + the project→workspace
  * migration). The vitest env is "node", so we stub a minimal in-memory `localStorage` + a
  * `window` (the store guards hydration on `typeof window`). Each test imports a FRESH module
- * instance (`vi.resetModules()`) so the module-scoped `state`/`hydrated` start clean.
+ * instance (`vi.resetModules()`) so the module-scoped `state`/`hydrated` start clean. The HTTP
+ * client is mocked so the optimistic API enqueues resolve without a backend (7c).
  */
+
+vi.mock("@/lib/api/client", () => {
+  const api = {
+    get: vi.fn().mockResolvedValue({}),
+    post: vi.fn().mockResolvedValue({}),
+    patch: vi.fn().mockResolvedValue({}),
+    del: vi.fn().mockResolvedValue({}),
+  };
+  return { api, setAuthHeader: vi.fn(), ApiError: class extends Error {} };
+});
 
 class MemStorage {
   private m = new Map<string, string>();
