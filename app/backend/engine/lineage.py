@@ -18,10 +18,11 @@ Three things this buys, the D3 acceptance:
   and renders "merged from {A, B, C}".
 
 Content-addressed, immutable, dependency-free — the same discipline as the C1 result cache
-(`skills/_result_cache.py`), and the **local precursor to D4** (the deferred DuckDB/Parquet lane):
-the local-dir backend swaps for an object store behind this same interface, exactly as C1's disk
-tier swaps for R2. A single-cell **matrix** payload (AnnData) is recorded **meta-only** (shape +
-lineage, no multi-GB CSV) — honest and bounded. See
+(`skills/_result_cache.py`). The artifact bytes now ride the shared **ObjectStore** seam
+(`storage/object_store.py`, keys ``artifacts/{id}.csv`` + ``artifacts/{id}.meta.json``): the
+backend swaps from local disk to S3 by config, behind this same interface — this is the named D4
+(materialization step 4, docs/aws-materialization/spec.md §1.2). A single-cell **matrix** payload
+(AnnData) is recorded **meta-only** (shape + lineage, no multi-GB CSV) — honest and bounded. See
 ``docs/architecture-consistency-gate/intermediate-table-lineage.md``.
 """
 
@@ -30,7 +31,6 @@ from __future__ import annotations
 import datetime
 import hashlib
 import json
-import os
 import pathlib
 import threading
 from typing import Any
@@ -38,6 +38,7 @@ from typing import Any
 from pydantic import BaseModel, Field, computed_field
 
 from engine.databundle import _is_anndata, _is_dataframe
+from storage.object_store import LocalObjectStore, get_object_store
 
 # Artifact kinds (the stage that produced the table).
 KIND_INGESTED = "ingested"    # the table a skill consumed, straight from ingest (parent = source file)
@@ -136,39 +137,48 @@ def source_parent(path: Any, filename: str = "") -> ParentRef:
 
 
 class ArtifactStore:
-    """Content-addressed local store: ``<id>.csv`` (the table) + ``<id>.meta.json`` (the lineage),
-    under ``data/artifacts/``. Immutable — a content hash that already exists is never rewritten, so a
-    re-materialize is a cheap idempotent no-op (the reproducibility guarantee). Disk-backed with a
-    small in-process meta cache; the D4 object-store tier swaps the backend behind this interface."""
+    """Content-addressed store on the shared ObjectStore seam: ``artifacts/<id>.csv`` (the table) +
+    ``artifacts/<id>.meta.json`` (the lineage). Immutable — a content hash that already exists is
+    never rewritten, so a re-materialize is a cheap idempotent no-op (the reproducibility guarantee).
+    A small in-process meta cache fronts the seam; the backend swaps from local disk to S3 by config
+    (D4) behind this interface — no caller changes."""
 
-    def __init__(self, root: Any, enabled: bool = True) -> None:
-        self.root = pathlib.Path(root)
+    def __init__(self, root: Any = None, enabled: bool = True, object_store=None) -> None:
+        # ``root`` (a local dir) keeps the test/explicit-local construction working — it becomes a
+        # root-scoped ``LocalObjectStore``. With no root and no injected store, the bytes ride the
+        # shared object store (data_dir-local in dev, S3 in prod) selected by config.
+        self.root = pathlib.Path(root) if root is not None else None
         self.enabled = enabled
+        self._obj = object_store
         self._meta_mem: dict[str, ArtifactMeta] = {}
         self._lock = threading.Lock()
 
-    def _table_path(self, aid: str) -> pathlib.Path:
-        return self.root / f"{aid}.csv"
+    def _store(self):
+        """The backend: an injected store, else a root-scoped local store, else the shared process
+        object store (resolved live so a test ``set_object_store`` is honoured)."""
+        if self._obj is not None:
+            return self._obj
+        if self.root is not None:
+            return LocalObjectStore(self.root)
+        return get_object_store()
 
-    def _meta_path(self, aid: str) -> pathlib.Path:
-        return self.root / f"{aid}.meta.json"
+    def _table_key(self, aid: str) -> str:
+        return f"artifacts/{aid}.csv"
 
-    def _atomic_write(self, target: pathlib.Path, write) -> None:
-        tmp = target.with_name(f"{target.name}.{os.getpid()}.tmp")
-        write(tmp)
-        os.replace(tmp, target)  # atomic — no torn reads across workers
+    def _meta_key(self, aid: str) -> str:
+        return f"artifacts/{aid}.meta.json"
 
     def put(self, aid: str, meta: ArtifactMeta, csv_bytes: bytes | None) -> None:
         """Write the table (if any) + its meta, immutably (skip if the id already exists)."""
         if not self.enabled:
             return
         try:
-            self.root.mkdir(parents=True, exist_ok=True)
-            if csv_bytes is not None and not self._table_path(aid).is_file():
-                self._atomic_write(self._table_path(aid), lambda t: t.write_bytes(csv_bytes))
-            if not self._meta_path(aid).is_file():
-                self._atomic_write(self._meta_path(aid),
-                                   lambda t: t.write_text(meta.model_dump_json(), encoding="utf-8"))
+            obj = self._store()
+            if csv_bytes is not None and not obj.head(self._table_key(aid)):
+                obj.put_bytes(self._table_key(aid), csv_bytes, "text/csv")
+            if not obj.head(self._meta_key(aid)):
+                obj.put_bytes(self._meta_key(aid), meta.model_dump_json().encode("utf-8"),
+                              "application/json")
             with self._lock:
                 self._meta_mem.setdefault(aid, meta)
         except (OSError, ValueError, TypeError):
@@ -176,8 +186,7 @@ class ArtifactStore:
 
     def get_table(self, aid: str) -> bytes | None:
         try:
-            p = self._table_path(aid)
-            return p.read_bytes() if p.is_file() else None
+            return self._store().get_bytes(self._table_key(aid))
         except OSError:
             return None
 
@@ -187,9 +196,9 @@ class ArtifactStore:
         if cached is not None:
             return cached
         try:
-            p = self._meta_path(aid)
-            if p.is_file():
-                meta = ArtifactMeta.model_validate_json(p.read_text(encoding="utf-8"))
+            raw = self._store().get_bytes(self._meta_key(aid))
+            if raw is not None:
+                meta = ArtifactMeta.model_validate_json(raw)
                 with self._lock:
                     self._meta_mem[aid] = meta
                 return meta
@@ -198,11 +207,16 @@ class ArtifactStore:
         return None
 
     def clear(self) -> None:
+        """Drop the in-proc meta cache and remove the durable tier (test / hygiene). Only a
+        root-scoped local store is enumerable (the ObjectStore Protocol has no list); a shared/
+        S3-backed store no-ops here."""
         with self._lock:
             self._meta_mem.clear()
+        if self.root is None or self._obj is not None:
+            return
         try:
-            for pat in ("*.csv", "*.meta.json", "*.tmp"):
-                for p in self.root.glob(pat):
+            for p in self.root.glob("**/*"):  # bytes now nest under artifacts/
+                if p.is_file():
                     p.unlink(missing_ok=True)
         except OSError:
             pass
@@ -221,8 +235,9 @@ def get_store() -> ArtifactStore:
             if _default is None:
                 from config import settings
 
-                _default = ArtifactStore(root=settings.data_dir / "artifacts",
-                                         enabled=settings.artifacts_enabled)
+                # No root: the bytes ride the shared object store, keyed artifacts/{id} (local
+                # under data_dir/artifacts/ in dev — the same path as before — or S3 in prod).
+                _default = ArtifactStore(enabled=settings.artifacts_enabled)
     return _default
 
 

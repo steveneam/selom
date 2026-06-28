@@ -20,6 +20,7 @@ import math
 import pathlib
 import re
 from datetime import datetime, timezone
+from typing import Protocol
 
 from pydantic import BaseModel, Field
 
@@ -960,24 +961,100 @@ def revalidate_panel(
 
 
 # --- persistence (D1/D2: typed JSON per paper) --------------------------------
+#
+# The reproduction Ledger is the fourth content-addressed store to ride the shared ObjectStore
+# seam (materialization step 5, docs/aws-materialization/spec.md §1.2). It was the only store
+# with no abstraction (direct path.write_text / model_validate_json); the ``LedgerStore`` seam
+# below gives it the same shape the result / cache / lineage stores already have — keyed
+# ``repro/{slug}/ledger.json``, the backend selected by config (local disk in dev, S3 in prod).
+#
+# Back-compat: ``save_ledger``/``load_ledger`` keep their explicit ``root`` argument, which still
+# writes/reads a plain filesystem path directly (the test + explicit-local contract is unchanged);
+# only the no-``root`` default path now flows through the seam.
 
 
-def _default_root() -> pathlib.Path:
-    from config import settings
+class LedgerStore(Protocol):
+    def save(self, ledger: Ledger) -> str:
+        """Persist the ledger; return its object key (``repro/{slug}/ledger.json``)."""
+        ...
 
-    return settings.data_dir / "repro"
+    def load(self, slug: str) -> Ledger:
+        """Load the ledger for ``slug`` (raises ``FileNotFoundError`` if absent)."""
+        ...
+
+    def exists(self, slug: str) -> bool:
+        """True if a ledger is stored for ``slug``."""
+        ...
 
 
-def save_ledger(ledger: Ledger, root: pathlib.Path | str | None = None) -> pathlib.Path:
-    base = pathlib.Path(root) if root is not None else _default_root()
-    paper_dir = base / ledger.paper.slug
-    paper_dir.mkdir(parents=True, exist_ok=True)
-    path = paper_dir / "ledger.json"
-    path.write_text(ledger.model_dump_json(indent=2), encoding="utf-8")
-    return path
+class ObjectStoreLedgerStore:
+    """``LedgerStore`` over the shared ``ObjectStore`` (key ``repro/{slug}/ledger.json``)."""
+
+    def __init__(self, object_store=None) -> None:
+        self._obj = object_store
+
+    def _store(self):
+        if self._obj is not None:
+            return self._obj
+        from storage.object_store import get_object_store
+
+        return get_object_store()
+
+    def _key(self, slug: str) -> str:
+        return f"repro/{slug}/ledger.json"
+
+    def save(self, ledger: Ledger) -> str:
+        key = self._key(ledger.paper.slug)
+        self._store().put_bytes(
+            key, ledger.model_dump_json(indent=2).encode("utf-8"), "application/json"
+        )
+        return key
+
+    def load(self, slug: str) -> Ledger:
+        raw = self._store().get_bytes(self._key(slug))
+        if raw is None:
+            raise FileNotFoundError(f"no ledger stored for {slug!r}")
+        return Ledger.model_validate_json(raw)
+
+    def exists(self, slug: str) -> bool:
+        return self._store().head(self._key(slug))
+
+
+# Lazy process default + a test seam (mirrors get_cache/set_cache, get_store/set_store).
+_ledger_store: LedgerStore | None = None
+
+
+def get_ledger_store() -> LedgerStore:
+    global _ledger_store
+    if _ledger_store is None:
+        _ledger_store = ObjectStoreLedgerStore()
+    return _ledger_store
+
+
+def set_ledger_store(store: LedgerStore | None) -> None:
+    global _ledger_store
+    _ledger_store = store
+
+
+def save_ledger(ledger: Ledger, root: pathlib.Path | str | None = None) -> pathlib.Path | str:
+    """Persist a paper's ledger. With an explicit ``root`` → a direct filesystem write returning
+    the ``pathlib.Path`` (the test / explicit-local contract). Without ``root`` → the ObjectStore
+    seam (local default or S3), returning the object key."""
+    if root is not None:
+        base = pathlib.Path(root)
+        paper_dir = base / ledger.paper.slug
+        paper_dir.mkdir(parents=True, exist_ok=True)
+        path = paper_dir / "ledger.json"
+        path.write_text(ledger.model_dump_json(indent=2), encoding="utf-8")
+        return path
+    return get_ledger_store().save(ledger)
 
 
 def load_ledger(slug: str, root: pathlib.Path | str | None = None) -> Ledger:
-    base = pathlib.Path(root) if root is not None else _default_root()
-    path = base / slug / "ledger.json"
-    return Ledger.model_validate_json(path.read_text(encoding="utf-8"))
+    """Load a paper's ledger. With an explicit ``root`` → read the filesystem path directly;
+    without ``root`` → the ObjectStore seam (local default or S3)."""
+    if root is not None:
+        base = pathlib.Path(root)
+        path = base / slug / "ledger.json"
+        return Ledger.model_validate_json(path.read_text(encoding="utf-8"))
+    return get_ledger_store().load(slug)

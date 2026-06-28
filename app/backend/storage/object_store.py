@@ -20,6 +20,7 @@ RISKS #5: boto3 >=1.36 breaks S3-compatible checksums unless the client sets
 
 from __future__ import annotations
 
+import os
 import pathlib
 from typing import Protocol
 
@@ -67,7 +68,12 @@ class LocalObjectStore:
     ) -> None:
         p = self._path(key)
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_bytes(data)
+        # Write-temp-then-replace: atomic on the same filesystem, so a concurrent reader
+        # never sees a torn write (the cache/lineage adapters relied on this before the
+        # seam; S3 PUT is atomic by nature). content_type is unused for the filesystem.
+        tmp = p.with_name(f"{p.name}.{os.getpid()}.tmp")
+        tmp.write_bytes(data)
+        os.replace(tmp, p)
 
     def head(self, key: str) -> bool:
         return self._path(key).exists()

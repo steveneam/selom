@@ -8,8 +8,8 @@ Each cached entry is therefore immutable.
 
 Two tiers behind one ``get``/``set``:
   * an in-process LRU (the hot path within a worker),
-  * a local-disk JSON tier under ``data/result_cache/`` (survives restarts, shared across
-    workers on one box).
+  * a durable JSON tier on the shared ``ObjectStore`` seam, keyed ``cache/result/{key}.json``
+    (survives restarts; the local filesystem in dev, AWS S3 in prod — selected once by config).
 
 What is cached is the **pre-theme compute output** (``{figure, table}``); theming is re-applied
 on every hit (it is cheap + deterministic — ``theme.apply`` deep-copies its input). That keeps
@@ -17,9 +17,11 @@ the cache forward-compatible with the C2 source/render split, where a theme-only
 re-render *without* recomputing the skill.
 
 Deliberately dependency-free (stdlib only). The roadmap named ``diskcache``; content-addressing
-makes its eviction/concurrency machinery unnecessary at this local tier (every entry is immutable
-and deduped by content), and avoids adding a dependency to the EDR-fragile venv. A future durable
-R2 tier (C4, deferred) can swap the disk backend behind this same interface.
+makes its eviction/concurrency machinery unnecessary at this durable tier (every entry is
+immutable and deduped by content), and avoids adding a dependency to the EDR-fragile venv. The
+durable tier (the named C4) now rides the ``ObjectStore`` seam (storage/object_store.py) — the
+backend swaps from local disk to S3 by config, behind this same interface. See
+docs/aws-materialization/spec.md §1.2 (materialization step 3).
 
 Assumes skills are **deterministic** given their inputs (the reproduction mission requires this
 anyway); a non-deterministic skill served from cache returns its first result, which is the
@@ -31,12 +33,12 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-import os
 import pathlib
 import threading
 from collections import OrderedDict
 
 from skills._engine import to_bool
+from storage.object_store import LocalObjectStore, get_object_store
 
 # Param-value casts, mirroring skills.contract._CASTS (kept local to avoid a contract<-cache
 # import cycle — contract imports this module). Query params arrive as strings; canonicalizing
@@ -166,36 +168,49 @@ class ResultCache:
     one extra copy per hit — negligible for a dev-tier cache, and obviously correct.
     """
 
-    def __init__(self, root, mem_max: int = 64, enabled: bool = True) -> None:
-        self.root = pathlib.Path(root)
+    def __init__(self, root=None, mem_max: int = 64, enabled: bool = True,
+                 object_store=None) -> None:
+        # ``root`` (a local dir) keeps the test/explicit-local construction working — it becomes a
+        # root-scoped ``LocalObjectStore``. With no root and no injected store, the durable tier
+        # rides the shared object store (data_dir-local in dev, S3 in prod) selected by config.
+        self.root = pathlib.Path(root) if root is not None else None
         self.mem_max = max(0, int(mem_max))
         self.enabled = enabled
+        self._obj = object_store
         self._mem: "OrderedDict[str, dict]" = OrderedDict()
         self._lock = threading.Lock()
         self.stats = {"mem_hits": 0, "disk_hits": 0, "misses": 0, "sets": 0, "errors": 0}
 
-    def _path(self, key: str) -> pathlib.Path:
-        return self.root / f"{key}.json"
+    def _store(self):
+        """The durable-tier backend: an injected store, else a root-scoped local store, else the
+        shared process object store (resolved live so a test ``set_object_store`` is honoured)."""
+        if self._obj is not None:
+            return self._obj
+        if self.root is not None:
+            return LocalObjectStore(self.root)
+        return get_object_store()
+
+    def _obj_key(self, key: str) -> str:
+        return f"cache/result/{key}.json"
 
     def _evict(self) -> None:
         while len(self._mem) > self.mem_max:
             self._mem.popitem(last=False)
 
-    def _disk_read(self, key: str) -> dict | None:
-        p = self._path(key)
+    def _obj_read(self, key: str) -> dict | None:
         try:
-            if p.is_file():
-                return json.loads(p.read_text(encoding="utf-8"))
+            raw = self._store().get_bytes(self._obj_key(key))
+            if raw is not None:
+                return json.loads(raw)
         except (OSError, ValueError):
             self.stats["errors"] += 1
         return None
 
-    def _disk_write(self, key: str, payload: dict) -> None:
+    def _obj_write(self, key: str, payload: dict) -> None:
         try:
-            self.root.mkdir(parents=True, exist_ok=True)
-            tmp = self._path(key).with_name(f"{key}.{os.getpid()}.tmp")
-            tmp.write_text(json.dumps(payload), encoding="utf-8")
-            os.replace(tmp, self._path(key))  # atomic — no torn reads across workers
+            self._store().put_bytes(
+                self._obj_key(key), json.dumps(payload).encode("utf-8"), "application/json"
+            )
         except (OSError, ValueError, TypeError):
             self.stats["errors"] += 1
 
@@ -212,7 +227,7 @@ class ResultCache:
                 self._mem.move_to_end(key)
                 self.stats["mem_hits"] += 1
                 return copy.deepcopy(payload)
-        payload = self._disk_read(key)  # fresh from JSON -> no external refs, safe to own
+        payload = self._obj_read(key)  # fresh from JSON -> no external refs, safe to own
         if payload is not None:
             with self._lock:
                 if self.mem_max:
@@ -236,7 +251,7 @@ class ResultCache:
                 self._mem.move_to_end(key)
                 self._evict()
             self.stats["sets"] += 1
-        self._disk_write(key, snapshot)
+        self._obj_write(key, snapshot)
 
     def get(self, key: str | None) -> dict | None:
         """A cached ``{figure, table}`` compute entry (a private deep copy), or None — see :meth:`fetch`."""
@@ -246,11 +261,16 @@ class ResultCache:
         self.put(key, {"figure": figure, "table": table})
 
     def clear(self) -> None:
-        """Drop the in-proc tier and remove the disk tier (test / forced-cold hygiene)."""
+        """Drop the in-proc tier and remove the durable tier (test / forced-cold hygiene).
+
+        The durable tier is only enumerable for a root-scoped local store (the ObjectStore
+        Protocol has no list); a shared/S3-backed cache no-ops here (production never clears)."""
         with self._lock:
             self._mem.clear()
+        if self.root is None or self._obj is not None:
+            return
         try:
-            for p in self.root.glob("*.json"):
+            for p in self.root.glob("**/*.json"):  # durable tier now nests under cache/result/
                 p.unlink(missing_ok=True)
         except OSError:
             pass
@@ -274,8 +294,9 @@ def get_cache() -> ResultCache:
             if _default is None:
                 from config import settings
 
+                # No root: the durable tier rides the shared object store (local under
+                # data_dir/cache/result/ in dev, S3 cache/result/ in prod) — selected by config.
                 _default = ResultCache(
-                    root=settings.data_dir / "result_cache",
                     mem_max=settings.result_cache_mem_max,
                     enabled=settings.result_cache_enabled,
                 )

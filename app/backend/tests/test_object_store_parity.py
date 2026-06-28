@@ -115,6 +115,58 @@ def test_same_bundle_yields_identical_bytes_across_backends(tmp_path):
     assert local.get_bytes("results/j.json") == mem.get_bytes("results/j.json")
 
 
+# --- cache / lineage / ledger adapter parity (the other three converged stores) --------------
+# §14: every content-addressed store rides the ONE ObjectStore seam, so each behaves identically
+# on both backends and places its bytes under its own prefix (cache/result/, artifacts/, repro/).
+
+
+def test_result_cache_durable_tier_over_the_seam(store):
+    from skills._result_cache import ResultCache
+
+    # mem_max=0 forces every read past the in-proc tier onto the durable (object-store) tier.
+    cache = ResultCache(object_store=store, mem_max=0)
+    cache.set("ck", {"data": [1]}, {"rows": [2]})
+    assert cache.get("ck") == {"figure": {"data": [1]}, "table": {"rows": [2]}}
+    assert cache.stats["disk_hits"] == 1 and cache.stats["errors"] == 0
+    assert store.head("cache/result/ck.json") is True        # key placement per §3
+    assert cache.get("absent") is None
+
+
+def test_artifact_store_over_the_seam(store):
+    from engine.lineage import ArtifactMeta, ArtifactStore
+
+    meta = ArtifactMeta(artifact_id="aid123", kind="ingested", filename="de.csv",
+                        n_rows=1, n_cols=2, columns=["a", "b"])
+    ArtifactStore(object_store=store).put("aid123", meta, b"a,b\n1,2\n")
+    # a cold instance (empty in-proc meta cache) reads both table + meta back over the seam
+    cold = ArtifactStore(object_store=store)
+    assert cold.get_table("aid123") == b"a,b\n1,2\n"          # round-trip the bytes
+    back = cold.get_meta("aid123")
+    assert back is not None and back.artifact_id == "aid123" and back.columns == ["a", "b"]
+    assert store.head("artifacts/aid123.csv") and store.head("artifacts/aid123.meta.json")
+    assert cold.get_table("missing") is None
+
+
+def test_ledger_store_over_the_seam(store):
+    import reproduction as R
+
+    ledger = R.Ledger(paper=R.Paper(id="p1", slug="parity-paper", title="T"))
+    ls = R.ObjectStoreLedgerStore(object_store=store)
+    assert ls.exists("parity-paper") is False
+    key = ls.save(ledger)
+    assert key == "repro/parity-paper/ledger.json"           # key placement per §3
+    assert store.head(key) is True and ls.exists("parity-paper") is True
+    back = ls.load("parity-paper")                            # cold load over the seam
+    assert back.paper.slug == "parity-paper" and back.paper.title == "T"
+
+
+def test_ledger_load_absent_raises(store):
+    import reproduction as R
+
+    with pytest.raises(FileNotFoundError):
+        R.ObjectStoreLedgerStore(object_store=store).load("nope")
+
+
 # --- the config seam selects the backend (mirrors make_result_store) -------------------------
 
 def test_make_result_store_selects_local(tmp_path):
@@ -171,3 +223,25 @@ def test_real_s3objectstore_against_moto():
         assert rs.url_if_exists("job1")               # truthy URL (signing time varies — no eq)
         assert rs.get("absent") is None
         assert store.head("results/job1.json") is True
+
+        # all four converged stores ride the SAME real S3 backend (cache · lineage · ledger)
+        from engine.lineage import ArtifactMeta, ArtifactStore
+        from skills._result_cache import ResultCache
+
+        import reproduction as R
+
+        cache = ResultCache(object_store=store, mem_max=0)
+        cache.set("ck", {"data": [1]}, {"rows": [2]})
+        assert cache.get("ck") == {"figure": {"data": [1]}, "table": {"rows": [2]}}
+        assert store.head("cache/result/ck.json") is True
+
+        meta = ArtifactMeta(artifact_id="aidS3", kind="ingested", filename="de.csv",
+                            n_rows=1, n_cols=2, columns=["a", "b"])
+        ArtifactStore(object_store=store).put("aidS3", meta, b"a,b\n1,2\n")
+        assert ArtifactStore(object_store=store).get_table("aidS3") == b"a,b\n1,2\n"
+        assert store.head("artifacts/aidS3.meta.json") is True
+
+        ls = R.ObjectStoreLedgerStore(object_store=store)
+        ls.save(R.Ledger(paper=R.Paper(id="p1", slug="s3-paper", title="T")))
+        assert ls.load("s3-paper").paper.title == "T"
+        assert store.head("repro/s3-paper/ledger.json") is True
