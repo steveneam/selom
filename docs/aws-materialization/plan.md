@@ -23,6 +23,27 @@ memory `selom-aws-materialization-decision`.
 
 ---
 
+## 0. Post-checkpoint corrections (owner-confirmed 2026-06-28, after the step-7c reflection)
+
+A deliberate mid-build checkpoint (live-AWS inspection + best-practice research + an
+architecture/plan review — memory `reflect-checkpoint-during-phase-build`) surfaced corrections
+to the topology + §10 rulings below. **These supersede the conflicting downstream lines; the
+originals are kept for provenance.**
+
+| # | Was | Now | Why |
+|---|---|---|---|
+| C1 | Aurora **0.5-ACU floor at launch** (§10, T3) | **min=0 ACU (true scale-to-zero)**; no floor until revenue | 0.5 ACU ≈ **$73/mo** in ap-southeast-2 = 7× the $10 guardrail; a cluster is *either* 0 (pauses) *or* ≥0.5 (never pauses), not both. Accept the ~15 s cold first-hit (optional pre-warm ping). |
+| C2 | Heavy **Docker/ECR Lambda** (§2, §5) | **Fargate (Arm+Spot)** for heavy compute; light zip Lambda stays for the API | scanpy/anndata blow past Lambda's hard 15-min / 10-GB ceilings; *same Docker image*, $0 idle, no wall. |
+| C3 | Bucket policy **Deny non-`aws:kms`** writes (spec §11) | **SSE-S3 (AES256)** — the bucket default; drop the KMS-deny until launch | SSE-S3 is free + automatic (no header); a KMS-deny would 403 the server PUT + every presigned POST (the code sends no SSE field). Revisit KMS at launch if compliance needs it. |
+| C4 | "SSE → polling/WS"; async unspecified (step 8) | **S3-event → EventBridge → Step Functions (Standard) → Fargate `runTask.sync` → `jobs` table**; FE polls `GET /jobs/{id}` | retries/idempotency/status for free, no always-on infra. |
+| C5 | Integration wiring implicit | **`docs/aws-materialization/integrations.md`** owns GitHub↔AWS↔Vercel (OIDC, CDK, CI/CD, CORS, env) | adopted CDK-Python IaC (`infra/`) + GitHub Actions CI (live) now — the cheapest moment. |
+
+**Account hardening applied live (2026-06-28):** account-level S3 Public Access Block · TLS-only
+bucket policy · abort-incomplete-multipart 7-day lifecycle · Cost Anomaly threshold $100→$5 · IAM
+Access Analyzer (free). CORS deferred to when the FE presigned-upload path goes live.
+
+---
+
 ## 1. Locked decisions (owner, 2026-06-28 discussion gate)
 
 | # | Decision | Over | Why |
@@ -237,6 +258,8 @@ Adopt **pyarrow + duckdb** as an extra **when the data substrate lands** (per §
 **Final owner rulings:**
 - **Aurora cold-start** → **scale-to-zero now** (retry/backoff + a "warming up" state) + add a
   **0.5-ACU floor at launch** when real users arrive. Aurora is prod-only; dev stays local.
+  **⚠ SUPERSEDED by §0 C1:** use **min=0 ACU** even at launch (the 0.5 floor ≈ $73/mo = 7× budget);
+  add a floor only when revenue justifies it.
 - **AI-layer PII** → **balanced**: the gateway **redacts identifier-like columns/values before any
   data leaves to the external LLM** (M-002), and the admin queue keeps a **redacted, length-capped**
   one-line summary (M-003) — not raw, not dropped.

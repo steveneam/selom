@@ -1,5 +1,11 @@
 # Selom — AWS Materialization Foundation (M-001) — Implementation Spec
 
+> **⚠ Post-checkpoint corrections (2026-06-28) — see `plan.md §0`.** Aurora **min=0 ACU** (no
+> 0.5 floor); heavy compute → **Fargate** (not Docker/ECR Lambda); **SSE-S3** (drop the KMS-deny
+> below until launch); async = S3-event→EventBridge→Step Functions→Fargate. GitHub↔AWS↔Vercel
+> integration backbone is its own doc: `integrations.md`. Those corrections supersede the
+> conflicting lines in §5/§7/§11/§10 below (kept for provenance).
+
 Status: **Amended in place as we build.** M-001 **steps 1–5 BUILT** — all four content-addressed
 stores ride the one `ObjectStore` seam (plan §6): result store (`storage/results.py`), result-cache
 durable tier (`skills/_result_cache.py`), artifact/lineage store (`engine/lineage.py`), and the
@@ -1019,7 +1025,7 @@ G — **Deploy + FE + cost**
 ## 16. Open questions (for the owner gate)
 
 > **RESOLVED at the gate (owner, 2026-06-28):** Q1 → **scale-to-zero now** (retry/backoff + a
-> "warming up" state) + a **0.5-ACU floor at launch**. Q3 → **keep both** app-`TenantQuery` + DB RLS.
+> "warming up" state) + a **0.5-ACU floor at launch** *(⚠ superseded — use min=0 ACU even at launch, plan §0 C1)*. Q3 → **keep both** app-`TenantQuery` + DB RLS.
 > Q4 → **yes**, denormalized `user_id` on every table. Q5 → parsed output **stays CSV** now; adopt
 > pyarrow/duckdb only when the D4/D8 substrate lands. Q6 → **wire the mechanism now**, numbers at
 > launch. Q7 → **Alembic**. Plus: **fold M-003's `skill_requests` into this unified schema** at build,
