@@ -100,5 +100,17 @@ class Settings(BaseSettings):
     # applies the Alembic migration instead (never auto-create against Aurora).
     db_auto_create: bool = Field(default=False, validation_alias="SELOM_DB_AUTO_CREATE")
 
+    # Auth / tenancy (materialization step 7b). `dev` (default) trusts a fixed dev user_id so the
+    # inner loop stays offline + single-tenant — nothing changes locally. `clerk` verifies the
+    # Clerk JWT (issuer + JWKS) and derives the tenant from the verified `sub` claim, never a
+    # request param (spec §4.3, §6.2). The same config seam as make_object_store/make_job_store.
+    # See auth/context.py + docs/aws-materialization/spec.md §4.3.
+    auth_mode: str = Field(default="dev", validation_alias="SELOM_AUTH_MODE")  # dev | clerk
+    dev_user_id: str = Field(default="dev-user", validation_alias="SELOM_DEV_USER_ID")
+    dev_user_email: str = Field(default="dev@selom.local", validation_alias="SELOM_DEV_USER_EMAIL")
+    clerk_issuer: str = Field(default="", validation_alias="SELOM_CLERK_ISSUER")  # https://<inst>.clerk.accounts.dev
+    clerk_jwks_url: str = Field(default="", validation_alias="SELOM_CLERK_JWKS_URL")  # default: {issuer}/.well-known/jwks.json
+    clerk_audience: str = Field(default="", validation_alias="SELOM_CLERK_AUDIENCE")  # optional aud claim check
+
 
 settings = Settings()
