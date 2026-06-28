@@ -30,7 +30,8 @@ def materialize_dataset(repo, object_store, user_id: str, dataset_id: str) -> di
     ``data/{sha256}.csv``. Stamps ``parquet_s3_key`` + the authoritative ``current_sha256`` + ``qc``.
 
     Returns the updated dataset dict, or ``None`` if it isn't this tenant's dataset. Raises
-    ``FileNotFoundError`` if the row points at an object that isn't in the store yet.
+    ``FileNotFoundError`` if the row points at an object that isn't in the store yet, or
+    ``ValueError`` if the parsed bytes don't match the client-declared sha (M6 integrity).
     """
     row = repo.get_dataset(user_id, dataset_id)
     if row is None:
@@ -38,13 +39,6 @@ def materialize_dataset(repo, object_store, user_id: str, dataset_id: str) -> di
     key = row.get("upload_s3_key")
     if not key:
         raise FileNotFoundError(f"dataset {dataset_id} has no upload key")
-    raw = object_store.get_bytes(key)
-    if raw is None:
-        raise FileNotFoundError(f"object not in store: {key}")
-
-    # The raw upload's authoritative content hash (staleness key). The presigned PUT can't be trusted
-    # to match the client's declared sha, so we recompute from the bytes we actually parsed.
-    raw_sha = hashlib.sha256(raw).hexdigest()
 
     # Own a temp dir + delete it in finally — the leak the old ingest temps had (acceptance D). The
     # file keeps the original name so the suffix-based loader picks correctly (.h5ad vs .csv …).
@@ -53,7 +47,24 @@ def materialize_dataset(repo, object_store, user_id: str, dataset_id: str) -> di
     qc_dict = None
     try:
         local = workdir / safe_filename(row.get("filename"))
-        local.write_bytes(raw)
+        # STREAM the object to disk — never buffer the whole omics file in memory (a big .h5ad read
+        # via get_bytes would blow the Lambda heap; download_file streams). spec §4.2.
+        if not object_store.download_to_path(key, local):
+            raise FileNotFoundError(f"object not in store: {key}")
+
+        # Authoritative content hash from the bytes we actually parsed (the presigned PUT can't be
+        # trusted to match the client's declared sha). Chunked so a large file isn't re-buffered.
+        raw_sha = _file_sha256(local)
+
+        # M6 integrity — a corrupted/truncated upload must not be silently accepted as the new truth.
+        # current_sha256 holds the CLIENT-declared hash (intake/confirm); compare it to reality.
+        declared = row.get("current_sha256")
+        if declared and declared != raw_sha:
+            raise ValueError(
+                f"upload integrity check failed for dataset {dataset_id}: "
+                f"declared sha {declared[:12]}… != actual {raw_sha[:12]}…"
+            )
+
         from engine import ingest, run_qc
 
         bundle = ingest(str(local))
@@ -77,6 +88,15 @@ def materialize_dataset(repo, object_store, user_id: str, dataset_id: str) -> di
 
 def _is_dataframe(obj) -> bool:
     return any(t.__name__ == "DataFrame" for t in type(obj).__mro__)
+
+
+def _file_sha256(path: pathlib.Path) -> str:
+    """sha256 of a file, read in 1 MiB chunks (never loads the whole file into memory)."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def sweep_orphans(repo, object_store, *, now: datetime | None = None,

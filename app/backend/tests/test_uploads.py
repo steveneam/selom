@@ -11,6 +11,8 @@ an anyio worker thread, so an in-memory DB (per-connection) wouldn't be visible 
 
 from __future__ import annotations
 
+import hashlib
+
 import sqlalchemy as sa
 import pytest
 from fastapi.testclient import TestClient
@@ -94,6 +96,33 @@ def test_full_upload_and_parse(env):
     assert parsed["parquet_s3_key"].endswith(".csv")  # CSV until the parquet substrate lands (Q5)
     assert store.get_bytes(parsed["parquet_s3_key"]) is not None
     assert parsed["current_sha256"]  # authoritative raw-bytes hash recomputed at parse
+
+
+def test_parse_accepts_matching_declared_sha(env):
+    # M6: a correct client-declared sha passes the integrity check and survives as the truth.
+    client, _v, _repo, _store, _eng = env
+    pid = _project(client)
+    csv = b"gene,ctrl,treat\nACTB,10,20\n"
+    real = hashlib.sha256(csv).hexdigest()
+    ds = _intake(client, pid, filename="c.csv", size=len(csv), sha=real).json()["dataset"]
+    client.put(f"/uploads/local/{ds['upload_s3_key']}", content=csv)
+    client.post(f"/uploads/{ds['id']}/confirm", json={})
+    r = client.post(f"/uploads/{ds['id']}/parse")
+    assert r.status_code == 200, r.text
+    assert r.json()["current_sha256"] == real  # declared matched the recomputed truth
+
+
+def test_parse_rejects_integrity_mismatch(env):
+    # M6: a wrong declared sha (corrupted/truncated upload) is rejected, not silently accepted.
+    client, _v, _repo, _store, _eng = env
+    pid = _project(client)
+    csv = b"gene,ctrl,treat\nACTB,10,20\n"
+    ds = _intake(client, pid, filename="c.csv", size=len(csv), sha="0" * 64).json()["dataset"]
+    client.put(f"/uploads/local/{ds['upload_s3_key']}", content=csv)
+    client.post(f"/uploads/{ds['id']}/confirm", json={})
+    r = client.post(f"/uploads/{ds['id']}/parse")
+    assert r.status_code == 400, r.text
+    assert "integrity" in r.json()["detail"].lower()
 
 
 def test_confirm_before_upload_is_409(env):
