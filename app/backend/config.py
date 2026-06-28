@@ -89,5 +89,16 @@ class Settings(BaseSettings):
     s3_region: str = Field(default="", validation_alias="SELOM_S3_REGION")
     s3_presign_ttl: int = Field(default=3600, validation_alias="SELOM_S3_PRESIGN_TTL")
 
+    # Job store — the statelessness fix (materialization step 2). `memory` (default) keeps the
+    # in-process JobStore (inline dev, zero infra). `sql` moves jobs onto the `analysis_jobs`
+    # table so a poll on one instance sees a job created on another (a Lambda poll on a cold
+    # instance sees nothing today). The dev/test path runs on SQLite, prod on Aurora Postgres,
+    # selected by `database_url`. See jobs/sql_store.py + docs/aws-materialization/spec.md §4.1.
+    job_store: str = Field(default="memory", validation_alias="SELOM_JOB_STORE")  # memory | sql
+    database_url: str = Field(default="", validation_alias="SELOM_DATABASE_URL")
+    # Dev/test convenience: auto-create tables from the schema (SQLite). Prod stays False and
+    # applies the Alembic migration instead (never auto-create against Aurora).
+    db_auto_create: bool = Field(default=False, validation_alias="SELOM_DB_AUTO_CREATE")
+
 
 settings = Settings()

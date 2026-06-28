@@ -1,8 +1,11 @@
-"""Job records + an in-process registry.
+"""Job records + the job-store seam.
 
-The ``JobStore`` is intentionally a thin in-memory dict: it's all the inline (single
-process) path needs, and it documents the seam where a Redis-backed store swaps in for
-distributed arq mode (see ``jobs/worker.py``). A ``Job`` is the unit the API polls.
+``JobStore`` is a thin in-memory dict — all the inline (single-process) dev path needs.
+``make_job_store`` selects it (default) or the SQL-backed ``SqlJobStore`` (materialization
+step 2) by config, exactly as ``make_object_store``/``make_result_store`` select their
+backends: the in-memory store for dev, the ``analysis_jobs`` table for a multi-instance /
+Lambda deploy where a poll must see a job another instance created. A ``Job`` is the unit
+the API polls; both backends return the same ``Job`` shape.
 """
 
 from __future__ import annotations
@@ -77,5 +80,14 @@ class JobStore:
         return job
 
 
-# Process-wide singleton (inline mode). Distributed mode replaces this with Redis.
-job_store = JobStore()
+def make_job_store(settings):
+    """Select the job-store backend by config: in-memory (default) or SQL (``analysis_jobs``).
+
+    Mirrors ``make_object_store``/``make_result_store`` — one config seam, the dev default
+    unchanged until ``SELOM_JOB_STORE=sql`` (with ``SELOM_DATABASE_URL``) flips it on. The SQL
+    store is lazy-imported so the light core never needs SQLAlchemy."""
+    if settings.job_store.strip().lower() == "sql":
+        from jobs.sql_store import SqlJobStore
+
+        return SqlJobStore(url=settings.database_url, create=settings.db_auto_create)
+    return JobStore()

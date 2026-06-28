@@ -124,6 +124,19 @@ dev = [
   "moto>=5",
 ]
 
+# Relational store (AWS materialization step 2): the statelessness fix moves the in-memory
+# JobStore onto a SQL backend (jobs/sql_store.py) behind the same create/get/update surface,
+# so a poll on one instance sees a job created on another. SQLAlchemy Core keeps it
+# backend-portable — the fast suite runs on stdlib SQLite (in-memory), prod runs on Aurora
+# Postgres; Alembic owns the migrations (spec §16). MIT (SQLAlchemy) + MIT (Alembic).
+# psycopg (LGPL) is the PROD Postgres driver only — NOT pulled for the SQLite fast suite;
+# install it (`uv pip install 'psycopg[binary]'`) when the Aurora connection lands.
+db = [
+  "sqlalchemy>=2.0",
+  "alembic>=1.13",
+  "psycopg[binary]>=3.2",
+]
+
 # Validation oracles — installed only to cross-check Selom's clean-room engines against the
 # original tools (NEVER on the shipped path; the edgeR/fgsea/mmc2 pattern). GPL/heavy deps are
 # quarantined here so the runtime extras stay clean. harmonypy is **GPL-3.0** (the whole Harmony

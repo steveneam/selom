@@ -17,11 +17,15 @@ from __future__ import annotations
 import pathlib
 
 from config import settings
-from jobs.store import Job, JobStatus, TERMINAL, job_store
+from jobs.store import TERMINAL, Job, JobStatus, make_job_store
 from storage.results import ResultStore, make_result_store
 
-# One result store per process, chosen from config (local filesystem unless R2 is set).
+# One result store + one job store per process, chosen from config. The job store is in-memory
+# by default (inline dev) or SQL-backed (SELOM_JOB_STORE=sql) so a poll on another instance sees
+# this job — the statelessness fix (materialization step 2). Both are by-id stores; the queue
+# operates by id + re-fetch, so the SQL backend is a drop-in.
 result_store: ResultStore = make_result_store(settings)
+job_store = make_job_store(settings)
 
 
 def execute_job(job_id: str, data_path: str, params: dict) -> None:
