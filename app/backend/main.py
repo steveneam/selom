@@ -1178,3 +1178,123 @@ def delete_figure(figure_id: str, repo=Depends(_library_repo),
     if removed == 0:
         raise HTTPException(status_code=404, detail="unknown figure")
     return {"ok": True, "id": figure_id}
+
+
+# ── account library: workspace · gene sets · papers · skill installs (sub-spec §3, BE-2) ───────
+# Namespaced under /workspace/* to avoid colliding with the read-only catalog/live routes /papers,
+# /gene-sets, /reproduction-runs (sub-spec §3.2). Tenant = ctx.user_id only (§6.2).
+
+
+class GeneSetBody(BaseModel):
+    model_config = {"extra": "ignore"}
+    id: str | None = None
+    name: str = "Gene set"
+    genes: list = []
+    source: str = ""
+    source_label: str = ""
+    license: str = ""
+    created_from: str | None = None
+
+
+class PaperBody(BaseModel):
+    model_config = {"extra": "ignore"}
+    id: str | None = None
+    filename: str = "paper.pdf"
+    doi: str | None = None
+    pmid: str | None = None
+    title: str | None = None
+    authors: list | None = None
+    venue: str | None = None
+    year: int | None = None
+    volume: str | None = None
+    issue: str | None = None
+    pages: str | None = None
+    is_preprint: bool = False
+    url: str | None = None
+    modality: str | None = None
+    skills: list | None = None
+    out_of_scope: list | None = None
+    figure_count: int = 0
+    tier_summary: dict | None = None
+    reproduction_run_id: str | None = None
+    data_map: dict | None = None
+    supplements: list | None = None
+
+
+class InstallBody(BaseModel):
+    skill_id: str
+    project_id: str | None = None         # null ⇒ workspace-wide install
+
+
+@app.get("/workspace")
+def get_workspace(repo=Depends(_library_repo), ctx: AuthContext = Depends(require_user)):
+    return repo.get_workspace(ctx.user_id, ctx.email)
+
+
+@app.get("/workspace/gene-sets")
+def list_gene_sets(repo=Depends(_library_repo), ctx: AuthContext = Depends(require_user)):
+    return {"gene_sets": repo.list_gene_sets(ctx.user_id)}
+
+
+@app.post("/workspace/gene-sets")
+def save_gene_set(body: GeneSetBody, repo=Depends(_library_repo),
+                  ctx: AuthContext = Depends(require_user)):
+    return repo.save_gene_set(ctx.user_id, ctx.email, body.model_dump())
+
+
+@app.delete("/workspace/gene-sets/{gene_set_id}")
+def delete_gene_set(gene_set_id: str, repo=Depends(_library_repo),
+                    ctx: AuthContext = Depends(require_user)):
+    if repo.delete_gene_set(ctx.user_id, gene_set_id) == 0:
+        raise HTTPException(status_code=404, detail="unknown gene set")
+    return {"ok": True, "id": gene_set_id}
+
+
+@app.get("/workspace/papers")
+def list_saved_papers(repo=Depends(_library_repo), ctx: AuthContext = Depends(require_user)):
+    return {"papers": repo.list_papers(ctx.user_id)}
+
+
+@app.post("/workspace/papers")
+def save_paper(body: PaperBody, repo=Depends(_library_repo),
+               ctx: AuthContext = Depends(require_user)):
+    return repo.upsert_paper(ctx.user_id, ctx.email, body.model_dump())
+
+
+@app.get("/workspace/papers/{paper_id}")
+def get_saved_paper(paper_id: str, repo=Depends(_library_repo),
+                    ctx: AuthContext = Depends(require_user)):
+    paper = repo.get_paper(ctx.user_id, paper_id)
+    if paper is None:
+        raise HTTPException(status_code=404, detail="unknown paper")
+    return paper
+
+
+@app.delete("/workspace/papers/{paper_id}")
+def delete_saved_paper(paper_id: str, repo=Depends(_library_repo),
+                       ctx: AuthContext = Depends(require_user)):
+    if repo.delete_paper(ctx.user_id, paper_id) == 0:
+        raise HTTPException(status_code=404, detail="unknown paper")
+    return {"ok": True, "id": paper_id}
+
+
+@app.get("/skill-installs")
+def list_skill_installs(project_id: str | None = None, repo=Depends(_library_repo),
+                        ctx: AuthContext = Depends(require_user)):
+    return {"installs": repo.list_installs(ctx.user_id, project_id)}
+
+
+@app.post("/skill-installs")
+def install_skill(body: InstallBody, repo=Depends(_library_repo),
+                  ctx: AuthContext = Depends(require_user)):
+    try:
+        return repo.install_skill(ctx.user_id, ctx.email, body.skill_id, body.project_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="unknown project") from exc
+
+
+@app.delete("/skill-installs")
+def uninstall_skill(skill_id: str, project_id: str | None = None, repo=Depends(_library_repo),
+                    ctx: AuthContext = Depends(require_user)):
+    removed = repo.uninstall_skill(ctx.user_id, skill_id, project_id)
+    return {"ok": True, "removed": removed}

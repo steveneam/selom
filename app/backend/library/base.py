@@ -27,6 +27,21 @@ def iso(dt) -> str | None:
     return dt.isoformat() if isinstance(dt, datetime) else dt
 
 
+def ensure_workspace(conn: sa.Connection, tq) -> str:
+    """The account's single workspace id (created on first need). Account-level assets (gene sets,
+    papers, workspace-wide skill installs) carry it so the ``skill_installs`` functional unique
+    ``COALESCE(project_id, workspace_id), skill_id`` stays unique *per tenant* — a workspace-wide
+    install with a NULL workspace_id would collide across tenants. Mirrors ``UploadRepo._ensure_workspace``."""
+    from db.schema import workspaces
+
+    existing = conn.execute(
+        sa.select(workspaces.c.id).where(workspaces.c.user_id == tq.user_id).limit(1)
+    ).first()
+    if existing is not None:
+        return existing.id
+    return tq.insert(workspaces, name="My workspace")
+
+
 class TenantRepo:
     """Engine construction shared by every library mixin (SQLite dev/test, Postgres prod, one URL)."""
 

@@ -12,10 +12,19 @@ from __future__ import annotations
 
 from library.base import TenantRepo
 from library.figures import FigureMixin
+from library.papers import PaperMixin
+from library.workspace import GeneSetMixin, InstallMixin, WorkspaceMixin
 
 
-class LibraryRepo(FigureMixin, TenantRepo):
-    """Tenant CRUD for the FE stores (figures + the account library) behind ``TenantQuery``."""
+class LibraryRepo(
+    FigureMixin, WorkspaceMixin, GeneSetMixin, InstallMixin, PaperMixin, TenantRepo
+):
+    """Tenant CRUD for the FE stores (figures + the account library) behind ``TenantQuery``.
+
+    Scope note (sub-spec §7): ``cleaning_recipes`` and ``reproduction_runs`` are intentionally NOT
+    built here — cleaning steps already round-trip inside ``datasets.qc`` (the QcReport JSON), and the
+    reproduction-run pointer is written by the BE reproduction engine (step 8), not an FE store. The
+    four resources the FE stores actually persist are figures · workspace · gene sets · papers."""
 
 
 _repo: LibraryRepo | None = None
