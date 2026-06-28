@@ -155,8 +155,8 @@ hookup is just env vars (§6) + the Clerk dashboard allowed origins.
 
 | Where | Var | Value / source | Notes |
 |---|---|---|---|
-| **Vercel** (FE) | `NEXT_PUBLIC_API_BASE_URL` | the HTTP API URL | public; per-env (preview vs prod) |
-| Vercel | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk dashboard | public |
+| **Vercel** (FE) | `API_PROXY_TARGET` | the HTTP API URL | the FE calls relative `/api/*`; `next.config.ts` rewrites them. **Today the destination is hardcoded `http://localhost:8000`** — at step 8 make it `process.env.API_PROXY_TARGET ?? "http://localhost:8000"` and set this on Vercel. (No `NEXT_PUBLIC_API_BASE_URL` exists in the FE.) |
+| Vercel | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk dashboard | public; only once Clerk is wired into the FE |
 | Vercel | `CLERK_SECRET_KEY` | Clerk dashboard | secret (Vercel env, encrypted) |
 | **GitHub** (Actions) | `AWS_DEPLOY_ROLE_ARN` | CDK output | repo **variable**, not a secret |
 | **AWS** (backend, via Secrets Manager / SSM) | `SELOM_DATABASE_URL` | Aurora endpoint | Secrets Manager (rotation) |
