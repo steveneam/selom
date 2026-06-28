@@ -125,3 +125,49 @@ def test_make_result_store_selects_local(tmp_path):
     rs.put("j1", _BUNDLE)
     assert rs.get("j1") == _BUNDLE
     assert (tmp_path / "results" / "j1.json").exists()  # lands under data_dir/results, unchanged
+
+
+# --- the REAL S3ObjectStore (boto3) against an in-memory S3 (moto) ---------------------------
+# Proves the actual boto3 code path — get/put/head/delete/presign — in the fast suite, with no
+# network or real AWS. The live HTTP fetch through a presigned URL is covered by the live script
+# (scratchpad/verify_s3_roundtrip.py); moto's presigned URL is well-formed but not HTTP-fetchable
+# in decorator mode, so we assert its shape, not a fetch. Skipped cleanly if moto is absent.
+
+_REGION = "ap-southeast-2"
+
+
+def test_real_s3objectstore_against_moto():
+    moto = pytest.importorskip("moto")
+    import types
+
+    import boto3
+
+    from storage.object_store import S3ObjectStore
+
+    with moto.mock_aws():
+        boto3.client("s3", region_name=_REGION).create_bucket(
+            Bucket="parity-bucket",
+            CreateBucketConfiguration={"LocationConstraint": _REGION},
+        )
+        store = S3ObjectStore(types.SimpleNamespace(s3_bucket="parity-bucket", s3_region=_REGION))
+
+        # ObjectStore byte parity through the real boto3 client (moto intercepts the calls)
+        assert store.get_bytes("results/x.json") is None
+        store.put_bytes("results/x.json", b'{"k": 1}', "application/json")
+        assert store.get_bytes("results/x.json") == b'{"k": 1}'
+        assert store.head("results/x.json") is True
+        store.put_bytes("results/x.json", b'{"k": 1}')  # idempotent re-write
+        assert store.get_bytes("results/x.json") == b'{"k": 1}'
+        url = store.presign_get("results/x.json", 300)
+        assert url and url.startswith("https://") and "results/x.json" in url
+        store.delete("results/x.json")
+        assert store.head("results/x.json") is False
+
+        # the result adapter over the real S3 backend
+        rs = ObjectStoreResultStore(store, presign_ttl=300)
+        put_url = rs.put("job1", _BUNDLE)
+        assert put_url.startswith("https://")        # S3 -> presigned, not the local route
+        assert rs.get("job1") == _BUNDLE              # JSON round-trip via boto3
+        assert rs.url_if_exists("job1")               # truthy URL (signing time varies — no eq)
+        assert rs.get("absent") is None
+        assert store.head("results/job1.json") is True

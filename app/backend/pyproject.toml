@@ -105,10 +105,11 @@ omics = [
   # closure means `uv sync --extra omics` can never re-resolve to the unbuildable harmonypy
   # 2.0.0 C++/CMake rewrite — the s28 footgun is closed for the shipped path.
 ]
-# Async job path (B3): arq + Redis queue (DECISIONS #6) + boto3 for the R2 result
-# store. OPTIONAL — the default inline executor + local-filesystem result store need
-# NONE of these, so `uv sync` (core) runs the full job API offline. boto3 >=1.36 needs
-# the R2 checksum workaround, applied in storage/results.py (RISKS #5).
+# Async job path (B3): arq + Redis queue (DECISIONS #6) + boto3 for the S3 object
+# store (storage/object_store.py). OPTIONAL — the default inline executor + local-
+# filesystem object store need NONE of these, so `uv sync` (core) runs the full job
+# API offline. boto3 >=1.36 needs the checksum workaround, applied in object_store.py
+# (RISKS #5). AWS materialization: SELOM_OBJECT_STORE=s3 flips the four stores to S3.
 jobs = [
   "arq>=0.25",
   "redis>=5",
@@ -118,6 +119,9 @@ dev = [
   "pytest",
   "httpx",
   "ruff",
+  # Apache-2.0 — in-memory AWS mock so the REAL S3ObjectStore (boto3) is exercised in the
+  # fast suite with no network/real AWS (test_object_store_parity.py). Pulls boto3/botocore.
+  "moto>=5",
 ]
 
 # Validation oracles — installed only to cross-check Selom's clean-room engines against the
