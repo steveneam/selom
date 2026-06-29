@@ -461,6 +461,92 @@ def _apply_apply_cleaning_step(action, ctx) -> dict:  # noqa: ARG001 — never c
 
 
 # ---------------------------------------------------------------------------
+# S4 — P3 route action: select_skill.
+#
+# Engine-surface: engine.compat.fit(skill_id, FileAssessment) gates on a *certain*
+# payload-class mismatch (table vs matrix) — the honesty rule.  When ctx.data_fit is
+# provided, a FileAssessment is reconstructed from its fields (kind, quality, qc_ok,
+# columns via ctx.data_columns) and the target skill is scored.  A DataFit.gated=True
+# result (compatible=False) → honest no_fitting_skill gap (recorded) so the backlog
+# captures demand for compatible alternatives.  When ctx.data_fit is None the compat
+# check is skipped (fail-soft: we don't know the data, so we can't gate).
+# ---------------------------------------------------------------------------
+
+def _validate_select_skill(action, ctx) -> "ValidationOutcome":
+    """Propose switching the active skill for the current data (P3 route action).
+
+    Two-layer validation:
+      1. Registry existence — the target skill must be installed.
+      2. Compat check (when ctx.data_fit is available) — engine.compat.fit scores
+         the current data against the target skill.  A certain mismatch (gated=True)
+         emits a no_fitting_skill gap rather than a hard error, so the backlog captures
+         demand for incompatible-but-requested skill switches.
+
+    Reuses engine.compat.fit — no parallel validation path.
+    """
+    from ai.models import ValidationOutcome
+
+    # Resolve the target skill from payload or target field.
+    target_skill = action.payload.get("skill_id") or action.target
+    if not target_skill:
+        return ValidationOutcome(
+            ok=False, errors=["select_skill payload must contain 'skill_id'"]
+        )
+
+    # Layer 1 — registry existence.
+    try:
+        from skills.registry import list_skill_ids
+        if target_skill not in set(list_skill_ids()):
+            return ValidationOutcome(
+                ok=False,
+                errors=[f"skill {target_skill!r} is not in the registry"],
+                gap=_make_gap(action, ctx, "no_fitting_skill"),
+            )
+    except Exception as exc:
+        return ValidationOutcome(
+            ok=False, errors=[f"could not check skill registry: {exc}"]
+        )
+
+    # Layer 2 — compat check (skip when data_fit is absent — fail-soft).
+    if ctx.data_fit:
+        try:
+            from engine.compat import FileAssessment
+            from engine.compat import fit as compat_fit
+
+            fa = FileAssessment(
+                path=ctx.data_fit.get("path", ""),
+                filename=ctx.data_fit.get("filename", ""),
+                loadable=True,
+                kind=ctx.data_fit.get("kind", "unknown"),
+                # Use score as a proxy for quality (same 0-100 scale, reasonable approx).
+                quality=ctx.data_fit.get("score", 80),
+                qc_ok=ctx.data_fit.get("qc_ok", True),
+                columns=ctx.data_columns or [],
+                n_numeric_cols=0,
+            )
+            result = compat_fit(target_skill, fa)
+            if result.gated:
+                return ValidationOutcome(
+                    ok=False,
+                    errors=[
+                        f"skill {target_skill!r} is incompatible with the current data: "
+                        f"{result.reason}"
+                    ],
+                    gap=_make_gap(action, ctx, "no_fitting_skill"),
+                )
+        except Exception:
+            pass  # compat check failed — degrade-clean, don't block the action
+
+    return ValidationOutcome(ok=True)
+
+
+def _apply_select_skill(action, ctx) -> dict:
+    """Stage the skill switch — the run path picks it up at commit time."""
+    target_skill = action.payload.get("skill_id") or action.target
+    return {"params": {"_selected_skill": target_skill}}
+
+
+# ---------------------------------------------------------------------------
 # The registry (the moat-as-data).
 # ---------------------------------------------------------------------------
 
@@ -528,6 +614,14 @@ ACTION_REGISTRY: dict[str, ActionDef] = {
         validate=_validate_apply_cleaning_step,
         apply=_apply_apply_cleaning_step,
         doc="[GAP] Toggle a cleaning-step on/off — plan_cleaning has no step-enable/skip hook.",
+    ),
+    # S4 — P3 route action
+    "select_skill": ActionDef(
+        type="select_skill",
+        tier="recompute",
+        validate=_validate_select_skill,
+        apply=_apply_select_skill,
+        doc="Switch the active skill to a compatible alternative (requires re-run).",
     ),
 }
 

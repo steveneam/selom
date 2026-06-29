@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json as _json
 import os
+from typing import Literal
 
 from fastapi import APIRouter, Form, HTTPException, UploadFile
 from pydantic import BaseModel
@@ -93,6 +94,103 @@ def propose(req: ProposeRequest):
     )
     turn = run_helper_turn(ctx, req.goal, get_action_gateway())
     return turn.model_dump()
+
+
+# ---------------------------------------------------------------------------
+# POST /ai/apply
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# GET /ai/gaps — review-only capability-gap backlog
+# ---------------------------------------------------------------------------
+
+@router.get("/ai/gaps")
+def get_gaps():
+    """Return the ranked, categorized capability-gap backlog.
+
+    Each entry carries context_hash, stage, unmet, category, skill_id, count,
+    and sample_attempt (the last attempted payload that produced this gap).
+
+    **Review-only** — this endpoint never mutates the action registry, relaxes a
+    validation rule, or widens a param_spec (the integrity boundary).  It is the
+    surface the retro workflow and the FE backlog view consume.
+    """
+    from ai import gaps as g
+
+    entries = g.list_gaps()
+    return [
+        {
+            "context_hash": entry["gap"].context_hash,
+            "stage": entry["gap"].stage,
+            "unmet": entry["gap"].unmet,
+            "category": entry["category"],
+            "skill_id": entry["gap"].skill_id,
+            "count": entry["count"],
+            "sample_attempt": entry["gap"].attempted,
+        }
+        for entry in entries
+    ]
+
+
+# ---------------------------------------------------------------------------
+# POST /ai/explain — informational helpers (NOT mutations)
+#
+# explain_score and propose_sweep produce explanatory text grounded in
+# deterministic artifacts (the scorecard; the SOP sweep space).  They are NOT
+# mutations: they do not go through the action registry or apply_plan.  The
+# gateway translate is used for structured output; the Null gateway falls back
+# to a short deterministic summary of the passed data (degrade-clean).
+#
+# DEFERRED: methods/legend polish (optional AI over the deterministic litsynth /
+# companions.methods; lower priority than explain_score + propose_sweep).
+# ---------------------------------------------------------------------------
+
+class ExplainRequest(BaseModel):
+    """Inbound request for an informational AI helper.
+
+    ``request`` selects which helper to invoke.  ``scorecard`` and
+    ``sweep_space`` are the deterministic artifacts that ground the explanation —
+    the AI is instructed never to fabricate values outside them.
+
+    ``explain_score``  — plain-language explanation of a reproducibility scorecard
+                         grounded in the scorecard fields (score, tier, panels).
+    ``propose_sweep``  — suggest which parameters to sweep, grounded in the
+                         declared sweep-space dict (param → range/options).
+    """
+
+    request: Literal["explain_score", "propose_sweep"]
+    stage: str = "grade"
+    skill_id: str | None = None
+    goal: str = ""
+    scorecard: dict | None = None
+    sweep_space: dict | None = None
+
+
+@router.post("/ai/explain")
+def explain(req: ExplainRequest):
+    """Return AI-generated (or deterministic) explanatory text for a grade/output helper.
+
+    Uses the active gateway's ``explain`` method — the Null gateway returns a
+    deterministic text built from the supplied deterministic data (scorecard /
+    sweep-space); the live gateway returns AI-generated text grounded in the same
+    data.  Either way the call degrades clean: no raises, no fabricated values.
+
+    This is an **informational path** — it never goes through ``apply_plan``, never
+    stages a param, and never records a gap.  Not in ACTION_TYPES.
+    """
+    gw = get_action_gateway()
+    data: dict = {}
+    if req.scorecard:
+        data["scorecard"] = req.scorecard
+    if req.sweep_space:
+        data["sweep_space"] = req.sweep_space
+
+    text = gw.explain(req.request, data, req.goal)
+    return {
+        "request": req.request,
+        "text": text,
+        "source": "deterministic" if isinstance(gw, NullActionGateway) else "ai",
+    }
 
 
 # ---------------------------------------------------------------------------

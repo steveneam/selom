@@ -120,6 +120,21 @@ class PydanticAIGateway:
         except Exception:  # noqa: BLE001 — degrade clean, never propagate AI errors
             return ActionPlan(goal=goal, actions=[])
 
+    def explain(self, request_type: str, data: dict, goal: str) -> str:
+        """Return AI-generated explanatory text grounded in the supplied data.
+
+        Degrade-clean: returns a deterministic fallback on any error (import
+        failure, API error, timeout, missing key) — never raises into the caller.
+        The text is grounded in ``data`` (scorecard / sweep-space dict) passed by
+        the caller; the AI is instructed never to fabricate analytical values.
+        """
+        from ai.gateway import _deterministic_explain
+
+        try:
+            return self._explain_inner(request_type, data, goal)
+        except Exception:  # noqa: BLE001 — degrade clean
+            return _deterministic_explain(request_type, data, goal)
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -194,6 +209,64 @@ class PydanticAIGateway:
             ],
             notes=proposed.notes,
         )
+
+    def _explain_inner(self, request_type: str, data: dict, goal: str) -> str:
+        """Call the live model for an explanatory text grounded in ``data``.
+
+        Uses the same thread-based timeout guard as ``_propose_inner``.  The
+        prompt instructs the model to use only the supplied deterministic data —
+        never to fabricate analytical values.
+        """
+        import json as _json_inner
+
+        from pydantic_ai import Agent
+        from pydantic_ai.models.anthropic import AnthropicModel, AnthropicModelSettings
+
+        system = (
+            "You are an analytical explainer.  You explain or suggest based ONLY on the "
+            "structured data provided — you never fabricate analytical results or values. "
+            "Be concise (≤120 words)."
+        )
+        prompt_lines = [
+            f"Request: {request_type}",
+            f"Goal: {goal}",
+            f"Data: {_json_inner.dumps(data, indent=2)}",
+        ]
+        prompt = "\n".join(prompt_lines)
+
+        model_instance = AnthropicModel(self._model)
+        model_settings: AnthropicModelSettings = AnthropicModelSettings(
+            anthropic_task_budget={"type": "tokens", "total": min(self._token_budget, 4000)},
+        )
+        agent: Agent[None, str] = Agent(
+            model_instance,
+            output_type=str,
+            model_settings=model_settings,
+            system_prompt=system,
+        )
+
+        result_holder: list = [None]
+        error_holder: list = [None]
+
+        def _do_run() -> None:
+            try:
+                result_holder[0] = agent.run_sync(prompt)
+            except Exception as exc:  # noqa: BLE001
+                error_holder[0] = exc
+
+        import threading
+        t = threading.Thread(target=_do_run, daemon=True)
+        t.start()
+        t.join(timeout=self._timeout_s)
+
+        if t.is_alive():
+            from ai.gateway import _deterministic_explain
+            return _deterministic_explain(request_type, data, goal)
+
+        if error_holder[0] is not None:
+            raise error_holder[0]
+
+        return str(result_holder[0].output)
 
     def _propose_inner(self, context: ActionContext, goal: str) -> ActionPlan:
         """Run the Pydantic AI agent with a thread-based timeout guard.

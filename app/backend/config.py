@@ -130,6 +130,14 @@ class Settings(BaseSettings):
     ai_token_budget: int = Field(default=20_000, validation_alias="SELOM_AI_TOKEN_BUDGET")
     ai_timeout_s: float = Field(default=30.0, validation_alias="SELOM_AI_TIMEOUT_S")
 
+    # Capability-gap store (S4) — "memory" (default, zero-infra) or "jsonl" (persistent JSONL
+    # file that survives process restarts).  The "jsonl" backend requires SELOM_GAP_STORE_PATH.
+    # Default behaviour is unchanged (in-memory) so zero-regression is guaranteed.
+    gap_store: str = Field(default="memory", validation_alias="SELOM_GAP_STORE")  # memory | jsonl
+    gap_store_path: pathlib.Path | None = Field(
+        default=None, validation_alias="SELOM_GAP_STORE_PATH"
+    )
+
     @model_validator(mode="after")
     def _validate_backend_combos(self):
         """Fail fast at boot if a non-local backend is selected without its required setting,

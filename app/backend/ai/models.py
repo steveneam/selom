@@ -26,6 +26,8 @@ ACTION_TYPES = (
     "set_design",
     "map_columns",
     "apply_cleaning_step",
+    # S4 — P3 route action
+    "select_skill",
 )
 ActionType = Literal[
     "set_param",
@@ -38,6 +40,8 @@ ActionType = Literal[
     "set_design",
     "map_columns",
     "apply_cleaning_step",
+    # S4 — P3 route action
+    "select_skill",
 ]
 
 
