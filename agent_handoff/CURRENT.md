@@ -11,6 +11,7 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
+| **BE-PKGS** | 2026-06-29 | `d18afb0..61a6d42` | flat `reproduction*.py` → `reproduction/` package (§3A, re-export `__init__`) + `methods/legends/provenance/guardrails` → `companions/` (§3B), both contract-frozen; `test_structure_guard` extended (no-flat-module checks, verified both ways) → plan §3 all DONE; fast gate 848/1 |
 | **FE-HOOKS** | 2026-06-29 | `c6af964..8bf5c26` | `project-workspace.tsx` → 3 hooks (view/crud/run, §3C DEFERRED→DONE, 1384→1111); +dev:mock 7c persistence handlers (un-rollback optimistic figures); `data-check-routing` e2e repointed to the figure-data stage → e2e 4/4 |
 | **RECORDS-MOVE** | 2026-06-29 | `b86f0e1` | `docs/records/` physical move — 22 record docs bucketed, 78 files / 169 inbound pointers rewritten; pushed FOUNDATION-FINISH |
 | **FOUNDATION-FINISH** | 2026-06-29 | `21c1177..6004a75` | docs name-collision rename + orientation de-dup; raise free-tier quota defaults (unblocks dogfood); scoped FE-3 / BE-pkgs / FE-hooks |
@@ -20,13 +21,13 @@
 | AWS-MAT-1..5 | 2026-06-28 | (git) | S3 object-store seam · jobs→SQL · tenant schema · Clerk auth · step-6 prep |
 | older | — | (git / `archive/`) | `git log` · `agent_handoff/archive/` |
 
-## ▸ LIVE · FE-HOOKS · 2026-06-29 16:24 +10:00 · local @ `8bf5c26` (handoff = next commit) — **push pending (all of FE-HOOKS + handoff); RECORDS-MOVE + FOUNDATION-FINISH already on `origin/main`** · Claude (FE+BE), Opus 4.8 xhigh
+## ▸ LIVE · BE-PKGS · 2026-06-29 17:10 +10:00 · local @ `61a6d42` (handoff = next commit) — **push pending (BE-PKGS 3 commits + handoff); `origin/main` still @ `dad321f` — owner pushes by default, confirm first** · Claude (FE+BE), Opus 4.8 xhigh
 
-- **Shipped — `project-workspace.tsx` → 3 hooks (§3C, DEFERRED→DONE; `c6af964`·`f7b54cf`·`aae8751`):** extracted the routing state (`use-workspace-view.ts` 52), open/delete handlers (`use-figure-crud.ts` 102), and the run engine (`use-figure-run.ts` 347 — `runFlow`/`rerunFigure`/`runSweep`/`rerunFigureWithParams` + `running`/`error`/`blocked`/`needData` + `resolveRunFile`/`captureCarryLabels`/`stampDataVersion`) under `components/project/hooks/`. **Contract-frozen:** control flow verbatim; each `useCallback` kept its dep set + the now-injected stable routing setters; parent **1384 → 1111** lines; `figure` store stays at root; `workrail.tsx` left whole. Verified per-slice (tsc/eslint/vitest) + e2e + browser.
-- **Side fix — dev:mock 7c persistence (`3086829`):** the e2e smoke surfaced a *pre-existing* mock-only rollback bug — the 7c optimistic write queue (FE-state→API) had **no MSW handlers**, so a run's `POST /figures` got an unhandled-route 4xx → `onPermanentFail` **deleted the figure** → `activeFigureId` dangled → Figure-data stage / VersionBar / staleness unreachable (gesture tests only passed by *racing* the rollback). New `mocks/persistence-handlers.ts` acks the 7c writes (client-authoritative ids, no remap) + returns empty reconcile GETs; mock now matches the real backend's create→persist→reconcile loop.
-- **e2e repointed (`8bf5c26`):** the `data-check-routing` specs were stale — asserted the routing surface on the figure landing view, but it moved to the figure-data stage (§3.7); **confirmed failing on pre-refactor `02deeeb`**, so not a regression. Now open "Figure data" first.
-- **Gates:** tsc clean · eslint **0-err** (16 warn, all pre-existing React-Compiler advisories) · vitest **353** · **playwright 4/4** (figure-gestures + data-check-routing). BE untouched this session.
-- **Lesson (the Ratchet):** an override/workaround almost always traces to legacy hardcode or a mock/seed gap — chase the root, don't paper over [[mock-must-mirror-backend-contract]]. The `:8000`-vs-mock + client-authoritative-id design is exactly why `dev:mock` drifted from the deployed API.
+- **Shipped — BE `reproduction/` package (§3A; `d18afb0`):** folded the 10 flat `reproduction*.py` into a package — `core`/`drive`/`runs`/`fixtures`/`guards`/`diagnose` + `papers/{rpgrip1,jev,hani,dorgau}`. **Contract-frozen:** the re-export `__init__` (`from .core import *`) froze every `import reproduction as R` / `from reproduction import X` consumer; only sibling-module refs moved to the dotted path + `papers_api` `__import__`→`importlib.import_module`. `reproduction_runs` SQL table name + the runs-module monkeypatch attr string deliberately untouched.
+- **Shipped — BE `companions/` package (§3B; `35ee84a`):** `methods`/`legends`/`provenance`/`guardrails` → `companions/` (moved verbatim, no internal edits); ~6 sites + 5 tests → `from companions import X` (no re-export shim per §3B). `export.py` stays flat.
+- **Enforcement — structure guard (`61a6d42`):** extended `test_structure_guard.py` so the fold can't rot back to flat — `test_no_flat_reproduction_modules` + `test_companion_builders_live_in_package` (fast-gate, **verified both ways**: green at target, planted stray fails). Plan §3 marked DONE (§3A/§3B/§3C); 1 stale doc ref fixed.
+- **Gates:** ruff clean · fast gate **848 passed / 1 skipped** (846 baseline + 2 guards; matched baseline before the guards) · full-suite **collect-only 1204 (0 import errors)** — proves @slow tests import the new paths too. FE untouched this session.
+- **Lesson (the Ratchet):** a structure rule only holds if a check **fails when it drifts** — the durable artifact for §3A/§3B is the guard test, not the plan prose [[the-ratchet-durable-artifacts]] [[selom-repo-structure-conventions]]. Contract-frozen fold = freeze the external surface (re-export `__init__`), script the bulk import rewrites, hand-edit the risky few, lean on the test suite [[contract-frozen-refactor]].
 
 ## ▸ NEXT (owner sequences — said "stop here, I'll sequence")
 
@@ -35,8 +36,8 @@
 
 ## ▸ DEFERRED (specced/scoped, not built)
 
-- **BE `reproduction/` + `companions/` packages** (~0.5d, plan §3A/§3B) — contract-frozen fold; a re-exporting `reproduction/__init__.py` (star-export of `core.__all__`) keeps the ~14 `import reproduction as R` consumers unchanged. ⚠ **one behavioral edit:** `papers_api.py:40` `__import__(…)` → `importlib.import_module(…)` (dotted module names). ⚠ scope the `reproduction_runs` find-replace to import lines only (it's also a DB table name). Do when reproduction is the active area.
-- _(done FE-HOOKS: FE `project-workspace.tsx` → hooks §3C — see SESSIONS / plan §3C.)_
+- _Repo-structure plan §3 is fully built — §3A `reproduction/` + §3B `companions/` (BE-PKGS), §3C FE hooks (FE-HOOKS). Nothing deferred there. New BE work follows the package conventions, guard-backstopped by `test_structure_guard.py`._
+- _(none else scoped — NEXT is owner-sequenced: FE-3 upload wiring · step 8.)_
 
 ## ▸ ENV / landmines
 
