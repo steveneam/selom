@@ -36,14 +36,11 @@ import {
 import { deriveFigureModel } from "@/lib/figure/figure-model";
 import { applyStagedThresholds, readThresholds, type VolcanoThresholds } from "@/lib/volcano/thresholds";
 import {
-  captureLabels,
-  carryLabels,
   labelableGenes,
   labeledGenes,
   toggleGeneLabelOps,
   toggleLabelOps,
   type GeneLabelPoint,
-  type LabelAnnotation,
 } from "@/lib/volcano/labels";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 import { projectStore, select, useProjects } from "@/lib/projects/store";
@@ -52,14 +49,14 @@ import type { Dataset, Figure } from "@/lib/projects/types";
 import { figureStaleness } from "@/lib/lineage/staleness";
 import { figureTable } from "@/lib/lineage/figure-table";
 import { versionFamily } from "@/lib/lineage/versions";
-import type { ParamValue } from "@/lib/lineage/diff";
 import { familyColorMap } from "@/lib/lineage/family";
 import { readStyleStamp } from "@/lib/figure/figure-spec";
-import { DataCheckError, runSkill, runtimeSkillId, type DataCheck, type SkillParams, type SkillProvenance } from "@/lib/skills/api";
+import type { SkillParams } from "@/lib/skills/api";
 import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
 import { pushUndo } from "@/lib/workspace/undo";
 import { useWorkspaceView } from "./hooks/use-workspace-view";
 import { useFigureCrud } from "./hooks/use-figure-crud";
+import { useFigureRun } from "./hooks/use-figure-run";
 
 /** Map a command-palette intent's tab onto the workrail's view model (Pillar 1, S2.3). */
 function viewFromTab(tab: WorkspaceTab): RailView {
@@ -88,20 +85,6 @@ function skillBadge(skillId: string): string | undefined {
   if (!sk) return undefined;
   const origin = sk.license === "proprietary" ? "proprietary" : sk.source;
   return `${origin} · v${sk.version}`;
-}
-
-/**
- * Stamp the figure's input hash with the dataset's CURRENT version (Pillar 1). The
- * input hash is the dataset bytes' hash; in the dogfood mock the backend hash is a
- * fixed stand-in, so we record the dataset's client-maintained version, which is what
- * staleness diffs against. For a real backend the two are equal, so this is a no-op.
- */
-function stampDataVersion(
-  provenance: SkillProvenance | undefined,
-  dataset: Dataset | undefined,
-): SkillProvenance | undefined {
-  if (!provenance || !dataset?.currentSha256) return provenance;
-  return { ...provenance, input: { ...provenance.input, sha256: dataset.currentSha256 } };
 }
 
 export function ProjectWorkspace({ projectId }: { projectId: string }) {
@@ -139,16 +122,6 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [designFile, setDesignFile] = React.useState<File | null>(null);
   // A file dropped on the Overview hub — handed to the Data tab to ingest + intake.
   const [incomingFile, setIncomingFile] = React.useState<File | null>(null);
-  const [running, setRunning] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  // The is-my-data-clean guardrail tripped (HTTP 422, P1c/D-e5): the run was halted by a
-  // block-severity QC problem. Holds the verdict + the step so "Review & run anyway" can re-run
-  // with override. Cleared at the start of every run.
-  const [blocked, setBlocked] = React.useState<{ check: DataCheck; step: ProposedStep } | null>(null);
-  // A run was attempted on a dataset whose bytes aren't in this session (re-opened after reload),
-  // against a real backend — so there's nothing real to send. Instead of POSTing a placeholder
-  // file that the skill can't read (a confusing failure), we halt and prompt a re-upload.
-  const [needData, setNeedData] = React.useState<{ datasetId?: string } | null>(null);
   // The dataset the user is re-uploading bytes for (C5): the next file dropped in the Data tab
   // REFILLS this existing dataset instead of spawning a duplicate. Set from the lost-bytes banner.
   const [reattachId, setReattachId] = React.useState<string | null>(null);
@@ -239,14 +212,23 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // Re-run needs the dataset bytes: present this session (lastFile) or fabricated in
   // mock mode; with neither (e.g. after reload against a real backend) it's disabled.
   const canRerun = !!activeFigure?.skillId && !!activeFigure?.provenance && (lastFile != null || mockMode);
-  // Resolve the bytes a run will send: this session's real upload, or a placeholder ONLY in mock
-  // mode (the MSW stub ignores bytes). Against a real backend with no session bytes → null, so the
-  // caller prompts a re-upload rather than POSTing an unreadable placeholder.
-  const resolveRunFile = React.useCallback(
-    (dataset?: { filename?: string }): File | null =>
-      lastFile ?? (mockMode ? new File(["mock"], dataset?.filename ?? "data.csv") : null),
-    [lastFile, mockMode],
-  );
+  // The skill-run engine (§3C): a fresh run + the three re-run flavours + their shared run
+  // state. It persists durable figure records and navigates by writing the routing setters.
+  const { running, error, blocked, needData, setBlocked, setNeedData, runFlow, rerunFigure, runSweep, rerunFigureWithParams } =
+    useFigureRun({
+      projectId,
+      figure,
+      datasets,
+      datasetId,
+      designFile,
+      lastFile,
+      mockMode,
+      activeFigure,
+      activeFigureId,
+      setActiveFigureId,
+      setView,
+      setCompareIds,
+    });
   // The Statistics table for the focused figure (stats view) — its stored table or a
   // fallback derived from its spec (D3).
   const activeStatsTable = activeFigure ? figureTable(activeFigure) : undefined;
@@ -329,226 +311,6 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     const id = setTimeout(() => projectStore.updateFigureSpec(activeFigureId, spec), 350);
     return () => clearTimeout(id);
   }, [figure.spec, activeFigureId, frozen]);
-
-  const runFlow = React.useCallback(
-    async (step: ProposedStep, opts: { override?: boolean } = {}) => {
-      setError(null);
-      setBlocked(null);
-      setNeedData(null);
-      // Attach the project's dataset even on the demo deep-link (no explicit pick),
-      // so produced figures have a dataset to compute staleness against.
-      const dsId = datasetId ?? datasets[0]?.id;
-      const dataset = dsId ? datasets.find((d) => d.id === dsId) : undefined;
-      const file = resolveRunFile(dataset);
-      if (!file) {
-        setNeedData({ datasetId: dsId });   // re-opened dataset, real backend → prompt re-upload
-        return;
-      }
-      setRunning(step.skillId);
-      try {
-        const res = await runSkill(runtimeSkillId(step.skillId), file, step.params, designFile, opts);
-        const name = getSkill(step.skillId)?.name ?? step.skillId;
-        // Persist the figure durably — full spec + the provenance bundle (the staleness
-        // trigger-set, stamped with the dataset's current version). Both were transient
-        // before Pillar 1, lost on reload. The legend + data-check verdict ride along too.
-        const saved = projectStore.addFigure(projectId, {
-          title: `${name} — figure`,
-          datasetId: dsId,
-          skillId: step.skillId,
-          spec: res.figure,
-          provenance: stampDataVersion(res.provenance, dataset),
-          methods: res.methods,
-          legend: res.legend,
-          guardrails: res.guardrails,
-          table: res.table ?? undefined,
-          dataCheck: res.dataCheck,
-          dataFit: res.dataFit ?? undefined,
-        });
-        setActiveFigureId(saved.id);
-        figure.init(res.figure); // fresh spec carries no style stamp → activeStyle derives the default
-        setView("figure");
-      } catch (e) {
-        // The is-my-data-clean guardrail (HTTP 422) → a reviewable block card + "run anyway",
-        // not a generic error (P1c/D-e5).
-        if (e instanceof DataCheckError) setBlocked({ check: e.dataCheck, step });
-        else setError(e instanceof Error ? e.message : "Run failed. Please try again.");
-      } finally {
-        setRunning(null);
-      }
-    },
-    [datasetId, datasets, figure, resolveRunFile, designFile, projectId],
-  );
-
-  // Capture the OPEN figure's hand-picked gene labels iff it's a volcano (the geneLabels capability), so
-  // a re-run can re-anchor them onto the fresh backend spec — they'd otherwise be lost (the auto top-N
-  // labels are a text trace, not annotations). generalization-spec §H follow-up. Non-volcano → [].
-  const captureCarryLabels = React.useCallback(
-    (): LabelAnnotation[] =>
-      figure.spec && deriveFigureModel(figure.spec).capabilities.geneLabels ? captureLabels(figure.spec) : [],
-    [figure],
-  );
-
-  // Re-run a (stale) figure: replay its skill with the SAME params against the
-  // dataset's CURRENT bytes, persisting a NEW version (`parentFigureId`). The prior is
-  // retained, never mutated (Pillar 1). The new version stamps the current data
-  // version, so it reads fresh while the prior stays stale.
-  const rerunFigure = React.useCallback(
-    async (fig: Figure) => {
-      if (!fig.skillId || !fig.provenance) return;
-      setError(null);
-      setNeedData(null);
-      const dataset = fig.datasetId ? datasets.find((d) => d.id === fig.datasetId) : undefined;
-      const file = resolveRunFile(dataset);
-      if (!file) {
-        setNeedData({ datasetId: fig.datasetId });
-        return;
-      }
-      // Persist hand-picked gene labels across the re-run, but only when re-running the figure that's
-      // actually open in the editor (else figure.spec is a different figure's labels).
-      const carryPrev = fig.id === activeFigureId ? captureCarryLabels() : [];
-      setRunning(fig.skillId);
-      try {
-        const res = await runSkill(runtimeSkillId(fig.skillId), file, fig.provenance.params, designFile);
-        const nextSpec = carryPrev.length ? carryLabels(res.figure, carryPrev) : res.figure;
-        const saved = projectStore.addFigure(projectId, {
-          title: fig.title,
-          datasetId: fig.datasetId,
-          skillId: fig.skillId,
-          spec: nextSpec,
-          provenance: stampDataVersion(res.provenance, dataset),
-          methods: res.methods,
-          legend: res.legend,
-          guardrails: res.guardrails,
-          table: res.table ?? undefined,
-          dataCheck: res.dataCheck,
-          dataFit: res.dataFit ?? undefined,
-          parentFigureId: fig.id,
-          variantLabel: "re-run",
-        });
-        setActiveFigureId(saved.id);
-        figure.init(nextSpec);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Re-run failed. Please try again.");
-      } finally {
-        setRunning(null);
-      }
-    },
-    [activeFigureId, captureCarryLabels, datasets, resolveRunFile, designFile, figure, projectId],
-  );
-
-  // Parameter sweep (S3.1): run the open figure's skill once per value of a chosen
-  // param (holding the rest fixed) → N linked sibling versions sharing the figure as
-  // parent. Lands in the compare view so the sweep is immediately legible.
-  const runSweep = React.useCallback(
-    async (param: string, values: ParamValue[]) => {
-      const origin = activeFigure;
-      if (!origin?.skillId) return;
-      setError(null);
-      setNeedData(null);
-      const dataset = origin.datasetId ? datasets.find((d) => d.id === origin.datasetId) : undefined;
-      const file = resolveRunFile(dataset);
-      if (!file) {
-        setNeedData({ datasetId: origin.datasetId });
-        return;
-      }
-      setRunning(origin.skillId);
-      // The non-swept params hold at the figure's recorded config; the backend fills any
-      // gap with the skill defaults, so a provenance-less origin sweeps from {} safely.
-      const base = origin.provenance?.params ?? {};
-      const saved: Figure[] = [];
-      try {
-        for (const value of values) {
-          const params = { ...base, [param]: value };
-          const res = await runSkill(runtimeSkillId(origin.skillId), file, params, designFile);
-          saved.push(
-            projectStore.addFigure(projectId, {
-              title: origin.title,
-              datasetId: origin.datasetId,
-              skillId: origin.skillId,
-              spec: res.figure,
-              provenance: stampDataVersion(res.provenance, dataset),
-              methods: res.methods,
-              legend: res.legend,
-              guardrails: res.guardrails,
-              table: res.table ?? undefined,
-              dataCheck: res.dataCheck,
-              dataFit: res.dataFit ?? undefined,
-              parentFigureId: origin.id,
-              variantLabel: `${param} = ${value}`,
-            }),
-          );
-        }
-        if (saved.length >= 2) {
-          setCompareIds(saved.map((f) => f.id));
-          setActiveFigureId(saved[saved.length - 1].id);
-          setView("compare");
-        } else if (saved.length === 1) {
-          setActiveFigureId(saved[0].id);
-          if (saved[0].spec) figure.init(saved[0].spec);
-          setView("figure");
-        }
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Sweep failed. Please try again.");
-      } finally {
-        setRunning(null);
-      }
-    },
-    [activeFigure, datasets, resolveRunFile, designFile, figure, projectId],
-  );
-
-  // Re-run the open figure from the Figure-data stage with EDITED inputs (P2): replay its
-  // skill with new params → a NEW linked version (`parentFigureId`), the original kept.
-  // Mirrors `rerunFigure`/`runSweep`; lands on the figure view with the new version open.
-  const rerunFigureWithParams = React.useCallback(
-    async (params: SkillParams) => {
-      const origin = activeFigure;
-      if (!origin?.skillId) return;
-      setError(null);
-      setBlocked(null);
-      setNeedData(null);
-      const dataset = origin.datasetId ? datasets.find((d) => d.id === origin.datasetId) : undefined;
-      const file = resolveRunFile(dataset);
-      if (!file) {
-        setNeedData({ datasetId: origin.datasetId });
-        return;
-      }
-      // Persist hand-picked gene labels across the re-run (origin is the open figure → figure.spec is
-      // its spec): the fresh backend spec has none, so re-anchor them onto it (generalization-spec §H).
-      const carryPrev = captureCarryLabels();
-      setRunning(origin.skillId);
-      try {
-        const res = await runSkill(runtimeSkillId(origin.skillId), file, params, designFile);
-        const nextSpec = carryPrev.length ? carryLabels(res.figure, carryPrev) : res.figure;
-        const saved = projectStore.addFigure(projectId, {
-          title: origin.title,
-          datasetId: origin.datasetId,
-          skillId: origin.skillId,
-          spec: nextSpec,
-          provenance: stampDataVersion(res.provenance, dataset),
-          methods: res.methods,
-          legend: res.legend,
-          guardrails: res.guardrails,
-          table: res.table ?? undefined,
-          dataCheck: res.dataCheck,
-          dataFit: res.dataFit ?? undefined,
-          parentFigureId: origin.id,
-          variantLabel: "edited inputs",
-        });
-        setActiveFigureId(saved.id);
-        figure.init(nextSpec);
-        // Stay on the Figure-data view: the live preview beside the inputs updates in place
-        // (and the styling box shows the same shared figure when opened) — no view switch.
-      } catch (e) {
-        // A block-severity QC problem surfaces the same reviewable block card as a fresh run.
-        if (e instanceof DataCheckError)
-          setBlocked({ check: e.dataCheck, step: { skillId: origin.skillId, params, rationale: "", confidence: 0 } });
-        else setError(e instanceof Error ? e.message : "Re-run failed. Please try again.");
-      } finally {
-        setRunning(null);
-      }
-    },
-    [activeFigure, captureCarryLabels, datasets, resolveRunFile, designFile, figure, projectId],
-  );
 
   // Drag an ERG landmark dot on the canvas (erg-manual-marks R5) → STAGE the new time into the shared
   // figure-data params (same place the numeric Marks editor writes). The dot moves live (the preview
