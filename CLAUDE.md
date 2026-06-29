@@ -75,6 +75,31 @@ Backstopped by `app/frontend/lib/structure.guard.test.ts` (fails if FE rules dri
   Keep the flat-import style; do **not** introduce `src/`.
 - New feature = new dir/router, registered in one line.
 
+## Operating Playbook
+
+The **Selom Playbook** is the named operating system for how this repo gets built (full manual:
+`docs/operating/playbook.md`). It is the Action-Gateway pattern applied to my own work — a declared
+set of parts (agents/skills/workflows) + a deterministic dispatch + a gap-loop. **This table is the
+dispatch layer: route by situation, don't wait to be asked.**
+
+| When the task is… | Invoke |
+|---|---|
+| A consequential/ambiguous change, before code | forcing-questions (`AskUserQuestion`) → `spec` (write, pause for review) |
+| Breaking a spec into work | `plan` / agile slices |
+| Reviewing a diff / before commit | **`review-gauntlet` workflow** (`.claude/workflows/`) — lenses: repro-integrity · spine-consistency · license · design |
+| FE work or any FE audit/review | the design skills: **ui-ux-pro-max** · **frontend-design** · **impeccable** |
+| Implementing a scoped change | `developer` agent / `implement` / `tdd` / `refactor` |
+| Confirming a change works | `verify` / `browser-verify` — real data + live backend, **not dev:mock** |
+| Stuck after 2 tries | build a helper + capture the gap (`step-back-build-helpers-when-stuck`) |
+| A lesson worth keeping | the Ratchet → one durable home + a lean memory pointer |
+| Deep multi-source research | `deep-research`; library docs → `context7` |
+| Committing | `commit` conventions — named paths (never `git add -A`), no AI sign-off, owner pushes |
+
+Pipelines (run end-to-end, the same way each time): **Design loop** = forcing-Qs → `spec` →
+`review-gauntlet` → approve → build → `verify` → `commit` → Ratchet · **Change review** = diff →
+`review-gauntlet` → fix → `verify` · **Reflect** = consume the CapabilityGap backlog → propose spine
+improvements.
+
 ## Notes
 
 - This repo runs on **Opus 4.8** (xhigh effort) — owner-directed 2026-06-13, pinned in `.claude/settings.json` (`model=claude-opus-4-8`, `effortLevel=xhigh`); superseded the prior Fable 5 default.
