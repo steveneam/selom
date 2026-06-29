@@ -75,12 +75,23 @@ The lenses:
 
 Optional `args`: `{ scope: "the changes in HEAD~2..HEAD" }` etc. Default = the working-tree diff.
 
+## The retro (reflect pipeline)
+
+`Workflow({ scriptPath: ".claude/workflows/retro.js", args: { window } })` — the **Reflect** half of
+the gap-loop (the gauntlet is the verify half). In parallel it gathers **what shipped** (`git log` +
+`CURRENT.md`) and the **open backlog** (`docs/skill-gaps.md` + spec `DEFERRED`/`Open questions`/`TODO`,
+plus the CapabilityGap backlog once S4 persists it), then synthesizes a ranked **what-to-improve-next**,
+the **lessons that should be Ratcheted** (each with its durable home), and health notes. Self-contained
+(default agents, inline briefs; invoke by `scriptPath`). Run it at a phase boundary or ~weekly.
+Optional `args`: `{ window: "the last 30 commits" | "since 2026-06-25" }`. Default = the recent work.
+
 ## Roadmap
 
 - **Built now** — this playbook, the CLAUDE.md dispatch table, the `review-gauntlet` workflow (4
-  inline, self-contained lenses; dogfood-hardened on its first real run).
-- **Next (with AI-Helpers S4)** — the **Reflect** pipeline as a scheduled agent that consumes the
-  CapabilityGap backlog.
+  inline, self-contained lenses; dogfood-hardened on its first real run), and the `retro` reflect
+  workflow.
+- **Next (with AI-Helpers S4)** — **schedule** the `retro` (CronCreate) + wire it to the *persisted*
+  CapabilityGap backlog (today it reads the committed `docs/skill-gaps.md` + spec DEFERRED items).
 - **At step-8 deploy** — a **canary + Web-Vitals-before/after** scheduled agent (Vercel MCP + Lighthouse).
 - **Optional** — `settings.json` hooks (capture-lesson on Stop, destructive-command guard) via
   `update-config` — owner confirms before any settings change.
