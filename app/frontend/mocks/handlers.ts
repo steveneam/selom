@@ -9,6 +9,7 @@ import { FIGURE_STYLES, mockApplyStyle } from "./styles-fixture";
 import { mockExtractChart } from "./extract-fixture";
 import { mockInspect } from "./data-inspect-fixture";
 import { SKILL_PARAM_SPECS } from "./skill-spec-fixture";
+import { persistenceHandlers } from "./persistence-handlers";
 import { REPRO_LEDGERS, REPRO_PAPERS } from "@/lib/reproduction/fixture";
 
 // Mirrors the live contract from app/backend/main.py:
@@ -162,4 +163,7 @@ export const handlers = [
       data_fit: mockDataFit(skillId),
     });
   }),
+  // 7c FE-state persistence (projectStore/workspaceStore optimistic writes + reconcile GETs).
+  // Spread last: the specific /api/figures/* and /api/gene-sets routes above win on overlap.
+  ...persistenceHandlers,
 ];
