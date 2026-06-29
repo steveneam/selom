@@ -1,8 +1,10 @@
 # Repo structure — conventions, cleanup, and refactor plan
 
 **Status:** APPROVED + executed for foundation work (conventions + specs + stale-doc fixes;
-`main.py`→`routers/`; FE lib/ feature-dirs; `docs/records/` physical move done 2026-06-29). ·
-**Stamped:** 2026-06-29 (+10:00).
+`main.py`→`routers/`; FE lib/ feature-dirs; `docs/records/` physical move done 2026-06-29).
+**The §3 deferred folds are now DONE** — FE `project-workspace.tsx` hooks (§3C), BE
+`reproduction/` package (§3A), BE `companions/` package (§3B), all 2026-06-29, each
+contract-frozen and backstopped by the §1.4 guard. · **Stamped:** 2026-06-29 (+10:00).
 
 This is the single foundation doc for keeping Selom's file/folder structure clean,
 consistent, and fast as the product keeps growing — before the AWS deploy (step 8) adds
@@ -22,8 +24,7 @@ rejected as a poor fit — rationale in §4.
 |---|---|---|
 | **Conventions (durable rules)** | FE/BE/docs rules + automated guard | now (§1) |
 | **NOW — execution-ready** | `main.py` → `routers/`; FE lib/ feature-dir finish + lazy fixture + dead-file delete; stale-doc fixes; `docs/records/` physical move; cruft cleanup | done (§2) |
-| **DEFERRED — specced, build later** | BE `reproduction/` package; BE `companions/` package | when that area is the active build (§3) |
-| **DONE (post-foundation)** | FE `project-workspace.tsx` hook decomposition (§3C) | 2026-06-29 |
+| **DONE (post-foundation)** | FE `project-workspace.tsx` hooks (§3C); BE `reproduction/` package (§3A); BE `companions/` package (§3B) — each contract-frozen, guard-backstopped | 2026-06-29 |
 | **SKIP** | `src/` move; 150-line hard cap; barrel `index.ts` files | never (§4) |
 | **Step-8 linked** | wire `obs.py` (CloudWatch JSON logging) | with step 8 |
 
@@ -79,7 +80,10 @@ mirrored as a memory rule, and backstopped by an automated guard (§1.4).
 ### 1.4 Enforcement — the ratchet (lands with the §2 moves)
 Chat memory rots; the rule has to fail a check when it drifts. Two lightweight guards:
 - **BE** `app/backend/tests/test_structure_guard.py` — asserts `main.py` source contains
-  **no `@app.get/post/put/patch/delete`** decorators (routes must be in `routers/`).
+  **no `@app.get/post/put/patch/delete`** decorators (routes must be in `routers/`), **no
+  flat `reproduction_*.py`** at the backend root (the engine is the `reproduction/` package,
+  §3A), and **no flat `methods/legends/provenance/guardrails.py`** (the `companions/`
+  package, §3B). A planted stray fails the gate — verified both directions.
 - **FE** `app/frontend/lib/structure.guard.test.ts` (vitest) — asserts there are **no
   flat `*-api.ts` files at `lib/` root** and **no `index.ts` barrel** anywhere in `lib/`.
 
@@ -187,13 +191,20 @@ Build the two guard tests in §1.4 **with the moves** so they enforce the new ta
 
 ---
 
-## 3. DEFERRED — specced now, build when that area is active
+## 3. Package folds — **DONE 2026-06-29** (specced here; executed contract-frozen)
 
-The owner directive: spec these now so the foundation is solid even though we don't build
-them yet. Do each when its area is the active build (so the import churn lands where
-someone is already working), not on the deploy boundary.
+The owner directive was to spec these so the foundation is solid, then build each when its
+area is the active build. All three are now done (§3C FE hooks; §3A/§3B BE packages), each
+contract-frozen against its external surface and backstopped by the §1.4 guard.
 
-### 3A. Backend `reproduction/` package
+### 3A. Backend `reproduction/` package — **DONE 2026-06-29**
+**Executed:** the layout below shipped verbatim. `dorgau` landed in `papers/`, `diagnose`
+in-package; `skill_gaps.py` + `repro_assets.py` stay flat (cross-cutting/serving, not in
+the layout); `guards.py` moved despite being test-only today. Re-export `__init__` froze
+the ~14 `import reproduction as R` consumers; only sibling-module references + `papers_api`'s
+`__import__`→`importlib.import_module` changed. Fast gate held at 846/1. Backstopped by
+`test_structure_guard.py::test_no_flat_reproduction_modules`.
+
 **What:** fold the flat `reproduction*.py` family into a package.
 ```
 reproduction/
@@ -218,7 +229,12 @@ today) and decide whether `reproduction_dorgau.py` (not in the ledger registry) 
 `diagnose.py`/`skill_gaps.py` diagnostic cluster stay, move to a `scripts/`/`dev/` home, or
 retire — Codex's call.
 
-### 3B. Backend `companions/` package
+### 3B. Backend `companions/` package — **DONE 2026-06-29**
+**Executed:** the four builders moved verbatim (no internal edits — they only import
+`skills.contract`); the ~6 sites + 5 tests switched to `from companions import X` (no
+re-export shim, per the §3B cost note). `export.py` stayed flat. Fast gate held at 846/1.
+Backstopped by `test_structure_guard.py::test_companion_builders_live_in_package`.
+
 **What:** group the figure-artifact builders `methods.py` + `legends.py` +
 `provenance.py` + `guardrails.py` into `companions/` (they're called together in
 `_execute_skill_run`/`jobs.queue` to build the "every figure ships with

@@ -1,7 +1,7 @@
 # Auto-drive regression fixtures (Slice 4)
 
 Frozen cold-`reproduce()` snapshots of blessed dogfood papers. Each `<paper>.json` is a
-`reproduction_fixtures.DriveSnapshot` — the **honest classification shape** a never-seen paper
+`reproduction.fixtures.DriveSnapshot` — the **honest classification shape** a never-seen paper
 auto-produces (per-panel status + skill + any driven metric values, plus `selom_defects` which must
 stay `0`). They are the regression anchor that stops engine growth from silently undoing a paper's
 win. See `docs/records/reproduction-dogfood/spec.md` (Slice 4, D5).
