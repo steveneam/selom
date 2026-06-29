@@ -355,7 +355,16 @@ preserving the "AI compiles away" invariant.
 
 ## Open questions (for review)
 
-1. Confirm the exact Pydantic AI `requires_approval` API at build time (context7) — load-bearing.
+1. ~~Confirm the Pydantic AI API.~~ **CONFIRMED (context7, v2.0.0):** `requires_approval` /
+   `ApprovalRequired` / `DeferredToolRequests` / `DeferredToolResults` exist;
+   `AnthropicModelSettings(anthropic_task_budget={'type':'tokens','total':N})` is the per-loop
+   token-budget guardrail; `claude-opus-4-8` is supported. **S2 design refinement:** use Pydantic AI
+   as the structured-output *translator* (NL goal + context → a Pydantic-validated proposed plan →
+   our `ActionPlan`); keep the S1 spine as the SINGLE authority for validation / approval / execution
+   / provenance. Do **not** use Pydantic AI's own tool-approval/deferred-execution — our actions
+   execute in `commit_recompute` after the user approves on the pending-changes rail, decoupled from
+   the agent run, so using Pydantic's approval too would split approval across two systems (a parallel
+   path the spine-consistency lens would flag). Strengthens the invariants and simplifies S2.
 2. How does `ActionPlan` map onto the FE staged-edit queue contract (`figure-editor-contract`)?
    Same queue, or an adapter? (Recommend: same queue, AI actions are tagged producers.)
 3. Do **ingest-stage** actions (pre-figure, no pending-changes banner yet) need a distinct approval

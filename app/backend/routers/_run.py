@@ -127,6 +127,8 @@ def _inspect_for_run(path: str, filename: str | None):
 async def _execute_skill_run(
     skill_id: str, path: str, filename: str | None, params: dict,
     override: bool, design_path: str | None,
+    *,
+    ai_actions: list[dict] | None = None,
 ):
     # Shared run body for the multipart /run and the run-from-dataset_id path (sub-spec §5): one
     # ingest → gates (QC / D1 / D2) → run → response. `filename` is the dropped name (or the dataset
@@ -264,7 +266,7 @@ async def _execute_skill_run(
         # skills). Additive — the FE still reads `.figure`.
         return {
             "figure": figure,                            # Plotly JSON -> frontend
-            "provenance": provenance.build(spec, path, filename, params),
+            "provenance": provenance.build(spec, path, filename, params, actions=ai_actions),
             "methods": methods.build(spec, params),
             "figure_legend": legends.build(spec, params, figure=figure, table=table),
             "guardrails": guardrails.build(spec, path, params),

@@ -64,6 +64,14 @@ pdf = [
   # back into the PDF). Optional: paper_metadata degrades cleanly when it is absent.
   "pikepdf>=9",
 ]
+# AI Helpers — the Probabilistic Shell / Action Gateway (docs/ai-helpers/spec.md). The LIVE
+# PydanticAIGateway translator is gated behind SELOM_AI_GATEWAY=live + ANTHROPIC_API_KEY and
+# lazy-imports pydantic_ai, so the core skeleton runs WITHOUT this and degrades clean to
+# NullActionGateway when it is absent. MIT — pydantic-ai-slim core + the anthropic client extra
+# only (no other provider SDKs). Live path: `uv pip install 'pydantic-ai-slim[anthropic]'`.
+ai = [
+  "pydantic-ai-slim[anthropic]>=2.1",
+]
 # Full heavy stack (superset of scrna): adds scvi-tools/PyTorch, proteomics, and Kaleido export
 # for later buckets (trajectory, proteomics volcano, journal-preset export). Multi-GB install.
 #

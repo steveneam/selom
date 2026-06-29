@@ -123,6 +123,13 @@ class Settings(BaseSettings):
     # landed (the client PUT failed) is swept after this TTL (spec §7/T2 reverse-orphan). Hours.
     upload_ttl_hours: int = Field(default=24, validation_alias="SELOM_UPLOAD_TTL_HOURS")
 
+    # AI Action Gateway (Slice 2) — live gateway is opt-in (default "null" = NullActionGateway,
+    # zero regression).  Set SELOM_AI_GATEWAY=live + ANTHROPIC_API_KEY to enable the live
+    # PydanticAIGateway.  This mirrors the OperatorVisionGateway seam in extract/vision.py.
+    ai_gateway: str = Field(default="null", validation_alias="SELOM_AI_GATEWAY")  # null | live
+    ai_token_budget: int = Field(default=20_000, validation_alias="SELOM_AI_TOKEN_BUDGET")
+    ai_timeout_s: float = Field(default=30.0, validation_alias="SELOM_AI_TIMEOUT_S")
+
     @model_validator(mode="after")
     def _validate_backend_combos(self):
         """Fail fast at boot if a non-local backend is selected without its required setting,

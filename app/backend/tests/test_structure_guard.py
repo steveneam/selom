@@ -72,6 +72,45 @@ def test_ai_reuses_core_validation():
     )
 
 
+def test_ai_live_package_structure():
+    """ai/live/ must exist and contain pydantic_gateway.py without re-implementing validation.
+
+    The live gateway is a structured-output *translator* only — it maps NL goal +
+    context into an ActionPlan.  Validation lives exclusively in ai/execute.py and
+    ai/registry.py (the existing structure guard already asserts this for those files).
+    The live gateway must not add a third path.
+    """
+    live_dir = BACKEND / "ai" / "live"
+    assert live_dir.is_dir(), (
+        "ai/live/ directory must exist (Slice 2). "
+        "Create it with ai/live/__init__.py + ai/live/pydantic_gateway.py."
+    )
+    assert (live_dir / "pydantic_gateway.py").is_file(), (
+        "ai/live/pydantic_gateway.py must exist (PydanticAIGateway, Slice 2)."
+    )
+    gw_src = (live_dir / "pydantic_gateway.py").read_text(encoding="utf-8")
+    assert "validate_param_ranges" not in gw_src, (
+        "ai/live/pydantic_gateway.py must not reimplement validation. "
+        "The live gateway is a structured-output translator only; "
+        "validate_param_ranges is called by ai/registry.py via ai/execute.py."
+    )
+
+
+def test_ai_apply_router_uses_execute_skill_run():
+    """POST /ai/apply must route through _execute_skill_run — no second gated path.
+
+    Inspection: routers/ai.py must import and call _execute_skill_run (the shared
+    human run body) so AI-assisted runs go through the exact same QC / D1 / D2
+    gates as human runs.  A separate AI execution path would violate the
+    'same gateway as humans' invariant (spec invariant 3).
+    """
+    ai_router_src = (BACKEND / "routers" / "ai.py").read_text(encoding="utf-8")
+    assert "_execute_skill_run" in ai_router_src, (
+        "routers/ai.py must call _execute_skill_run for POST /ai/apply. "
+        "AI-assisted runs must use the same gated body as human runs."
+    )
+
+
 def test_ai_action_registry_matches_action_types():
     """ACTION_REGISTRY keys, ACTION_TYPES tuple, and ActionType Literal must be identical.
 
