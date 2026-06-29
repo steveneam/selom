@@ -309,6 +309,47 @@ def test_apply_endpoint_provenance_has_ai_actions(tmp_path, monkeypatch):
     assert prov["actions"][0]["action_id"] == "abc123"
 
 
+def test_apply_endpoint_threads_design_sheet(tmp_path, monkeypatch):
+    """POST /ai/apply with a `design` file threads it through to _execute_skill_run exactly like the
+    human /skills/{id}/run path — so a design-consuming skill (deg / heatmap) re-run via the AI path
+    keeps its sample→condition mapping instead of silently falling back to column-name inference
+    (gauntlet H1, 2026-06-30)."""
+    monkeypatch.setenv("SELOM_SKILLS_ENGINE", "stub")
+    import routers.ai as ai_router
+
+    captured: dict = {}
+
+    async def _fake_exec(skill_id, path, filename, params, override, design_path, *, ai_actions=None):
+        captured["design_path"] = design_path
+        captured["has_design_param"] = "_design_path" in params
+        return {"figure": {"data": [], "layout": {}}, "provenance": {}}
+
+    monkeypatch.setattr(ai_router, "_execute_skill_run", _fake_exec)
+
+    from fastapi.testclient import TestClient
+    from main import app
+
+    matrix = tmp_path / "counts.csv"
+    matrix.write_text("gene,A,B\nG1,1,2\n", encoding="utf-8")
+    design = tmp_path / "design.csv"
+    design.write_text("sample,group\nA,control\nB,treatment\n", encoding="utf-8")
+    ai_actions = [{"action_id": "d1", "actor": "ai", "type": "set_param", "target": "fc_threshold",
+                   "prompt": "", "model": "m", "approved_by": "u", "approved_at": "t"}]
+
+    client = TestClient(app)
+    with open(matrix, "rb") as mfh, open(design, "rb") as dfh:
+        response = client.post(
+            "/ai/apply",
+            data={"skill_id": "deg", "params": json.dumps({"fc_threshold": "1.5"}),
+                  "ai_actions": json.dumps(ai_actions), "override": "false"},
+            files={"matrix": ("counts.csv", mfh, "text/csv"), "design": ("design.csv", dfh, "text/csv")},
+        )
+
+    assert response.status_code == 200, response.text
+    assert captured.get("design_path") is not None, "the design file must be saved + threaded to the run"
+    assert captured.get("has_design_param") is True, "params must carry the reserved _design_path key"
+
+
 def test_apply_endpoint_unknown_skill_is_404(tmp_path, monkeypatch):
     """POST /ai/apply with an unregistered skill_id returns 404."""
     monkeypatch.setenv("SELOM_SKILLS_ENGINE", "stub")

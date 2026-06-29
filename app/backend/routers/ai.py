@@ -20,7 +20,7 @@ import json as _json
 import os
 from typing import Literal
 
-from fastapi import APIRouter, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from ai.gateway import ActionGateway, NullActionGateway
@@ -205,6 +205,7 @@ async def apply_approved(
     override: bool = Form(False),
     params: str = Form("{}"),
     ai_actions: str = Form("[]"),
+    design: UploadFile | None = File(None),
 ):
     """Execute user-approved AI actions through the same gated run path as human runs.
 
@@ -272,12 +273,20 @@ async def apply_approved(
             )
 
     path = _save_upload(matrix)
+    # Thread the design sheet (sample→condition/time) exactly as the human /skills/{id}/run path does
+    # (routers/skills.py): a design-consuming skill (deg / heatmap) re-run via the AI path MUST get it,
+    # else it silently falls back to column-name inference → a DIFFERENT result, not an error. Reserved
+    # param (the skill reads params["_design_path"]) + the path for the finally cleanup; kept out of
+    # provenance (resolved_params strips "_"-prefixed keys), preserving "AI compiles away".
+    design_path = _save_upload(design) if design is not None else None
+    if design_path:
+        params_dict["_design_path"] = design_path
     return await _execute_skill_run(
         skill_id,
         path,
         matrix.filename,
         _stringify_params(params_dict),
         override,
-        None,
+        design_path,
         ai_actions=actions_list,
     )
