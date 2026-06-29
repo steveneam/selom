@@ -53,12 +53,13 @@ import { figureStaleness } from "@/lib/lineage/staleness";
 import { figureTable } from "@/lib/lineage/figure-table";
 import { versionFamily } from "@/lib/lineage/versions";
 import type { ParamValue } from "@/lib/lineage/diff";
-import { datasetDisplayName, familyColorMap } from "@/lib/lineage/family";
+import { familyColorMap } from "@/lib/lineage/family";
 import { readStyleStamp } from "@/lib/figure/figure-spec";
 import { DataCheckError, runSkill, runtimeSkillId, type DataCheck, type SkillParams, type SkillProvenance } from "@/lib/skills/api";
 import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
 import { pushUndo } from "@/lib/workspace/undo";
 import { useWorkspaceView } from "./hooks/use-workspace-view";
+import { useFigureCrud } from "./hooks/use-figure-crud";
 
 /** Map a command-palette intent's tab onto the workrail's view model (Pillar 1, S2.3). */
 function viewFromTab(tab: WorkspaceTab): RailView {
@@ -677,6 +678,19 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     setView("skill");
   }
 
+  // Open + delete handlers for figures and datasets (§3C) — they navigate by writing the
+  // routing setters above and seed/reset the shared figure store.
+  const { openFigure, openStats, openCompare, deleteFigure, deleteDataset } = useFigureCrud({
+    figure,
+    view,
+    activeFigureId,
+    activeDatasetId,
+    setView,
+    setActiveFigureId,
+    setActiveDatasetId,
+    setCompareIds,
+  });
+
   if (!project) {
     return (
       <div className="grid h-full place-items-center p-10 text-center">
@@ -706,57 +720,6 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   function dropOnOverview(file: File) {
     setIncomingFile(file);
     setView("data");
-  }
-
-  // Open a persisted figure in the editor: seed the live store from its stored spec
-  // (durable now — Pillar 1). A legacy figure with no stored spec opens to a notice
-  // rather than crashing (see the Figure view's empty states).
-  function openFigure(f: Figure) {
-    setActiveFigureId(f.id);
-    if (f.spec) figure.init(f.spec);
-    else figure.reset();
-    setView("figure");
-  }
-
-  // Select a figure's Statistics node: focus it (drives the table read-out). Load its spec into the
-  // editor store too, so the gene-label Label toggle in the table edits the SAME spec the canvas does
-  // (one shared, undoable label set). A legacy figure with no stored spec is left as-is.
-  function openStats(f: Figure) {
-    setActiveFigureId(f.id);
-    if (f.spec) figure.init(f.spec);
-    setView("stats");
-  }
-
-  // Open the compare view for a version family (from the rail's family group or the
-  // version bar). Needs ≥2 versions; focuses the newest so the lineage reads cleanly.
-  function openCompare(ids: string[]) {
-    if (ids.length < 2) return;
-    setCompareIds(ids);
-    setActiveFigureId(ids[ids.length - 1]);
-    setView("compare");
-  }
-
-  // Delete ONE figure (only that figure — never the project). Offers an Undo rather
-  // than a confirm, since the removal is reversible from the returned record. If the
-  // deleted figure was open, drop back to the project home.
-  function deleteFigure(f: Figure) {
-    const removed = projectStore.removeFigure(f.id);
-    if (!removed) return;
-    pushUndo(`Deleted figure “${f.title}”`, () => projectStore.restoreFigure(removed));
-    if (activeFigureId === f.id) {
-      setActiveFigureId(null);
-      figure.reset();
-      if (view === "figure" || view === "stats") setView("home");
-    }
-  }
-
-  // Delete ONE dataset (only the dataset — its figures stay, just without a live data
-  // link). Undo-backed, like figure delete.
-  function deleteDataset(d: Dataset) {
-    const removed = projectStore.removeDataset(d.id);
-    if (!removed) return;
-    pushUndo(`Deleted dataset “${datasetDisplayName(removed)}”`, () => projectStore.restoreDataset(removed));
-    if (activeDatasetId === d.id) setActiveDatasetId(null);
   }
 
   // The dataset in focus in the Data view (picked from the rail) — the subject of the
