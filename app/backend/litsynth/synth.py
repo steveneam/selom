@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-import methods
+from companions import methods
 from litsynth.models import MethodsSection, SkillRunRef
 from skills.contract import load_skill
 

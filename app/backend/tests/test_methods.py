@@ -1,6 +1,6 @@
 """B4 auto methods-text — every skill yields cited, parameterized prose."""
 
-import methods
+from companions import methods
 from skills.contract import SkillSpec, load_skill
 from skills.registry import list_skill_ids
 

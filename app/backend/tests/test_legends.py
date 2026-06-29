@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-import legends
+from companions import legends
 import papers_api
 import reproduction as R
 from extract.readers import de_counts

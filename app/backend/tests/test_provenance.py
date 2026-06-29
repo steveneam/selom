@@ -8,7 +8,7 @@ import hashlib
 import pytest
 from fastapi.testclient import TestClient
 
-import provenance
+from companions import provenance
 from main import app
 from skills.contract import load_skill
 

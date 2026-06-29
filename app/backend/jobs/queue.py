@@ -33,9 +33,9 @@ def execute_job(job_id: str, data_path: str, params: dict, user_id: str | None =
 
     ``user_id`` (the job's tenant) is threaded to every store call so the worker's reads/writes stay
     tenant-scoped under Postgres RLS — on SQLite (no RLS) it's harmless."""
-    import guardrails
-    import methods
-    import provenance
+    from companions import guardrails
+    from companions import methods
+    from companions import provenance
     from skills.contract import load_skill, run_skill_with_table  # lazy: keeps import graph light
 
     job = job_store.get(job_id, user_id)

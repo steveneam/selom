@@ -8,10 +8,10 @@ import uuid
 
 from fastapi import HTTPException, UploadFile
 
-import guardrails
-import legends
-import methods
-import provenance
+from companions import guardrails
+from companions import legends
+from companions import methods
+from companions import provenance
 from config import settings
 from skills.contract import (
     load_skill,

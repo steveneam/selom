@@ -3,7 +3,7 @@
 import pytest
 
 import litsynth
-import methods
+from companions import methods
 from litsynth.citations import CANONICAL_REFS, citations_for
 from skills.contract import load_skill
 

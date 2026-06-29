@@ -9,7 +9,7 @@ lookup to ``methods.build_body``. ``methods.py`` stays the single source of trut
 
 from __future__ import annotations
 
-import methods
+from companions import methods
 from skills.contract import load_skill
 
 # The canonical reference strings, by their methods.py constant name (advisory — the

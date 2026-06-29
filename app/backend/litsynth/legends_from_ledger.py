@@ -14,7 +14,7 @@ explicitly.
 
 from __future__ import annotations
 
-import legends
+from companions import legends
 import reproduction as R
 from litsynth.models import FigureLegend
 from skills.contract import load_skill

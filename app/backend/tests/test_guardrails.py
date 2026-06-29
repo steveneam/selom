@@ -8,7 +8,7 @@ feeds ``_data_guardrails`` needs anndata and is exercised by the real-engine smo
 import pytest
 from fastapi.testclient import TestClient
 
-import guardrails
+from companions import guardrails
 from main import app
 from skills.contract import load_skill
 

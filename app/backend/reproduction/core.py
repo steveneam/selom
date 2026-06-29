@@ -898,8 +898,8 @@ def run_panel(
     provenance_bundle = None
     methods_text = None
     try:  # best-effort; the figure is the load-bearing output
-        import methods
-        import provenance
+        from companions import methods
+        from companions import provenance
 
         provenance_bundle = provenance.build(spec, data_path, filename, panel.params)
         methods_text = methods.build(spec, panel.params)
