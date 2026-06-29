@@ -16,6 +16,7 @@ export function ParamControl({
   value,
   onChange,
   disabled = false,
+  badge,
 }: {
   field: ParamField;
   value: SkillParams[string] | undefined;
@@ -23,6 +24,9 @@ export function ParamControl({
   /** Render greyed + non-interactive (a `enabledWhen` gate isn't satisfied). The control stays
    *  visible so its capability is discoverable; it just can't be changed until the gate matches. */
   disabled?: boolean;
+  /** Optional adornment rendered inline beside the label (e.g. the AI ✨ attribution marker). Placed
+   *  next to the label — never over the right-aligned value readout — so it can't occlude the value. */
+  badge?: React.ReactNode;
 }) {
   const v = value ?? field.default;
   // Standard disabled affordance (MD): reduced opacity + cursor change + semantic disabled.
@@ -33,7 +37,7 @@ export function ParamControl({
     return (
       <label className={cn("flex items-center justify-between gap-3 sm:col-span-2", disabledWrap)}>
         <span>
-          <span className="block text-xs font-medium text-foreground">{field.label}</span>
+          <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">{field.label}{badge}</span>
           {field.help && <span className="block text-[11px] text-muted-foreground">{field.help}</span>}
         </span>
         <button
@@ -63,7 +67,7 @@ export function ParamControl({
   if (field.type === "select") {
     return (
       <label className={cn("block sm:col-span-2", disabledWrap)}>
-        <span className="text-xs font-medium text-foreground">{field.label}</span>
+        <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">{field.label}{badge}</span>
         <select
           value={String(v)}
           disabled={disabled}
@@ -91,8 +95,8 @@ export function ParamControl({
       field.step != null && field.step < 1 ? (String(field.step).split(".")[1]?.length ?? 1) : 0;
     return (
       <label className={cn("block sm:col-span-2", disabledWrap)}>
-        <span className="flex items-center justify-between">
-          <span className="text-xs font-medium text-foreground">{field.label}</span>
+        <span className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">{field.label}{badge}</span>
           <span className="tabular text-xs text-primary">{Number(v).toFixed(decimals)}</span>
         </span>
         <input
@@ -115,7 +119,7 @@ export function ParamControl({
     <label className={cn("block", disabledWrap)}>
       {/* Reserve two lines for the label so a wrapped label (e.g. "Scale bar — amplitude (µV)")
           and a one-line label ("Scale bar — time (ms)") keep their inputs aligned in the 2-col grid. */}
-      <span className="block min-h-8 text-xs font-medium leading-4 text-foreground">{field.label}</span>
+      <span className="flex min-h-8 items-start gap-1.5 text-xs font-medium leading-4 text-foreground">{field.label}{badge}</span>
       <input
         type={field.type === "number" ? "number" : "text"}
         value={String(v)}

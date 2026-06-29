@@ -167,25 +167,29 @@ function VerdictPanel({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center gap-2.5 rounded-xl px-4 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+        className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-left outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring/60"
       >
         {ok ? (
-          <ShieldCheck className="size-4 text-primary" />
+          <ShieldCheck className="size-4 shrink-0 text-primary" />
         ) : (
-          <AlertTriangle className="size-4 text-amber-400" />
+          <AlertTriangle className="size-4 shrink-0 text-amber-400" />
         )}
         <span className="text-sm font-medium text-foreground">Data check</span>
         <KindChip kind={kind} />
-        <span className="hidden text-xs text-muted-foreground sm:inline">
-          {reviewCount > 0
-            ? `${reviewCount} to review`
-            : notSure
-              ? "clean, but not sure how to analyze"
-              : "looks clean to analyze"}
+        {/* Verdict + the disclosure caret are one right-aligned group, so the header reads
+            title-left / status-right instead of leaving an awkward gap before a far-right caret. */}
+        <span className="ml-auto flex items-center gap-2">
+          <span className="hidden text-xs text-muted-foreground sm:inline">
+            {reviewCount > 0
+              ? `${reviewCount} to review`
+              : notSure
+                ? "clean, but not sure how to analyze"
+                : "looks clean to analyze"}
+          </span>
+          <ChevronDown
+            className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
+          />
         </span>
-        <ChevronDown
-          className={cn("ml-auto size-4 text-muted-foreground transition-transform", open && "rotate-180")}
-        />
       </button>
 
       {open && (

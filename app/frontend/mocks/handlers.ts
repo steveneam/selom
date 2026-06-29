@@ -10,6 +10,8 @@ import { mockExtractChart } from "./extract-fixture";
 import { mockInspect } from "./data-inspect-fixture";
 import { SKILL_PARAM_SPECS } from "./skill-spec-fixture";
 import { persistenceHandlers } from "./persistence-handlers";
+import { mockExplain, mockGaps, mockHelperTurn } from "./ai-fixture";
+import type { AiAction } from "@/lib/ai/types";
 import { REPRO_LEDGERS, REPRO_PAPERS } from "@/lib/reproduction/fixture";
 
 // Mirrors the live contract from app/backend/main.py:
@@ -161,6 +163,65 @@ export const handlers = [
       figure_legend: mockLegend(skillId),
       data_check: mockDataCheck(query),
       data_fit: mockDataFit(skillId),
+    });
+  }),
+  // AI Action Gateway (S5) — mirrors app/backend/routers/ai.py. The stubs return a representative
+  // non-empty HelperTurn so the dev:mock UI loop is demonstrable; the real gateway is OFF by default.
+  http.post("/api/ai/propose", async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as {
+      skill_id?: string | null;
+      goal?: string;
+      params?: Record<string, unknown>;
+    };
+    return HttpResponse.json(mockHelperTurn(body.skill_id ?? null, body.goal ?? "", body.params ?? {}));
+  }),
+  http.post("/api/ai/apply", async ({ request }) => {
+    const fd = await request.formData();
+    const skillId = String(fd.get("skill_id") ?? "umap_scrna");
+    // /ai/apply sends `params` as a JSON object (the FINAL approved params), NOT a query string —
+    // parse it as JSON so provenance.params reflects the applied values (e.g. n_neighbors → 30).
+    let params: Record<string, string> = {};
+    try {
+      params = JSON.parse(String(fd.get("params") ?? "{}"));
+    } catch {
+      /* malformed → empty */
+    }
+    let actions: AiAction[] = [];
+    try {
+      actions = JSON.parse(String(fd.get("ai_actions") ?? "[]")) as AiAction[];
+    } catch {
+      /* malformed → empty */
+    }
+    // Mirror the 400 the backend raises on an empty/missing ai_actions log.
+    if (!Array.isArray(actions) || actions.length === 0) {
+      return HttpResponse.json(
+        { detail: "/ai/apply requires a non-empty ai_actions log (the approved, actor-tagged actions)" },
+        { status: 400 },
+      );
+    }
+    const bundle = mockBundle(skillId, params as Record<string, string>);
+    // The AI-assisted run stamps the actor-tagged log onto provenance.actions[] (the audit trail).
+    bundle.provenance = { ...bundle.provenance, actions };
+    return HttpResponse.json({
+      figure: stubUmapFigure(),
+      ...bundle,
+      table: mockTable(skillId, params as Record<string, string>),
+      figure_legend: mockLegend(skillId),
+      data_check: mockDataCheck(params as Record<string, string>),
+      data_fit: mockDataFit(skillId),
+    });
+  }),
+  http.get("/api/ai/gaps", () => HttpResponse.json(mockGaps())),
+  http.post("/api/ai/explain", async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as {
+      request?: string;
+      scorecard?: { score?: number };
+      sweep_space?: Record<string, unknown>;
+    };
+    return HttpResponse.json({
+      request: body.request ?? "explain_score",
+      text: mockExplain(body.request ?? "explain_score", body),
+      source: "deterministic",
     });
   }),
   // 7c FE-state persistence (projectStore/workspaceStore optimistic writes + reconcile GETs).

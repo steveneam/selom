@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Lock, Paintbrush, Redo2, RefreshCw, SlidersHorizontal, Sparkles, Table2, Trash2, Undo2 } from "lucide-react";
+import { ArrowRight, Lock, Paintbrush, Redo2, RefreshCw, RotateCcw, SlidersHorizontal, Sparkles, Table2, Trash2, Undo2 } from "lucide-react";
 import { DataPanel, type AnalyzeArgs } from "./data-panel";
 import { DataCheckPanel } from "./data-check";
 import { FigureDataPanel } from "./figure-data-panel";
@@ -57,6 +57,12 @@ import { pushUndo } from "@/lib/workspace/undo";
 import { useWorkspaceView } from "./hooks/use-workspace-view";
 import { useFigureCrud } from "./hooks/use-figure-crud";
 import { useFigureRun } from "./hooks/use-figure-run";
+import { AiPanel } from "@/components/ai/ai-panel";
+import { AiProposalRow } from "@/components/ai/ai-proposal-row";
+import { AiProposeComposer } from "@/components/ai/ai-propose-composer";
+import type { ActivityTurn } from "@/components/ai/ai-activity-feed";
+import { acceptProposal, applyAcceptedProposals, approvedActions, dismissProposal, pendingCounter, unacceptProposal } from "@/lib/ai/proposals";
+import type { AiProposal } from "@/lib/ai/types";
 
 /** Map a command-palette intent's tab onto the workrail's view model (Pillar 1, S2.3). */
 function viewFromTab(tab: WorkspaceTab): RailView {
@@ -132,6 +138,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // When the export popover is open, the page dims+blurs behind it but the figure
   // artboard stays crisp (it's the subject of the export) — see EditorWorkspace `elevated`.
   const [exportOpen, setExportOpen] = React.useState(false);
+  // AI panel (S5) — the right-dock with the Activity feed + the capability-gap backlog.
+  const [aiPanelOpen, setAiPanelOpen] = React.useState(false);
   // Live "show a/b labels" toggle for the Figure-data preview (figure-data-capabilities §6). Labels
   // are cosmetic on already-drawn dots, so hiding them is an INSTANT client-side restyle.
   const [markLabelsShown, setMarkLabelsShown] = React.useState(true);
@@ -156,7 +164,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [fdScopeKey, setFdScopeKey] = React.useState(fdScope);
   if (fdScopeKey !== fdScope) {
     setFdScopeKey(fdScope);
-    setFdParams({ ...fdBaseParams });
+    // Seed from the figure's base params, then re-hydrate any ACCEPTED AI proposals' staged values
+    // (S5) so an accepted-but-not-yet-re-run suggestion survives a reload coherently — the banner's
+    // "staged" row, the counter, and the ✨ control marker stay in agreement.
+    setFdParams(applyAcceptedProposals({ ...fdBaseParams }, activeFigure?.aiProposals ?? []));
     setMarkLabelsShown(fdBaseParams.mark_labels === undefined ? true : String(fdBaseParams.mark_labels) === "true");
   }
   // Are there staged input changes pending a re-run? (drag / time edit / dots toggle / any input.)
@@ -214,7 +225,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const canRerun = !!activeFigure?.skillId && !!activeFigure?.provenance && (lastFile != null || mockMode);
   // The skill-run engine (§3C): a fresh run + the three re-run flavours + their shared run
   // state. It persists durable figure records and navigates by writing the routing setters.
-  const { running, error, blocked, needData, setBlocked, setNeedData, runFlow, rerunFigure, runSweep, rerunFigureWithParams } =
+  const { running, error, blocked, needData, setBlocked, setNeedData, runFlow, rerunFigure, runSweep, rerunFigureWithParams, rerunFigureWithAi } =
     useFigureRun({
       projectId,
       figure,
@@ -229,6 +240,93 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       setView,
       setCompareIds,
     });
+
+  // ── AI Helpers (S5) ──────────────────────────────────────────────────────────
+  // The open figure's AI-proposal queue + the DERIVED, author-partitioned banner counter.
+  // Single source of truth = the staged-vs-base param diff + the accepted-proposal author map
+  // (lib/ai/proposals); no stored counter to drift. Reverting a value to base drops it from the
+  // diff → the count auto-decrements; reverting all → 0 → the banner clears itself.
+  const aiProposals = activeFigure?.aiProposals ?? [];
+  const aiCounter = pendingCounter(fdBaseParams, fdParams, aiProposals);
+  // Committed AI-assisted runs (one per AI-touched figure) for the Activity feed.
+  const aiTurns: ActivityTurn[] = React.useMemo(
+    () =>
+      figures
+        .filter((f) => (f.provenance?.actions?.length ?? 0) > 0)
+        .map((f) => ({
+          figureId: f.id,
+          title: f.title,
+          createdAt: f.createdAt,
+          actions: f.provenance!.actions!,
+          params: f.provenance!.params,
+        })),
+    [figures],
+  );
+
+  // Accept a proposal → stage its value into fdParams (the ✨ author map then attributes the
+  // staged key to "ai"); the single explicit re-run commits it through /ai/apply.
+  function acceptAiProposal(id: string) {
+    if (!activeFigureId) return;
+    const p = aiProposals.find((x) => x.id === id);
+    if (p?.paramKey !== undefined && p.value !== undefined) {
+      setFdParams((prev) => ({ ...prev, [p.paramKey!]: p.value! }));
+    }
+    projectStore.setFigureProposals(activeFigureId, acceptProposal(aiProposals, id));
+  }
+  // Dismiss a still-proposed suggestion (it was never staged) — drop it from the queue.
+  function dismissAiProposal(id: string) {
+    if (!activeFigureId) return;
+    projectStore.setFigureProposals(activeFigureId, dismissProposal(aiProposals, id));
+  }
+  // Revert an accepted proposal → restore its base value (leaves the diff, decrements the counter)
+  // and return the suggestion to "proposed" so it can be re-accepted.
+  function revertAiProposal(id: string) {
+    if (!activeFigureId) return;
+    const p = aiProposals.find((x) => x.id === id);
+    if (p?.paramKey !== undefined) {
+      const key = p.paramKey;
+      setFdParams((prev) => {
+        const next = { ...prev };
+        if (key in fdBaseParams) next[key] = fdBaseParams[key];
+        else delete next[key];
+        return next;
+      });
+    }
+    projectStore.setFigureProposals(activeFigureId, unacceptProposal(aiProposals, id));
+  }
+  // Append a fresh batch of AI proposals (from the propose composer) to the open figure's queue.
+  function addAiProposals(fresh: AiProposal[]) {
+    if (!activeFigureId) return;
+    projectStore.setFigureProposals(activeFigureId, [...aiProposals, ...fresh]);
+  }
+  // The one explicit "Re-run" for the pending-changes banner: route through /ai/apply when any
+  // AI proposal is accepted (so the figure gets actor-tagged provenance.actions[]), else the plain
+  // edited-inputs re-run. "AI compiles away" — the deterministic run is identical either way.
+  function rerunPending() {
+    // Only emit AI actions for params whose value is STILL the AI's (authorOf gate inside) — a
+    // user-overridden accepted proposal must not tag the human's value as AI-authored.
+    const actions = approvedActions(aiProposals, fdBaseParams, fdParams, "user", new Date().toISOString());
+    if (actions.length > 0) void rerunFigureWithAi(fdParams, actions);
+    else void rerunFigureWithParams(fdParams);
+  }
+  // Discard all staged input changes → back to this figure's current run values, and un-stage any
+  // accepted AI proposals (return them to "proposed" so the suggestions stay offered, just not
+  // applied). Pre-commit only: nothing is persisted — the figure's provenance is untouched until a
+  // re-run actually produces a new version.
+  function resetFdToBase() {
+    setFdParams({ ...fdBaseParams });
+    // Restore EVERY staged surface, not just params — the a/b-label toggle is staged separately, so
+    // a params-only reset would leave the preview changed while the banner reports "no pending".
+    // (Mirrors the fdScope re-seed above.)
+    setMarkLabelsShown(fdBaseParams.mark_labels === undefined ? true : String(fdBaseParams.mark_labels) === "true");
+    if (activeFigureId && aiProposals.some((p) => p.status === "accepted")) {
+      projectStore.setFigureProposals(
+        activeFigureId,
+        aiProposals.map((p) => (p.status === "accepted" ? { ...p, status: "proposed" as const } : p)),
+      );
+    }
+  }
+
   // The Statistics table for the focused figure (stats view) — its stored table or a
   // fallback derived from its spec (D3).
   const activeStatsTable = activeFigure ? figureTable(activeFigure) : undefined;
@@ -489,7 +587,13 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const focusedDataset = activeDatasetId ? datasets.find((d) => d.id === activeDatasetId) : undefined;
 
   return (
-    <div className="flex h-full flex-col px-5 py-6 lg:px-7">
+    <div
+      className="flex h-full flex-col px-5 py-6 transition-[padding] duration-200 lg:px-7"
+      // When the AI panel (a fixed right dock) is open, reserve its width so it never overlays the
+      // figure-data dock or the banner's Re-run button — the content shifts left instead of being
+      // covered (the right-padding overrides the lg:px-7 right inset only while open).
+      style={aiPanelOpen ? { paddingRight: 376 } : undefined}
+    >
       {/* header */}
       <div className="flex flex-wrap items-center gap-3">
         <span
@@ -507,6 +611,33 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           }}
           className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-lg font-semibold tracking-tight text-foreground outline-none hover:border-border focus-visible:border-ring/60 focus-visible:bg-background/40"
         />
+        {/* AI Helpers (S5): the persistent ✨ toggle for the AI panel (Activity feed + capability
+            backlog). Carries the pending-✨ count so attribution is visible without opening it. */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setAiPanelOpen((o) => !o)}
+          aria-pressed={aiPanelOpen}
+          title="AI activity — proposals, the audit trail, and the capability backlog"
+          className={aiPanelOpen ? "text-stage-ai" : undefined}
+        >
+          {/* The ✨ glyph is the AI-attribution mark — keep it fuchsia at all times (matching the
+              panel header + markers), so the entry point reads as the AI surface even when closed;
+              only the "AI" word stays foreground for legibility. */}
+          <Sparkles className="text-stage-ai" /> AI
+          {aiProposals.length > 0 && (
+            // Count ALL outstanding AI proposals (proposed-awaiting-review + accepted/staged), not
+            // just the staged ones — an un-accepted suggestion is otherwise invisible until you open
+            // the figure. Matches the Activity-tab badge + the panel's Pending section.
+            <span
+              className="ml-1 inline-flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums text-stage-ai"
+              style={{ backgroundColor: "color-mix(in oklab, var(--stage-ai) 16%, transparent)" }}
+              aria-label={`${aiProposals.length} AI suggestion${aiProposals.length === 1 ? "" : "s"}`}
+            >
+              {aiProposals.length}
+            </span>
+          )}
+        </Button>
         {/* The header's destructive action is scoped to the current view — the whole
             project can only be deleted from the Pipeline (home), never from inside a
             Data / Statistics / Figure view (owner steer). */}
@@ -625,7 +756,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           {view === "figure" ? (
             figure.spec ? (
               <div className="flex h-full flex-col gap-3">
-                <div className="flex items-center gap-1.5">
+                {/* flex-wrap so the toolbar wraps within the content column instead of overflowing
+                    under the fixed AI panel at ≤~1400px (the paddingRight reserve alone didn't stop a
+                    single non-wrapping row from running past it). */}
+                <div className="flex flex-wrap items-center gap-1.5">
                   {frozen ? (
                     <>
                       <span className="inline-flex items-center gap-1.5 text-xs font-medium text-stage-figure">
@@ -662,7 +796,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                       </Button>
                     </div>
                   )}
-                  <div className="ml-auto flex items-center gap-1.5">
+                  {/* flex-wrap + justify-end so this right-aligned action group wraps within the
+                      (narrow, rail-shrunk) content column instead of overflowing one 624px row under
+                      the AI panel — the outer toolbar's flex-wrap can't break inside a single child. */}
+                  <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
                     {mockMode && activeDataset && (
                       <Button
                         variant="ghost"
@@ -783,20 +920,64 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
               <div className="flex min-h-0 flex-1 flex-col gap-3">
                 {/* Pending-changes prompt: any re-run input (dot drag, a/b time, dots toggle, an
                     analysis input) stages here; the figure only updates when you re-run. */}
-                {fdDirty && (
-                  <div className="flex items-center justify-between gap-3 rounded-lg border border-stage-figuredata/45 bg-[color-mix(in_oklab,var(--stage-figuredata)_12%,var(--card))] px-3.5 py-2.5">
-                    <span className="text-xs leading-relaxed text-foreground">
-                      <span className="font-semibold text-stage-figuredata">Pending changes</span> — re-run to
-                      apply them to the measured values, the statistics table, and any downstream figures.
-                    </span>
-                    <Button
-                      size="sm"
-                      className="shrink-0"
-                      disabled={running != null}
-                      onClick={() => void rerunFigureWithParams(fdParams)}
-                    >
-                      <RefreshCw /> {running != null ? "Re-running…" : "Re-run → new version"}
-                    </Button>
+                {(fdDirty || aiProposals.length > 0) && (
+                  <div className="space-y-2.5 rounded-lg border border-stage-figuredata/45 bg-[color-mix(in_oklab,var(--stage-figuredata)_12%,var(--card))] px-3.5 py-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs leading-relaxed text-foreground">
+                        <span className="font-semibold text-stage-figuredata">Pending changes</span>
+                        {aiCounter.total > 0 ? (
+                          <>
+                            {" · "}
+                            <span className="tabular-nums">{aiCounter.total} pending</span>
+                            {aiCounter.you > 0 && <span className="tabular-nums"> · {aiCounter.you} you</span>}
+                            {aiCounter.ai > 0 && (
+                              <span className="inline-flex items-center gap-0.5 align-baseline text-stage-ai">
+                                {" · "}
+                                <Sparkles className="size-3" aria-hidden />
+                                <span className="tabular-nums">{aiCounter.ai}</span> AI
+                              </span>
+                            )}
+                            {" — re-run to apply them to the measured values, the statistics table, and any downstream figures."}
+                          </>
+                        ) : (
+                          " — review the AI suggestions below, then accept the ones to keep."
+                        )}
+                      </span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {aiCounter.total > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={running != null}
+                            onClick={resetFdToBase}
+                            title="Discard changes — back to this figure's current values"
+                          >
+                            <RotateCcw /> Reset
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          disabled={running != null || aiCounter.total === 0}
+                          onClick={rerunPending}
+                        >
+                          <RefreshCw /> {running != null ? "Re-running…" : "Re-run → new version"}
+                        </Button>
+                      </div>
+                    </div>
+                    {aiProposals.length > 0 && (
+                      <ul className="space-y-1.5 border-t border-stage-figuredata/25 pt-2.5">
+                        {aiProposals.map((p) => (
+                          <AiProposalRow
+                            key={p.id}
+                            proposal={p}
+                            onAccept={acceptAiProposal}
+                            onDismiss={dismissAiProposal}
+                            onRevert={revertAiProposal}
+                            disabled={running != null}
+                          />
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 )}
                 <div className="flex min-h-0 flex-1 gap-4">
@@ -848,7 +1029,17 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     </div>
                   )}
                 </div>
-                <div className="w-[360px] shrink-0 overflow-y-auto pr-1">
+                <div className="w-[360px] shrink-0 space-y-3 overflow-y-auto pr-1">
+                  {/* AI Helpers (S5): a single-shot "Ask AI to tune these inputs" composer — its
+                      proposals land in the pending-changes banner above. Degrades clean (the gateway
+                      is off by default → an empty plan → a quiet note, the editor unaffected). */}
+                  <AiProposeComposer
+                    skillId={activeFigure.skillId}
+                    params={fdParams}
+                    figureSpec={figure.spec ?? activeFigure.spec}
+                    onProposals={addAiProposals}
+                    disabled={running != null}
+                  />
                   {/* Isolated (Task B1): the Figure-data inputs are bespoke per skill — if a control
                       throws on an unexpected param/spec shape, the inputs pane fails alone, not the
                       whole stage. resetKeys clear a stuck boundary on a dataset/skill/figure switch.
@@ -883,7 +1074,15 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     }
                     markLabelsShown={markLabelsShown}
                     onMarkLabelsShownChange={setMarkLabelsShown}
-                    onRerun={rerunFigureWithParams}
+                    proposals={aiProposals}
+                    onRevertProposal={revertAiProposal}
+                    onReset={resetFdToBase}
+                    // Route the panel's own Re-run through rerunPending too (NOT the plain
+                    // rerunFigureWithParams) so it takes the /ai/apply path when proposals are
+                    // accepted — otherwise the two identical "Re-run" buttons diverge and this one
+                    // silently drops AI provenance + orphans the queue. rerunPending reads fdParams
+                    // (the shared staged source the panel also edits) so the param arg is redundant.
+                    onRerun={rerunPending}
                     onPickSkill={pickSuggestedSkill}
                     onPickManually={() => setView("skill")}
                   />
@@ -965,6 +1164,15 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           )}
         </main>
       </div>
+      {/* AI Helpers (S5): the right-dock AI panel (fixed-position → overlays consistently across
+          every view; the user keeps working underneath). Activity feed + capability backlog. */}
+      <AiPanel
+        open={aiPanelOpen}
+        onClose={() => setAiPanelOpen(false)}
+        turns={aiTurns}
+        proposals={aiProposals}
+        aiCount={aiProposals.length}
+      />
     </div>
   );
 }

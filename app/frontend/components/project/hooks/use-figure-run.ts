@@ -17,6 +17,8 @@ import {
   type SkillParams,
   type SkillProvenance,
 } from "@/lib/skills/api";
+import { applyAiActions } from "@/lib/ai/api";
+import type { AiAction } from "@/lib/ai/types";
 import type { RailView } from "../workrail";
 
 /**
@@ -68,6 +70,7 @@ export interface FigureRun {
   rerunFigure: (fig: Figure) => Promise<void>;
   runSweep: (param: string, values: ParamValue[]) => Promise<void>;
   rerunFigureWithParams: (params: SkillParams) => Promise<void>;
+  rerunFigureWithAi: (params: SkillParams, aiActions: AiAction[]) => Promise<void>;
 }
 
 /**
@@ -332,6 +335,63 @@ export function useFigureRun({
     [activeFigure, captureCarryLabels, datasets, resolveRunFile, designFile, figure, projectId, setActiveFigureId],
   );
 
+  // Re-run the open figure with USER-APPROVED AI actions (S5): the SAME path as
+  // `rerunFigureWithParams`, but POSTed through `/ai/apply` so the produced figure carries
+  // `provenance.actions[]` (the actor-tagged audit log the ✨ markers + Activity feed read from).
+  // The deterministic run is identical (same `_execute_skill_run`) — "AI compiles away": a plain
+  // re-run from the recorded params reproduces it with no gateway. The origin figure's proposal
+  // queue is consumed on success (its durable proof becomes the new figure's provenance).
+  const rerunFigureWithAi = React.useCallback(
+    async (params: SkillParams, aiActions: AiAction[]) => {
+      const origin = activeFigure;
+      if (!origin?.skillId) return;
+      // Nothing AI-approved (all proposals reverted) → fall back to the plain edited-inputs re-run.
+      if (aiActions.length === 0) return rerunFigureWithParams(params);
+      setError(null);
+      setBlocked(null);
+      setNeedData(null);
+      const dataset = origin.datasetId ? datasets.find((d) => d.id === origin.datasetId) : undefined;
+      const file = resolveRunFile(dataset);
+      if (!file) {
+        setNeedData({ datasetId: origin.datasetId });
+        return;
+      }
+      const carryPrev = captureCarryLabels();
+      setRunning(origin.skillId);
+      try {
+        const res = await applyAiActions(runtimeSkillId(origin.skillId), file, params, aiActions, {
+          design: designFile,
+        });
+        const nextSpec = carryPrev.length ? carryLabels(res.figure, carryPrev) : res.figure;
+        const saved = projectStore.addFigure(projectId, {
+          title: origin.title,
+          datasetId: origin.datasetId,
+          skillId: origin.skillId,
+          spec: nextSpec,
+          provenance: stampDataVersion(res.provenance, dataset),
+          methods: res.methods,
+          legend: res.legend,
+          guardrails: res.guardrails,
+          table: res.table ?? undefined,
+          dataCheck: res.dataCheck,
+          dataFit: res.dataFit ?? undefined,
+          parentFigureId: origin.id,
+          variantLabel: "AI-assisted",
+        });
+        projectStore.setFigureProposals(origin.id, []);
+        setActiveFigureId(saved.id);
+        figure.init(nextSpec);
+      } catch (e) {
+        if (e instanceof DataCheckError)
+          setBlocked({ check: e.dataCheck, step: { skillId: origin.skillId, params, rationale: "", confidence: 0 } });
+        else setError(e instanceof Error ? e.message : "AI re-run failed. Please try again.");
+      } finally {
+        setRunning(null);
+      }
+    },
+    [activeFigure, rerunFigureWithParams, captureCarryLabels, datasets, resolveRunFile, designFile, figure, projectId, setActiveFigureId],
+  );
+
   return {
     running,
     error,
@@ -343,5 +403,6 @@ export function useFigureRun({
     rerunFigure,
     runSweep,
     rerunFigureWithParams,
+    rerunFigureWithAi,
   };
 }

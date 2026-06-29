@@ -130,6 +130,19 @@ function mergeById<T extends { id: string }>(local: T[], server: T[]): T[] {
   return [...byId.values()];
 }
 
+/** Figures carry a LOCAL-ONLY field — `aiProposals`, the pre-commit AI queue (intentionally not in
+ *  toApiFigure/fromApiFigure). The server row never has it, so on a server-wins merge re-attach it
+ *  from the local row; otherwise a reconcile (hydrate / window-focus, queue idle) would clobber an
+ *  accepted-but-not-yet-re-run proposal → authorOf flips to "user", the ✨ marker vanishes, and the
+ *  re-run records NO provenance.actions[] (an AI run mis-logged as human). [[selom-ai-helpers]] */
+export function mergeFigures(local: Figure[], server: Figure[]): Figure[] {
+  const localById = new Map(local.map((f) => [f.id, f]));
+  return mergeById(local, server).map((f) => {
+    const prev = localById.get(f.id);
+    return f.aiProposals === undefined && prev?.aiProposals ? { ...f, aiProposals: prev.aiProposals } : f;
+  });
+}
+
 async function reconcile() {
   if (queue.pending > 0) return; // a write is in flight — server is stale, don't clobber
   try {
@@ -138,7 +151,7 @@ async function reconcile() {
       projects: mergeById(state.projects, srv.projects),
       datasets: mergeById(state.datasets, srv.datasets),
       installs: mergeById(state.installs, srv.installs),
-      figures: mergeById(state.figures, srv.figures),
+      figures: mergeFigures(state.figures, srv.figures),
       geneSets: mergeById(state.geneSets, srv.geneSets),
     });
   } catch {
@@ -341,6 +354,15 @@ export const projectStore = {
   freezeFigure(id: string, frozen: boolean) {
     setState({ ...state, figures: state.figures.map((f) => (f.id === id ? { ...f, frozen } : f)) });
     queue.enqueue({ coalesceKey: `freeze:${id}`, run: () => api.patch(`/figures/${id}`, { frozen }) });
+  },
+  /** AI Helpers (S5): set a figure's AI-proposal queue. LOCAL-ONLY — proposals are a transient
+   *  pre-commit editing queue (accept → stage → re-run consumes them into `provenance.actions[]`,
+   *  which IS persisted). It rides the localStorage mirror AND is preserved across server reconcile
+   *  by `mergeFigures` (a plain server-wins merge would drop it, since it's intentionally NOT in
+   *  `toApiFigure`'s whitelist — no backend column, no PATCH round-trip), so it survives a soft
+   *  reload + a window-focus reconcile. */
+  setFigureProposals(id: string, aiProposals: Figure["aiProposals"]) {
+    setState({ ...state, figures: state.figures.map((f) => (f.id === id ? { ...f, aiProposals } : f)) });
   },
   /** Delete one figure, returning the removed record so the caller can offer an Undo. */
   removeFigure(id: string): Figure | undefined {

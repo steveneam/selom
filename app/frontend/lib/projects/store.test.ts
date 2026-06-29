@@ -12,7 +12,8 @@ vi.mock("@/lib/api/client", () => {
 });
 
 import { api } from "@/lib/api/client";
-import { projectStore } from "./store";
+import { mergeFigures, projectStore } from "./store";
+import type { Figure } from "./types";
 
 const flush = () => new Promise<void>((r) => setTimeout(r, 0));
 
@@ -82,5 +83,31 @@ describe("projectStore — sync read / async write (sub-spec §2.2)", () => {
     await flush();
     expect(api.del).not.toHaveBeenCalled(); // the delete was cancelled before firing
     expect(projectStore.getSnapshot().projects.some((x) => x.id === pj.id)).toBe(true);
+  });
+});
+
+describe("mergeFigures — the local-only aiProposals survives a server-wins reconcile (S5)", () => {
+  const fig = (over: Partial<Figure>): Figure =>
+    ({ id: "f1", projectId: "p", title: "F", createdAt: 1, ...over }) as Figure;
+
+  it("re-attaches aiProposals when the server row (which lacks them) replaces the local figure", () => {
+    const local = [
+      fig({
+        aiProposals: [
+          { id: "a1", type: "set_param", tier: "recompute", status: "accepted", paramKey: "n_neighbors", value: 30, actor: "ai" },
+        ],
+      }),
+    ];
+    const server = [fig({ title: "F (from server)" })]; // same id, NO aiProposals key
+    const merged = mergeFigures(local, server);
+    const f1 = merged.find((f) => f.id === "f1")!;
+    expect(f1.title).toBe("F (from server)"); // server wins on synced fields
+    expect(f1.aiProposals).toHaveLength(1); // ...but the pre-commit AI queue is preserved
+    expect(f1.aiProposals![0].id).toBe("a1");
+  });
+
+  it("leaves a server figure with no local counterpart untouched (no phantom proposals)", () => {
+    const merged = mergeFigures([], [fig({ id: "f2" })]);
+    expect(merged.find((f) => f.id === "f2")!.aiProposals).toBeUndefined();
   });
 });

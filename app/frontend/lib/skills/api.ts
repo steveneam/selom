@@ -1,6 +1,7 @@
 import type { FigureSpec } from "@/lib/figure/figure-spec";
 import type { DataFit } from "@/lib/reproduction/data-fit";
 import type { BackendParamSpec } from "@/lib/catalog/params";
+import type { AiAction } from "@/lib/ai/types";
 
 /** Per-figure reproducibility bundle (backend provenance.py — charter B4). */
 export interface SkillProvenance {
@@ -22,6 +23,14 @@ export interface SkillProvenance {
     engine_policy: string;
     packages: Record<string, string>;
   };
+  /**
+   * AI Helpers (S5): the actor-tagged log of AI actions an assisted run was approved
+   * under (backend provenance.build `actions[]`). Present ONLY on figures produced via
+   * `/ai/apply`; absent on every human run (additive, non-breaking — the bundle stays
+   * byte-identical otherwise, preserving the "AI compiles away" invariant). The ✨ marker
+   * reads its tooltip from here; the Activity feed renders these entries.
+   */
+  actions?: AiAction[];
 }
 
 /** Auto methods-text (backend methods.py — charter B4). */
@@ -191,6 +200,18 @@ export async function runSkill(
   const url = `/api/skills/${encodeURIComponent(skillId)}/run${qs ? `?${qs}` : ""}`;
 
   const res = await fetch(url, { method: "POST", body: fd });
+  return parseSkillRunResponse(res);
+}
+
+/**
+ * Parse a skill-run HTTP response into a {@link SkillRunResponse} (or throw a friendly,
+ * typed error). Shared by {@link runSkill} (POST /skills/{id}/run) and the AI gateway's
+ * apply path (POST /ai/apply) — both route through the SAME `_execute_skill_run` body,
+ * so they return the SAME shape and must surface failures the SAME way. One home for the
+ * one-shot-body-read discipline (read once, branch off the parsed body) so the two callers
+ * can never drift [[fetch-body-read-once-browser-verify]].
+ */
+export async function parseSkillRunResponse(res: Response): Promise<SkillRunResponse> {
   if (!res.ok) {
     // The response body is a one-shot stream — read it ONCE and share it across every branch
     // below (reading it twice throws "body already used", which silently swallowed the real

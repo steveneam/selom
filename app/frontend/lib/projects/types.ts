@@ -10,6 +10,7 @@
 import type { FigureSpec } from "@/lib/figure/figure-spec";
 import type { DataCheck, FigureLegend, SkillGuardrail, SkillMethods, SkillProvenance, StatsTable } from "@/lib/skills/api";
 import type { DataFit } from "@/lib/reproduction/data-fit";
+import type { AiProposal } from "@/lib/ai/types";
 
 export type Modality = "scRNA-seq" | "bulk RNA-seq" | "proteomics" | "unknown";
 
@@ -146,6 +147,11 @@ export interface Figure {
   parentFigureId?: string;     // set on a fork / variant / re-run
   variantLabel?: string;       // e.g. "resolution = 1.0"
   frozen?: boolean;            // the "paper" tag (S3)
+  // AI Helpers (S5): the AI-proposed param changes queued against this figure — surfaced
+  // in the pending-changes banner (✨), accepted into the figure-data params, then applied
+  // by ONE explicit re-run. Additive + optional → legacy figures load unchanged. The
+  // *applied* proof is the produced figure's `provenance.actions[]`, not this queue.
+  aiProposals?: AiProposal[];
   createdAt: number;
 }
 

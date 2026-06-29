@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { RefreshCw, SlidersHorizontal } from "lucide-react";
+import { RefreshCw, RotateCcw, SlidersHorizontal } from "lucide-react";
+import { cn } from "@/lib/ui/cn";
 import { ParamControl } from "./param-control";
 import { MarksEditor } from "./marks-editor";
 import { ThresholdEditor } from "./threshold-editor";
@@ -9,12 +10,15 @@ import { DataCheckPanel } from "./data-check";
 import { DataFitVerdict } from "@/components/reproduction/data-fit-panel";
 import { Button } from "@/components/ui/button";
 import { PaneShell } from "@/components/ui/pane-shell";
+import { AiMarker } from "@/components/ai/ai-marker";
 import { isFieldDisabled, visibleParamFields, type ParamField } from "@/lib/catalog/params";
 import { useSkillParams, type ParamSpecSeed } from "@/lib/catalog/use-skill-params";
+import { authorOf } from "@/lib/ai/proposals";
 import type { PaneState } from "@/lib/ui/pane-state";
 import type { FigureSpec } from "@/lib/figure/figure-spec";
 import type { SkillParams } from "@/lib/skills/api";
 import type { SeededMark } from "@/lib/erg/marks";
+import type { AiProposal } from "@/lib/ai/types";
 import type { Figure } from "@/lib/projects/types";
 
 /**
@@ -43,6 +47,9 @@ export function FigureDataPanel({
   specSeed = null,
   markLabelsShown = true,
   onMarkLabelsShownChange,
+  proposals = [],
+  onRevertProposal,
+  onReset,
   onRerun,
   onPickSkill,
   onPickManually,
@@ -76,6 +83,13 @@ export function FigureDataPanel({
    *  preview (the parent owns it so the preview can react without a re-run). */
   markLabelsShown?: boolean;
   onMarkLabelsShownChange?: (shown: boolean) => void;
+  /** AI Helpers (S5): the figure's proposal queue — a control whose staged value is currently an
+   *  accepted AI proposal's value gets a ✨ (filled) attribution marker with click-to-revert. */
+  proposals?: AiProposal[];
+  onRevertProposal?: (id: string) => void;
+  /** Discard all staged input changes back to this figure's current run values (and un-stage any
+   *  accepted AI proposals). Shown as "Reset" when there's something to discard. */
+  onReset?: () => void;
   /** Re-run the skill with the edited inputs → a new figure version. */
   onRerun: (params: SkillParams) => void;
   /** From the data-check routing card: set up a suggested skill in the workbench. */
@@ -157,24 +171,74 @@ export function FigureDataPanel({
 
       {/* Inputs → re-run. A stable slot across loading / error / empty / ready (Task B3). */}
       <PaneShell state={inputsState} title="Inputs">
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {visibleParamFields(schema, params).map((f) => (
-            <ParamControl
-              key={f.key}
-              field={f}
-              value={params[f.key]}
-              disabled={isFieldDisabled(schema, f, params)}
-              onChange={(v) => setParams((p) => ({ ...p, [f.key]: v }))}
-            />
-          ))}
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {visibleParamFields(schema, params).map((f) => {
+            // Highlight a control changed since the figure was produced (staged ≠ base), so it's
+            // obvious WHICH inputs a re-run will apply: amber for a manual edit (matching the
+            // pending-changes banner), fuchsia + the ✨ marker for an accepted AI value. authorOf
+            // returns null when unchanged → no highlight. Editing an AI value yourself flips it to
+            // "user" (amber) since the value stops matching the proposal — no extra bookkeeping.
+            const author = authorOf(f.key, baseParams, params, proposals);
+            const aiProposal =
+              author === "ai"
+                ? proposals.find((p) => p.status === "accepted" && p.paramKey === f.key)
+                : undefined;
+            return (
+              <div
+                key={f.key}
+                className={cn(
+                  "rounded-lg p-2 transition-shadow",
+                  author === "user" &&
+                    "bg-[color-mix(in_oklab,var(--stage-figuredata)_9%,transparent)] ring-1 ring-stage-figuredata/45",
+                  author === "ai" &&
+                    "bg-[color-mix(in_oklab,var(--stage-ai)_9%,transparent)] ring-1 ring-stage-ai/45",
+                )}
+              >
+                {/* The ✨ marker rides ParamControl's `badge` slot (inline beside the label), NOT an
+                    absolute overlay — an overlay covered the control's right-aligned value readout. It
+                    is "staged" (accepted, not yet re-run), not "applied". */}
+                <ParamControl
+                  field={f}
+                  value={params[f.key]}
+                  disabled={isFieldDisabled(schema, f, params)}
+                  onChange={(v) => setParams((p) => ({ ...p, [f.key]: v }))}
+                  badge={
+                    aiProposal ? (
+                      <AiMarker
+                        state="staged"
+                        size="xs"
+                        model={aiProposal.model}
+                        onRevert={onRevertProposal ? () => onRevertProposal(aiProposal.id) : undefined}
+                      />
+                    ) : undefined
+                  }
+                />
+              </div>
+            );
+          })}
         </div>
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <span className="text-[11px] text-muted-foreground">
+        {/* Helper text on its own line, then a right-aligned button row — in the narrow 360px dock a
+            side-by-side text+buttons layout cramps the text into a one-word column once Reset appears. */}
+        <div className="mt-4 space-y-2">
+          <p className="text-[11px] text-muted-foreground">
             {dirty ? "Re-runs the analysis → a new linked version." : "Adjust an input to re-run."}
-          </span>
-          <Button size="sm" disabled={running || !dirty} onClick={() => onRerun(params)}>
-            <RefreshCw /> {running ? "Re-running…" : "Re-run → new version"}
-          </Button>
+          </p>
+          <div className="flex items-center justify-end gap-2">
+            {dirty && onReset && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onReset}
+                disabled={running}
+                title="Discard changes — back to this figure's current values"
+              >
+                <RotateCcw /> Reset
+              </Button>
+            )}
+            <Button size="sm" disabled={running || !dirty} onClick={() => onRerun(params)}>
+              <RefreshCw /> {running ? "Re-running…" : "Re-run → new version"}
+            </Button>
+          </div>
         </div>
       </PaneShell>
     </div>

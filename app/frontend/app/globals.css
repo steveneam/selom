@@ -65,6 +65,11 @@
   --stage-figuredata: #f59e0b; /* amber — the inputs/re-run behind a figure */
   --stage-figure: #22d3ee; /* cyan — the figure (brand) */
   --stage-publish: #34d399; /* green — reproducible / publish */
+  /* AI attribution — an ORTHOGONAL axis, not a pipeline stage: it marks what an AI
+     helper touched, layered over whichever stage owns the surface. Fuchsia so it never
+     collides with cyan (the live/action signal) or violet (--stage-skill, the analysis
+     stage). Tints chrome only (markers/counter/panel accents); cyan stays the one CTA. */
+  --stage-ai: #d946ef; /* fuchsia — AI-helper attribution */
 
   --radius: 0.625rem;
 }
@@ -108,6 +113,7 @@
   --color-stage-figuredata: var(--stage-figuredata);
   --color-stage-figure: var(--stage-figure);
   --color-stage-publish: var(--stage-publish);
+  --color-stage-ai: var(--stage-ai);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
