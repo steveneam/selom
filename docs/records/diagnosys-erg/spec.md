@@ -2,7 +2,7 @@
 
 Status: **APPROVED · Phases 1–4 BUILT + validated on real data** (2026-06-23 → 24). Author: Claude (Opus 4.8).
 Phase 1 (parser + scotopic reuse) · Phase 2 (photopic `adaptation` hint) · Phase 3 (`erg_flicker` skill — waveform grid + N1→P1-vs-frequency summary) · Phase 4 (`methods._erg_flicker` + three-mode ISCEV wording + FE seed/overlay) all shipped.
-Sibling of `docs/erg-module/spec.md` (the iWorx `.iwxdata` ERG module). Extends it; does not replace it.
+Sibling of `docs/records/erg-module/spec.md` (the iWorx `.iwxdata` ERG module). Extends it; does not replace it.
 
 ## What
 
@@ -33,12 +33,12 @@ than the flash trace grid) and the parser itself. This effectively subsumes the 
   The new parser is a sibling of the validated `_iwx.py`. The flicker skill is the one new figure.
 - **Better lab for photopic + flicker than the owner's own data.** The owner's iWorx `.iwxdata` path
   currently *errors honestly* on a photopic file (`_iwx.load_eye` raises when grouping ≠ 7 scotopic
-  intensities — `docs/erg-module/spec.md` Out of Scope). The Diagnosys export carries the device's
+  intensities — `docs/records/erg-module/spec.md` Out of Scope). The Diagnosys export carries the device's
   own markers and a clean two-table structure, so it is the better place to build and validate the
   photopic + flicker handling; the iWorx photopic path can later inherit the same logic.
 
 ### What exists today (verified this session)
-- **ERG module (`docs/erg-module/spec.md`, built + validated 2026-06-22):**
+- **ERG module (`docs/records/erg-module/spec.md`, built + validated 2026-06-22):**
   - `app/backend/skills/_tracegrid.py` — generic axis-less small-multiples primitive (`grid_spec`).
   - `app/backend/skills/_erg.py` — `clean_trace`, `landmarks` (dual-smooth a/b detection), `naka_rushton` + `naka_rushton_fit`, `summary_stats`, condition order/colors.
   - `app/backend/skills/_iwx.py` — pure-stdlib iWorx `.iwxdata` decoder → `erg_waveforms_long` rows; **the pattern this parser mirrors.**
@@ -51,7 +51,7 @@ than the flash trace grid) and the parser itself. This effectively subsumes the 
   column signature is ERG by **content**. ERG profile → `plan_cleaning` returns an honest empty plan
   ("used as-is", no matrix cleaning). `engine/route.py::route_profile` routes a recognized ERG table
   to the electrophysiology skills.
-- **Skill contract / guards** (`docs/erg-module/spec.md` "What exists today"): `SkillSpec`,
+- **Skill contract / guards** (`docs/records/erg-module/spec.md` "What exists today"): `SkillSpec`,
   `run_skill_with_table` pops `spec["table"]` before theming, the table-contract guard
   (`NATIVE ∪ L3 ∪ L4_ONLY`), golden tests (`regen_golden.py`).
 
@@ -302,7 +302,7 @@ the base line styling. No new theme kind needed.
   (configurable), defaulting to the file/group identity. The owner's own conditions would come from
   the filename as today; another lab's groups (`dr`/`ivt`/`noivt`) come from the file stem.
   Reversible: yes (a param).
-- **D9 — This is proprietary IP** (consistent with `docs/erg-module/spec.md` D8): the Diagnosys
+- **D9 — This is proprietary IP** (consistent with `docs/records/erg-module/spec.md` D8): the Diagnosys
   parser + `erg_flicker` ship under `skills/proprietary/` with `origin:"proprietary"`. Reversible: yes.
 - **D10 — Ingest target = the CSV export, NOT the native Espion `.BAK`.** Chosen (confirmed by
   inspecting the native files — proprietary `ESP`-magic binary DB backups). Alt: a native `.BAK`

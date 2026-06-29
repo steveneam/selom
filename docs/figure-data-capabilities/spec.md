@@ -321,6 +321,6 @@ skill opts in by stamping `meta.selom.capabilities`; the resolver and both surfa
 - `app/frontend/lib/erg/marks.ts` — `readSeededMarks`, `SeededMark` (dot data; role colour/label/legend helpers).
 - Backend: `skills/_tracegrid.py` (markers overlay + `meta.selom` emit), `skills/_erg.py` (mark builders),
   `skills/proprietary/erg_{traces,flicker,bwave_bar,intensity_response}/` (stamp the §5 rows).
-- `docs/erg-manual-marks/spec.md` (shipped v1) · `docs/figure-editor-contract/spec.md` (`meta.selom`).
+- `docs/records/erg-manual-marks/spec.md` (shipped v1) · `docs/figure-editor-contract/spec.md` (`meta.selom`).
 - memory [[selom-erg-manual-marks]] [[selom-figure-editor-architecture]] [[selom-erg-module]]
   [[full-app-smoke-test-before-handoff]] [[verify-on-real-data-not-mock]].

@@ -19,7 +19,7 @@ skill (a flat table can never be a single-cell matrix — ``sc_counts`` needs An
 never be the per-gene DE table a volcano reads). An unloadable or modality-unclear file stays
 *optimistic* (scored low, but never gated on a guess) — so a hard file is honest, never a false
 block, and every fake-path drive test is unaffected. Mirrors the reproduction "no silent caps" /
-"never a Selom defect for a data gap" invariant. See ``docs/reproduction-dogfood/spec.md`` Slice 2.
+"never a Selom defect for a data gap" invariant. See ``docs/records/reproduction-dogfood/spec.md`` Slice 2.
 """
 
 from __future__ import annotations

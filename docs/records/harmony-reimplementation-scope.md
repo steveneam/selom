@@ -1,7 +1,7 @@
 # Scope — clean-room in-house Harmony ("Selom Integrate")
 
 > **SUPERSEDED & BUILT (session 29, 2026-06-19).** This scope is realized — see
-> `docs/selom-integrate/spec.md` (the reviewed/approved spec + the validation result) and
+> `docs/records/selom-integrate/spec.md` (the reviewed/approved spec + the validation result) and
 > `skills/integration/melody.py`. **Two corrections to the text below:** (1) the engine is named
 > **"Selom Melody"** (owner renamed Harmony→Melody so our clean-room code isn't confused with
 > the GPL packages); (2) the "License posture" section's claim that "harmonypy is MIT" is

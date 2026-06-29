@@ -37,7 +37,7 @@ def get_paper_methods(slug: str, modality: str = ""):
     # lit-synthesizer Phase D: turn this paper's driven ledger into ONE publication Methods
     # section + deduped citations (deterministic, offline). Walks the in-scope analysis panels
     # in figure order, reusing each skill's existing methods prose. `modality` overrides the
-    # ledger's declared paper.modality for the intro framing. See docs/lit-synthesizer-scope.md.
+    # ledger's declared paper.modality for the intro framing. See docs/records/lit-synthesizer-scope.md.
     if slug not in papers_api.SLUGS:
         raise HTTPException(status_code=404, detail=f"unknown paper '{slug}'")
     ledger = papers_api.driven_ledger(slug)

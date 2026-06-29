@@ -8,7 +8,7 @@ AI **verifies** and **mines**; it never replaces the deterministic router. Mirro
 :class:`~extract.routing.models.FeasibilityMap` is produced by ``route_text``; :func:`verify_map`
 is a SEPARATE opt-in post-pass, so the free / offline / inspectable / repeatable core is never on the
 AI's critical path. A live service slots in behind the same Protocol later. See
-``docs/skill-keyword-index/ai-verify-scope.md``.
+``docs/records/skill-keyword-index/ai-verify-scope.md``.
 """
 
 from __future__ import annotations

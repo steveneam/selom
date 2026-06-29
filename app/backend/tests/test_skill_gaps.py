@@ -1,4 +1,4 @@
-"""Skill-gap signal (skill_gaps.py, Slice 3 / R5) — the idempotent docs/skill-gaps.md updater.
+"""Skill-gap signal (skill_gaps.py, Slice 3 / R5) — the idempotent docs/records/skill-gaps.md updater.
 
 Pure projection over constructed DiagnosticReports (no PDF / no stack), so these are fast and
 deterministic. The load-bearing properties (D4 + the testing strategy): only *buildable* gaps are

@@ -11,7 +11,7 @@ reserved) on ``Citation.metadata_license`` — never assume CC. A bioRxiv/medRxi
 ``10.1101`` prefix across both servers, so ``by_doi`` tries ``biorxiv`` then ``medrxiv``; a miss
 returns ``{"status": "no posts found"}`` with an empty ``collection`` (a clean ``None``, not an
 error). Bibliographic fields + the license tag only — no abstract-corpus redistribution
-(see ``docs/lit-synthesizer-scope.md`` + the pre-launch gate).
+(see ``docs/records/lit-synthesizer-scope.md`` + the pre-launch gate).
 """
 
 from __future__ import annotations

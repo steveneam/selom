@@ -3,7 +3,7 @@
 The first integration test of the Reproduction Engine on a real paper (R0+R1+R2+R3 together).
 It does NOT touch real data or R — it replays the verified session-11/12 dogfood observations
 (``reproduction_rpgrip1._captured``) through the engine and asserts the scorecard the engine
-*produces* equals the verdicts/blame reached by hand in ``docs/rpgrip1-figrepro.md``. The live
+*produces* equals the verdicts/blame reached by hand in ``docs/records/rpgrip1-figrepro.md``. The live
 re-run on the real GSE293982 deposit is the dev CLI (``python -m reproduction_rpgrip1 --live-fig5``).
 """
 

@@ -8,7 +8,7 @@
 > Keystone first move (owner-picked): the engine-structure spec — `docs/engine-spine/spec.md`.
 > Parked sidetracks: `docs/on-hold/README.md` (cataloged, never deleted).
 > Companions: `docs/reproduction-engine/live-reproduction-spec.md` (P5),
-> `docs/table-synthesis/spec.md` (P2/L3), [[layered-deterministic-extraction]],
+> `docs/records/table-synthesis/spec.md` (P2/L3), [[layered-deterministic-extraction]],
 > [[selom-figure-repro-mission]], [[compound-capability-each-task]].
 
 ---
@@ -82,7 +82,7 @@ Each pillar lists **agile slices** sized to roughly one scoped commit / session.
 the routed skeleton + extracted goldens + computed results into one ledger, and **L3** so *every*
 skill emits a canonical Statistics table.
 **Today:** `reproduction_drive.py` merge + `data_map` (heuristic); `skills/_table.py`; the **L3
-spec is written but awaiting sign-off** (`docs/table-synthesis/spec.md`, 4 decisions).
+spec is written but awaiting sign-off** (`docs/records/table-synthesis/spec.md`, 4 decisions).
 **Slices:**
 - **2a** Sign off the L3 spec (D-t1…D-t4) → build L3 **Tier A** (`pca, composition, cluster, pvca, regression, umap_scrna, annotate, integration, trajectory`).
 - **2b** Reader ↔ synthesize integration — `extract/readers.py` tries `synthesize_table` when the native table is absent (tagged lower confidence); re-verify a drive panel end-to-end.
@@ -116,7 +116,7 @@ Now harden **credibility**.
 **Today:** `reproduction_drive` + `reproduction_runs` + Phase-3 FE + 4 validated ledgers + the
 two-axis Score.
 **ACTIVE PHASE (s50, owner-picked):** *Reproduction — dogfood-ready* → focused execution plan
-+ agile task slices in **`docs/reproduction-dogfood/spec.md`** (covers **5b/5c/5d + P2 2d + P3 3c**).
++ agile task slices in **`docs/records/reproduction-dogfood/spec.md`** (covers **5b/5c/5d + P2 2d + P3 3c**).
 Owner's why: dogfood many papers to *train the engine* (limited own omics data). Start = a cold-drive
 diagnostic on Harmony. That spec is the task-of-record for this phase; the slices below are the
 roadmap entries it fulfils.

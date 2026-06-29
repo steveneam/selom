@@ -242,7 +242,7 @@ export const CATALOG: SkillCatalogEntry[] = [
     source: "selom", category: "electrophysiology", omics: ["electrophysiology"],
     tier: "verified", status: "beta", engine: "python",
     inputFormats: [".csv", ".txt", ".iwxdata"], chainsWith: ["selom.erg_bwave_bar", "selom.erg_intensity_response"],
-    // Proprietary module (docs/erg-module/spec.md) — the trace-grid primitive + native .iwxdata decode.
+    // Proprietary module (docs/records/erg-module/spec.md) — the trace-grid primitive + native .iwxdata decode.
     outputs: ["figure", "tables"], license: "proprietary",
     provenance: { repo: "selom/skills", path: "erg_traces" }, version: "0.1.0", popularity: 1,
   }),

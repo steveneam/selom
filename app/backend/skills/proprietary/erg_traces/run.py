@@ -1,6 +1,6 @@
 """ERG representative trace grid — stacked floating waveforms (flash intensity down the
 rows × condition across the columns), no per-panel axes, one shared scale bar. The
-publication layout Prism/Excel can't make. Proprietary (docs/erg-module/spec.md).
+publication layout Prism/Excel can't make. Proprietary (docs/records/erg-module/spec.md).
 
 Stub = a dependency-free synthetic 7×6 grid (golden-stable). Real path
 (``run_real``) reads a long ERG waveform table and renders the chosen representatives.

@@ -1,7 +1,7 @@
 # Selom skill-gap backlog
 
 > The durable "Selom can't do X yet" backlog, fed by the cold-drive reproduction diagnostic
-> (`docs/reproduction-dogfood/spec.md`, Slice 3 / R5). Each dogfooded paper's honest non-graded
+> (`docs/records/reproduction-dogfood/spec.md`, Slice 3 / R5). Each dogfooded paper's honest non-graded
 > panels accumulate here so dogfooding is a feedback engine, not just a score — the Ratchet.
 
 ## Curated capability gaps (hand-authored — the updater preserves this section)

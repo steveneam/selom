@@ -184,6 +184,6 @@ def test_markdown_cited_datasets_shows_download_handoff():
 
 def test_markdown_shows_per_run_skill_gaps():
     # The needs_recipe panel (fig3, gsea: ran but no reader caught the NES) is a buildable read-back
-    # gap → it shows in the run's own "Skill gaps" section (accumulated in docs/skill-gaps.md).
+    # gap → it shows in the run's own "Skill gaps" section (accumulated in docs/records/skill-gaps.md).
     md = to_markdown(diagnose(_driven_result(), paper_id="harmony"))
     assert "Skill gaps (this run)" in md and "read_back" in md and "gsea" in md

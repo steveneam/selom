@@ -1,6 +1,6 @@
 """Build a license-clean GO gene-set library for the `enrichment` skill (dev-time).
 
-DECISIONS #10 / docs/p1-skills-scope.md (Decision #1A): replace the 10-set / 102-gene
+DECISIONS #10 / docs/records/p1-skills-scope.md (Decision #1A): replace the 10-set / 102-gene
 sample with real coverage from a primary, openly-licensed source. The GO annotation file
 (GAF) is **gene-symbol keyed**, which matches Selom's inputs (rpgrip1 var_names, EYG_28
 GeneID) directly — no ID mapping needed.

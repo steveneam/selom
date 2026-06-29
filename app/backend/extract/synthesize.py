@@ -8,7 +8,7 @@ pixel-digitized read it MAY feed the Reproducibility Score (S2), tagged via ``sy
 
 The third layer of Selom's extraction stack ([[layered-deterministic-extraction]]): L1 skill-specific
 reader · L2 generic reader · **L3 synthesis** · L4 AI. Source shapes: ``docs/reproduction-engine/
-skill-table-schemas.md``. Spec + decisions: ``docs/table-synthesis/spec.md`` (Tier A 9/9 + the full
+skill-table-schemas.md``. Spec + decisions: ``docs/records/table-synthesis/spec.md`` (Tier A 9/9 + the full
 Tier-B set; D-t1..D-t4 owner-signed). Tier B = the clean trio (``corr_heatmap``/``sankey``/``upset``)
 plus the lossy set (``boxplot``/``heatmap``/``scorecard``/``violin``), each behind a faithfulness gate
 (a non-conforming shape -> ``None`` -> L4). ``proteomics_de`` is the one remaining at-source fix

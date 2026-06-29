@@ -1,7 +1,7 @@
 # Skill Keyword Index — L4 AI-verify + synonym-mining seam (fast-follow #2)
 
 > **Status: scoped 2026-06-20 (session 34), owner-approved ("continue with 2 and 3").** Adds the
-> optional, gated L4 layer of the 4-layer router (`docs/skill-keyword-index/spec.md` §"AI's role —
+> optional, gated L4 layer of the 4-layer router (`docs/records/skill-keyword-index/spec.md` §"AI's role —
 > verify + mine, never replace"). **AI verifies and mines; it never replaces the deterministic
 > core.** Mirrors the existing AI-gateway discipline (`extract/classify.VisionClassifier` +
 > `extract/vision.OperatorVisionGateway`, memory `selom-claude-acts-as-ai-gateway`): a typed

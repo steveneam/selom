@@ -2,7 +2,7 @@
 
 > **Status: DRAFT for owner approval** (charter rule: new skills get a plan before they're
 > built). Implements the competitor-driven **DECISIONS #10** P1 priorities. Non-Docker.
-> _Filed 2026-06-13 · Claude (acting FE+BE) · companion to `docs/competitors/omicsbox.md` §7._
+> _Filed 2026-06-13 · Claude (acting FE+BE) · companion to `docs/records/competitors/omicsbox.md` §7._
 
 ## Why this doc (the dogfooding finding that reshaped P1)
 

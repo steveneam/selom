@@ -9,7 +9,7 @@
 > Cross-lane (the engine lives in the backend; Claude covers both lanes while Codex is
 > away — [[claude-covers-both-selom-lanes]]). Companions: `docs/pillars/plan.md`,
 > `docs/reproduction-engine/live-reproduction-spec.md` (the reproduction consumer),
-> `docs/table-synthesis/spec.md` (P2/L3), [[layered-deterministic-extraction]],
+> `docs/records/table-synthesis/spec.md` (P2/L3), [[layered-deterministic-extraction]],
 > [[unify-on-superior-framework]], [[compound-capability-each-task]].
 
 ## 1. Why (the problem this fixes)

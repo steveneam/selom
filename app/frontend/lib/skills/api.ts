@@ -49,7 +49,7 @@ export interface StatsTable {
   rows: (string | number)[][];
   title?: string;
   /**
-   * L3 table synthesis (docs/table-synthesis/spec.md, S3): true when Selom re-shaped
+   * L3 table synthesis (docs/records/table-synthesis/spec.md, S3): true when Selom re-shaped
    * this table from the figure's OWN output because the skill emits no native table —
    * a real computed value, not a digitized guess, but labelled distinctly in the UI.
    */

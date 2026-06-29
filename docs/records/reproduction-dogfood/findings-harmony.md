@@ -1,6 +1,6 @@
 # Slice 0 findings — Harmony cold drive (Korsunsky 2019)
 
-> Session 50, 2026-06-22. The first cold-drive diagnostic (`docs/reproduction-dogfood/spec.md`
+> Session 50, 2026-06-22. The first cold-drive diagnostic (`docs/records/reproduction-dogfood/spec.md`
 > Slice 0). Tool: `reproduction_diagnose.diagnose_paper`. Inputs: the staged main PDF + supplements
 > 3/4 (PDF methods) + supplement-8.xlsx (the only tabular file). Raw report:
 > `graphify-out/scratch/s50-harmony-gap.{md,json}` (gitignored scratch).

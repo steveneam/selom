@@ -4,7 +4,7 @@ Phase A (this package, shipped): promote the per-figure auto-methods engine
 (``methods.py``) to the project/story level — stitch an *ordered sequence* of skill runs
 into one publication Methods section with a deduped citation list. Deterministic,
 offline, no LLM, no new deps. Phases B/C add the stdlib PubMed/bioRxiv citation-lookup
-layer (network injected as a fetcher, mockable). See ``docs/lit-synthesizer-scope.md``.
+layer (network injected as a fetcher, mockable). See ``docs/records/lit-synthesizer-scope.md``.
 """
 
 from litsynth.models import Citation, MethodsSection, SkillRunRef

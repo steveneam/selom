@@ -1,6 +1,6 @@
 """Generic small-multiples *trace grid* — the reusable figure primitive behind the ERG
 module (and any time-series shown as ``row × col`` small multiples: EEG/ECG/patch-clamp,
-dose × condition, …). See docs/erg-module/spec.md.
+dose × condition, …). See docs/records/erg-module/spec.md.
 
 The look: a grid of floating line panels with **no per-panel axes** (no ticks, lines,
 labels, or grid) and a **single shared scale bar** that encodes amplitude (vertical) and
@@ -258,7 +258,7 @@ def grid_spec(
         "xLen": sb["x_len"], "xUnit": sb["x_unit"], "yLen": sb["y_len"], "yUnit": sb["y_unit"],
     }]
 
-    # Editable landmark marks (docs/erg-manual-marks/spec.md R4): each panel may carry a
+    # Editable landmark marks (docs/records/erg-manual-marks/spec.md R4): each panel may carry a
     # `mark_meta` list [{segment, role, t_ms, source, label}, …] describing its a/b (or N1/P1)
     # landmark points (seeded from the auto-detection / supplied manual marks). We surface them as
     # `meta.selom.marks` so the Marks panel can list/edit them and the canvas can bind a drag back
@@ -303,7 +303,7 @@ def _num(v) -> str:
 
 # --- per-panel overlays -----------------------------------------------------------------
 # A panel dict may carry optional overlays drawn against its own hidden axis (the SAME
-# xaxis{N}/yaxis{N} as the line). One shared hook serves two features (docs/erg-module/
+# xaxis{N}/yaxis{N} as the line). One shared hook serves two features (docs/records/erg-module/
 # mean-spread-styling-spec.md §3, D6): the N1/P1 marker dots on the flicker grid (M3), and
 # the mean ± spread band / per-point error bars / faint replicate lines for the styling
 # feature. A panel with none of these keys emits no extra traces (byte-identical output).

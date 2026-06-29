@@ -1,7 +1,7 @@
 """Generic figure-styling vocabulary (skills/_charts.py) — proves the mean ± spread / points /
 patterns / significance / reference-line bar builder is NOT ERG-specific: it works for any
 categorical comparison (dose groups, cell types, …). The ERG bar is one consumer; these tests use
-plain non-ERG categories. See docs/erg-module/mean-spread-styling-spec.md.
+plain non-ERG categories. See docs/records/erg-module/mean-spread-styling-spec.md.
 """
 from skills import _charts
 

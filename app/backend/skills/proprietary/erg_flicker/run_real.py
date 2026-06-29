@@ -57,7 +57,7 @@ def run(data_path: str, params: dict) -> dict:
     lowpass = float(params.get("lowpass_hz", 120.0))
     show_marks = to_bool(params.get("marks", True))  # N1/P1 dots on each waveform panel (M3)
     show_labels = to_bool(params.get("mark_labels", True))  # pinned N1/P1 labels (figure-data-capabilities §6)
-    # Operator-set N1/P1 marks (docs/erg-manual-marks/spec.md) — applied only on the Selom
+    # Operator-set N1/P1 marks (docs/records/erg-manual-marks/spec.md) — applied only on the Selom
     # re-derivation path (device markers stay authoritative when the feed carries them). Keyed by
     # (condition, flicker_hz, eye); the grid aggregates over eyes, so the seed/lookup uses empty eye.
     manual_marks = _erg.parse_manual_marks(params.get("manual_marks", ""))

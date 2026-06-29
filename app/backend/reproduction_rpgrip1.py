@@ -2,7 +2,7 @@
 
 This is the first end-to-end integration of the Reproduction Engine (build-plan R0+R1+R2+R3)
 on a real paper. It hand-encodes the RPGRIP1 ledger — the structured form of
-``docs/rpgrip1-figrepro.md`` + ``D:/tmp-thl/rpgrip1_target_spec.md`` (until R4's extraction
+``docs/records/rpgrip1-figrepro.md`` + ``D:/tmp-thl/rpgrip1_target_spec.md`` (until R4's extraction
 subsystem generates it from the PDF) — and drives it through the full loop:
 verdict (D4) -> sweep (stage 9) -> oracle (stage 7, gated) -> revalidate -> findings-first
 scorecard (D10). It exercises the deterministic core (``reproduction.py``), the blame
@@ -209,7 +209,7 @@ def build_ledger() -> Ledger:
     """The full RPGRIP1 reproduction ledger (Fig 5 + Fig 6), built from the target spec.
 
     Pure: no data, no heavy deps. This is the hand-authored structured form of
-    ``docs/rpgrip1-figrepro.md`` that R4's extraction subsystem will eventually produce
+    ``docs/records/rpgrip1-figrepro.md`` that R4's extraction subsystem will eventually produce
     from the PDF. ``drive_captured`` / ``drive_live_fig5`` add the runs + verdicts."""
     paper = Paper(
         id=PAPER_ID, slug=PAPER_ID,

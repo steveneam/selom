@@ -1,6 +1,6 @@
 """ERG b-wave bar — group mean ± SEM per condition at one flash intensity, with every
 eye overlaid as an individual data point (Reviewer 2: "include individual data points in
-all quantitative graphs"). Proprietary ERG module (docs/erg-module/spec.md, R22).
+all quantitative graphs"). Proprietary ERG module (docs/records/erg-module/spec.md, R22).
 
 Stub = a dependency-free bar seeded from the real Group-4 (log 1.0 cd·s/m²) reference
 b-waves, so the golden figure is shape-faithful. Real path (``run_real``) reads the long

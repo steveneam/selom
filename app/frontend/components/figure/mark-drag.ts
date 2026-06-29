@@ -1,5 +1,5 @@
 /**
- * Draggable ERG landmark dots (docs/erg-manual-marks/spec.md R5, the canvas half).
+ * Draggable ERG landmark dots (docs/records/erg-manual-marks/spec.md R5, the canvas half).
  *
  * The a/b (and N1/P1) dots the skill draws on the trace grid become draggable: grab a dot and slide
  * it along the trace in TIME — it stays sticky to the line (snaps to the nearest sample, its height

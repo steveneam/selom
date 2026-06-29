@@ -46,7 +46,7 @@ def run(data_path: str, params: dict) -> dict:
     # else scotopic. `adapt` reflects the stimulus_type filter when that column is present; else fall
     # back to the user's adaptation/stimulus_type hint (a plain waveform CSV with no such column).
     metric_mode = adapt or _erg.adaptation_mode(params.get("adaptation", "auto"), params.get("stimulus_type", ""))
-    # Operator-set landmark marks (docs/erg-manual-marks/spec.md). The trace grid is the primary
+    # Operator-set landmark marks (docs/records/erg-manual-marks/spec.md). The trace grid is the primary
     # authoring surface: a per-panel mark is keyed by (condition, "", intensity_group, "") — empty
     # stimulus/eye, so it also drives the per-eye bar + intensity-response via the wildcard match.
     manual_marks = _erg.parse_manual_marks(params.get("manual_marks", ""))

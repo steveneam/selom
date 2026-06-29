@@ -2,7 +2,7 @@
 
 Structural guarantees the ERG skill (and any future trace-grid skill) relies on: one line
 trace per panel on its own hidden axis pair, exactly one shared scale bar, shared ranges,
-and the right label counts. See docs/erg-module/spec.md (R1–R7).
+and the right label counts. See docs/records/erg-module/spec.md (R1–R7).
 """
 import pytest
 

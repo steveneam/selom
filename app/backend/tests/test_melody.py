@@ -158,7 +158,7 @@ def test_rejects_batch_length_mismatch():
 # (lambda_hat = alpha * E) — both aimed at avoiding OVER-integration in heterogeneous data. The
 # default path (harmony2=False) is exercised — and pinned bit-for-bit — by every test above; these
 # add the new branch. Validated by metric vs the R harmony 2.0.5 oracle in the s30 dogfood
-# (Melody-on batch-mixing/purity matched the oracle; see docs/harmony2-scope/scope.md).
+# (Melody-on batch-mixing/purity matched the oracle; see docs/records/harmony2-scope/scope.md).
 
 
 def _nonoverlapping_stress(seed=0, per=120):

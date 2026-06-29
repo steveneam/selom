@@ -46,7 +46,7 @@ individual points (`points`) and the error bars (`show_error`).
 - **TRACE / line half still pending** (`central=mean`, band/error/individual reps; flat-line band builder in
   `_charts`) — gated on C6 for real n (one .iwxdata = one eye); the `_tracegrid` overlay hook (M3) is ready.
 
-Sibling of `docs/erg-module/spec.md` + `docs/diagnosys-erg/spec.md`. Applies to `erg_traces` (the grid)
+Sibling of `docs/records/erg-module/spec.md` + `docs/records/diagnosys-erg/spec.md`. Applies to `erg_traces` (the grid)
 and `erg_bwave_bar` (the amplitude bar); the primitives are generic (reusable by any future line/bar skill).
 
 ## D12 — The LINE/spread styling is GENERIC too (owner steer 2026-06-24, session T13)

@@ -1,4 +1,4 @@
-"""L3 table synthesis on the own-data run path (docs/table-synthesis/spec.md §4 / §8 step 4).
+"""L3 table synthesis on the own-data run path (docs/records/table-synthesis/spec.md §4 / §8 step 4).
 
 A tableless skill that HAS a deterministic synthesizer gets a canonical Statistics table re-shaped
 from its OWN figure on ``POST /skills/{id}/run`` — tagged ``synthesized: True`` — so the FE

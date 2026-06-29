@@ -1,5 +1,5 @@
 """Shared ERG helpers — the analysis bits behind the ERG figure skills (see
-docs/erg-module/spec.md). Domain constants are import-time cheap (no numpy); the
+docs/records/erg-module/spec.md). Domain constants are import-time cheap (no numpy); the
 signal-processing helpers lazy-import numpy so the dependency-free stubs never pull it.
 """
 from __future__ import annotations
@@ -122,7 +122,7 @@ _BWAVE_SMOOTH_MS = 16.0  # heavy: real broad b-wave survives, high-freq noise av
 #     b-wave. (An early real-data tuning widened this to 130 ms to capture a 104 ms C57 peak — the
 #     timing literature then showed that peak is NOT a cone b-wave; window narrowed back to the cone
 #     range. On hum-heavy single-eye recordings the auto-metric is only a SEED — the manual a/b
-#     override is the rigorous path; see docs/erg-module/spec.md T15.)
+#     override is the rigorous path; see docs/records/erg-module/spec.md T15.)
 # Smoothing stays HEAVY (same as scotopic): these recordings carry strong ~50 Hz mains hum (20 ms
 # period) and the 16 ms b-smooth nulls it — a lighter kernel rides the hum and over-reads the b-wave.
 # Selected by the `mode` argument to landmarks() — driven off `stimulus_type`/`adaptation` upstream.
@@ -169,7 +169,7 @@ def landmarks(time_ms, y, fs: float = 5000.0, *, mode: str = "scotopic",
     NOT extended past ~80 ms (a ~100 ms "photopic b-wave" is rod/hum contamination, not cone — see
     the ``_PHOTOPIC_*`` constants). Unknown mode → scotopic (byte-identical legacy path).
 
-    ``manual`` (docs/erg-manual-marks/spec.md) optionally overrides the a-wave and/or b-wave TIME:
+    ``manual`` (docs/records/erg-manual-marks/spec.md) optionally overrides the a-wave and/or b-wave TIME:
     ``{"a_ms": …, "b_ms": …}`` (either or both). The amplitude is re-measured from the trace AT
     that time per ISCEV — a = baseline − value(a_ms); the manual a-trough also becomes the b-wave's
     reference, so b = value(b_ms) − value(a_ms). Each value is tagged ``a_source``/``b_source`` ∈
@@ -236,7 +236,7 @@ def fs_from(time_ms) -> float:
 
 
 # --- Manual landmark marks (operator override) -------------------------------
-# docs/erg-manual-marks/spec.md: the scientist sets/moves the a/b (or N1/P1) TIME on a trace;
+# docs/records/erg-manual-marks/spec.md: the scientist sets/moves the a/b (or N1/P1) TIME on a trace;
 # the metric re-measures AT that time. The marks travel as a JSON param keyed by the segment
 # identity "{condition}|{stimulus_type}|{intensity_group}|{eye}" (flicker: "{condition}|{hz}|{eye}").
 # Empty key parts are wildcards, so a grid-panel mark (no eye) applies to every eye of that
@@ -327,7 +327,7 @@ def metrics_from_waveforms(df, *, default_mode: str = "scotopic", marks: dict | 
     measures each mode with the right timing; ``default_mode`` applies when there is no
     ``stimulus_type`` column (a plain waveform CSV — the caller passes the user's ``adaptation``).
 
-    ``marks`` (docs/erg-manual-marks/spec.md) optionally carries operator-set a/b times keyed by the
+    ``marks`` (docs/records/erg-manual-marks/spec.md) optionally carries operator-set a/b times keyed by the
     segment identity ``(condition, stimulus_type, intensity_group, eye)``; a matched segment is
     measured AT those times and its row carries ``a_source``/``b_source`` ∈ {auto, manual}. No
     ``marks`` → byte-identical (every row ``auto``)."""
@@ -592,7 +592,7 @@ def flicker_landmarks(time_ms, voltage, hz: float, *, n_bins: int = 120,
     (µV / ms), or None when no cycle could be formed. ``n1p1_uv`` is the peak-to-trough amplitude
     (the ISCEV flicker measure); ``p1_implicit_ms`` is the P1 phase within the cycle.
 
-    ``manual`` (docs/erg-manual-marks/spec.md) optionally overrides the N1 and/or P1 TIME
+    ``manual`` (docs/records/erg-manual-marks/spec.md) optionally overrides the N1 and/or P1 TIME
     (``{"n1_ms": …, "p1_ms": …}``), interpreted as a phase within the cycle (mod the period); the
     amplitude is re-read at that phase and the value tagged ``n1_source``/``p1_source`` ∈
     {auto, manual}. No ``manual`` → byte-identical to the auto path."""

@@ -6,7 +6,7 @@ enriched pathways, fetches the Reactome **event hierarchy** once to wire parent-
 edges among them (transitive-reduced, like `go_graph`), and lays them out as an editable
 Plotly node-link coloured by each pathway's mean log2 fold change.
 
-Live API (option C, docs/p1-skills-scope.md): Reactome data is open (CC0), so this stays
+Live API (option C, docs/records/p1-skills-scope.md): Reactome data is open (CC0), so this stays
 license-clean without gseapy/MSigDB (DECISIONS #9). It needs the network — a request
 failure raises a clear error rather than silently faking a result (the dependency-free
 ``run.py`` stub is only selected via SELOM_SKILLS_ENGINE, never as a network fallback).

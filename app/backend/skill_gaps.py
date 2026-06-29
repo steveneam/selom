@@ -1,7 +1,7 @@
 """Skill-gap signal (Slice 3, P3 3c) — turn each dogfooded paper's honest gaps into a durable,
-ranked "Selom can't do X yet" backlog at ``docs/skill-gaps.md``.
+ranked "Selom can't do X yet" backlog at ``docs/records/skill-gaps.md``.
 
-Phase: *Reproduction — dogfood-ready* (``docs/reproduction-dogfood/spec.md`` R5 / Slice 3). The
+Phase: *Reproduction — dogfood-ready* (``docs/records/reproduction-dogfood/spec.md`` R5 / Slice 3). The
 cold-drive diagnostic already classifies every panel honestly; this module reads those classifications
 and accumulates the *buildable capability gaps* across papers into a committed doc — the Ratchet
 ([[the-ratchet-durable-artifacts]]): the backlog must outlive the session and rank across papers, so
@@ -180,7 +180,7 @@ def _render_auto(gaps: dict[str, SkillGap], papers_seen: list[str]) -> str:
 _SCAFFOLD = """# Selom skill-gap backlog
 
 > The durable "Selom can't do X yet" backlog, fed by the cold-drive reproduction diagnostic
-> (`docs/reproduction-dogfood/spec.md`, Slice 3 / R5). Each dogfooded paper's honest non-graded
+> (`docs/records/reproduction-dogfood/spec.md`, Slice 3 / R5). Each dogfooded paper's honest non-graded
 > panels accumulate here so dogfooding is a feedback engine, not just a score — the Ratchet.
 
 ## Curated capability gaps (hand-authored — the updater preserves this section)

@@ -12,7 +12,7 @@ Two layers:
 * **Figure builders**: :func:`bar_figure` — a mean ± spread bar with optional individual points,
   per-category hatch patterns, computed-or-overridden significance brackets, and reference lines.
 
-See docs/erg-module/mean-spread-styling-spec.md (the 7 reference styles + the param vocabulary).
+See docs/records/erg-module/mean-spread-styling-spec.md (the 7 reference styles + the param vocabulary).
 """
 from __future__ import annotations
 

@@ -12,7 +12,7 @@ in-scope skill is ``skill_id``; the full ranked in-scope suggestion set rides in
 out-of-scope figure carries the mapped ``scope`` and no skill. The complete per-figure candidate
 detail still lives on the ``FeasibilityMap`` the caller holds. The auto-map is the *skeleton* a
 human (or the paid L4 AI tier) refines into sub-panels — never a claim of exact panel knowledge.
-See ``docs/skill-keyword-index/engine-wiring-scope.md``.
+See ``docs/records/skill-keyword-index/engine-wiring-scope.md``.
 """
 
 from __future__ import annotations

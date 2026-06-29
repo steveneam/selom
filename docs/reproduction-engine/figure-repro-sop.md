@@ -5,7 +5,7 @@
 > Engine pillar (`spec.md`) — the engine automates these same steps. Build-phase: today it's run by
 > hand; every step here maps to a future engine stage.
 >
-> Grounded in the first end-to-end dogfood: RPGRIP1 / Loi 2025 Fig 5 (`../rpgrip1-figrepro.md`).
+> Grounded in the first end-to-end dogfood: RPGRIP1 / Loi 2025 Fig 5 (`../records/rpgrip1-figrepro.md`).
 > Owner-requested 2026-06-17 ("write an SOP/script so the process is faster").
 
 ## Governing rules (non-negotiable — from memory)

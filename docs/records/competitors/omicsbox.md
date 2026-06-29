@@ -5,7 +5,7 @@
 > level, plus the **prioritized Skill-Foundry backlog** it implies for Selom.
 > Owner-directed (2026-06-12): "look at every link and line… so we can reverse
 > engineer what workflow / tools / things Selom needs." Companion to
-> `docs/external-integrations.md` (porting sources), `docs/command-center/design.md §6.5`
+> `docs/records/external-integrations.md` (porting sources), `docs/command-center/design.md §6.5`
 > (toolchain) and `docs/build-charter.md` (sequencing). API-reuse cross-refs the
 > sibling **eamos** project. Binding decisions still land in `agent_handoff/DECISIONS.md`.
 >

@@ -60,7 +60,7 @@ Column-level detail (exact columns, caps, golden metrics readable) is in `skill-
 `scorecard` · `violin`
 
 Each behind a faithfulness gate (a non-conforming figure → `None` → L4; never a fabricated table).
-Spec + per-skill shapes: `docs/table-synthesis/spec.md`. Note these synthesizers yield a table only
+Spec + per-skill shapes: `docs/records/table-synthesis/spec.md`. Note these synthesizers yield a table only
 when the figure has the expected shape — e.g. `violin` tabulates only its PubMed marker-call
 annotation, `integration` only when the title carries the batch-mixing delta — by design (S4: don't
 force). That is a *figure-shape* condition, not a missing contract; the skill still **has** an L3

@@ -13,8 +13,8 @@ later rows). Two export shapes are supported:
 * **Reduced ``.CSV``** (COMMA-delimited) — ``Marker Table`` + ``Data Table`` only, no Contents/
   Stimulus tables; stimulus type is then *inferred* from the marker vocabulary.
 
-Emits the canonical tables the existing ERG skills consume (see ``docs/erg-module/spec.md`` +
-``docs/diagnosys-erg/spec.md``):
+Emits the canonical tables the existing ERG skills consume (see ``docs/records/erg-module/spec.md`` +
+``docs/records/diagnosys-erg/spec.md``):
 
 * ``erg_markers_long`` — every device marker (``a``/``B``/``b``/``c-wave``/``N1``/``P1``/…), µV + ms.
 * ``erg_metrics_long`` — the a/b view (``a_wave_uv``/``b_wave_uv`` + implicit times) the current

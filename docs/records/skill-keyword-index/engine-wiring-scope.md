@@ -3,8 +3,8 @@
 > **Status: scoped 2026-06-20 (session 34), owner-approved breadth.** Wires the validated
 > 4-layer router's **L3 inventory + per-figure routes** into the reproduction engine's front-half,
 > so a dropped paper auto-produces the panel→skill map the four ledgers hand-encode today. Builds
-> on the v1 router (`docs/skill-keyword-index/spec.md`) + the legend-hardening 4-layer core
-> (`docs/skill-keyword-index/legend-hardening-scope.md`). Resolved decision #2 of the v1 spec
+> on the v1 router (`docs/records/skill-keyword-index/spec.md`) + the legend-hardening 4-layer core
+> (`docs/records/skill-keyword-index/legend-hardening-scope.md`). Resolved decision #2 of the v1 spec
 > ("Auto-populating `Panel.skill_id` is a fast-follow after the backtest passes") — now due.
 
 ## What

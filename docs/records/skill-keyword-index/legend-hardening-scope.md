@@ -1,7 +1,7 @@
 # Skill Keyword Index — legend-segmentation hardening (scope)
 
 > **Status: DRAFT for owner review (spec-before-code, session 33, 2026-06-20).** Fast-follow #1 to
-> the Skill Keyword Index v1 (`docs/skill-keyword-index/spec.md`, shipped s32). v1's honest
+> the Skill Keyword Index v1 (`docs/records/skill-keyword-index/spec.md`, shipped s32). v1's honest
 > limitation: **per-figure routing degrades on real PDFs**. This doc pins *why* (measured on the
 > real JEV text), scopes the deterministic fixes, and keeps the open-core / library-only / AI-verifies
 > posture intact. Per-item scope first; validate-by-metric against the four hand ledgers + the real

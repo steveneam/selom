@@ -1,6 +1,6 @@
 """Unified, license-clean gene-set library over Selom's owned/open corpus.
 
-Phase A of the gene-set builder (docs/gene-set-builder-design.md §4 · DECISIONS #11):
+Phase A of the gene-set builder (docs/records/gene-set-builder-design.md §4 · DECISIONS #11):
 surface the gene sets Selom already owns or that are openly licensed as a single
 browsable/searchable corpus, and resolve a chosen source as an ORA library the
 `enrichment` skill scores against. **Open-core only** — no gseapy/MSigDB (DECISIONS #9).

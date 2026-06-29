@@ -233,7 +233,7 @@ async def _execute_skill_run(
                 "error": "skill_timeout",
                 "message": f"'{skill_id}' exceeded the {timeout}s execution limit and was abandoned.",
             })
-        # L3 table synthesis (docs/table-synthesis/spec.md §4 / §8 step 4): a tableless skill that
+        # L3 table synthesis (docs/records/table-synthesis/spec.md §4 / §8 step 4): a tableless skill that
         # has a deterministic synthesizer gets a canonical Statistics table re-shaped from its OWN
         # figure (S1 read-not-recompute -> tagged synthesized:True, S3), so the FE Statistics node
         # renders for purely-visual skills too. None when no synthesizer exists (-> L4 Pro-AI, S4) or

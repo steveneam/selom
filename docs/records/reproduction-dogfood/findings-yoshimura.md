@@ -1,6 +1,6 @@
 # Slice 0/1/5 findings — Yoshimura cold drive (Wu & Little 2023, kidney organoid multiome)
 
-> Session 51, 2026-06-22. The **second** calibration paper (`docs/reproduction-dogfood/spec.md`),
+> Session 51, 2026-06-22. The **second** calibration paper (`docs/records/reproduction-dogfood/spec.md`),
 > chosen for deposited tabular data to separate the *extractor* gap from the *data* gap. Tool:
 > `reproduction_diagnose.diagnose_paper`. Inputs: the staged main PDF + the SI Appendix PDF +
 > `pnas.2219699120.sd01.xlsx`. Raw reports: `graphify-out/scratch/s51-yoshimura-gap.{md,json}`

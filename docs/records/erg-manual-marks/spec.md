@@ -14,7 +14,7 @@ auto-windowed peak/trough. The auto-detection (`_erg.landmarks` / `flicker_landm
 
 ## Context
 ### Why this matters
-The T15 photopic work (`docs/erg-module/spec.md` D12–D14) showed the from-traces a/b metric is only
+The T15 photopic work (`docs/records/erg-module/spec.md` D12–D14) showed the from-traces a/b metric is only
 as good as the search window, and on real hum-heavy single-eye iWorx photopic recordings the window
 can land on an artifact (a ~50 Hz hum crest, a rod-contaminated late peak). Web research (recorded in
 the T15 build-log) confirmed the field-standard fix is **auto-seed + operator-adjust**, not a fully

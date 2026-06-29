@@ -56,7 +56,7 @@ would be dishonest and would dilute the real signal. So:
 
 - **Skill Keyword Index** = `app/backend/extract/routing/` — a dropped paper → its
   **skill inventory + per-figure feasibility map**, with **no LLM on the critical path**.
-  The IP is the **layered deterministic core** (`docs/skill-keyword-index/legend-hardening-scope.md`),
+  The IP is the **layered deterministic core** (`docs/records/skill-keyword-index/legend-hardening-scope.md`),
   designed so the core promise rests on the most robust layer:
   - **L1 structured** (clean numbered captions / headers / exact match) +
     **L2 recovery sweep** (de-spaced/garbled/glyph markers, ordinal number recovery,

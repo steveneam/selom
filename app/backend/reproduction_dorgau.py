@@ -8,7 +8,7 @@ doi ``10.1038/s41467-024-47933-x``; GEO super-series **GSE234971**, scRNA sub-se
 (Figs 2-3), scATAC-seq (Figs 4-5), IPA/SCENIC+ gene-regulatory networks (Fig 6), and TF
 footprinting + wet-lab validation (Fig 7).
 
-The honest scope (``docs/dorgau-figrepro/scope.md``): **only Fig 1 (scRNA) is squarely in
+The honest scope (``docs/records/dorgau-figrepro/scope.md``): **only Fig 1 (scRNA) is squarely in
 Selom's skill set**, plus the scRNA-derived early/late-RPC ratio (Fig 3H). Figs 2-7 are spatial /
 scATAC / IPA / wet-lab — a new **modality-unsupported** out-of-scope category (the data is openly
 deposited; Selom just has no skill for the modality), distinct from WET_LAB and DATA_NOT_DEPOSITED.

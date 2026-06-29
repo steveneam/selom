@@ -7,7 +7,7 @@
 > confused with the GPL packages. Validated by the batch-mixing METRIC vs. the harmonypy
 > oracle on real GSE201356 — results at the foot of this doc.
 > Author: Claude (acting FE+BE), session 29, 2026-06-19.
-> Supersedes the recommendation in `docs/harmony-reimplementation-scope.md` (extends it; the
+> Supersedes the recommendation in `docs/records/harmony-reimplementation-scope.md` (extends it; the
 > scope's "0.0.10 is MIT" premise is **corrected** below).
 
 ## What
@@ -294,7 +294,7 @@ dogfood reported in the handoff.
 - Harmony2 (2026) scale/anti-over-integration features — not v1. **Update (s30): the
   anti-over-integration subset (stabilized diversity penalty + dynamic λ) was folded into
   `melody.py` behind a default-off `harmony2` flag and validated vs the R harmony 2.0.5 oracle —
-  see `docs/harmony2-scope/scope.md`. The >100M-cell scale engineering remains out of scope.**
+  see `docs/records/harmony2-scope/scope.md`. The >100M-cell scale engineering remains out of scope.**
 - Reference mapping (Methods §3.3), `>1` batch *variable* / covariate adjustment, GPU/mini-batch
   scaling — the engine should not preclude them, but they are not built now.
 - FE changes — none; the output contract is unchanged.

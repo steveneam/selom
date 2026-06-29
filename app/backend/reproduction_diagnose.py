@@ -1,6 +1,6 @@
 """Cold-drive diagnostic — measure how much of a never-seen paper auto-grades, and why the rest doesn't.
 
-Phase: *Reproduction — dogfood-ready*, **Slice 0** (``docs/reproduction-dogfood/spec.md``). This is
+Phase: *Reproduction — dogfood-ready*, **Slice 0** (``docs/records/reproduction-dogfood/spec.md``). This is
 **presentation over the existing drive**, not new engine: it runs ``reproduce()`` (or projects an
 already-computed :class:`reproduction_drive.DriveResult`) into a structured **gap report** — per panel
 the honest status + the *reason* it didn't grade, plus a rollup and an ``auto_grade_rate``. The point
@@ -23,7 +23,7 @@ from extract.ingest import ingest_paper
 from reproduction_drive import DRIVEN, DriveResult, drive_bundle
 
 # A short, owner-readable "what would close this" per honest-gap status — the diagnostic's whole point
-# is to route each gap to the slice that fixes it (``docs/reproduction-dogfood/spec.md``).
+# is to route each gap to the slice that fixes it (``docs/records/reproduction-dogfood/spec.md``).
 _FIX_HINT = {
     "no_golden": "extractor miss, or genuinely no printed number — widen golden extraction (Slice 1)",
     "data_unmatched": "in scope w/ a golden but no file matched — point it at its supplement (Slice 2)",
@@ -184,7 +184,7 @@ def to_markdown(report: DiagnosticReport) -> str:
     if run_gaps:
         head += ("## Skill gaps (this run)\n\n"
                  "_Buildable capability gaps this paper surfaced — accumulated + ranked across papers "
-                 "in `docs/skill-gaps.md` (Slice 3)._\n\n")
+                 "in `docs/records/skill-gaps.md` (Slice 3)._\n\n")
         gcols = ["gap", "kind", "what would close it"]
         head += "| " + " | ".join(gcols) + " |\n|" + "|".join(["---"] * len(gcols)) + "|\n"
         for g in run_gaps.values():

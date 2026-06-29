@@ -40,7 +40,7 @@ An optional ``harmony2=True`` mode (default off — the shipped/validated path i
 method) folds in the two clean-room **Harmony2** (Patikas et al., bioRxiv 2026) quality
 improvements — a stabilized scale-invariant diversity penalty and dynamic per-batch ridge
 (``lambda_hat = alpha * E``) — both aimed at avoiding over-integration in large,
-heterogeneous data. See ``melody`` / ``docs/harmony2-scope/scope.md``.
+heterogeneous data. See ``melody`` / ``docs/records/harmony2-scope/scope.md``.
 
 Determinism: with a fixed ``random_state`` the KMeans initialisation and the block update
 order are both seeded, so ``melody`` is bit-stable across runs. Pure
@@ -101,7 +101,7 @@ def melody(
         ``lambda_hat_kb = alpha * E_kb`` (``alpha`` default 0.2) instead of the fixed
         ``lamb``, shrinking outlier-batch corrections toward 0.
     Both are folded in from the published preprint (not the GPL source); see
-    ``docs/harmony2-scope/scope.md``.
+    ``docs/records/harmony2-scope/scope.md``.
     """
     Z = np.asarray(Z, dtype=np.float64)
     if Z.ndim != 2:

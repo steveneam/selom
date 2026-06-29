@@ -21,7 +21,7 @@ import {
 import type { SkillParams } from "@/lib/skills/api";
 
 /**
- * Marks editor (docs/erg-manual-marks/spec.md R5) — the numeric half of the operator override, in
+ * Marks editor (docs/records/erg-manual-marks/spec.md R5) — the numeric half of the operator override, in
  * the Figure-data stage where re-runs live. It reads the skill-seeded landmark times
  * (`meta.selom.marks`), lets the scientist set/confirm each a/b (or N1/P1) TIME per cell, and writes
  * the `manual_marks` param; the metric re-measures the amplitude at that time on re-run. The canvas

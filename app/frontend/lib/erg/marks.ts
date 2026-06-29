@@ -1,5 +1,5 @@
 /**
- * ERG manual landmark marks (docs/erg-manual-marks/spec.md) — the shared front-end logic for
+ * ERG manual landmark marks (docs/records/erg-manual-marks/spec.md) — the shared front-end logic for
  * editing a/b (flash) and N1/P1 (flicker) landmark TIMES, used by both surfaces: the numeric Marks
  * panel (Figure-data) and the draggable dots on the canvas. Pure + framework-free so it unit-tests
  * in node-env vitest; the React pieces consume it.

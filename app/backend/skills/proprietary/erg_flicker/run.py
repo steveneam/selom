@@ -1,5 +1,5 @@
 """ERG flicker — the steady-state periodic-response figure the flash trace grid can't make.
-Proprietary ERG module (docs/diagnosys-erg/spec.md, R-flicker).
+Proprietary ERG module (docs/records/diagnosys-erg/spec.md, R-flicker).
 
 Two editable views of one skill (D3 in the spec — flicker's graph + metric differ enough from a
 flash trace to be its own skill):

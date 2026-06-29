@@ -5,7 +5,7 @@ feasibility map (the Dorgau-style table, produced by hand today): each figure ro
 Selom skill or an out-of-scope modality (+reason). No model on the critical path — an
 inverted keyword index over a registry-derived + curated-synonym vocabulary, section-weighted
 (methods > legends > results > body; references excluded). AI verifies + mines synonyms; it
-never replaces the deterministic layer. See docs/skill-keyword-index/spec.md.
+never replaces the deterministic layer. See docs/records/skill-keyword-index/spec.md.
 """
 
 from .engine import build_auto_ledger, route_to_panels

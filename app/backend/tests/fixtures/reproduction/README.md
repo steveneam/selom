@@ -4,7 +4,7 @@ Frozen cold-`reproduce()` snapshots of blessed dogfood papers. Each `<paper>.jso
 `reproduction_fixtures.DriveSnapshot` — the **honest classification shape** a never-seen paper
 auto-produces (per-panel status + skill + any driven metric values, plus `selom_defects` which must
 stay `0`). They are the regression anchor that stops engine growth from silently undoing a paper's
-win. See `docs/reproduction-dogfood/spec.md` (Slice 4, D5).
+win. See `docs/records/reproduction-dogfood/spec.md` (Slice 4, D5).
 
 These complement, not replace, the four hand ledgers
 (`tests/test_reproduction_{rpgrip1,jev,hani,dorgau}.py`): the hand ledger locks the *hand-authored

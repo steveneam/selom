@@ -1,6 +1,6 @@
 """Auto-drive regression fixtures (reproduction_fixtures.py) — Slice 4.
 
-Three tiers, matching ``docs/reproduction-dogfood/spec.md`` D5:
+Three tiers, matching ``docs/records/reproduction-dogfood/spec.md`` D5:
 
 * **framework unit tests** (CI, no data) — prove ``snapshot`` / ``diff`` / ``assert_reproduces`` and
   the s46 tolerance reuse: an identical re-drive reproduces, a status flip is caught, a driven

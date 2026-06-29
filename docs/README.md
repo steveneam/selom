@@ -19,17 +19,17 @@ the docs convention in `docs/repo-structure/plan.md` §1.3).
 | `ai-chat-context/spec.md` · `ai-skills-safe-slice/spec.md` | spec | Ask-Selom + AI-skills slice |
 | `real-datasets.md` · `proprietary-skills.md` · `build-charter.md` | spec | Living references |
 
-## Records (completed — archive candidates)
+## Records (completed — under `docs/records/`)
 
 | Path | What |
 |---|---|
-| `reproduction-dogfood/` | Dogfood phase (CLOSED s55) |
-| `rpgrip1-figrepro.md` · `dorgau-figrepro/` · `erg-module/findings-2026-06-23.md` | Figure-repro records |
-| `lit-synthesizer-scope.md` · `skill-keyword-index/` · `table-synthesis/spec.md` | Shipped-feature scopes |
-| `selom-integrate/` · `harmony-reimplementation-scope.md` · `harmony2-scope/` | Melody (shipped) — consolidation candidate |
-| `osca-sc-workflow-study.md` · `external-tools-study.md` · `external-integrations.md` · `skill-audit/` · `competitors/` | Studies & audits (OmicVerse/sklearn/R-oracle porting research) |
-| `erg-manual-marks/` · `diagnosys-erg/` · `erg-module/spec.md` · `gene-set-builder-design.md` | Feature specs (shipped) |
-| `stack-and-graphing-notes.md` · `skill-gaps.md` · `hani-skill-gap-roadmap.md` · `p1-skills-scope.md` | Notes / scoping |
+| `records/reproduction-dogfood/` | Dogfood phase (CLOSED s55) |
+| `records/rpgrip1-figrepro.md` · `records/dorgau-figrepro/` · `records/erg-module/findings-2026-06-23.md` | Figure-repro records |
+| `records/lit-synthesizer-scope.md` · `records/skill-keyword-index/` · `records/table-synthesis/spec.md` | Shipped-feature scopes |
+| `records/selom-integrate/` · `records/harmony-reimplementation-scope.md` · `records/harmony2-scope/` | Melody (shipped) — consolidation candidate |
+| `records/osca-sc-workflow-study.md` · `records/external-tools-study.md` · `records/external-integrations.md` · `records/skill-audit/` · `records/competitors/` | Studies & audits (OmicVerse/sklearn/R-oracle porting research) |
+| `records/erg-manual-marks/` · `records/diagnosys-erg/` · `records/erg-module/spec.md` · `records/gene-set-builder-design.md` | Feature specs (shipped) |
+| `records/stack-and-graphing-notes.md` · `records/skill-gaps.md` · `records/hani-skill-gap-roadmap.md` · `records/p1-skills-scope.md` | Notes / scoping |
 
 ## Parked (on-hold)
 
@@ -39,14 +39,13 @@ the docs convention in `docs/repo-structure/plan.md` §1.3).
 | `command-center/design.md` | C/B platform — parked, largely superseded by `pillars/plan.md` |
 | `journal-styles/` · `extract-reproduction-bridge/` · `workspace-library/` | Parked specs |
 
-## Buckets are logical (the physical `docs/records/` move is a deferred task)
+## Buckets are physical
 
-The **record** rows above are not *yet* moved into a `docs/records/` tree — that physical
-move is **deferred to its own focused session** (it touches ~80 inbound code-comment/docstring
-path pointers across both lanes, heavily in the active ERG + skill-keyword-index clusters; see
-`repo-structure/plan.md` §2C). Until then, this index *is* the bucketing (spec / record /
-parked) — keep it current.
+The **record** rows above now live under `docs/records/` (physical move done 2026-06-29 —
+~78 inbound code-comment/docstring path pointers rewritten across both lanes). New completed
+work goes under `docs/records/`; live design under `docs/<feature>/`; on-hold under
+`docs/on-hold/` (or a `parked` row here). Keep this index current — it is the map.
 
-`external-integrations.md` (OmicVerse / scikit-learn / R-oracle porting research) is the old
-"External Integrations" doc, renamed 2026-06-29 to stop colliding with
+`records/external-integrations.md` (OmicVerse / scikit-learn / R-oracle porting research) is
+the old "External Integrations" doc, renamed 2026-06-29 to stop colliding with
 `aws-materialization/integrations.md` (the GitHub↔AWS↔Vercel backbone).

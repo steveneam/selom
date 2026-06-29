@@ -1,7 +1,7 @@
 """Auto-drive regression fixtures (Slice 4) — freeze a cold drive's HONEST classification shape so
 engine growth can never silently regress a real paper's win.
 
-Phase: *Reproduction — dogfood-ready*, **Slice 4** (``docs/reproduction-dogfood/spec.md``, D5). The
+Phase: *Reproduction — dogfood-ready*, **Slice 4** (``docs/records/reproduction-dogfood/spec.md``, D5). The
 4 hand ledgers (``test_reproduction_{rpgrip1,jev,hani,dorgau}.py``) lock the *hand-authored* target
 spec; this locks the **cold ``reproduce()``** — what a never-seen paper auto-produces with no hand
 ledger. The two are complementary: the hand ledger says "this is what the paper should grade to";

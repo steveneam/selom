@@ -11,7 +11,7 @@
 > validated s29) implements. Which of its improvements are worth folding into Melody to keep our
 > integration engine novel and future-proof — and which are scale engineering we should ignore?
 > Same discipline as the Melody build: **clean-room from the PAPER, validate by metric.**
-> Companion docs: `docs/selom-integrate/spec.md` (the Melody spec), `docs/harmony-reimplementation-scope.md`
+> Companion docs: `docs/records/selom-integrate/spec.md` (the Melody spec), `docs/records/harmony-reimplementation-scope.md`
 > (the s28 scope), memory `selom-harmony-reimplementation`.
 
 ---

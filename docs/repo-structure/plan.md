@@ -1,7 +1,8 @@
 # Repo structure — conventions, cleanup, and refactor plan
 
-**Status:** APPROVED for foundation work (conventions + specs + stale-doc fixes); file
-moves staged, gated on owner go. · **Stamped:** 2026-06-29 (+10:00).
+**Status:** APPROVED + executed for foundation work (conventions + specs + stale-doc fixes;
+`main.py`→`routers/`; FE lib/ feature-dirs; `docs/records/` physical move done 2026-06-29). ·
+**Stamped:** 2026-06-29 (+10:00).
 
 This is the single foundation doc for keeping Selom's file/folder structure clean,
 consistent, and fast as the product keeps growing — before the AWS deploy (step 8) adds
@@ -20,7 +21,7 @@ rejected as a poor fit — rationale in §4.
 | Bucket | Items | When |
 |---|---|---|
 | **Conventions (durable rules)** | FE/BE/docs rules + automated guard | now (§1) |
-| **NOW — execution-ready** | `main.py` → `routers/`; FE lib/ feature-dir finish + lazy fixture + dead-file delete; stale-doc fixes; cruft cleanup | now / gated moves (§2) |
+| **NOW — execution-ready** | `main.py` → `routers/`; FE lib/ feature-dir finish + lazy fixture + dead-file delete; stale-doc fixes; `docs/records/` physical move; cruft cleanup | done (§2) |
 | **DEFERRED — specced, build later** | BE `reproduction/` package; BE `companions/` package; FE `project-workspace.tsx` hook decomposition | when that area is the active build (§3) |
 | **SKIP** | `src/` move; 150-line hard cap; barrel `index.ts` files | never (§4) |
 | **Step-8 linked** | wire `obs.py` (CloudWatch JSON logging) | with step 8 |
@@ -161,23 +162,22 @@ Stale top-level docs actively mislead every new session — highest ROI for agen
 - **plans/README.md + v2-*.md** — superseded banners. *(done)*
 - **docs/README.md** — new index for the 72-file tree. *(done)*
 - **`integrations.md` name collision** — renamed the old "External Integrations" doc to
-  `docs/external-integrations.md` (resolves the clash with `aws-materialization/integrations.md`);
-  ~8 cross-refs updated (ROADMAP, plans/v2-backend, build-charter, competitors/omicsbox,
-  aws-materialization/integrations, pyproject comment). *(done 2026-06-29)*
+  `external-integrations.md` (resolves the clash with `aws-materialization/integrations.md`),
+  now at `docs/records/external-integrations.md`; ~8 cross-refs updated (ROADMAP, plans/v2-backend,
+  build-charter, competitors/omicsbox, aws-materialization/integrations, pyproject comment). *(done 2026-06-29)*
 - **`AGENTS.md` ≈ `.context/READ-ME-FIRST.md`** — de-duplicated: `AGENTS.md` is the single
   canonical entry; `.context/READ-ME-FIRST.md` is now a thin pointer to it (no inbound refs). *(done 2026-06-29)*
-- **Bucket completed records under `docs/records/` — DEFERRED to its own session (owner
-  2026-06-29: do the full move, just not this session).** Measured blast radius: the record
-  docs are referenced by **~80 code files across BOTH lanes** (docstring/comment path
-  pointers), heavily in the *active* ERG cluster (`erg-module/`, `erg-manual-marks/`,
-  `diagnosys-erg/`) and the flagship `skill-keyword-index/` (extract/routing) — so it is **not**
-  the cheap finisher it was first scoped as. It is a real contract-frozen refactor: `git mv`
-  each record doc → `docs/records/<…>/`, then update every inbound path pointer (code comments
-  + docstrings + sibling docs) — script the bulk find-replace, verify by `tsc`/`ruff`/fast-gate
-  + a grep for stale `docs/<moved>` paths. Do it as **one focused task** (ideally when one of
-  those clusters' code is the active build area, so the churn lands where someone's already
-  working). **Interim:** the README's spec/record/parked buckets are the *logical* bucketing —
-  they give agents the live-vs-done signal until the physical tree lands.
+- **Bucket completed records under `docs/records/` — DONE 2026-06-29 (full move, owner-approved).**
+  `git mv`'d all 22 record docs (11 dirs + 11 top-level `.md`) into `docs/records/`, then rewrote
+  every inbound path pointer: **78 files / 169 replacements** across both lanes (code
+  docstrings/comments/output-text + sibling docs + `plans/`, `ROADMAP`, `pyproject`, handoff
+  archive). All refs were absolute `docs/<x>` form → a guarded scripted find-replace handled them
+  (exact-per-token, collision-safe vs the non-moved near-neighbours `reproduction-engine/`,
+  `skill-references/`); one relative code-span (`reproduction-engine/figure-repro-sop.md` →
+  `../records/rpgrip1-figrepro.md`) fixed by hand. Verified: a grep for stale `docs/<moved>` paths
+  is clean, BE fast gate + ruff green, FE tsc + eslint + vitest green. No code reads/writes a moved
+  doc by hardcoded path (the `skill_gaps.py` updater takes its path as a param), so this was a pure
+  pointer refactor. The README index points at `records/…` and is the live spec/record/parked map.
 
 Cleanup: the empty gitignored root `node_modules/` is already gone — nothing to delete.
 

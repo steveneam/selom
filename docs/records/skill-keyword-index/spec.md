@@ -15,7 +15,7 @@ A layer that reads an ingested paper and **routes its content to Selom skills / 
 figure's modality out-of-scope — **without an LLM on the critical path**. Given the PDF text it
 produces, per figure, a ranked list of `RoutingCandidate`s (`skill_id` or `out-of-scope:reason` +
 score + the evidence terms) and rolls them up into a paper-level **feasibility map** identical in
-shape to the one written by hand in `docs/dorgau-figrepro/scope.md`.
+shape to the one written by hand in `docs/records/dorgau-figrepro/scope.md`.
 
 Three target kinds:
 
@@ -31,7 +31,7 @@ Three target kinds:
 An optional LLM pass only (a) adjudicates *ambiguous* routings and negations and (b) **mines missed
 synonyms that are then ADDED to the vocabulary** — so the AI *improves* the deterministic layer
 rather than replacing it. LLM/RAG over the full paper and OCR/vision over scanned PDFs are the
-**paid tier** (open-core, like `docs/gene-set-builder-design.md`).
+**paid tier** (open-core, like `docs/records/gene-set-builder-design.md`).
 
 ## Why it matters
 
@@ -198,7 +198,7 @@ The killer test already exists: **backtest the index against the four hand-built
 
 1. **Routing accuracy** — for each of RPGRIP1 / JEV / Hani / Dorgau, the index's per-figure
    `top` target must reproduce the hand-written feasibility map (skill id or out-of-scope reason).
-   Metric = precision/recall vs the hand map; Dorgau's table (in `docs/dorgau-figrepro/scope.md`) is
+   Metric = precision/recall vs the hand map; Dorgau's table (in `docs/records/dorgau-figrepro/scope.md`) is
    the literal golden. Target: ≥ the hand mapping on the in-scope figures, with every spatial/scATAC/
    IPA/wet-lab figure correctly flagged out-of-scope.
 2. **Refs-exclusion guard** — a tool named *only* in References does NOT route (synthetic + real:
@@ -285,5 +285,5 @@ pytest **BE 509** (495 + 14); ruff clean.
 the 4-layer core) and the engine wiring are now done. The router's L3 inventory + per-figure routes
 feed the reproduction engine via `extract/routing/engine.route_to_panels` / `build_auto_ledger` +
 `extract/golden.to_engine_panels(feasibility=)` — a dropped paper auto-produces the figure→skill
-ledger skeleton the four ledgers hand-encode. See `docs/skill-keyword-index/engine-wiring-scope.md`.
+ledger skeleton the four ledgers hand-encode. See `docs/records/skill-keyword-index/engine-wiring-scope.md`.
 Remaining: (3) the L4 AI-verify + synonym-mining seam; (4) the FE feasibility surface.

@@ -4,7 +4,7 @@ with every eye overlaid as a point.
 Two input shapes are accepted, so the bar is a true fan-out sibling of the trace grid:
 
 * ``erg_metrics_long`` — the device's own markers (``a_wave_uv``/``b_wave_uv`` per eye × step).
-  Preferred when present (the device is authoritative — docs/diagnosys-erg/spec.md D2).
+  Preferred when present (the device is authoritative — docs/records/diagnosys-erg/spec.md D2).
 * ``erg_waveforms_long`` — the raw waveforms the trace grid draws (``time_ms``/``voltage_uv``).
   When no marker column is present the a/b peak is **measured from the traces** per
   (sample × condition × intensity × eye) with ``_erg.landmarks`` — the same metric the grid
@@ -46,7 +46,7 @@ def run(data_path: str, params: dict) -> dict:
     # Fan-out path: handed the waveform table (no marker column) → measure the a/b peak from the
     # traces, the owner's "max b-wave peak from the traces at a chosen intensity". Device markers
     # win when present (above) per D2; this is the measure-from-traces fallback + the own-recording path.
-    # Operator-set landmark marks (docs/erg-manual-marks/spec.md) — applied only on the
+    # Operator-set landmark marks (docs/records/erg-manual-marks/spec.md) — applied only on the
     # measure-from-traces path (device markers stay authoritative when a metrics table is supplied).
     manual_marks = _erg.parse_manual_marks(params.get("manual_marks", ""))
     measured_from_traces = False

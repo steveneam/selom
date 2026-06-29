@@ -21,7 +21,7 @@ def compose_methods_endpoint(req: ComposeMethodsRequest):
     # lit-synthesizer Phase A: stitch an ordered sequence of skill runs into ONE publication
     # Methods section + deduped citations (deterministic, offline, no LLM). Promotes the
     # per-figure methods engine (used at /skills/{id}/run) to the project/story level without
-    # touching that response shape. See docs/lit-synthesizer-scope.md.
+    # touching that response shape. See docs/records/lit-synthesizer-scope.md.
     if not req.runs:
         raise HTTPException(status_code=400, detail="runs is required")
     try:
@@ -36,7 +36,7 @@ def citations_search(q: str = "", source: str = "both", max_results: int = 20, m
     # lit-synthesizer Phase B/C: topical PubMed lookup (NCBI E-utilities, cached, self-throttled).
     # Advisory tier-3 (off by default in the synthesizer); degrades to [] + degraded=True on any
     # network/parse failure — a lookup must never break the caller. bioRxiv has no free-text search
-    # API (Phase C), so source=biorxiv returns []. See docs/lit-synthesizer-scope.md.
+    # API (Phase C), so source=biorxiv returns []. See docs/records/lit-synthesizer-scope.md.
     if source not in _CITATION_SOURCES:
         raise HTTPException(status_code=400, detail=f"source must be one of {_CITATION_SOURCES}")
     if not q.strip():

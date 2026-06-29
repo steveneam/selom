@@ -7,7 +7,7 @@
 > Parent: `docs/pillars/plan.md` (this phase = **P5 b/c/d + P2 2d + P3 3c**; that doc stays the
 > roadmap-of-record, this is the focused execution plan for one phase).
 > Companions: `docs/reproduction-engine/live-reproduction-spec.md` (the floor this builds on),
-> `docs/table-synthesis/spec.md` (L3), [[selom-figure-repro-mission]], [[selom-repro-edge-cases]],
+> `docs/records/table-synthesis/spec.md` (L3), [[selom-figure-repro-mission]], [[selom-repro-edge-cases]],
 > [[layered-deterministic-extraction]], [[compound-capability-each-task]], [[step-back-build-helpers-when-stuck]].
 
 ## What
@@ -192,7 +192,7 @@ and it drives the matcher.
 
 ### Slice 3 — Skill-gap signal (P3 3c)
 
-> **SHIPPED s54.** `app/backend/skill_gaps.py` + the committed `docs/skill-gaps.md`. The updater
+> **SHIPPED s54.** `app/backend/skill_gaps.py` + the committed `docs/records/skill-gaps.md`. The updater
 > (`update_skill_gaps_doc`) accumulates each cold-drive's *buildable* gaps — `needs_recipe`
 > (read-back), `no_skill` (routing), and `out_of_scope`+`modality_unsupported` (modality) — into a
 > ranked doc, **idempotently** (paper ids + examples de-dup; `papers_seen` accumulates). Two regions:
@@ -209,9 +209,9 @@ and it drives the matcher.
 - **Goal:** turn every `out_of_scope` / `needs_recipe` into a durable, prioritized "Selom can't
   do X yet" backlog, so dogfooding becomes a feedback engine, not just a score.
 - **Build:** the diagnostic appends gaps (paper · panel · skill/analysis · reason · frequency) to
-  a committed `docs/skill-gaps.md` (the durable home — the Ratchet; not chat memory). Per-run the
+  a committed `docs/records/skill-gaps.md` (the durable home — the Ratchet; not chat memory). Per-run the
   report shows the run's own gaps; the doc accumulates across papers and ranks by frequency.
-- **Acceptance:** after dogfooding ≥2 papers, `docs/skill-gaps.md` lists the missing
+- **Acceptance:** after dogfooding ≥2 papers, `docs/records/skill-gaps.md` lists the missing
   analyses ranked by how many papers hit them, with a one-line "what skill would close this."
 - **DoD:** the doc exists and is updated by the diagnostic (idempotent — re-running a paper
   doesn't double-count).
@@ -338,7 +338,7 @@ honestly. *Why:* matches the floor's honest ceiling — recall is a curve, not a
 unchanged), **ask only on `data_unmatched`** via the per-panel picker. Never block the report or
 silently guess. *Why:* keeps the common case zero-click and the gap recoverable. *Reversible:* yes.
 
-**D4 — Skill-gap signal home.** *Recommend:* a committed **`docs/skill-gaps.md`** (durable,
+**D4 — Skill-gap signal home.** *Recommend:* a committed **`docs/records/skill-gaps.md`** (durable,
 ranked, the Ratchet) + the per-run report for the immediate run. *Not* chat memory (too churny /
 unbounded). *Why:* the backlog must outlive the session and rank across papers. *Reversible:* yes.
 
@@ -389,7 +389,7 @@ this does not block the diagnostic.
 - Slice 1: a unit test per new reader over its real output shape; the 4 ledgers as the regression
   guard.
 - Slice 2: a `data_map` round-trip BE test + FE browser-verify.
-- Slice 3: an idempotency test on the `docs/skill-gaps.md` updater.
+- Slice 3: an idempotency test on the `docs/records/skill-gaps.md` updater.
 - Slice 4: the new auto-drive fixtures themselves, + a "break a reader → fixture goes red" check.
 
 ## Remaining phases (roadmap, re-cast as agile tasks)

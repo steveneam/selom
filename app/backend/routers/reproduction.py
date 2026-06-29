@@ -141,7 +141,7 @@ class RouteRequest(BaseModel):
 
 @router.post("/papers/route")
 def route_paper(req: RouteRequest):
-    # Skill Keyword Index (docs/skill-keyword-index/spec.md): route a dropped paper's text to a
+    # Skill Keyword Index (docs/records/skill-keyword-index/spec.md): route a dropped paper's text to a
     # per-figure feasibility map — each figure → a Selom skill or an out-of-scope modality (+reason)
     # — deterministically, no LLM on the path. Internal dogfood surface (engine D12 posture).
     return routing.route_text(req.text, paper_id=req.paper_id).model_dump()
