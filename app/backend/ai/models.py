@@ -21,6 +21,11 @@ ACTION_TYPES = (
     "remove_filter",
     "restyle_figure",
     "relabel",
+    # S3 — ingest-stage helpers (P1 surface)
+    "set_profile",
+    "set_design",
+    "map_columns",
+    "apply_cleaning_step",
 )
 ActionType = Literal[
     "set_param",
@@ -28,6 +33,11 @@ ActionType = Literal[
     "remove_filter",
     "restyle_figure",
     "relabel",
+    # S3 — ingest-stage helpers (P1 surface)
+    "set_profile",
+    "set_design",
+    "map_columns",
+    "apply_cleaning_step",
 ]
 
 
@@ -64,6 +74,9 @@ class ActionContext(BaseModel):
     ``stage`` locates the action in the engine spine; ``skill_id`` scopes param
     validation; ``figure_spec`` is read-only to the AI (it proposes a patch, never
     a replacement).  ``data_fit`` and ``capability_surface`` gate certain actions.
+    ``data_columns`` carries the bundle's column names for ingest-stage column checks
+    (set_design); left ``None`` when the caller cannot provide them, which skips the
+    check rather than blocking the action.
     """
 
     stage: Literal["ingest", "join", "route", "analyze", "grade", "output"] = "analyze"
@@ -72,6 +85,7 @@ class ActionContext(BaseModel):
     figure_spec: dict | None = None
     capability_surface: dict | None = None
     data_fit: dict | None = None
+    data_columns: list[str] | None = None
 
 
 class CapabilityGap(BaseModel):

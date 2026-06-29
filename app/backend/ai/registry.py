@@ -316,6 +316,151 @@ def _apply_cosmetic(action, ctx) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# S3 — ingest-stage handlers (set_profile / set_design / map_columns / apply_cleaning_step).
+#
+# Engine-surface investigation findings (2026-06-29):
+#   set_profile      — HOOK EXISTS: profile_data(bundle, override=<code>) in engine/cleaning.py.
+#                      Effect delta carries _profile_override for the run path (S5 wires it).
+#   set_design       — PARTIAL HOOK: Design model + _design_path reserved-key exist.
+#                      Effect delta stages design fields as params; S5 wires to run path.
+#   map_columns      — CAPABILITY GAP (missing_column_op): _LOGFC/_PVAL in databundle.py are
+#                      auto-detection synonym sets only — no user column-override hook exists.
+#   apply_cleaning_step — CAPABILITY GAP (validation_blocked): plan_cleaning proposes steps
+#                      but has no step-enable/skip parameter; CleaningStep has no enabled field.
+# ---------------------------------------------------------------------------
+
+def _validate_set_profile(action, ctx) -> "ValidationOutcome":
+    """Resolve an ambiguous DataProfile to a specific modality code.
+
+    Reuses the engine's Kind constants (engine.models.ALL_KINDS) and the ERG profile
+    code (engine.cleaning.ERG) — no parallel taxonomy.  If the caller populates
+    ``ctx.capability_surface["candidates"]``, codes from the live DataProfile are also
+    accepted (strongest validation; falls back to the full-vocab check gracefully).
+    Unknown code → gap(validation_blocked) so the owner sees which codes the AI proposes.
+    """
+    from engine.cleaning import ERG
+    from engine.models import ALL_KINDS
+    from ai.models import ValidationOutcome
+
+    if "value" not in action.payload:
+        return ValidationOutcome(ok=False, errors=["set_profile payload must contain 'value'"])
+
+    code = action.payload["value"]
+    valid_codes: set[str] = set(ALL_KINDS) | {ERG}
+
+    # If the caller passed the DataProfile's candidates via capability_surface, accept those too.
+    surface = ctx.capability_surface or {}
+    for cand in surface.get("candidates", []):
+        if isinstance(cand, dict) and "code" in cand:
+            valid_codes.add(cand["code"])
+
+    if code not in valid_codes:
+        return ValidationOutcome(
+            ok=False,
+            errors=[f"{code!r} is not a recognised data-type code; valid: {sorted(valid_codes)}"],
+            gap=_make_gap(action, ctx, "validation_blocked"),
+        )
+
+    return ValidationOutcome(ok=True)
+
+
+def _apply_set_profile(action, ctx) -> dict:
+    """Stage the profile override — same key that profile_data(override=...) already accepts."""
+    return {"params": {"_profile_override": action.payload["value"]}}
+
+
+def _validate_set_design(action, ctx) -> "ValidationOutcome":
+    """Set the experimental design (condition/batch columns) before a skill run.
+
+    Column-existence check runs only when ``ctx.data_columns`` is provided; if the
+    caller omits it the check is skipped rather than blocking (fail-soft, not false-
+    negative).  Missing 'condition' key in the payload is always an error.
+    """
+    from ai.models import ValidationOutcome
+
+    if "condition" not in action.payload:
+        return ValidationOutcome(ok=False, errors=["set_design payload must contain 'condition'"])
+
+    cols = ctx.data_columns
+    if cols is not None:
+        condition = action.payload["condition"]
+        if condition not in cols:
+            return ValidationOutcome(
+                ok=False,
+                errors=[f"condition column {condition!r} not found in data; available: {cols}"],
+                gap=_make_gap(action, ctx, "validation_blocked"),
+            )
+        batch = action.payload.get("batch")
+        if batch and batch not in cols:
+            return ValidationOutcome(
+                ok=False,
+                errors=[f"batch column {batch!r} not found in data; available: {cols}"],
+                gap=_make_gap(action, ctx, "validation_blocked"),
+            )
+
+    return ValidationOutcome(ok=True)
+
+
+def _apply_set_design(action, ctx) -> dict:
+    """Stage the design fields as params — the run path picks them up at commit time."""
+    delta: dict = {"condition": action.payload["condition"]}
+    for key in ("control", "treatment", "batch"):
+        if key in action.payload:
+            delta[key] = action.payload[key]
+    return {"params": delta}
+
+
+def _validate_map_columns(action, ctx) -> "ValidationOutcome":
+    """Column remapping is a CapabilityGap — the engine has no column-override hook.
+
+    engine/databundle.py exposes _LOGFC / _PVAL synonym sets for AUTO-detection only;
+    there is no API to say "treat column X as column Y" before analysis.  This gap
+    surfaces the backlog item (unmet=missing_column_op) so the frequency-ranked log
+    captures demand for an explicit column-mapping hook on the ingest surface.
+    """
+    from ai.models import ValidationOutcome
+
+    return ValidationOutcome(
+        ok=False,
+        errors=[
+            "column remapping is not yet supported; the engine uses synonym-detection sets "
+            "(databundle._LOGFC / _PVAL) for auto-detection only — there is no column-"
+            "override hook (engine backlog: missing_column_op)"
+        ],
+        gap=_make_gap(action, ctx, "missing_column_op"),
+    )
+
+
+def _apply_map_columns(action, ctx) -> dict:  # noqa: ARG001 — never called (validate always fails)
+    return {}
+
+
+def _validate_apply_cleaning_step(action, ctx) -> "ValidationOutcome":
+    """Step-toggling is a CapabilityGap — plan_cleaning has no step-enable/skip hook.
+
+    plan_cleaning(bundle, *, profile=None) proposes a list of CleaningStep objects
+    verbatim; it accepts no include/skip parameter and CleaningStep carries no
+    ``enabled`` field.  The intent is coherent (skip step X) but the engine cannot
+    validate or effect it (unmet=validation_blocked).
+    """
+    from ai.models import ValidationOutcome
+
+    return ValidationOutcome(
+        ok=False,
+        errors=[
+            "selective cleaning-step application is not yet supported; plan_cleaning proposes "
+            "steps but has no step-enable/skip hook and CleaningStep has no 'enabled' field "
+            "(engine backlog: validation_blocked)"
+        ],
+        gap=_make_gap(action, ctx, "validation_blocked"),
+    )
+
+
+def _apply_apply_cleaning_step(action, ctx) -> dict:  # noqa: ARG001 — never called
+    return {}
+
+
+# ---------------------------------------------------------------------------
 # The registry (the moat-as-data).
 # ---------------------------------------------------------------------------
 
@@ -354,6 +499,35 @@ ACTION_REGISTRY: dict[str, ActionDef] = {
         validate=_validate_cosmetic,
         apply=_apply_cosmetic,
         doc="Relabel a figure element (axis, trace, title) via JSON-pointer (no re-run).",
+    ),
+    # S3 — ingest-stage helpers
+    "set_profile": ActionDef(
+        type="set_profile",
+        tier="recompute",
+        validate=_validate_set_profile,
+        apply=_apply_set_profile,
+        doc="Resolve an ambiguous data-type profile to a specific modality (requires re-ingest).",
+    ),
+    "set_design": ActionDef(
+        type="set_design",
+        tier="recompute",
+        validate=_validate_set_design,
+        apply=_apply_set_design,
+        doc="Set the experimental grouping (condition/batch columns) before a skill run.",
+    ),
+    "map_columns": ActionDef(
+        type="map_columns",
+        tier="recompute",
+        validate=_validate_map_columns,
+        apply=_apply_map_columns,
+        doc="[GAP] Map ambiguous column names to expected roles — engine lacks a column-override hook.",
+    ),
+    "apply_cleaning_step": ActionDef(
+        type="apply_cleaning_step",
+        tier="recompute",
+        validate=_validate_apply_cleaning_step,
+        apply=_apply_apply_cleaning_step,
+        doc="[GAP] Toggle a cleaning-step on/off — plan_cleaning has no step-enable/skip hook.",
     ),
 }
 
