@@ -67,14 +67,31 @@ def environment_snapshot() -> dict:
     }
 
 
-def build(spec: SkillSpec, data_path: str, filename: str | None, params: dict) -> dict:
+def build(
+    spec: SkillSpec,
+    data_path: str,
+    filename: str | None,
+    params: dict,
+    *,
+    actions: list[dict] | None = None,
+) -> dict:
     """The reproducibility bundle for one figure.
 
     ``params`` may be raw (query-string) — it is merged over the skill defaults and
     coerced, so the record is the exact effective config that produced the figure.
     Reads ``data_path``; call before the temp upload is unlinked.
+
+    ``actions`` is optional.  When provided (AI-assisted runs), each entry carries
+    ``{action_id, actor, type, target, prompt, model, approved_by, approved_at}``
+    and is appended to the bundle as ``"actions"``.  When ``None`` (the default),
+    the returned dict is byte-identical to the pre-AI behaviour — existing callers
+    and tests are unaffected (additive, non-breaking).
+
+    The ``params``/``input``/``environment`` blocks are unchanged — they remain the
+    sole basis for reproduction, preserving the "AI compiles away" invariant: a
+    re-run from recorded ``params`` with no gateway reproduces the figure exactly.
     """
-    return {
+    bundle: dict = {
         "skill": {
             "id": spec.id,
             "version": spec.version,
@@ -96,3 +113,6 @@ def build(spec: SkillSpec, data_path: str, filename: str | None, params: dict) -
         },
         "environment": environment_snapshot(),
     }
+    if actions is not None:
+        bundle["actions"] = actions
+    return bundle

@@ -3,7 +3,7 @@ import pathlib
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from routers import data, extract, figures, gene_sets, jobs, library, litsynth, papers, reproduction, skills, system
+from routers import ai, data, extract, figures, gene_sets, jobs, library, litsynth, papers, reproduction, skills, system
 
 app = FastAPI(title="Selom API")
 
@@ -14,6 +14,7 @@ _REPRO_ASSETS = pathlib.Path(__file__).resolve().parent / "repro-assets"
 if _REPRO_ASSETS.is_dir():
     app.mount("/repro-assets", StaticFiles(directory=str(_REPRO_ASSETS)), name="repro-assets")
 
+app.include_router(ai.router)
 app.include_router(system.router)
 app.include_router(skills.router)
 app.include_router(gene_sets.router)
