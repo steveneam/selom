@@ -17,6 +17,7 @@ the docs convention in `docs/repo-structure/plan.md` §1.3).
 | `figure-editor-contract/spec.md` | spec | Figure-editor contract |
 | `figure-data-capabilities/` | spec | Capability-gated figure-data window |
 | `ai-chat-context/spec.md` · `ai-skills-safe-slice/spec.md` | spec | Ask-Selom + AI-skills slice |
+| `ai-helpers/spec.md` | spec | AI Helpers end-to-end — Probabilistic Shell / Action Gateway over the engine spine |
 | `real-datasets.md` · `proprietary-skills.md` · `build-charter.md` | spec | Living references |
 
 ## Records (completed — under `docs/records/`)
