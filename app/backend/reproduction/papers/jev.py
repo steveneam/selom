@@ -35,8 +35,8 @@ Library-only (D12); no HTTP. The paper PDF + supplement live outside the repo (A
 
 Dev/validation entrypoint:
 
-    python -m reproduction_jev                       # captured drive → scorecard
-    python -m reproduction_jev --live --xlsx "…/JEV2-12-12393-s001.xlsx"   # live DE recount
+    python -m reproduction.papers.jev                       # captured drive → scorecard
+    python -m reproduction.papers.jev --live --xlsx "…/JEV2-12-12393-s001.xlsx"   # live DE recount
 """
 
 from __future__ import annotations

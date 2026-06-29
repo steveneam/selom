@@ -30,8 +30,8 @@ Library-only (D12); no HTTP. The paper PDF + supplements live outside the repo (
 
 Dev/validation entrypoint::
 
-    python -m reproduction_hani                       # captured drive -> scorecard
-    python -m reproduction_hani --live --csv "…/…-mmc2.csv"   # live marker-matrix recount
+    python -m reproduction.papers.hani                       # captured drive -> scorecard
+    python -m reproduction.papers.hani --live --csv "…/…-mmc2.csv"   # live marker-matrix recount
 """
 
 from __future__ import annotations

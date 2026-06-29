@@ -34,7 +34,7 @@ async def reproduce_paper(
     # `data_map` (JSON {panel_key: filename}) is the per-panel data picker (Slice 2 R4): the FE points
     # a `data_unmatched` panel at a chosen supplement by filename; we resolve it to that file's saved
     # path so the matcher's override (which wins over the auto-heuristic) feeds the picked file.
-    import reproduction_runs
+    from reproduction import runs as reproduction_runs
 
     max_bytes = settings.max_upload_mb * 1024 * 1024
     run_dir = tempfile.mkdtemp(prefix="selom-repro-")
@@ -106,7 +106,7 @@ async def assess_paper_data(
 def get_reproduction_run(run_id: str):
     # The run's state; on `succeeded` the driven Ledger + scorecard (same shape as GET /papers/{slug})
     # so the Score stage reuses the showcase heatmap / dual-axis score / golden-vs-computed.
-    import reproduction_runs
+    from reproduction import runs as reproduction_runs
 
     rec = reproduction_runs.get_run(run_id)
     if rec is None:
@@ -118,7 +118,7 @@ def get_reproduction_run(run_id: str):
 async def reproduction_run_events(run_id: str):
     # SSE progress for the drive. Inline runs are already terminal, so this resolves in one event;
     # the arq path (deferred) would stream the per-panel transitions.
-    import reproduction_runs
+    from reproduction import runs as reproduction_runs
 
     async def stream():
         for _ in range(600):  # ~5 min ceiling at 0.5s/tick

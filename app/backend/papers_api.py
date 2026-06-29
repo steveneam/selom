@@ -13,6 +13,7 @@ hand-authored mock.
 
 from __future__ import annotations
 
+import importlib
 from functools import lru_cache
 
 import repro_assets
@@ -21,9 +22,9 @@ import reproduction as R
 # slug -> the ledger module that builds + drives it. Imported lazily (inside the cache) so app
 # startup never pays to import the three ledgers + their skills unless /papers is actually hit.
 _LEDGER_MODULES: dict[str, str] = {
-    "rpgrip1": "reproduction_rpgrip1",
-    "jev": "reproduction_jev",
-    "hani": "reproduction_hani",
+    "rpgrip1": "reproduction.papers.rpgrip1",
+    "jev": "reproduction.papers.jev",
+    "hani": "reproduction.papers.hani",
 }
 
 # Spectrum order for the index — ascending reproducibility so the row reads red -> green
@@ -37,7 +38,7 @@ def driven_ledger(slug: str) -> R.Ledger:
 
     Staged X3 panel thumbnails (★D bridge) are attached presentationally after driving — they
     never touch the scorecard the drive produced (digitize ≠ reproduce)."""
-    module = __import__(_LEDGER_MODULES[slug])
+    module = importlib.import_module(_LEDGER_MODULES[slug])
     return repro_assets.attach_lifts(module.drive_captured())
 
 

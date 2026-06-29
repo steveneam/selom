@@ -25,10 +25,10 @@ the blame degrades to ``delta-unmeasured`` honestly, exactly as the product prof
 Dev/validation entrypoint (not a product endpoint; the engine is library-only, D12):
 
     # captured drive (anywhere): build the ledger -> scorecard -> save ledger.json
-    python -m reproduction_rpgrip1
+    python -m reproduction.papers.rpgrip1
 
     # live Fig 5 proof on the real deposit (oracle gated; add --oracle to upgrade blame)
-    SELOM_ORACLE=r python -m reproduction_rpgrip1 --live-fig5 --oracle \
+    SELOM_ORACLE=r python -m reproduction.papers.rpgrip1 --live-fig5 --oracle \
         --fig5-dir D:/tmp-thl/fig5-real \
         --counts C:/Temp/selom-geo/GSE293982/GSE293982_dedup_countTable_geneName.tsv.gz
 """

@@ -11,7 +11,7 @@ import pytest
 
 import repro_assets
 import reproduction as R
-import reproduction_hani as HN
+from reproduction.papers import hani as HN
 
 
 def _write_manifest(root, slug, panels):

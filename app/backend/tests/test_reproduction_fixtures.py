@@ -22,8 +22,8 @@ import pytest
 
 import reproduction as R
 from extract.ingest import SUPP_CSV, IngestedPaper, IngestedSupplement, PaperBundle
-from reproduction_drive import DRIVEN, DriveResult, PanelDrive, drive_bundle
-from reproduction_fixtures import (
+from reproduction.drive import DRIVEN, DriveResult, PanelDrive, drive_bundle
+from reproduction.fixtures import (
     HONEST_STATUSES,
     assert_reproduces,
     diff,
@@ -204,7 +204,7 @@ def test_real_cold_drive_reproduces_snapshot(paper_id):
         pytest.skip(f"{paper_id}: main PDF not staged (owner machine only)")
     if not snap_path.exists():
         pytest.skip(f"{paper_id}: no committed snapshot (run scripts.regen_reproduction_fixtures)")
-    from reproduction_drive import reproduce
+    from reproduction.drive import reproduce
 
     result = reproduce(main, supplements, paper_id=paper_id)
     assert_reproduces(load_snapshot(snap_path), result)

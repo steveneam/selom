@@ -36,9 +36,9 @@ the raw matrices stage to ``D:/selom-data/dorgau`` (gitignored).
 
 Dev/validation entrypoints::
 
-    python -m reproduction_dorgau                                    # captured drive -> scorecard
-    python -m reproduction_dorgau --markers "…/Supplementary Data 2.xlsx"   # deposit re-derivation
-    python -m reproduction_dorgau --qc      "…/Supplementary Data 1.xlsx"   # cohort QC re-derivation
+    python -m reproduction.papers.dorgau                                    # captured drive -> scorecard
+    python -m reproduction.papers.dorgau --markers "…/Supplementary Data 2.xlsx"   # deposit re-derivation
+    python -m reproduction.papers.dorgau --qc      "…/Supplementary Data 1.xlsx"   # cohort QC re-derivation
 """
 
 from __future__ import annotations

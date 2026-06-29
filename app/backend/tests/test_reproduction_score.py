@@ -10,8 +10,8 @@ detecting it is a win, not a Selom failure. The two real ledgers are the rollup 
 import reproduction as R
 from reproduction import Golden, Ledger, MethodSub, OracleResult, Panel, Paper, SourceTag
 
-import reproduction_jev as jev
-import reproduction_rpgrip1 as rp1
+from reproduction.papers import jev as jev
+from reproduction.papers import rpgrip1 as rp1
 
 
 # --- tier banding (score → named tier + heatmap color) ------------------------

@@ -10,7 +10,7 @@ recount from the workbook is the dev CLI (``python -m reproduction_jev --live``)
 """
 
 import reproduction as R
-import reproduction_jev as JV
+from reproduction.papers import jev as JV
 
 
 # --- ledger construction (the structured target spec) -------------------------

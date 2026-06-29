@@ -10,8 +10,8 @@ invariant in ``test_reproduction_drive``).
 from __future__ import annotations
 
 import reproduction as R
-from reproduction_diagnose import diagnose, to_markdown
-from reproduction_drive import (
+from reproduction.diagnose import diagnose, to_markdown
+from reproduction.drive import (
     DATA_UNMATCHED,
     DRIVEN,
     NEEDS_RECIPE,

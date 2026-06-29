@@ -14,11 +14,11 @@ from fastapi.testclient import TestClient
 
 import config
 import reproduction as R
-import reproduction_runs
+from reproduction import runs as reproduction_runs
 from engine.compat import DataFit, FileFitReport
 from jobs.store import JobStatus
 from main import app
-from reproduction_drive import DriveResult, PanelDrive
+from reproduction.drive import DriveResult, PanelDrive
 
 client = TestClient(app)
 

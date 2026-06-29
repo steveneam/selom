@@ -52,8 +52,8 @@ FIXTURE_DIR = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "repr
 
 def regen(paper_id: str) -> Path | None:
     """Cold-drive one paper and write its snapshot; return the path, or ``None`` if not stageable."""
-    from reproduction_drive import reproduce
-    from reproduction_fixtures import save_snapshot, snapshot
+    from reproduction.drive import reproduce
+    from reproduction.fixtures import save_snapshot, snapshot
 
     main, supplements = FIXTURE_PAPERS[paper_id]
     if not main or not Path(main).exists():

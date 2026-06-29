@@ -4,7 +4,7 @@ The 14 SOP edge-case guards as first-class checks; the data-logic helpers are te
 directly (filter ceiling, batch purity, species prefixes, cell-type set delta).
 """
 
-import reproduction_guards as G
+from reproduction import guards as G
 from reproduction import (
     Golden,
     Inconsistency,

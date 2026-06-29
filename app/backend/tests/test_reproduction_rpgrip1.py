@@ -8,7 +8,7 @@ re-run on the real GSE293982 deposit is the dev CLI (``python -m reproduction_rp
 """
 
 import reproduction as R
-import reproduction_rpgrip1 as RP
+from reproduction.papers import rpgrip1 as RP
 
 
 # --- ledger construction (the structured target spec) -------------------------

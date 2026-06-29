@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import reproduction as R
 from extract.ingest import SUPP_CSV, IngestedPaper, IngestedSupplement, PaperBundle
-from reproduction_drive import DRIVEN, drive_bundle, drive_panel
+from reproduction.drive import DRIVEN, drive_bundle, drive_panel
 
 
 # A paper that PRINTS DE counts (180/61/119, Figure 4) the deposited data won't reproduce.

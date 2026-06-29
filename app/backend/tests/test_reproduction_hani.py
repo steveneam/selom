@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 import reproduction as R
-import reproduction_hani as HN
+from reproduction.papers import hani as HN
 
 
 # --- ledger construction (the structured target spec) -------------------------

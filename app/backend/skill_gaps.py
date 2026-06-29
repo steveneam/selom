@@ -44,7 +44,7 @@ import re
 from pydantic import BaseModel, Field
 
 from reproduction import MODALITY_UNSUPPORTED
-from reproduction_drive import NEEDS_RECIPE, NO_SKILL, OUT_OF_SCOPE
+from reproduction.drive import NEEDS_RECIPE, NO_SKILL, OUT_OF_SCOPE
 
 # --- gap kinds (the buildable axis) -------------------------------------------
 READ_BACK = "read_back"    # ran, but no layer read the metric back → widen readers / L3

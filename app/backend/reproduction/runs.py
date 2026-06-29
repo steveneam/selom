@@ -20,7 +20,7 @@ import uuid
 from pydantic import BaseModel, Field
 
 import reproduction as R
-import reproduction_drive
+from reproduction import drive as reproduction_drive
 from jobs.store import JobStatus
 
 

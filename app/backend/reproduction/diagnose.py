@@ -20,7 +20,7 @@ import reproduction as R
 from engine.compat import FileFitReport
 from extract.accessions import Accession, AccessionReport
 from extract.ingest import ingest_paper
-from reproduction_drive import DRIVEN, DriveResult, drive_bundle
+from reproduction.drive import DRIVEN, DriveResult, drive_bundle
 
 # A short, owner-readable "what would close this" per honest-gap status — the diagnostic's whole point
 # is to route each gap to the slice that fixes it (``docs/records/reproduction-dogfood/spec.md``).

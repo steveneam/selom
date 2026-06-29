@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import skill_gaps
 from reproduction import MODALITY_UNSUPPORTED, WET_LAB
-from reproduction_diagnose import DiagnosticPanel, DiagnosticReport
-from reproduction_drive import (
+from reproduction.diagnose import DiagnosticPanel, DiagnosticReport
+from reproduction.drive import (
     DATA_UNMATCHED,
     DRIVEN,
     NEEDS_RECIPE,

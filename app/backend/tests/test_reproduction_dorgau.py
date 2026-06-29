@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 import reproduction as R
-import reproduction_dorgau as DG
+from reproduction.papers import dorgau as DG
 
 
 # --- ledger construction (the structured target spec) -------------------------

@@ -407,8 +407,8 @@ def _hand_map(build_ledger):
 
 
 @pytest.mark.parametrize("text,module_name", [
-    (DORGAU, "reproduction_dorgau"), (HANI, "reproduction_hani"),
-    (JEV, "reproduction_jev"), (RPGRIP1, "reproduction_rpgrip1"),
+    (DORGAU, "reproduction.papers.dorgau"), (HANI, "reproduction.papers.hani"),
+    (JEV, "reproduction.papers.jev"), (RPGRIP1, "reproduction.papers.rpgrip1"),
 ])
 def test_auto_map_matches_hand_ledger_per_figure(text, module_name):
     import importlib

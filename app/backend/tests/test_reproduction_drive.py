@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import reproduction as R
 from extract.ingest import SUPP_CSV, IngestedPaper, IngestedSupplement, PaperBundle
-from reproduction_drive import (
+from reproduction.drive import (
     DATA_UNMATCHED,
     DRIVEN,
     NEEDS_RECIPE,
@@ -145,7 +145,7 @@ def test_two_axis_guard_grey_panels_are_zero_defects():
     drive_panel(led, p_oos, tabular=["d.csv"], data_map=None, runner=_volcano_runner, params=None)
     drive_panel(led, p_recipe, tabular=["d.csv"], data_map=None, runner=_empty_runner, params=None)
     led.scorecard = R.build_scorecard(led)
-    from reproduction_drive import _append_grey_cells
+    from reproduction.drive import _append_grey_cells
     _append_grey_cells(led, [])
     sc = led.scorecard
     assert sc.findings["selom_engine_bugs"] == 0                 # no panel is a Selom defect
