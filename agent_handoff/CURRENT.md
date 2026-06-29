@@ -21,7 +21,7 @@
 | AWS-MAT-1..5 | 2026-06-28 | (git) | S3 object-store seam · jobs→SQL · tenant schema · Clerk auth · step-6 prep |
 | older | — | (git / `archive/`) | `git log` · `agent_handoff/archive/` |
 
-## ▸ LIVE · BE-PKGS · 2026-06-29 17:10 +10:00 · local @ `61a6d42` (handoff = next commit) — **push pending (BE-PKGS 3 commits + handoff); `origin/main` still @ `dad321f` — owner pushes by default, confirm first** · Claude (FE+BE), Opus 4.8 xhigh
+## ▸ LIVE · BE-PKGS · 2026-06-29 17:18 +10:00 · **PUSHED — `origin/main` in sync through BE-PKGS (`d18afb0..0b7f4cd` + this handoff fix); verify `git rev-list --left-right --count origin/main...HEAD` → `0 0`** · Claude (FE+BE), Opus 4.8 xhigh
 
 - **Shipped — BE `reproduction/` package (§3A; `d18afb0`):** folded the 10 flat `reproduction*.py` into a package — `core`/`drive`/`runs`/`fixtures`/`guards`/`diagnose` + `papers/{rpgrip1,jev,hani,dorgau}`. **Contract-frozen:** the re-export `__init__` (`from .core import *`) froze every `import reproduction as R` / `from reproduction import X` consumer; only sibling-module refs moved to the dotted path + `papers_api` `__import__`→`importlib.import_module`. `reproduction_runs` SQL table name + the runs-module monkeypatch attr string deliberately untouched.
 - **Shipped — BE `companions/` package (§3B; `35ee84a`):** `methods`/`legends`/`provenance`/`guardrails` → `companions/` (moved verbatim, no internal edits); ~6 sites + 5 tests → `from companions import X` (no re-export shim per §3B). `export.py` stays flat.
