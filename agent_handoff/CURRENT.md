@@ -23,12 +23,12 @@
 | AWS-MAT-1..5 | 2026-06-28 | (git) | S3 object-store seam · jobs→SQL · tenant schema · Clerk auth · step-6 prep |
 | older | — | (git / `archive/`) | `git log` · `agent_handoff/archive/` |
 
-## ▸ LIVE · S5-SHIP · 2026-06-30 +10:00 · **NOT PUSHED — 4 commits ahead; `origin/main` @ `72ecb03`; verify `git rev-list --left-right --count origin/main...HEAD` → `0 4`** · Claude (FE+BE), Opus 4.8 xhigh
+## ▸ LIVE · S5-SHIP · 2026-06-30 +10:00 · **PUSHED — `origin/main` in sync (`27b4836..1df7534` pushed; verify `git rev-list --left-right --count origin/main...HEAD` → `0 0`)** · Claude (FE+BE), Opus 4.8 xhigh
 
 - **AI-Helpers S5 SHIPPED — the FE attribution layer** over the S1–S4 gateway (the initiative's last epic). 4 commits `27b4836..0e0afa5`: **`27b4836`** BE (`/ai/apply` threads the design sheet — gauntlet H1) · **`bccf749`** FE S5 (`--stage-ai` fuchsia token · `lib/ai/{types,api,proposals,format}` + the 4 endpoint wrappers · `components/ai/` [✨ marker proposed/staged/applied · AI panel Activity(Pending+History)|Gaps · proposal row · composer] · banner author-counter + control markers + Reset · `Figure.aiProposals` + `SkillProvenance.actions`) + ALL review fixes · **`0687284`** the **fe-review** tool · **`0e0afa5`** the `use-ai-helpers` hook extraction (project-workspace 1310→1256).
 - **Dual-reviewed — both caught real bugs the green suite + the impeccable audit missed:** review-gauntlet → **6** (3 HIGH: design-sheet drop · `reconcile()` clobbering `aiProposals` [[selom-fe-review-framework]] · two divergent Re-run buttons; 1 MED false-attribution; 2 LOW) all fixed + guard-tested. **fe-review** (its first dogfood) → re-found 2 of those + the ✨-marker-occlusion (HIGH) + the toolbar-overlap (G2-blocking, **measured-fixed at 1280px**).
 - **Operating layer grew to 3 tools:** `fe-review` (V·R·D·A·R·N — Visible·Reversible·Discoverable·Attributable·Recorded·Non-breaking + G1 user-task + G2 rendered-in-context) is now the FE-interaction peer of `review-gauntlet` (correctness) + `retro` (reflect); FE diffs run it ALONGSIDE the gauntlet. Spec `docs/fe-review/spec.md`; memory [[selom-fe-review-framework]].
-- **Gates:** tsc + eslint clean (5 pre-existing warnings) · vitest **385** (+27) · BE AI tests 96 + the new design-thread test. **NOT pushed — owner pushes the 4 commits.** Retro DONE → ranked NEXT below + `docs/ai-helpers/s5-followups.md` (deferred backlog).
+- **Gates:** tsc + eslint clean (5 pre-existing warnings) · vitest **385** (+27) · BE AI tests 96 + the new design-thread test. **Pushed to `origin/main`** (this re-stamp is the only commit after the push, kept in sync). Retro DONE → ranked NEXT below + `docs/ai-helpers/s5-followups.md` (deferred backlog).
 
 ## ▸ NEXT — **build-the-gaps** (retro-ranked 2026-06-30)
 
