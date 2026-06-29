@@ -11,6 +11,7 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
+| **FE-HOOKS** | 2026-06-29 | `c6af964..8bf5c26` | `project-workspace.tsx` → 3 hooks (view/crud/run, §3C DEFERRED→DONE, 1384→1111); +dev:mock 7c persistence handlers (un-rollback optimistic figures); `data-check-routing` e2e repointed to the figure-data stage → e2e 4/4 |
 | **RECORDS-MOVE** | 2026-06-29 | `b86f0e1` | `docs/records/` physical move — 22 record docs bucketed, 78 files / 169 inbound pointers rewritten; pushed FOUNDATION-FINISH |
 | **FOUNDATION-FINISH** | 2026-06-29 | `21c1177..6004a75` | docs name-collision rename + orientation de-dup; raise free-tier quota defaults (unblocks dogfood); scoped FE-3 / BE-pkgs / FE-hooks |
 | STRUCTURE-REFACTOR | 2026-06-29 | `b6e3b38..c70635e` | `main.py`→`routers/` + finish lib/ feature-dirs + conventions/guards/plan; Vercel git-email fix |
@@ -19,12 +20,13 @@
 | AWS-MAT-1..5 | 2026-06-28 | (git) | S3 object-store seam · jobs→SQL · tenant schema · Clerk auth · step-6 prep |
 | older | — | (git / `archive/`) | `git log` · `agent_handoff/archive/` |
 
-## ▸ LIVE · RECORDS-MOVE · 2026-06-29 15:20 +10:00 · local @ `b86f0e1` (handoff = next commit) — **push pending (RECORDS-MOVE + handoff); FOUNDATION-FINISH already pushed → origin/main `6467d99`** · Claude (FE+BE), Opus 4.8 xhigh
+## ▸ LIVE · FE-HOOKS · 2026-06-29 16:24 +10:00 · local @ `8bf5c26` (handoff = next commit) — **push pending (all of FE-HOOKS + handoff); RECORDS-MOVE + FOUNDATION-FINISH already on `origin/main`** · Claude (FE+BE), Opus 4.8 xhigh
 
-- **Shipped — `docs/records/` physical move (`b86f0e1`):** `git mv` 22 record docs (11 dirs + 11 top-level `.md`) into `docs/records/`; rewrote **78 files / 169 inbound pointers** (code docstrings/comments/output-text + sibling docs + `plans/`/`ROADMAP`/`pyproject`/handoff archive) via a guarded **exact-per-token** script (collision-safe vs the non-moved near-neighbours `reproduction-engine/`, `skill-references/`); one relative code-span (`reproduction-engine/figure-repro-sop.md` → `../records/rpgrip1-figrepro.md`) fixed by hand. README index + `repo-structure/plan.md` §2C/§0 marked **done**. Owner-picked the **full move** (incl. the active ERG / `skill-keyword-index` / `table-synthesis` specs).
-- **Why safe = pure pointer refactor:** no code reads/writes a moved doc by hardcoded path — the `skill_gaps.py` updater takes its doc path as a **param** (tests inject `tmp_path`); every reference was an absolute `docs/<x>` string in a comment/docstring/output-text.
-- **Gates:** 0 stale `docs/<moved>` paths (grep) · BE fast gate **846 pass / 1 skip** + ruff clean · FE tsc clean + eslint **0-err** (38 pre-existing warns) + vitest **353**.
-- **Also this session:** pushed the 3 FOUNDATION-FINISH commits to `origin/main` at start (owner: "push before proceeding") → `6467d99`. ⚠ quota note still stands: `server_default` only applies at INSERT → an existing `dev.db` user row keeps the OLD caps; recreate `dev.db` or `UPDATE users SET max_projects=50, max_datasets=200, max_storage_bytes=53687091200 …` before dogfood.
+- **Shipped — `project-workspace.tsx` → 3 hooks (§3C, DEFERRED→DONE; `c6af964`·`f7b54cf`·`aae8751`):** extracted the routing state (`use-workspace-view.ts` 52), open/delete handlers (`use-figure-crud.ts` 102), and the run engine (`use-figure-run.ts` 347 — `runFlow`/`rerunFigure`/`runSweep`/`rerunFigureWithParams` + `running`/`error`/`blocked`/`needData` + `resolveRunFile`/`captureCarryLabels`/`stampDataVersion`) under `components/project/hooks/`. **Contract-frozen:** control flow verbatim; each `useCallback` kept its dep set + the now-injected stable routing setters; parent **1384 → 1111** lines; `figure` store stays at root; `workrail.tsx` left whole. Verified per-slice (tsc/eslint/vitest) + e2e + browser.
+- **Side fix — dev:mock 7c persistence (`3086829`):** the e2e smoke surfaced a *pre-existing* mock-only rollback bug — the 7c optimistic write queue (FE-state→API) had **no MSW handlers**, so a run's `POST /figures` got an unhandled-route 4xx → `onPermanentFail` **deleted the figure** → `activeFigureId` dangled → Figure-data stage / VersionBar / staleness unreachable (gesture tests only passed by *racing* the rollback). New `mocks/persistence-handlers.ts` acks the 7c writes (client-authoritative ids, no remap) + returns empty reconcile GETs; mock now matches the real backend's create→persist→reconcile loop.
+- **e2e repointed (`8bf5c26`):** the `data-check-routing` specs were stale — asserted the routing surface on the figure landing view, but it moved to the figure-data stage (§3.7); **confirmed failing on pre-refactor `02deeeb`**, so not a regression. Now open "Figure data" first.
+- **Gates:** tsc clean · eslint **0-err** (16 warn, all pre-existing React-Compiler advisories) · vitest **353** · **playwright 4/4** (figure-gestures + data-check-routing). BE untouched this session.
+- **Lesson (the Ratchet):** an override/workaround almost always traces to legacy hardcode or a mock/seed gap — chase the root, don't paper over [[mock-must-mirror-backend-contract]]. The `:8000`-vs-mock + client-authoritative-id design is exactly why `dev:mock` drifted from the deployed API.
 
 ## ▸ NEXT (owner sequences — said "stop here, I'll sequence")
 
@@ -34,7 +36,7 @@
 ## ▸ DEFERRED (specced/scoped, not built)
 
 - **BE `reproduction/` + `companions/` packages** (~0.5d, plan §3A/§3B) — contract-frozen fold; a re-exporting `reproduction/__init__.py` (star-export of `core.__all__`) keeps the ~14 `import reproduction as R` consumers unchanged. ⚠ **one behavioral edit:** `papers_api.py:40` `__import__(…)` → `importlib.import_module(…)` (dotted module names). ⚠ scope the `reproduction_runs` find-replace to import lines only (it's also a DB table name). Do when reproduction is the active area.
-- **FE `project-workspace.tsx` → hooks** (~0.5–1d, plan §3C) — extract `useWorkspaceView` (first — owns the routing state the others write), then `useFigureCrud`, then `useFigureRun`, into `components/project/hooks/` (NOT `lib/`; inject view setters). `figure` store stays at root. Verify = `npx tsc --noEmit` (no `typecheck` script) + eslint + vitest + **e2e** (`figure-gestures`/`data-check-routing` are the only tests that render it) + browser smoke.
+- _(done FE-HOOKS: FE `project-workspace.tsx` → hooks §3C — see SESSIONS / plan §3C.)_
 
 ## ▸ ENV / landmines
 
@@ -42,6 +44,8 @@
 - BE tests: uv-3.12 PY + `PYTHONPATH=.venv/Lib/site-packages` (NOT `uv run` — EDR) [[selom-backend-python-exec]]; fast gate = `pytest -m "not slow"`; ruff = `$PY -m ruff check`.
 - FE dev: `npx next dev --webpack` (Turbopack panics) [[selom-turbopack-webpack-workaround]].
 - Local dogfood: `SELOM_JOB_STORE=sql SELOM_DATABASE_URL=sqlite:///dev.db SELOM_DB_AUTO_CREATE=true` + FE `API_PROXY_TARGET=http://localhost:<port>`.
+- ⚠ Quota (real-backend dogfood): `server_default` only applies at INSERT → an existing `dev.db` user row keeps the OLD caps; recreate `dev.db` or `UPDATE users SET max_projects=50, max_datasets=200, max_storage_bytes=53687091200 WHERE user_id='dev-user'` before dogfood.
+- `dev:mock` now persists 7c writes (`mocks/persistence-handlers.ts`) — a run's figure survives (no rollback); e2e via `next dev --webpack --port 3011` + `npx playwright test` (config reuses an existing :3011 server).
 - This repo's `git user.email` MUST stay `282747725+steveneam@users.noreply.github.com` or Vercel blocks deploys [[selom-git-commit-email-vercel]].
 - Snapshot localStorage before any live-store verify [[selom-fe-probe-autopersist-gotcha]].
 

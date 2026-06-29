@@ -22,7 +22,8 @@ rejected as a poor fit — rationale in §4.
 |---|---|---|
 | **Conventions (durable rules)** | FE/BE/docs rules + automated guard | now (§1) |
 | **NOW — execution-ready** | `main.py` → `routers/`; FE lib/ feature-dir finish + lazy fixture + dead-file delete; stale-doc fixes; `docs/records/` physical move; cruft cleanup | done (§2) |
-| **DEFERRED — specced, build later** | BE `reproduction/` package; BE `companions/` package; FE `project-workspace.tsx` hook decomposition | when that area is the active build (§3) |
+| **DEFERRED — specced, build later** | BE `reproduction/` package; BE `companions/` package | when that area is the active build (§3) |
+| **DONE (post-foundation)** | FE `project-workspace.tsx` hook decomposition (§3C) | 2026-06-29 |
 | **SKIP** | `src/` move; 150-line hard cap; barrel `index.ts` files | never (§4) |
 | **Step-8 linked** | wire `obs.py` (CloudWatch JSON logging) | with step 8 |
 
@@ -226,19 +227,30 @@ methods+legend+provenance+guardrails" bundle).
 Bundle this with 3A. `export.py` optionally folds into `figures/` if doing the figures
 grouping; otherwise leave flat.
 
-### 3C. Frontend `project-workspace.tsx` decomposition
-**What:** the 1384-line core editor orchestrator already delegates rendering to panel
-subcomponents; the bloat is **state + orchestration** (~20 `useState`, 12 `useEffect`,
-~20 handlers). Extract cohesive hooks:
-- `useFigureRun` — `runFlow` / `rerunFigure` / `runSweep` / `rerunFigureWithParams` +
-  `running` / `error`.
-- `useWorkspaceView` — `view` / `activeFigureId` / `activeDatasetId` / `compareIds`
-  routing.
-- `useFigureCrud` — open/delete figure & dataset.
-**Why deferred:** highest maintenance value but it's the core editor with interdependent
-state → its own focused task, leaning on existing tests + a real-browser smoke pass. Also
-shrinks `next dev --webpack` HMR recompile surface. `workrail.tsx` (828) is **fine** — a
-cohesive feature file with co-located private subcomponents; do **not** split it.
+### 3C. Frontend `project-workspace.tsx` decomposition — **DONE 2026-06-29**
+**What:** the 1384-line core editor orchestrator already delegated rendering to panel
+subcomponents; the bloat was **state + orchestration** (~20 `useState`, 12 `useEffect`,
+~20 handlers). Extracted three cohesive hooks under `components/project/hooks/` (NOT `lib/`;
+the run + CRUD hooks receive the routing setters injected from the view hook):
+- `use-workspace-view.ts` (52) — `view` / `activeFigureId` / `activeDatasetId` /
+  `compareIds` routing (extracted first — owns the state the others write).
+- `use-figure-crud.ts` (102) — open/delete figure & dataset.
+- `use-figure-run.ts` (347) — `runFlow` / `rerunFigure` / `runSweep` /
+  `rerunFigureWithParams` + `running` / `error` / `blocked` / `needData` +
+  `resolveRunFile` / `captureCarryLabels` / `stampDataVersion`.
+
+Contract-frozen: control flow moved verbatim; each `useCallback` kept its original dep set,
+extended only with the now-injected stable setters. `project-workspace.tsx` 1384 → 1111
+lines. `figure` store stays at root. `workrail.tsx` (828) left whole — a cohesive feature
+file with co-located private subcomponents; do **not** split it. Commits `c6af964` ·
+`f7b54cf` · `aae8751`. Verify: tsc clean · eslint 0 err · vitest 353 · e2e 4/4 (figure-
+gestures + data-check-routing).
+
+**Side fix this session (`3086829`/`8bf5c26`):** the e2e smoke surfaced a *pre-existing*
+dev:mock bug — the 7c optimistic write queue had no MSW handlers, so a run's figure POST
+permanently-failed and rolled back, orphaning `activeFigure`. Added
+`mocks/persistence-handlers.ts` (acks the 7c writes, client-authoritative ids) and pointed
+the stale `data-check-routing` specs at the figure-data stage where that surface now lives.
 
 ---
 
