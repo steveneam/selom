@@ -74,6 +74,41 @@ def _set_pointer(doc: dict, path: str, value) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Cosmetic-path allowlist (gauntlet finding 2026-06-29) — cosmetic actions are visual-only.
+# ---------------------------------------------------------------------------
+
+# A "cosmetic" action (restyle_figure/relabel) is applied IMMEDIATELY client-side via JSON-Patch with
+# no recompute and no provenance entry of its own. So its JSON-pointer must NEVER reach plotted data
+# (/data/<i>/<array>) or the meta.selom capability contract (/layout/meta/...): either would let an
+# AI-chosen number become the displayed figure with zero engine involvement — defeating "AI compiles
+# away" and feeding a non-engine number into the figure. To CHANGE data, the AI must use a recompute
+# action (set_param/add_filter), which is staged + recorded in provenance params.
+_COSMETIC_TRACE_KEYS = frozenset({
+    "marker", "line", "name", "opacity", "mode", "showlegend", "hoverinfo", "hovertemplate",
+    "textposition", "textfont", "textangle", "fill", "fillcolor", "colorscale", "showscale",
+    "colorbar", "orientation", "width", "color", "size", "symbol",
+})
+
+
+def _is_cosmetic_safe_path(path: str) -> bool:
+    """True iff a cosmetic JSON-pointer is purely presentational.
+
+    Allowed: ``/layout/...`` style (but NOT ``/layout/meta`` — the selom contract), and
+    ``/data/<i>/<key>/...`` where ``<key>`` is a trace PRESENTATION key. Rejected: ``/data`` or
+    ``/data/<i>`` (whole-array / whole-trace overwrite), any ``/data/<i>/<data-array>`` (x/y/z/
+    values/labels/customdata/text…), and anything outside layout/data.
+    """
+    parts = [p.replace("~1", "/").replace("~0", "~") for p in path.split("/") if p]
+    if not parts:
+        return False
+    if parts[0] == "layout":
+        return not (len(parts) >= 2 and parts[1] == "meta")
+    if parts[0] == "data":
+        return len(parts) >= 3 and parts[2] in _COSMETIC_TRACE_KEYS
+    return False
+
+
+# ---------------------------------------------------------------------------
 # Shared gap-builder (avoids repeating the import in every handler).
 # ---------------------------------------------------------------------------
 
@@ -126,6 +161,9 @@ def _validate_set_param(action, ctx) -> "ValidationOutcome":
             gap=_make_gap(action, ctx, "param_not_in_spec"),
         )
 
+    if "value" not in action.payload:
+        return ValidationOutcome(ok=False, errors=["set_param payload must contain 'value'"])
+
     errs = validate_param_ranges(spec, {action.target: action.payload.get("value")})
     if errs:
         return ValidationOutcome(
@@ -164,6 +202,9 @@ def _validate_add_filter(action, ctx) -> "ValidationOutcome":
             errors=[f"filter target {action.target!r} is not a param of {ctx.skill_id!r}"],
             gap=_make_gap(action, ctx, "unsupported_filter"),
         )
+
+    if "value" not in action.payload:
+        return ValidationOutcome(ok=False, errors=["filter payload must contain 'value'"])
 
     errs = validate_param_ranges(spec, {action.target: action.payload.get("value")})
     if errs:
@@ -230,6 +271,15 @@ def _validate_cosmetic(action, ctx) -> "ValidationOutcome":
             ok=False, errors=["payload 'path' must be a string starting with '/'"]
         )
 
+    # Visual-only boundary: a cosmetic pointer may not touch plotted data or the meta.selom contract.
+    if not _is_cosmetic_safe_path(path):
+        return ValidationOutcome(
+            ok=False,
+            errors=[f"cosmetic actions may only restyle presentation; {path!r} targets plotted data "
+                    f"or the meta.selom contract — use a recompute action (set_param/add_filter) to "
+                    f"change data"],
+        )
+
     # Check parent traversal in figure_spec when available.
     if ctx.figure_spec is not None:
         parts = [p.replace("~1", "/").replace("~0", "~") for p in path.split("/") if p]
@@ -237,6 +287,8 @@ def _validate_cosmetic(action, ctx) -> "ValidationOutcome":
         for part in parts[:-1]:
             if isinstance(node, dict) and part in node:
                 node = node[part]
+            elif isinstance(node, list) and part.isdigit() and int(part) < len(node):
+                node = node[int(part)]  # traverse a trace index (matches _set_pointer)
             else:
                 return ValidationOutcome(
                     ok=False,

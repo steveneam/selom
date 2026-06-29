@@ -120,33 +120,38 @@ def apply_plan(plan: ActionPlan, ctx: ActionContext) -> HelperTurn:
             ))
             continue
 
-        # Valid action — apply it.
-        if tier == "cosmetic":
-            # Thread the running figure_spec so each cosmetic action builds on the last.
-            apply_ctx = ctx.model_copy(update={"figure_spec": running_figure_spec})
-            effect = reg.get(action.type).apply(action, apply_ctx)
-            if "figure_spec" in effect:
-                running_figure_spec = effect["figure_spec"]
+        # Valid action — apply it. FAIL SOFT: a validated-but-unapplicable action (e.g. a threaded-
+        # spec mismatch the top-of-loop validate couldn't foresee) degrades to a rejected result —
+        # the deterministic core never crashes on an AI proposal.
+        try:
+            if tier == "cosmetic":
+                # Thread the running figure_spec so each cosmetic action builds on the last.
+                apply_ctx = ctx.model_copy(update={"figure_spec": running_figure_spec})
+                effect = reg.get(action.type).apply(action, apply_ctx)
+                if "figure_spec" in effect:
+                    running_figure_spec = effect["figure_spec"]
+                status = "applied"
+            else:
+                # Recompute — stage the param delta; don't execute yet.
+                effect = reg.get(action.type).apply(action, ctx)
+                staged_params.update(effect.get("params", {}))
+                status = "staged"
+        except (KeyError, ValueError, IndexError, TypeError) as exc:
             results.append(ActionResult(
-                action_id=action.id,
-                type=action.type,
-                target=action.target,
-                tier=tier,
-                status="applied",
-                effect=effect,
+                action_id=action.id, type=action.type, target=action.target,
+                tier=tier, status="rejected",
+                errors=[f"action could not be applied: {exc!r}"],
             ))
-        else:
-            # Recompute — stage the param delta; don't execute yet.
-            effect = reg.get(action.type).apply(action, ctx)
-            staged_params.update(effect.get("params", {}))
-            results.append(ActionResult(
-                action_id=action.id,
-                type=action.type,
-                target=action.target,
-                tier=tier,
-                status="staged",
-                effect=effect,
-            ))
+            continue
+
+        results.append(ActionResult(
+            action_id=action.id,
+            type=action.type,
+            target=action.target,
+            tier=tier,
+            status=status,  # type: ignore[arg-type]
+            effect=effect,
+        ))
 
         # Actor-tagged provenance entry for every successfully applied/staged action.
         provenance_actions.append({

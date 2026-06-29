@@ -312,3 +312,56 @@ def test_gap_log_does_not_mutate_registry():
     assert keys_before == keys_after, (
         "Gap recording mutated ACTION_REGISTRY — the gap log must be review-only."
     )
+
+
+# ---------------------------------------------------------------------------
+# Gauntlet findings (2026-06-29): cosmetic path allowlist + fail-soft apply
+# ---------------------------------------------------------------------------
+
+def test_cosmetic_path_allowlist_blocks_data_and_contract():
+    """A cosmetic action may only restyle presentation. A JSON-pointer into plotted data or the
+    meta.selom contract is REJECTED (the gauntlet-found backdoor) — it must go through recompute,
+    where the change is recorded in provenance params ("AI compiles away")."""
+    figure_spec = {
+        "data": [{"y": [1, 2, 3], "marker": {"color": "red"}}],
+        "layout": {"title": {"text": "x"}, "meta": {"selom": {"skill": "volcano"}}},
+    }
+    ctx = ActionContext(skill_id="volcano", stage="analyze", figure_spec=figure_spec)
+
+    for bad in ("/data", "/data/0", "/data/0/y", "/layout/meta/selom", "/layout/meta/selom/skill"):
+        action = Action(type="restyle_figure", target="x", payload={"path": bad, "value": [666]})
+        outcome = validate_action(action, ctx)
+        assert not outcome.ok, f"{bad!r} should be rejected as a cosmetic target (data/contract)"
+
+    for ok_path in ("/layout/title/text", "/data/0/marker/color", "/data/0/name"):
+        action = Action(type="restyle_figure", target="x", payload={"path": ok_path, "value": "z"})
+        outcome = validate_action(action, ctx)
+        assert outcome.ok, f"{ok_path!r} should be an allowed cosmetic target: {outcome.errors}"
+
+
+def test_apply_plan_fails_soft_on_apply_raise():
+    """A validated action that raises at apply time degrades to status='rejected' — apply_plan
+    never lets an uncaught exception escape (the core never crashes on a proposal)."""
+    # Action 1 turns /layout/title into a string; action 2 validates against the ORIGINAL spec
+    # (title still a dict) but raises at apply against the threaded spec.
+    figure_spec = {"layout": {"title": {"text": "x"}}}
+    ctx = ActionContext(skill_id="volcano", stage="analyze", figure_spec=figure_spec)
+    plan = ActionPlan(goal="break it", actions=[
+        Action(type="restyle_figure", target="t", payload={"path": "/layout/title", "value": "flat"}),
+        Action(type="restyle_figure", target="t", payload={"path": "/layout/title/text", "value": "y"}),
+    ])
+
+    turn = apply_plan(plan, ctx)  # must not raise
+
+    statuses = [r.status for r in turn.results]
+    assert "rejected" in statuses, f"expected a soft 'rejected' on the apply-time raise, got {statuses}"
+
+
+def test_set_param_requires_value():
+    """A set_param with no 'value' in payload is rejected at validate (closes the
+    payload.get vs payload[] asymmetry → no KeyError at apply)."""
+    ctx = ActionContext(skill_id="volcano", stage="analyze")
+    action = Action(type="set_param", target="fc_threshold", payload={})
+    outcome = validate_action(action, ctx)
+    assert not outcome.ok
+    assert outcome.errors
