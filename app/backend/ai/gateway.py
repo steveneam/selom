@@ -70,9 +70,13 @@ class ActionGateway(Protocol):
 
     ``propose`` returns an ActionPlan drawn from the closed ACTION_REGISTRY.
     ``explain`` returns grounded explanatory text (NOT a mutation — not an action).
+    ``model_id`` identifies the actor that produced the plan — stamped into provenance
+    so the audit log records which model (or operator/null stand-in) proposed the action.
     A gateway that returns an empty plan / a deterministic string (the default) leaves
     every existing behaviour unchanged (zero-regression guarantee).
     """
+
+    model_id: str
 
     def propose(self, context: ActionContext, goal: str) -> ActionPlan: ...
 
@@ -102,6 +106,8 @@ class NullActionGateway:
     so the informational endpoint degrades gracefully rather than returning nothing.
     """
 
+    model_id: str = "null"
+
     def propose(self, context: ActionContext, goal: str) -> ActionPlan:
         return ActionPlan(goal=goal, actions=[])
 
@@ -127,6 +133,8 @@ class OperatorActionGateway:
     This is the CI-safe, LLM-free implementation used in tests; it lets the entire
     propose→validate→stage/apply loop and the informational path run deterministically.
     """
+
+    model_id: str = "operator"
 
     def __init__(
         self,

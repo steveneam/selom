@@ -237,6 +237,7 @@ async def apply_approved(
         (each entry: action_id, actor, type, target, prompt, model,
         approved_by, approved_at).
     """
+    # S5: harden actor-tag against client forgery (FE posts staged delta separately; backend re-derives the tag). Backlog.
     from skills.registry import list_skill_ids
 
     if skill_id not in set(list_skill_ids()):
@@ -252,6 +253,24 @@ async def apply_approved(
     except (ValueError, TypeError):
         actions_list = []
 
+    if not actions_list:
+        raise HTTPException(
+            status_code=400,
+            detail="/ai/apply requires a non-empty ai_actions log (the approved, actor-tagged actions)",
+        )
+
+    for entry in actions_list:
+        if (
+            not isinstance(entry, dict)
+            or entry.get("actor") != "ai"
+            or not entry.get("type")
+            or "target" not in entry
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="malformed ai_actions entry: each must carry actor='ai', type, target",
+            )
+
     path = _save_upload(matrix)
     return await _execute_skill_run(
         skill_id,
@@ -260,5 +279,5 @@ async def apply_approved(
         _stringify_params(params_dict),
         override,
         None,
-        ai_actions=actions_list if actions_list else None,
+        ai_actions=actions_list,
     )

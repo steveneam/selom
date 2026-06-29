@@ -109,6 +109,11 @@ class PydanticAIGateway:
     # Public API
     # ------------------------------------------------------------------
 
+    @property
+    def model_id(self) -> str:
+        """The Anthropic model name stamped into provenance for every proposed action."""
+        return self._model
+
     def propose(self, context: ActionContext, goal: str) -> ActionPlan:
         """Translate goal + context into a validated ``ActionPlan``.
 

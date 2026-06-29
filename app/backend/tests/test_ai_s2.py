@@ -234,6 +234,8 @@ def test_retry_improves_turn_when_corrected_plan_is_valid():
 
     class _SequentialGateway:
         """Returns bad_plan first, good_plan on any subsequent call."""
+        model_id = "operator"
+
         def __init__(self):
             self._calls = 0
 
@@ -326,12 +328,11 @@ def test_apply_endpoint_unknown_skill_is_404(tmp_path, monkeypatch):
     assert response.status_code == 404
 
 
-def test_apply_endpoint_no_ai_actions_runs_clean(tmp_path, monkeypatch):
-    """POST /ai/apply with no ai_actions still runs and returns a valid bundle.
+def test_apply_endpoint_empty_ai_actions_is_400(tmp_path, monkeypatch):
+    """POST /ai/apply with an empty ai_actions list returns 400.
 
-    The ai_actions field is optional — a run with an empty list passes
-    provenance.build(actions=None) which returns the same bundle as a
-    human run (byte-identical to the pre-S2 behaviour for the human path).
+    /ai/apply IS the AI-routed endpoint; an empty actions log is an integrity
+    error — the caller must supply the actor-tagged log from the approved HelperTurn.
     """
     monkeypatch.setenv("SELOM_SKILLS_ENGINE", "stub")
     from fastapi.testclient import TestClient
@@ -351,12 +352,8 @@ def test_apply_endpoint_no_ai_actions_runs_clean(tmp_path, monkeypatch):
             files={"matrix": ("de.csv", fh, "text/csv")},
         )
 
-    assert response.status_code == 200, response.text
-    body = response.json()
-    # No ai_actions → provenance.actions key must be absent (byte-identical to human run).
-    assert "actions" not in body.get("provenance", {}), (
-        "Empty ai_actions list should not write an 'actions' key to provenance"
-    )
+    assert response.status_code == 400
+    assert "non-empty" in response.json()["detail"]
 
 
 # ---------------------------------------------------------------------------
@@ -412,3 +409,221 @@ def test_ai_compiles_away_through_apply(tmp_path, monkeypatch):
         "AI compiles away invariant FAILED via /ai/apply: re-running from "
         "provenance.params did not reproduce the figure."
     )
+
+
+# ---------------------------------------------------------------------------
+# 6. model_id threading — actor-tagged provenance audit fidelity (gauntlet F1)
+# ---------------------------------------------------------------------------
+
+def test_operator_gateway_model_id():
+    """OperatorActionGateway.model_id == 'operator'."""
+    from ai.gateway import OperatorActionGateway
+    gw = OperatorActionGateway()
+    assert gw.model_id == "operator"
+
+
+def test_null_gateway_model_id():
+    """NullActionGateway.model_id == 'null'."""
+    from ai.gateway import NullActionGateway
+    gw = NullActionGateway()
+    assert gw.model_id == "null"
+
+
+def test_pydantic_gateway_model_id():
+    """PydanticAIGateway.model_id returns the model string (no live key needed)."""
+    pytest.importorskip("pydantic_ai")
+    from ai.live.pydantic_gateway import PydanticAIGateway
+    gw = PydanticAIGateway(model="claude-opus-4-8")
+    assert gw.model_id == "claude-opus-4-8"
+
+
+def test_operator_run_stamps_operator_in_provenance():
+    """OperatorActionGateway run → provenance_actions records model=='operator'.
+
+    Proves that the model_id is threaded from the gateway through run_helper_turn
+    into apply_plan and stamped on the provenance entry.
+    """
+    from ai.execute import apply_plan
+    from ai.gateway import OperatorActionGateway
+
+    plan = ActionPlan(
+        goal="stamp test",
+        actions=[Action(type="set_param", target="fc_threshold", payload={"value": 1.5})],
+    )
+    gw = OperatorActionGateway()
+    gw.record("stamp test", plan)
+
+    ctx = ActionContext(skill_id="volcano", stage="analyze")
+    turn = run_helper_turn(ctx, "stamp test", gw)
+
+    assert turn.provenance_actions, "expected at least one provenance entry"
+    assert turn.provenance_actions[0]["model"] == "operator"
+
+
+def test_pydantic_gateway_model_id_threaded_into_apply_plan():
+    """PydanticAIGateway.model_id=='claude-opus-4-8' is stamped via apply_plan directly.
+
+    Tests apply_plan(model_id=...) without a live API key — uses apply_plan
+    directly with an ActionPlan to confirm the threading without running the gateway.
+    """
+    from ai.execute import apply_plan
+
+    plan = ActionPlan(
+        goal="live stamp test",
+        actions=[Action(type="set_param", target="fc_threshold", payload={"value": 2.0})],
+    )
+    ctx = ActionContext(skill_id="volcano", stage="analyze")
+
+    turn = apply_plan(plan, ctx, model_id="claude-opus-4-8")
+
+    assert turn.provenance_actions, "expected at least one provenance entry"
+    assert turn.provenance_actions[0]["model"] == "claude-opus-4-8"
+
+
+def test_apply_plan_default_model_id_is_operator():
+    """apply_plan with no model_id kwarg (direct callers / S1 path) still records 'operator'.
+
+    The default preserves backward compat for all existing direct callers.
+    """
+    from ai.execute import apply_plan
+
+    plan = ActionPlan(
+        goal="default model test",
+        actions=[Action(type="set_param", target="fc_threshold", payload={"value": 1.0})],
+    )
+    ctx = ActionContext(skill_id="volcano", stage="analyze")
+
+    turn = apply_plan(plan, ctx)  # no model_id kwarg
+
+    assert turn.provenance_actions[0]["model"] == "operator"
+
+
+# ---------------------------------------------------------------------------
+# 7. /ai/apply entry validation — actor-tag integrity (gauntlet F2)
+# ---------------------------------------------------------------------------
+
+def test_apply_endpoint_malformed_entry_missing_type_is_400(tmp_path, monkeypatch):
+    """POST /ai/apply with an entry missing 'type' returns 400."""
+    monkeypatch.setenv("SELOM_SKILLS_ENGINE", "stub")
+    from fastapi.testclient import TestClient
+    from main import app
+
+    tiny_csv = tmp_path / "de.csv"
+    tiny_csv.write_text("gene,logFC,padj\nA,1,0.01\n", encoding="utf-8")
+
+    bad_actions = [{"actor": "ai", "target": "fc_threshold", "action_id": "x"}]  # missing type
+
+    client = TestClient(app)
+    with open(tiny_csv, "rb") as fh:
+        response = client.post(
+            "/ai/apply",
+            data={
+                "skill_id": "volcano",
+                "goal": "test",
+                "ai_actions": json.dumps(bad_actions),
+            },
+            files={"matrix": ("de.csv", fh, "text/csv")},
+        )
+
+    assert response.status_code == 400
+    assert "malformed" in response.json()["detail"]
+
+
+def test_apply_endpoint_malformed_entry_missing_target_is_400(tmp_path, monkeypatch):
+    """POST /ai/apply with an entry missing 'target' returns 400."""
+    monkeypatch.setenv("SELOM_SKILLS_ENGINE", "stub")
+    from fastapi.testclient import TestClient
+    from main import app
+
+    tiny_csv = tmp_path / "de.csv"
+    tiny_csv.write_text("gene,logFC,padj\nA,1,0.01\n", encoding="utf-8")
+
+    bad_actions = [{"actor": "ai", "type": "set_param", "action_id": "x"}]  # missing target
+
+    client = TestClient(app)
+    with open(tiny_csv, "rb") as fh:
+        response = client.post(
+            "/ai/apply",
+            data={
+                "skill_id": "volcano",
+                "goal": "test",
+                "ai_actions": json.dumps(bad_actions),
+            },
+            files={"matrix": ("de.csv", fh, "text/csv")},
+        )
+
+    assert response.status_code == 400
+    assert "malformed" in response.json()["detail"]
+
+
+def test_apply_endpoint_malformed_entry_wrong_actor_is_400(tmp_path, monkeypatch):
+    """POST /ai/apply with actor != 'ai' returns 400 (forged/human actor tag rejected)."""
+    monkeypatch.setenv("SELOM_SKILLS_ENGINE", "stub")
+    from fastapi.testclient import TestClient
+    from main import app
+
+    tiny_csv = tmp_path / "de.csv"
+    tiny_csv.write_text("gene,logFC,padj\nA,1,0.01\n", encoding="utf-8")
+
+    bad_actions = [{"actor": "human", "type": "set_param", "target": "fc_threshold"}]
+
+    client = TestClient(app)
+    with open(tiny_csv, "rb") as fh:
+        response = client.post(
+            "/ai/apply",
+            data={
+                "skill_id": "volcano",
+                "goal": "test",
+                "ai_actions": json.dumps(bad_actions),
+            },
+            files={"matrix": ("de.csv", fh, "text/csv")},
+        )
+
+    assert response.status_code == 400
+    assert "malformed" in response.json()["detail"]
+
+
+def test_apply_endpoint_valid_tagged_entry_is_200_and_recorded(tmp_path, monkeypatch):
+    """POST /ai/apply with a valid actor-tagged entry returns 200 and records provenance.actions."""
+    monkeypatch.setenv("SELOM_SKILLS_ENGINE", "stub")
+    from fastapi.testclient import TestClient
+    from main import app
+
+    tiny_csv = tmp_path / "de.csv"
+    tiny_csv.write_text(
+        "gene,logFC,padj\nGeneA,2.5,0.001\nGeneB,-1.8,0.01\n",
+        encoding="utf-8",
+    )
+
+    valid_actions = [
+        {
+            "action_id": "z9",
+            "actor": "ai",
+            "type": "set_param",
+            "target": "fc_threshold",
+            "prompt": "bump threshold",
+            "model": "claude-opus-4-8",
+            "approved_by": "user-1",
+            "approved_at": "2026-06-29T00:00:00Z",
+        }
+    ]
+
+    client = TestClient(app)
+    with open(tiny_csv, "rb") as fh:
+        response = client.post(
+            "/ai/apply",
+            data={
+                "skill_id": "volcano",
+                "goal": "bump threshold",
+                "params": json.dumps({"fc_threshold": "1.5"}),
+                "ai_actions": json.dumps(valid_actions),
+            },
+            files={"matrix": ("de.csv", fh, "text/csv")},
+        )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert "provenance" in body
+    assert "actions" in body["provenance"]
+    assert body["provenance"]["actions"][0]["actor"] == "ai"
+    assert body["provenance"]["actions"][0]["action_id"] == "z9"

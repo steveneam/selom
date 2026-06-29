@@ -64,7 +64,7 @@ def validate_action(action: Action, ctx: ActionContext) -> ValidationOutcome:
     return reg.get(action.type).validate(action, ctx)
 
 
-def apply_plan(plan: ActionPlan, ctx: ActionContext) -> HelperTurn:
+def apply_plan(plan: ActionPlan, ctx: ActionContext, *, model_id: str = "operator") -> HelperTurn:
     """Validate and dispatch every action in ``plan``.
 
     Cosmetic actions are applied immediately and their figure_spec patches are
@@ -160,7 +160,7 @@ def apply_plan(plan: ActionPlan, ctx: ActionContext) -> HelperTurn:
             "type": action.type,
             "target": action.target,
             "prompt": plan.goal,
-            "model": "operator",
+            "model": model_id,
             "approved_by": None,
             "approved_at": None,
         })

@@ -55,8 +55,9 @@ def run_helper_turn(
         Maximum number of self-correction attempts after the initial pass.
         0 = single-pass (Slice 1 behaviour).  Bounded deterministically.
     """
+    model_id = gateway.model_id
     plan = gateway.propose(ctx, goal)
-    turn = apply_plan(plan, ctx)
+    turn = apply_plan(plan, ctx, model_id=model_id)
 
     for _ in range(max_retries):
         rejected = [r for r in turn.results if r.status == "rejected"]
@@ -69,7 +70,7 @@ def run_helper_turn(
             "propose corrected actions]"
         )
         new_plan = gateway.propose(ctx, corrected_goal)
-        new_turn = apply_plan(new_plan, ctx)
+        new_turn = apply_plan(new_plan, ctx, model_id=model_id)
 
         # Keep the better turn: prefer the one with more applied/staged results.
         def _valid_count(t: HelperTurn) -> int:
