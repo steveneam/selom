@@ -58,6 +58,7 @@ import { readStyleStamp } from "@/lib/figure/figure-spec";
 import { DataCheckError, runSkill, runtimeSkillId, type DataCheck, type SkillParams, type SkillProvenance } from "@/lib/skills/api";
 import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
 import { pushUndo } from "@/lib/workspace/undo";
+import { useWorkspaceView } from "./hooks/use-workspace-view";
 
 /** Map a command-palette intent's tab onto the workrail's view model (Pillar 1, S2.3). */
 function viewFromTab(tab: WorkspaceTab): RailView {
@@ -114,18 +115,19 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const figures = select.figures(state, projectId);
 
   const figure = useFigureStore();
-  // The workrail view (Pillar 1, S2.3) — replaces the old four tabs. The lineage rail
-  // navigates: home (pipeline) / data / skill (run) / stats (a result table) / figure.
-  const [view, setView] = React.useState<RailView>("home");
-  // The persisted figure currently in focus (Pillar 1). Drives the editor (figure view),
-  // the Statistics table (stats view), and the staleness/bundle read-out. null = nothing
-  // open / fresh run.
-  const [activeFigureId, setActiveFigureId] = React.useState<string | null>(null);
-  // The dataset in focus in the Data view (picked from the rail) — drives the
-  // context-scoped header delete ("Delete dataset").
-  const [activeDatasetId, setActiveDatasetId] = React.useState<string | null>(null);
-  // The version family (figure ids) shown in the compare view (S3.2).
-  const [compareIds, setCompareIds] = React.useState<string[]>([]);
+  // The workrail routing state (Pillar 1, S2.3) — view + the figure/dataset/compare
+  // focus. Extracted into useWorkspaceView; the run + CRUD hooks below write it through
+  // these setters.
+  const {
+    view,
+    setView,
+    activeFigureId,
+    setActiveFigureId,
+    activeDatasetId,
+    setActiveDatasetId,
+    compareIds,
+    setCompareIds,
+  } = useWorkspaceView();
   // A skill the command palette / Gene Sets surface asked to pre-select in the
   // Workbench, with optional param prefills. The nonce makes a repeat request (same
   // skill, again) a fresh prop for the panel.
