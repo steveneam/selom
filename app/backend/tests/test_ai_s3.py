@@ -4,15 +4,15 @@ All tests run in the fast gate (``pytest -m "not slow"``).  No file I/O or live 
 deps are needed: every test calls ``validate_action`` / ``apply_plan`` directly with a
 constructed ``ActionContext``.  The ``_stub_engine`` fixture is included for safety.
 
-Per-action findings (engine-surface investigation 2026-06-29):
+Per-action state (map_columns / apply_cleaning_step flipped gap→wired 2026-06-30, P1 ingest hooks):
   set_profile      — HOOK EXISTS: profile_data(bundle, override=code) in engine/cleaning.py.
-                     Effect delta: {_profile_override: code}.  S5 wires it to the run path.
+                     Effect delta: {_profile_override: code}.
   set_design       — PARTIAL HOOK: Design model + _design_path reserved key exist in engine.
-                     Effect delta: design fields staged as params.  S5 wires to run path.
-  map_columns      — CAPABILITY GAP (missing_column_op): databundle._LOGFC/_PVAL are
-                     auto-detection synonym sets — there is no column-override/remap hook.
-  apply_cleaning_step — CAPABILITY GAP (validation_blocked): plan_cleaning has no step-
-                     enable/skip parameter; CleaningStep carries no 'enabled' field.
+                     Effect delta: design fields staged as params.
+  map_columns      — WIRED: engine.columns column-override; stages {_column_override: {role: column}}
+                     (roles logFC/pval/gene); honoured at D1/D2/the runner + recorded → reproducible.
+  apply_cleaning_step — WIRED (param-backed): a step in engine.cleaning.STEP_PARAM (normalize→
+                     normalize) compiles to a set_param effect; a non-backed step → honest gap.
 """
 
 from __future__ import annotations
@@ -307,139 +307,192 @@ def test_set_design_staged_in_apply_plan():
 
 
 # ---------------------------------------------------------------------------
-# map_columns — HONEST CAPABILITY GAP (unmet=missing_column_op)
+# map_columns — WIRED (P1 ingest hook): engine.columns column-override.
 #
-# Engine finding: databundle._LOGFC / _PVAL are auto-detection synonym SETS only.
-# There is no API to say "treat column X as column Y".  The gap surfaces the backlog.
+# A {role: column} map (roles logFC/pval/gene, disjoint from set_design) that wins over
+# synonym auto-detection; staged as {_column_override: map} and recorded → reproducible.
 # ---------------------------------------------------------------------------
 
-def test_map_columns_emits_capability_gap():
-    """map_columns is registered but always produces a CapabilityGap(missing_column_op).
-
-    The gap records the intended mapping so the frequency-ranked backlog captures demand
-    for an explicit column-override hook on the ingest surface.
-    """
-    ctx = ActionContext(stage="ingest")
+def test_map_columns_valid_mapping_validates_ok():
+    """A {role: column} map whose columns exist in the data validates ok."""
+    ctx = ActionContext(
+        stage="ingest",
+        data_columns=["GeneName", "FoldChange_custom", "padj"],
+    )
     action = Action(
-        type="map_columns",
-        target="",
-        payload={"logFC": "log2FoldChange", "pval": "padj"},
+        type="map_columns", target="",
+        payload={"logFC": "FoldChange_custom", "pval": "padj", "gene": "GeneName"},
     )
 
     outcome = validate_action(action, ctx)
-
-    assert not outcome.ok
-    assert outcome.gap is not None
-    assert outcome.gap.unmet == "missing_column_op"
-    assert outcome.gap.stage == "ingest"
-    assert outcome.gap.intent == "map_columns"
+    assert outcome.ok, f"Expected ok=True, got errors: {outcome.errors}"
 
 
-def test_map_columns_status_is_gap_in_apply_plan():
-    """apply_plan sets status='gap' (backlog candidate) for missing_column_op gaps."""
-    ctx = ActionContext(stage="ingest")
+def test_map_columns_effect_stages_column_override():
+    """apply stages {_column_override: {role: column}} — the reserved param the run path reads."""
+    from ai import registry as reg
+
+    ctx = ActionContext(stage="ingest", data_columns=["FC_custom", "padj"])
+    action = Action(type="map_columns", target="", payload={"logFC": "FC_custom", "pval": "padj"})
+
+    effect = reg.get("map_columns").apply(action, ctx)
+    assert effect == {"params": {"_column_override": {"logFC": "FC_custom", "pval": "padj"}}}
+
+
+def test_map_columns_staged_in_apply_plan():
+    """map_columns flows through apply_plan → status=staged + staged_params has _column_override."""
+    ctx = ActionContext(stage="ingest", data_columns=["FC_custom", "padj"])
     plan = ActionPlan(
-        goal="rename logFC column",
-        actions=[Action(type="map_columns", target="", payload={"logFC": "log2FoldChange"})],
+        goal="treat FC_custom as logFC",
+        actions=[Action(type="map_columns", target="",
+                        payload={"logFC": "FC_custom", "pval": "padj"})],
     )
 
     turn = apply_plan(plan, ctx)
 
     assert len(turn.results) == 1
-    assert turn.results[0].status == "gap"
-    assert len(turn.gaps) == 1
-    assert turn.gaps[0].unmet == "missing_column_op"
-    # Gap is recorded in the gap store.
-    recorded = g.list_gaps()
-    assert len(recorded) == 1
-    assert recorded[0]["gap"].unmet == "missing_column_op"
+    assert turn.results[0].status == "staged", f"got {turn.results[0].status!r}"
+    assert turn.staged_params == {"_column_override": {"logFC": "FC_custom", "pval": "padj"}}
+    assert not turn.gaps
 
 
-def test_map_columns_gap_deduped_on_recurrence():
-    """Recurring map_columns gaps increment count, not entries."""
-    ctx = ActionContext(stage="ingest")
-    plan = ActionPlan(
-        goal="rename logFC",
-        actions=[Action(type="map_columns", target="", payload={"logFC": "log2FoldChange"})],
-    )
+def test_map_columns_missing_column_rejected_with_gap():
+    """A mapped column absent from data_columns → rejected with gap(validation_blocked).
 
-    apply_plan(plan, ctx)
-    apply_plan(plan, ctx)
-
-    recorded = g.list_gaps()
-    assert len(recorded) == 1
-    assert recorded[0]["count"] == 2
-
-
-# ---------------------------------------------------------------------------
-# apply_cleaning_step — HONEST CAPABILITY GAP (unmet=validation_blocked)
-#
-# Engine finding: plan_cleaning(bundle, *, profile=None) has no skip_steps/include_steps
-# param.  CleaningStep has no 'enabled' field.  Intent coherent, but engine cannot
-# effect or validate it.
-# ---------------------------------------------------------------------------
-
-def test_apply_cleaning_step_emits_capability_gap():
-    """apply_cleaning_step is registered but always produces a CapabilityGap(validation_blocked).
-
-    The intent (skip step filter_genes) is coherent; the engine cannot effect it
-    (plan_cleaning has no step-toggle hook), so the gap is validation_blocked.
+    Override-only: it never fabricates a column. Mirrors set_design's missing-column behaviour.
     """
-    ctx = ActionContext(stage="ingest")
-    action = Action(
-        type="apply_cleaning_step",
-        target="",
-        payload={"step_id": "filter_genes", "enabled": False},
-    )
+    ctx = ActionContext(stage="ingest", data_columns=["gene", "padj"])
+    action = Action(type="map_columns", target="", payload={"logFC": "nonexistent_fc"})
 
     outcome = validate_action(action, ctx)
 
     assert not outcome.ok
     assert outcome.gap is not None
     assert outcome.gap.unmet == "validation_blocked"
-    assert outcome.gap.stage == "ingest"
-    assert outcome.gap.intent == "apply_cleaning_step"
+    assert "nonexistent_fc" in outcome.errors[0]
 
 
-def test_apply_cleaning_step_status_is_rejected_in_apply_plan():
-    """apply_plan sets status='rejected' for validation_blocked gaps (coherent but blocked)."""
-    ctx = ActionContext(stage="ingest")
+def test_map_columns_unknown_role_rejected_no_gap():
+    """A non-overridable role (e.g. condition/batch — set_design owns those) → clean reject, no gap."""
+    ctx = ActionContext(stage="ingest", data_columns=["batch", "padj"])
+    action = Action(type="map_columns", target="", payload={"batch": "batch"})
+
+    outcome = validate_action(action, ctx)
+
+    assert not outcome.ok
+    assert outcome.gap is None
+    assert "batch" in outcome.errors[0]
+
+
+def test_map_columns_no_data_columns_skips_check():
+    """When data_columns is None the existence check is skipped — no false-negative block."""
+    ctx = ActionContext(stage="ingest")  # data_columns=None
+    action = Action(type="map_columns", target="", payload={"logFC": "any_fc", "pval": "any_p"})
+
+    outcome = validate_action(action, ctx)
+    assert outcome.ok, f"Without data_columns the existence check must be skipped: {outcome.errors}"
+
+
+def test_map_columns_empty_payload_rejected():
+    """An empty payload is rejected cleanly (no map to apply)."""
+    ctx = ActionContext(stage="ingest", data_columns=["x"])
+    outcome = validate_action(Action(type="map_columns", target="", payload={}), ctx)
+    assert not outcome.ok
+    assert outcome.gap is None
+
+
+# ---------------------------------------------------------------------------
+# apply_cleaning_step — WIRED (P1 ingest hook, param-backed).
+#
+# A step in engine.cleaning.STEP_PARAM (normalize → the 'normalize' skill param) compiles to a
+# set_param effect via validate_param_ranges; a non-param-backed step → honest gap(validation_blocked).
+# ---------------------------------------------------------------------------
+
+def test_apply_cleaning_step_normalize_validates_ok():
+    """The normalize step on a skill that declares a 'normalize' param validates ok."""
+    ctx = ActionContext(stage="ingest", skill_id="deg")
+    action = Action(type="apply_cleaning_step", target="",
+                    payload={"step_id": "normalize", "enabled": False})
+
+    outcome = validate_action(action, ctx)
+    assert outcome.ok, f"Expected ok=True, got errors: {outcome.errors}"
+
+
+def test_apply_cleaning_step_effect_stages_controlling_param():
+    """apply stages the controlling skill param (disable → normalize=False) — a real recompute param."""
+    from ai import registry as reg
+
+    ctx = ActionContext(stage="ingest", skill_id="deg")
+    action = Action(type="apply_cleaning_step", target="",
+                    payload={"step_id": "normalize", "enabled": False})
+
+    effect = reg.get("apply_cleaning_step").apply(action, ctx)
+    assert effect == {"params": {"normalize": False}}
+
+
+def test_apply_cleaning_step_staged_in_apply_plan():
+    """apply_cleaning_step flows through apply_plan → status=staged + staged_params has the param."""
+    ctx = ActionContext(stage="ingest", skill_id="umap_scrna")
     plan = ActionPlan(
-        goal="skip the gene-filter step",
-        actions=[Action(
-            type="apply_cleaning_step",
-            target="",
-            payload={"step_id": "filter_genes", "enabled": False},
-        )],
+        goal="skip normalization (data is already normalized)",
+        actions=[Action(type="apply_cleaning_step", target="",
+                        payload={"step_id": "normalize", "enabled": False})],
     )
 
     turn = apply_plan(plan, ctx)
 
     assert len(turn.results) == 1
-    assert turn.results[0].status == "rejected"
-    assert len(turn.gaps) == 1
-    assert turn.gaps[0].unmet == "validation_blocked"
+    assert turn.results[0].status == "staged", f"got {turn.results[0].status!r}"
+    assert turn.staged_params == {"normalize": False}
+    assert not turn.gaps
 
 
-def test_apply_cleaning_step_gap_recorded_and_deduped():
-    """Recurring apply_cleaning_step gaps dedup in the gap store."""
-    ctx = ActionContext(stage="ingest")
-    plan = ActionPlan(
-        goal="skip normalize step",
-        actions=[Action(
-            type="apply_cleaning_step",
-            target="",
-            payload={"step_id": "normalize"},
-        )],
-    )
+def test_apply_cleaning_step_non_param_backed_step_gap():
+    """A hard-coded step with no backing param (filter_genes) → honest gap(validation_blocked)."""
+    ctx = ActionContext(stage="ingest", skill_id="deg")
+    action = Action(type="apply_cleaning_step", target="",
+                    payload={"step_id": "filter_genes", "enabled": False})
 
-    apply_plan(plan, ctx)
-    apply_plan(plan, ctx)
+    outcome = validate_action(action, ctx)
 
-    recorded = g.list_gaps()
-    assert len(recorded) == 1
-    assert recorded[0]["gap"].unmet == "validation_blocked"
-    assert recorded[0]["count"] == 2
+    assert not outcome.ok
+    assert outcome.gap is not None
+    assert outcome.gap.unmet == "validation_blocked"
+    assert "filter_genes" in outcome.errors[0]
+
+
+def test_apply_cleaning_step_no_active_skill_gap():
+    """No active skill (skill_id=None) → gap(validation_blocked): the step's param needs a skill."""
+    ctx = ActionContext(stage="ingest")  # skill_id=None
+    action = Action(type="apply_cleaning_step", target="", payload={"step_id": "normalize"})
+
+    outcome = validate_action(action, ctx)
+
+    assert not outcome.ok
+    assert outcome.gap is not None
+    assert outcome.gap.unmet == "validation_blocked"
+
+
+def test_apply_cleaning_step_skill_without_param_gap():
+    """A skill that doesn't declare the step's param (volcano has no 'normalize') → honest gap."""
+    ctx = ActionContext(stage="analyze", skill_id="volcano")
+    action = Action(type="apply_cleaning_step", target="",
+                    payload={"step_id": "normalize", "enabled": False})
+
+    outcome = validate_action(action, ctx)
+
+    assert not outcome.ok
+    assert outcome.gap is not None
+    assert outcome.gap.unmet == "validation_blocked"
+    assert "normalize" in outcome.errors[0]
+
+
+def test_apply_cleaning_step_missing_step_id_rejected():
+    """payload without 'step_id' is rejected cleanly (no gap — malformed)."""
+    ctx = ActionContext(stage="ingest", skill_id="deg")
+    outcome = validate_action(Action(type="apply_cleaning_step", target="", payload={}), ctx)
+    assert not outcome.ok
+    assert outcome.gap is None
 
 
 # ---------------------------------------------------------------------------

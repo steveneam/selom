@@ -34,6 +34,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from engine.columns import override_column, role_of_synonyms
 from engine.compat import _SCHEMA
 from engine.databundle import _LOGFC, _PVAL, _is_dataframe
 
@@ -97,7 +98,8 @@ def _has_finite_numeric(series: Any) -> bool:
         return True
 
 
-def check_skill_input(skill_id: str, payload: Any, *, lazy: bool = True) -> list[FrameViolation]:
+def check_skill_input(skill_id: str, payload: Any, *, lazy: bool = True,
+                      override: dict | None = None) -> list[FrameViolation]:
     """Validate the frame ``skill_id`` is about to consume, at the ingest/clean→skill seam.
 
     Returns the structural defects among the columns this skill's D1 contract *requires* — each
@@ -105,6 +107,10 @@ def check_skill_input(skill_id: str, payload: Any, *, lazy: bool = True) -> list
     ``[]`` for a skill with no column contract, a non-table payload (an AnnData matrix is checked by
     QC + the modality gate, not here), or a well-formed frame. ``lazy`` collects every violation (the
     default — one 400 lists them all); ``lazy=False`` stops at the first.
+
+    ``override`` (the user ``{role: column}`` map, see :mod:`engine.columns`) selects the resolved
+    column for a role when set — so the *overridden* column is the one usability-checked, matching
+    what the runner will actually read (D1 honours the same override, so the group is present).
 
     Only columns D1 has already confirmed present are inspected — a *missing* group is D1's 422, so
     D2 never double-reports it (and never false-blocks on absence). The check is best-effort: any
@@ -116,7 +122,9 @@ def check_skill_input(skill_id: str, payload: Any, *, lazy: bool = True) -> list
     groups, _needs_numeric = contract
     violations: list[FrameViolation] = []
     for label, synonyms in groups:
-        matched = _resolve(payload, synonyms)
+        role = role_of_synonyms(synonyms)
+        ov_col = override_column(override, role, payload.columns) if role else None
+        matched = [ov_col] if ov_col else _resolve(payload, synonyms)
         if not matched:
             continue  # absent → D1's job (422), not D2's
         col = matched[0]

@@ -190,10 +190,9 @@ def _frame_signature(payload: Any) -> tuple[list[str], int]:
 # synonym sets reused from the classifier (``engine.databundle._LOGFC`` / ``_PVAL``) so header
 # variants (``avg_log2FC``, ``p_val_adj``, ``adj.P.Val``) all resolve. See
 # ``docs/architecture-consistency-gate/skill-input-contract.md`` (D1).
+from engine.columns import GENE as _GENE  # noqa: E402 — single-source the gene synonyms
+from engine.columns import override_column, role_of_synonyms  # noqa: E402
 from engine.databundle import _LOGFC, _PVAL  # noqa: E402 — kept beside its only consumer
-
-# Gene/feature label column synonyms — the row key a DE / ranked table is expected to carry.
-_GENE = ("gene", "feature", "symbol", "protein", "gene_id", "gene_name", "geneid", "ensembl")
 # A named column group: (human label, synonym substrings). A table satisfies it if any column
 # name contains any synonym.
 _FC = ("a fold-change column", _LOGFC)
@@ -213,22 +212,35 @@ def _has_group(columns_lower: list[str], synonyms: tuple[str, ...]) -> bool:
     return any(any(s in c for s in synonyms) for c in columns_lower)
 
 
-def _check_schema(skill_id: str, fa: FileAssessment) -> tuple[bool | None, str]:
+def _group_present(fa: FileAssessment, cols_lower: list[str], label: str, syns: tuple[str, ...],
+                   override: dict | None) -> bool:
+    """A required column group is present when a user override maps its role to an existing column,
+    or a synonym matches. The override (``{role: column}``) wins over synonym detection."""
+    role = role_of_synonyms(syns)
+    if role is not None and override_column(override, role, fa.columns):
+        return True
+    return _has_group(cols_lower, syns)
+
+
+def _check_schema(skill_id: str, fa: FileAssessment, override: dict | None = None
+                  ) -> tuple[bool | None, str]:
     """Does ``fa``'s table carry the columns ``skill_id`` needs? → ``(ok, reason)``.
 
     ``True`` = all required columns/score present (precise fit); ``False`` = a determined miss with
     an actionable reason naming what to add/rename; ``None`` = this skill has no column contract
     (defer to the modality layer). Honest: only a *loaded* table can miss a column — an unloadable
-    file never reaches here."""
+    file never reaches here. ``override`` (the user ``{role: column}`` map, see :mod:`engine.columns`)
+    satisfies a group when it points at an existing column — so a non-standard-named fold-change /
+    significance / gene column the synonym sets miss still fits once the user maps it."""
     contract = _SCHEMA.get(skill_id)
     if contract is None:
         return None, ""
     groups, needs_numeric = contract
     cols = [c.lower() for c in fa.columns]
-    missing = [label for label, syns in groups if not _has_group(cols, syns)]
+    missing = [label for label, syns in groups if not _group_present(fa, cols, label, syns, override)]
     if needs_numeric and fa.n_numeric_cols < 1:
         missing.append("a numeric score column")
-    have = [label for label, syns in groups if _has_group(cols, syns)]
+    have = [label for label, syns in groups if _group_present(fa, cols, label, syns, override)]
     if not missing:
         found = ", ".join(label for label, _ in groups)
         return True, f"has {found} — fits {skill_id}"
@@ -320,7 +332,7 @@ def _fit_ok(fa: FileAssessment, skill_id: str, reason: str) -> DataFit:
     return _mk(fa, skill_id, compatible=True, base=_FIT, verdict=verdict, reason=reason)
 
 
-def fit(skill_id: str, fa: FileAssessment) -> DataFit:
+def fit(skill_id: str, fa: FileAssessment, *, column_override: dict | None = None) -> DataFit:
     """Score a file (its :class:`FileAssessment`) against ``skill_id`` → a :class:`DataFit`.
 
     Layered, most-precise-first ([[layered-deterministic-extraction]]): **L2** payload-class gate (a
@@ -328,7 +340,11 @@ def fit(skill_id: str, fa: FileAssessment) -> DataFit:
     schema (does the table carry the columns this skill needs — authoritative + actionable when the
     skill has a contract) → **L3** coarse modality fallback (for skills without a column contract).
     The base score (fit / unclear / wrong) × the file's cleanliness fraction, so the same file reads
-    differently per analysis and a dirty-but-right file ranks below a clean-and-right one."""
+    differently per analysis and a dirty-but-right file ranks below a clean-and-right one.
+
+    ``column_override`` (the user ``{role: column}`` map) is honoured at the L1 schema layer so a
+    DE table with a non-standard-named fold-change/significance/gene column fits once the user maps
+    it; the matcher / ranking callers leave it ``None`` (unchanged)."""
     if not fa.loadable:
         return DataFit(path=fa.path, filename=fa.filename, skill_id=skill_id, kind=fa.kind,
                        score=0, compatible=None, verdict="unreadable", qc_ok=False,
@@ -344,7 +360,7 @@ def fit(skill_id: str, fa: FileAssessment) -> DataFit:
                    reason=f"this is {label}, but {skill_id} needs {need}")
 
     # L1 — precise column schema (authoritative when this skill has a column contract).
-    schema_ok, schema_reason = _check_schema(skill_id, fa)
+    schema_ok, schema_reason = _check_schema(skill_id, fa, column_override)
     if schema_ok is True:
         return _fit_ok(fa, skill_id, schema_reason)
     if schema_ok is False:

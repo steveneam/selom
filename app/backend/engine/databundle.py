@@ -58,16 +58,22 @@ _PVAL = ("padj", "pvalue", "p_val", "p.value", "pval", "adj.p.val", "fdr", "qval
 _METAB_TOKENS = ("m/z", "hmdb", "metabolite", "kegg c")
 
 
-def classify(payload: Any, *, hint: str | None = None, source: SourceRef | None = None) -> str:
+def classify(payload: Any, *, hint: str | None = None, source: SourceRef | None = None,
+             override: dict | None = None) -> str:
     """Best-effort modality for a loaded payload. ``hint`` (a caller-supplied ``Kind``) wins;
     otherwise dispatch by payload type, then by table signature. Returns a member of
-    ``engine.models.ALL_KINDS`` — ``UNKNOWN`` when nothing matches (never raises)."""
+    ``engine.models.ALL_KINDS`` — ``UNKNOWN`` when nothing matches (never raises).
+
+    ``override`` is the optional user column-override (``{role: column}``, roles logFC/pval/gene —
+    see :mod:`engine.columns`): a mapped, *existing* column counts as that role for DE detection, so a
+    table whose fold-change/significance columns the synonym sets miss can still classify as
+    ``de_results``. Override-only — a mapping to an absent column is ignored (never fabricated)."""
     if hint:
         return hint
     if _is_anndata(payload):
         return SC_COUNTS
     if _is_dataframe(payload):
-        return _classify_frame(payload)
+        return _classify_frame(payload, override)
     return UNKNOWN
 
 
@@ -80,9 +86,21 @@ def _is_dataframe(obj: Any) -> bool:
     return any(t.__name__ == "DataFrame" for t in type(obj).__mro__)
 
 
-def _classify_frame(df: Any) -> str:
+def _override_has(df: Any, override: dict | None, role: str) -> bool:
+    """True when ``override`` maps ``role`` to a column the frame actually carries (override-only —
+    a mapping to an absent column never fabricates the role). Inline here to keep
+    :mod:`engine.databundle` free of an :mod:`engine.columns` import (columns imports databundle)."""
+    if not override or not isinstance(override, dict):
+        return False
+    col = override.get(role)
+    return bool(col) and col in set(str(c) for c in df.columns)
+
+
+def _classify_frame(df: Any, override: dict | None = None) -> str:
     cols = [str(c).strip().lower() for c in df.columns]
-    if _has_any(cols, _LOGFC) and _has_any(cols, _PVAL):
+    has_fc = _override_has(df, override, "logFC") or _has_any(cols, _LOGFC)
+    has_pval = _override_has(df, override, "pval") or _has_any(cols, _PVAL)
+    if has_fc and has_pval:
         return DE_RESULTS
 
     num = df.select_dtypes(include="number")

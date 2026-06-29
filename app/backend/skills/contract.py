@@ -176,6 +176,13 @@ def validate_param_ranges(spec: SkillSpec, params: dict) -> list[str]:
     return errors
 
 
+# Reserved (``_``-prefixed) params that ARE reproducible config and so are kept in the recorded
+# bundle (unlike a temp-file path like ``_design_path``, which is stripped). ``_column_override`` is
+# a ``{role: column}`` map — recording it lets a re-run re-apply the user's column mapping with zero
+# AI ("AI compiles away" extended to ingest overrides). See ``docs/p1-ingest-engine-hooks/spec.md``.
+_RECORDED_RESERVED = frozenset({"_column_override"})
+
+
 def resolved_params(spec: SkillSpec, params: dict) -> dict:
     """Skill defaults overlaid with caller params, coerced to the param_spec types.
 
@@ -183,11 +190,15 @@ def resolved_params(spec: SkillSpec, params: dict) -> dict:
     (typed) that ran — what the reproducibility bundle records and the methods text
     quotes. Unknown keys / failed casts pass through unchanged. The runners still
     coerce their own inputs; this never feeds them, so the proven path is untouched.
+
+    Reserved ``_``-prefixed keys are dropped EXCEPT the reproducible ones in
+    ``_RECORDED_RESERVED`` (e.g. ``_column_override``), which are kept verbatim so a
+    re-run from the recorded params reproduces the figure with no AI in the loop.
     """
     merged = {**defaults(spec), **params}
     out: dict = {}
     for key, value in merged.items():
-        if str(key).startswith("_"):
+        if str(key).startswith("_") and key not in _RECORDED_RESERVED:
             continue  # reserved runtime keys (e.g. _design_path) — not part of the recorded config
         cast = _CASTS.get(spec.param_spec.get(key, {}).get("type"))
         try:

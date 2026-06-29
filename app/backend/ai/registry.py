@@ -323,10 +323,10 @@ def _apply_cosmetic(action, ctx) -> dict:
 #                      Effect delta carries _profile_override for the run path (S5 wires it).
 #   set_design       — PARTIAL HOOK: Design model + _design_path reserved-key exist.
 #                      Effect delta stages design fields as params; S5 wires to run path.
-#   map_columns      — CAPABILITY GAP (missing_column_op): _LOGFC/_PVAL in databundle.py are
-#                      auto-detection synonym sets only — no user column-override hook exists.
-#   apply_cleaning_step — CAPABILITY GAP (validation_blocked): plan_cleaning proposes steps
-#                      but has no step-enable/skip parameter; CleaningStep has no enabled field.
+#   map_columns      — WIRED (P1 ingest hook): engine.columns column-override; effect delta
+#                      {_column_override: {role: column}} honoured at D1/D2/the runner + recorded.
+#   apply_cleaning_step — WIRED (P1 ingest hook, param-backed): a step in engine.cleaning.STEP_PARAM
+#                      (normalize→normalize) compiles to a set_param effect; non-backed step → gap.
 # ---------------------------------------------------------------------------
 
 def _validate_set_profile(action, ctx) -> "ValidationOutcome":
@@ -411,53 +411,104 @@ def _apply_set_design(action, ctx) -> dict:
 
 
 def _validate_map_columns(action, ctx) -> "ValidationOutcome":
-    """Column remapping is a CapabilityGap — the engine has no column-override hook.
+    """Map a non-standard-named column to a DE-figure role (logFC / pval / gene).
 
-    engine/databundle.py exposes _LOGFC / _PVAL synonym sets for AUTO-detection only;
-    there is no API to say "treat column X as column Y" before analysis.  This gap
-    surfaces the backlog item (unmet=missing_column_op) so the frequency-ranked log
-    captures demand for an explicit column-mapping hook on the ingest surface.
+    WIRED (P1 ingest hook): the engine now has a column-override (engine.columns) — a {role: column}
+    map that wins over synonym auto-detection at every resolution site (D1 schema / D2 usability / the
+    volcano runner).  The payload IS the map.  Validation: each role must be overridable (the set is
+    disjoint from set_design's condition/batch); when ctx.data_columns is provided, each mapped column
+    must EXIST in the data (else gap(validation_blocked), mirroring set_design — override-only, never
+    fabricate); an unknown role is a clean rejection (malformed, no gap).
     """
+    from engine.columns import OVERRIDABLE_ROLES
     from ai.models import ValidationOutcome
 
-    return ValidationOutcome(
-        ok=False,
-        errors=[
-            "column remapping is not yet supported; the engine uses synonym-detection sets "
-            "(databundle._LOGFC / _PVAL) for auto-detection only — there is no column-"
-            "override hook (engine backlog: missing_column_op)"
-        ],
-        gap=_make_gap(action, ctx, "missing_column_op"),
-    )
+    mapping = dict(action.payload or {})
+    if not mapping:
+        return ValidationOutcome(
+            ok=False,
+            errors=["map_columns payload must be a {role: column} map (roles: "
+                    + ", ".join(sorted(OVERRIDABLE_ROLES)) + ")"],
+        )
+    unknown = [r for r in mapping if r not in OVERRIDABLE_ROLES]
+    if unknown:
+        return ValidationOutcome(
+            ok=False,
+            errors=[f"unknown role(s) {unknown}; overridable roles: {sorted(OVERRIDABLE_ROLES)}"],
+        )
+    cols = ctx.data_columns
+    if cols is not None:
+        for role, col in mapping.items():
+            if col not in cols:
+                return ValidationOutcome(
+                    ok=False,
+                    errors=[f"column {col!r} for role {role!r} not found in data; available: {cols}"],
+                    gap=_make_gap(action, ctx, "validation_blocked"),
+                )
+    return ValidationOutcome(ok=True)
 
 
-def _apply_map_columns(action, ctx) -> dict:  # noqa: ARG001 — never called (validate always fails)
-    return {}
+def _apply_map_columns(action, ctx) -> dict:  # noqa: ARG001 — ctx unused (the map is the payload)
+    """Stage the column-override — the run path reads params['_column_override'] + records it, so a
+    re-run reproduces the figure with no AI ("AI compiles away" extended to ingest overrides)."""
+    return {"params": {"_column_override": dict(action.payload)}}
 
 
 def _validate_apply_cleaning_step(action, ctx) -> "ValidationOutcome":
-    """Step-toggling is a CapabilityGap — plan_cleaning has no step-enable/skip hook.
+    """Toggle a cleaning step on/off by setting its controlling skill param (param-backed).
 
-    plan_cleaning(bundle, *, profile=None) proposes a list of CleaningStep objects
-    verbatim; it accepts no include/skip parameter and CleaningStep carries no
-    ``enabled`` field.  The intent is coherent (skip step X) but the engine cannot
-    validate or effect it (unmet=validation_blocked).
+    WIRED (P1 ingest hook): a step in engine.cleaning.STEP_PARAM (e.g. 'normalize' → the 'normalize'
+    param) compiles to a set_param effect, REUSING skills.contract.validate_param_ranges (no parallel
+    path) so the figure genuinely changes + is recorded.  A non-param-backed (hard-coded) step, no
+    active skill, or a skill that lacks that param → an honest gap(validation_blocked), so the backlog
+    captures demand to wire more steps.  Payload: {step_id, enabled} (enabled defaults True).
     """
+    from engine.cleaning import STEP_PARAM
+    from skills.contract import load_skill, validate_param_ranges
     from ai.models import ValidationOutcome
 
-    return ValidationOutcome(
-        ok=False,
-        errors=[
-            "selective cleaning-step application is not yet supported; plan_cleaning proposes "
-            "steps but has no step-enable/skip hook and CleaningStep has no 'enabled' field "
-            "(engine backlog: validation_blocked)"
-        ],
-        gap=_make_gap(action, ctx, "validation_blocked"),
-    )
+    step_id = action.payload.get("step_id")
+    if not step_id:
+        return ValidationOutcome(ok=False, errors=["apply_cleaning_step payload must contain 'step_id'"])
+    enabled = bool(action.payload.get("enabled", True))
+
+    param = STEP_PARAM.get(step_id)
+    if param is None:
+        return ValidationOutcome(
+            ok=False,
+            errors=[f"cleaning step {step_id!r} has no skip hook yet (it is hard-coded, not "
+                    f"param-backed); togglable steps: {sorted(STEP_PARAM)}"],
+            gap=_make_gap(action, ctx, "validation_blocked"),
+        )
+    if ctx.skill_id is None:
+        return ValidationOutcome(
+            ok=False,
+            errors=["toggling a cleaning step needs an active skill (its param controls the step)"],
+            gap=_make_gap(action, ctx, "validation_blocked"),
+        )
+    try:
+        spec = load_skill(ctx.skill_id)
+    except Exception as exc:
+        return ValidationOutcome(ok=False, errors=[f"could not load skill {ctx.skill_id!r}: {exc}"])
+    if param not in spec.param_spec:
+        return ValidationOutcome(
+            ok=False,
+            errors=[f"{ctx.skill_id!r} has no {param!r} step to toggle"],
+            gap=_make_gap(action, ctx, "validation_blocked"),
+        )
+    errs = validate_param_ranges(spec, {param: enabled})
+    if errs:
+        return ValidationOutcome(ok=False, errors=errs, gap=_make_gap(action, ctx, "validation_blocked"))
+    return ValidationOutcome(ok=True)
 
 
-def _apply_apply_cleaning_step(action, ctx) -> dict:  # noqa: ARG001 — never called
-    return {}
+def _apply_apply_cleaning_step(action, ctx) -> dict:  # noqa: ARG001 — ctx unused
+    """Stage the controlling skill param (disable = param False) — a real recompute param, so it is
+    validated, recorded, and reproduced by the existing machinery (no reserved key needed)."""
+    from engine.cleaning import STEP_PARAM
+    step_id = action.payload["step_id"]
+    enabled = bool(action.payload.get("enabled", True))
+    return {"params": {STEP_PARAM[step_id]: enabled}}
 
 
 # ---------------------------------------------------------------------------
@@ -606,14 +657,14 @@ ACTION_REGISTRY: dict[str, ActionDef] = {
         tier="recompute",
         validate=_validate_map_columns,
         apply=_apply_map_columns,
-        doc="[GAP] Map ambiguous column names to expected roles — engine lacks a column-override hook.",
+        doc="Map a non-standard-named column to a DE role (logFC/pval/gene) (requires re-run).",
     ),
     "apply_cleaning_step": ActionDef(
         type="apply_cleaning_step",
         tier="recompute",
         validate=_validate_apply_cleaning_step,
         apply=_apply_apply_cleaning_step,
-        doc="[GAP] Toggle a cleaning-step on/off — plan_cleaning has no step-enable/skip hook.",
+        doc="Toggle a cleaning step on/off via its controlling skill param (requires re-run).",
     ),
     # S4 — P3 route action
     "select_skill": ActionDef(

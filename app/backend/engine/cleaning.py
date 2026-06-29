@@ -261,9 +261,21 @@ def profile_data(bundle: Any, *, override: str | None = None) -> DataProfile:
 
 # --- cleaning plan (the dynamic pane) ---------------------------------------------------
 
+# Cleaning steps that map 1:1 to a controlling SKILL param, so the AI ``apply_cleaning_step`` action
+# can toggle them via the proven ``set_param`` recompute path (disabling the step = setting the param
+# False). The single source the registry's validator reads. A step absent here is hard-coded with no
+# skip hook → ``apply_cleaning_step`` returns an honest gap for it. See
+# ``docs/p1-ingest-engine-hooks/spec.md``.
+STEP_PARAM: dict[str, str] = {"normalize": "normalize"}
+
+
 class CleaningStep(BaseModel):
     """One proposed cleaning operation + the effect it has on the matrix shape (negative =
-    removed; ``None`` = a transform that changes values, not shape)."""
+    removed; ``None`` = a transform that changes values, not shape).
+
+    ``enabled`` (default True) is the toggle state for the dynamic pane; ``param`` names the skill
+    param that controls this step when it is param-backed (``""`` = hard-coded, no skip hook) — so the
+    FE/AI know which steps are togglable (the registry derives the same from :data:`STEP_PARAM`)."""
 
     id: str
     label: str
@@ -271,6 +283,8 @@ class CleaningStep(BaseModel):
     kind: str = "filter"  # filter (drops rows/cols) | transform (rescales) | selection (flags)
     obs_delta: int | None = None
     var_delta: int | None = None
+    enabled: bool = True
+    param: str = ""
 
 
 class CleaningPlan(BaseModel):
@@ -330,7 +344,8 @@ def _sc_plan(adata: Any, profile: str) -> CleaningPlan:
                      detail="Drop genes seen in fewer than 3 cells.", kind="filter",
                      var_delta=var_delta),
         CleaningStep(id="normalize", label="Normalize + log1p",
-                     detail="Library-size normalize to 10,000 counts, then log1p.", kind="transform"),
+                     detail="Library-size normalize to 10,000 counts, then log1p.", kind="transform",
+                     param=STEP_PARAM["normalize"]),
     ]
     return CleaningPlan(kind=SC_COUNTS, profile=profile, applies=True, obs_label="cells",
                         var_label="genes", n_obs=n_cells, n_var=n_genes, steps=steps,

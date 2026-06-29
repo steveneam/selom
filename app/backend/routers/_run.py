@@ -179,11 +179,58 @@ async def _execute_skill_run(
         # gates (compatible is False); an unreadable / modality-unclear file stays optimistic and runs.
         # Overridable (override=true) — the same escape hatch as the QC gate — for a rare classifier or
         # column-synonym miss; the runner's own ValueError→400 then covers any skill without a contract.
+        # User column-override (reserved param, the AI map_columns action or a hand-set override): a
+        # {role: column} map (roles logFC/pval/gene) that wins over synonym detection at every
+        # resolution site — D1 schema, D2 usability, and the runner — so a non-standard-named DE
+        # column the synonym sets miss is still read. Normalize a JSON-string form to a dict; drop
+        # anything that isn't a non-empty dict (so nothing inert is recorded / handed to the runner).
+        column_override = params.get("_column_override")
+        if isinstance(column_override, str):
+            try:
+                column_override = json.loads(column_override)
+            except (ValueError, TypeError):
+                column_override = None
+        if not isinstance(column_override, dict) or not column_override:
+            column_override = None
+            params.pop("_column_override", None)
+        else:
+            params["_column_override"] = column_override
         data_fit_obj = None
         if bundle is not None:
             from engine import compat
 
-            data_fit_obj = compat.fit(skill_id, compat.assess_bundle(bundle))
+            fa = compat.assess_bundle(bundle)
+            if column_override is not None and fa.columns:
+                have = set(fa.columns)
+                # Override-only, never fabricate: a mapping to a column this table doesn't carry is a
+                # clear 400 (not a silent no-op / a runner crash) — overridable like the QC/D1/D2 gates.
+                missing = {role: col for role, col in column_override.items() if col not in have}
+                if missing and not override:
+                    raise HTTPException(status_code=400, detail={
+                        "error": "column_override_missing",
+                        "message": "A column override points at a column this data doesn't have. "
+                                   "Map each role to an existing column, or re-run with override=true.",
+                        "skill_id": skill_id,
+                        "missing": missing,
+                        "available": fa.columns,
+                    })
+                # Keep ONLY the entries that resolve to a real column — the EFFECTIVE override the
+                # runner actually uses. So provenance records exactly what fed the figure, and a
+                # faithful re-run (no override=true) resolves identically. Under override=true an
+                # unresolvable entry is pruned, NOT recorded as a poison value the runner silently
+                # drops to synonyms (gauntlet repro-integrity finding 2026-06-30).
+                column_override = {role: col for role, col in column_override.items() if col in have}
+                if column_override:
+                    params["_column_override"] = column_override
+                else:
+                    column_override = None
+                    params.pop("_column_override", None)
+            elif column_override is not None:
+                # A matrix payload (AnnData) carries no columns to map — the override is inert; drop
+                # it so it isn't recorded as having fed the figure.
+                column_override = None
+                params.pop("_column_override", None)
+            data_fit_obj = compat.fit(skill_id, fa, column_override=column_override)
             if data_fit_obj.gated and not override:
                 raise HTTPException(status_code=422, detail={
                     "error": "data_contract_failed",
@@ -202,7 +249,8 @@ async def _execute_skill_run(
         if bundle is not None and not override:
             from engine import frame_schema
 
-            frame_errs = frame_schema.check_skill_input(skill_id, bundle.payload)
+            frame_errs = frame_schema.check_skill_input(skill_id, bundle.payload,
+                                                        override=column_override)
             if frame_errs:
                 raise HTTPException(status_code=400, detail={
                     "error": "frame_validation_failed",

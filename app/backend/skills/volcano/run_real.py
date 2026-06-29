@@ -24,12 +24,20 @@ def run(data_path: str, params: dict) -> dict:
 
     df = pd.read_csv(data_path)
     cols = {c.lower(): c for c in df.columns}
-    fc_col = _pick(cols, _FC_COLS)
-    p_col = _pick(cols, _P_COLS)
+    # User column-override (the AI map_columns action / a hand-set override): a mapped, EXISTING
+    # column wins over synonym auto-detection, so a non-standard-named fold-change/significance/gene
+    # column the _*_COLS sets miss is still read. Recorded in provenance → reproduces with no AI.
+    from engine.columns import override_column
+
+    ov = params.get("_column_override")
+    fc_col = override_column(ov, "logFC", df.columns) or _pick(cols, _FC_COLS)
+    p_col = override_column(ov, "pval", df.columns) or _pick(cols, _P_COLS)
     if fc_col is None or p_col is None:
         raise ValueError("volcano needs a log2 fold-change column and an adjusted-p column")
-    gene_col = _pick(cols, _GENE_COLS)
-    genes = df[gene_col].astype(str) if gene_col else df.index.astype(str)
+    gene_col = override_column(ov, "gene", df.columns) or _pick(cols, _GENE_COLS)
+    # Always a Series (positional-aligned with the row arrays below) so the .iloc / .str reads later
+    # work whether the labels come from a gene column or the frame index — a bare Index has no .iloc.
+    genes = df[gene_col].astype(str) if gene_col else pd.Series(df.index.astype(str))
 
     fc_t = float(params.get("fc_threshold", 1.0))
     fdr_t = float(params.get("fdr_threshold", 0.05))
