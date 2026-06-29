@@ -49,9 +49,20 @@ Three layers, different reliability. Put each rule in the layer that actually fi
 
 ## The review-gauntlet
 
-`Workflow({ name: "review-gauntlet" })` — a deterministic gauntlet: fan out Selom-specific **invariant
-lenses** over a diff in parallel, then **adversarially verify** each finding (refute-by-default) so
-only real issues survive. Lenses (custom subagents in `.claude/agents/`):
+Run via `Workflow({ scriptPath: ".claude/workflows/review-gauntlet.js", args: { scope } })` — a
+deterministic gauntlet: fan out Selom-specific **invariant lenses** over a diff in parallel, then
+**adversarially verify** each finding (refute-by-default) so only real issues survive. The lenses are
+defined **inline in the workflow** (self-contained — no dependency on session-scoped custom-agent
+registration).
+
+> **Dogfood lesson (2026-06-29).** `.claude/agents` + `.claude/workflows` load only at **session
+> start**, so a freshly-added workflow isn't `name`-resolvable and a fresh `agentType` won't resolve
+> in the same session — **invoke by `scriptPath`**, and keep lens logic **inline** rather than as a
+> custom `agentType`. On its first real run the gauntlet caught **2 real S1 issues** (a cosmetic-
+> action data/contract backdoor + a fail-soft hole) that manual review and 858 tests had missed —
+> the gap-loop paying for itself.
+
+The lenses:
 
 - **repro-integrity-lens** — "AI compiles away", actor-tagged provenance, the two-axis score, no AI
   on the score's critical path, honest classification (no silent caps).
@@ -66,7 +77,8 @@ Optional `args`: `{ scope: "the changes in HEAD~2..HEAD" }` etc. Default = the w
 
 ## Roadmap
 
-- **Built now** — this playbook, the CLAUDE.md dispatch table, the `review-gauntlet` workflow + 4 lenses.
+- **Built now** — this playbook, the CLAUDE.md dispatch table, the `review-gauntlet` workflow (4
+  inline, self-contained lenses; dogfood-hardened on its first real run).
 - **Next (with AI-Helpers S4)** — the **Reflect** pipeline as a scheduled agent that consumes the
   CapabilityGap backlog.
 - **At step-8 deploy** — a **canary + Web-Vitals-before/after** scheduled agent (Vercel MCP + Lighthouse).
