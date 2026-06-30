@@ -1,0 +1,21 @@
+{
+  "_comment": "Claude-authored operator-gateway recordings — the canned demo engine for the public showcase papers (SELOM_AI_GATEWAY=operator). Grounded ONLY in each paper's real scorecard (reproducibility/tier/confidence/findings); no fabricated values, ≤120 words, mirrors the live gateway's explain style. Keyed by request_type:scorecard.paper_id. Spec: docs/ai-gateway-wiring/spec.md. propose_sweep is intentionally left to the deterministic ranker (rank_sweep_space).",
+  "explanations": [
+    {
+      "request_type": "explain_score",
+      "key": "rpgrip1",
+      "text": "Reproducibility 63/100 places this paper in the 'deposit-faithful' tier: Selom reproduced what the deposited data supports, but the headline is held down because 2 panels are paper-irreproducible — the published figure can't be recovered from the data the authors deposited, which is a limit of the deposit, not a Selom error (Selom confidence stays high at 92/100). 9 panel comparisons reproduced. 7 of 10 in-scope panels scored; 3 are form-only, where the figure type is matched but exact values aren't gradable. To raise the score, supply the underlying data for the form-only panels — the irreproducible ones reflect the paper's deposit, not the pipeline."
+    },
+    {
+      "request_type": "explain_score",
+      "key": "jev",
+      "text": "Reproducibility 86/100 — the 'reproduced' tier — at full Selom confidence (100/100). All 7 in-scope panels scored and 14 panel comparisons reproduced with zero paper-irreproducible findings, so nothing here is blamed on the deposit or the pipeline. The score sits below 100 because several panels reproduced closely rather than exactly. 4 panels are out-of-scope — schematics and non-data figures Selom doesn't grade. This is a strong, trustworthy reproduction; to push toward 'verified', tighten the close-but-not-exact panels by matching the paper's exact thresholds and normalization."
+    },
+    {
+      "request_type": "explain_score",
+      "key": "hani",
+      "text": "Reproducibility 96/100 earns the top 'verified' tier at full Selom confidence (100/100). All 5 in-scope panels scored, 9 panel comparisons reproduced, and there are no paper-irreproducible or discrepant findings — Selom recovered the published figures from the data essentially exactly. 1 panel is out-of-scope, a non-gradable figure type. This is the cleanest of the showcase reproductions: the small gap from 100 reflects minor numeric rounding rather than any structural disagreement. No action is needed to trust these panels — they are a faithful, end-to-end reproduction of the paper's results."
+    }
+  ],
+  "plans": []
+}

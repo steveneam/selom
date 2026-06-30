@@ -123,12 +123,50 @@ class Settings(BaseSettings):
     # landed (the client PUT failed) is swept after this TTL (spec §7/T2 reverse-orphan). Hours.
     upload_ttl_hours: int = Field(default=24, validation_alias="SELOM_UPLOAD_TTL_HOURS")
 
-    # AI Action Gateway (Slice 2) — live gateway is opt-in (default "null" = NullActionGateway,
-    # zero regression).  Set SELOM_AI_GATEWAY=live + ANTHROPIC_API_KEY to enable the live
-    # PydanticAIGateway.  This mirrors the OperatorVisionGateway seam in extract/vision.py.
-    ai_gateway: str = Field(default="null", validation_alias="SELOM_AI_GATEWAY")  # null | live
+    # AI Action Gateway — the active gateway is opt-in (default "null" = NullActionGateway,
+    # zero regression).  Mirrors the OperatorVisionGateway seam in extract/vision.py.  Modes:
+    #   null     — NullActionGateway (deterministic fallback; the default)
+    #   operator — OperatorActionGateway.from_recordings(): Claude-authored recorded outputs, NO
+    #              credit; the build/optimize default AND the canned demo engine (the 3 demo papers)
+    #   gateway  — VercelAIGateway (live Llama via the Vercel AI Gateway); needs AI_GATEWAY_API_KEY;
+    #              the real gated-product path.  Provider-agnostic: swap ai_gateway_model to change
+    #              model/provider (groq/openai/anthropic/google/mistral), zero feature-code change.
+    #   live     — PydanticAIGateway (direct Anthropic); needs ANTHROPIC_API_KEY (kept, optional)
+    # See docs/ai-gateway-wiring/spec.md; demo/product split: docs/pricing strategy memory.
+    ai_gateway: str = Field(default="null", validation_alias="SELOM_AI_GATEWAY")  # null|operator|gateway|live
     ai_token_budget: int = Field(default=20_000, validation_alias="SELOM_AI_TOKEN_BUDGET")
     ai_timeout_s: float = Field(default=30.0, validation_alias="SELOM_AI_TIMEOUT_S")
+
+    # Vercel AI Gateway (mode "gateway") — OpenAI-compatible endpoint; one bearer key (AI_GATEWAY_API_KEY,
+    # bare name to match the shared shell/Render var) routes provider failover server-side.  Field
+    # names mirror the eamos gateway broker.  Inert unless ai_gateway == "gateway" + key present.
+    ai_gateway_api_key: str | None = Field(default=None, validation_alias="AI_GATEWAY_API_KEY")
+    ai_gateway_base_url: str = Field(
+        default="https://ai-gateway.vercel.sh/v1", validation_alias="SELOM_AI_GATEWAY_BASE_URL"
+    )
+    ai_gateway_model: str = Field(
+        default="meta/llama-3.3-70b", validation_alias="SELOM_AI_GATEWAY_MODEL"
+    )
+    ai_gateway_provider_order_raw: str = Field(
+        default="groq,bedrock", validation_alias="SELOM_AI_GATEWAY_PROVIDER_ORDER"
+    )
+    ai_gateway_temperature: float = Field(
+        default=0.3, validation_alias="SELOM_AI_GATEWAY_TEMPERATURE"
+    )
+    ai_gateway_max_tokens: int = Field(
+        default=700, validation_alias="SELOM_AI_GATEWAY_MAX_TOKENS"
+    )
+
+    # Operator gateway (mode "operator") — path to the Claude-authored recordings JSON.  Default None
+    # → the bundled ai/recordings/explain.json (resolved in OperatorActionGateway.from_recordings).
+    ai_operator_recordings_path: str | None = Field(
+        default=None, validation_alias="SELOM_AI_OPERATOR_RECORDINGS"
+    )
+
+    @property
+    def ai_gateway_provider_order(self) -> list[str]:
+        """Provider failover order parsed from the comma-separated raw env value."""
+        return [p.strip() for p in self.ai_gateway_provider_order_raw.split(",") if p.strip()]
 
     # Capability-gap store (S4) — "memory" (default, zero-infra) or "jsonl" (persistent JSONL
     # file that survives process restarts).  The "jsonl" backend requires SELOM_GAP_STORE_PATH.

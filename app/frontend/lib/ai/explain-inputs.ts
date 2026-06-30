@@ -24,6 +24,9 @@ export function buildScorecardPayload(sc: Scorecard | null | undefined): Record<
   if (!sc || !sc.score) return null;
   const s = sc.score;
   const payload: Record<string, unknown> = {
+    // paper_id lets the operator gateway key its recorded explanation per showcase paper
+    // (the canned demo engine); the live gateway and the deterministic path ignore it.
+    paper_id: sc.paper_id,
     tier: s.tier,
     panel_count: sc.panel_scores.length,
     findings: sc.findings,

@@ -73,6 +73,61 @@ _SYSTEM_PROMPT = (
 )
 
 
+def build_action_prompt(ctx: ActionContext, goal: str) -> str:
+    """Compose the propose-context string from an ``ActionContext`` (gateway-agnostic).
+
+    Includes: stage, skill_id, param_spec (names + constraints only), current params,
+    capability_surface summary, data_fit summary, and figure_spec shape (keys only —
+    never the full data arrays, so the prompt stays bounded and no plotted data crosses
+    the wire to the AI). Shared by ``PydanticAIGateway`` and ``VercelAIGateway``.
+    """
+    import json as _json
+
+    lines: list[str] = [f"Goal: {goal}", f"Stage: {ctx.stage}"]
+
+    if ctx.skill_id:
+        lines.append(f"Skill: {ctx.skill_id}")
+        try:
+            from skills.contract import load_skill
+
+            spec = load_skill(ctx.skill_id)
+            param_summary = {
+                name: {
+                    k: v
+                    for k, v in pdef.items()
+                    if k in ("type", "min", "max", "options", "default")
+                }
+                for name, pdef in spec.param_spec.items()
+            }
+            lines.append(f"param_spec: {_json.dumps(param_summary)}")
+        except Exception:  # noqa: BLE001 — param_spec is advisory, degrade clean
+            pass
+
+    if ctx.params:
+        lines.append(f"Current params: {_json.dumps(ctx.params)}")
+
+    if ctx.capability_surface:
+        lines.append(f"Capability surface: {_json.dumps(ctx.capability_surface)}")
+
+    if ctx.data_fit:
+        fit_summary = {
+            k: ctx.data_fit[k]
+            for k in ("score", "confidence", "compatible")
+            if k in ctx.data_fit
+        }
+        lines.append(f"Data fit: {_json.dumps(fit_summary)}")
+
+    if ctx.figure_spec:
+        # Shallow summary only — keys, never the plotted data arrays.
+        fig_shape = {
+            "layout_keys": list(ctx.figure_spec.get("layout", {}).keys()),
+            "data_trace_count": len(ctx.figure_spec.get("data", [])),
+        }
+        lines.append(f"Figure spec (shape): {_json.dumps(fig_shape)}")
+
+    return "\n".join(lines)
+
+
 class PydanticAIGateway:
     """Live gateway: NL goal + ActionContext → Pydantic-validated ``ActionPlan``.
 
@@ -145,58 +200,8 @@ class PydanticAIGateway:
     # ------------------------------------------------------------------
 
     def _build_prompt(self, ctx: ActionContext, goal: str) -> str:
-        """Compose a context string for the agent from the ``ActionContext``.
-
-        Includes: stage, skill_id, param_spec (names + constraints only),
-        current params, capability_surface summary, data_fit summary, and
-        figure_spec shape (keys only — never the full data arrays so the prompt
-        stays bounded and no plotted data crosses the wire to the AI).
-        """
-        import json as _json
-
-        lines: list[str] = [f"Goal: {goal}", f"Stage: {ctx.stage}"]
-
-        if ctx.skill_id:
-            lines.append(f"Skill: {ctx.skill_id}")
-            try:
-                from skills.contract import load_skill
-
-                spec = load_skill(ctx.skill_id)
-                param_summary = {
-                    name: {
-                        k: v
-                        for k, v in pdef.items()
-                        if k in ("type", "min", "max", "options", "default")
-                    }
-                    for name, pdef in spec.param_spec.items()
-                }
-                lines.append(f"param_spec: {_json.dumps(param_summary)}")
-            except Exception:  # noqa: BLE001 — param_spec is advisory, degrade clean
-                pass
-
-        if ctx.params:
-            lines.append(f"Current params: {_json.dumps(ctx.params)}")
-
-        if ctx.capability_surface:
-            lines.append(f"Capability surface: {_json.dumps(ctx.capability_surface)}")
-
-        if ctx.data_fit:
-            fit_summary = {
-                k: ctx.data_fit[k]
-                for k in ("score", "confidence", "compatible")
-                if k in ctx.data_fit
-            }
-            lines.append(f"Data fit: {_json.dumps(fit_summary)}")
-
-        if ctx.figure_spec:
-            # Shallow summary only — keys, never the plotted data arrays.
-            fig_shape = {
-                "layout_keys": list(ctx.figure_spec.get("layout", {}).keys()),
-                "data_trace_count": len(ctx.figure_spec.get("data", [])),
-            }
-            lines.append(f"Figure spec (shape): {_json.dumps(fig_shape)}")
-
-        return "\n".join(lines)
+        """Delegate to the shared :func:`build_action_prompt` (kept for back-compat)."""
+        return build_action_prompt(ctx, goal)
 
     @staticmethod
     def _map_plan(goal: str, proposed: ProposedPlan) -> ActionPlan:

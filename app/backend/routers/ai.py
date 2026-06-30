@@ -33,24 +33,42 @@ router = APIRouter()
 
 
 def get_action_gateway() -> ActionGateway:
-    """Gateway provider seam.
+    """Gateway provider seam — selects the active gateway from ``SELOM_AI_GATEWAY``.
 
-    Returns the live ``PydanticAIGateway`` when ``SELOM_AI_GATEWAY=live`` AND
-    ``ANTHROPIC_API_KEY`` is set; otherwise falls back to ``NullActionGateway``
-    (the zero-regression default).  Mirrors the ``OperatorVisionGateway`` seam
-    in ``extract/vision.py``: flipping the env var + key turns the live gateway
-    on without touching any handler code.
+    Modes (first match wins; a mode whose credential is absent falls through to Null,
+    so the call never raises and behaviour degrades clean):
+
+    - ``gateway`` (+ ``AI_GATEWAY_API_KEY``) → ``VercelAIGateway`` — live Llama via the
+      Vercel AI Gateway; the real gated-product path. Provider-agnostic (swap the model id).
+    - ``operator`` → ``OperatorActionGateway.from_recordings()`` — Claude-authored recorded
+      outputs, NO credit; the build/optimize default AND the canned demo engine.
+    - ``live`` (+ ``ANTHROPIC_API_KEY``) → ``PydanticAIGateway`` — direct Anthropic (kept).
+    - otherwise → ``NullActionGateway`` (the zero-regression deterministic default).
+
+    Mirrors the ``OperatorVisionGateway`` seam in ``extract/vision.py``: flipping the env
+    var (+ key) changes the gateway without touching any handler code.  See
+    ``docs/ai-gateway-wiring/spec.md``.
     """
-    if (
-        settings.ai_gateway.strip().lower() == "live"
-        and os.environ.get("ANTHROPIC_API_KEY")
-    ):
+    mode = settings.ai_gateway.strip().lower()
+
+    if mode == "gateway" and settings.ai_gateway_api_key:
+        from ai.live.vercel_gateway import VercelAIGateway  # lazy import
+
+        return VercelAIGateway.from_settings(settings)
+
+    if mode == "operator":
+        from ai.gateway import OperatorActionGateway  # lazy import
+
+        return OperatorActionGateway.from_recordings(settings.ai_operator_recordings_path)
+
+    if mode == "live" and os.environ.get("ANTHROPIC_API_KEY"):
         from ai.live.pydantic_gateway import PydanticAIGateway  # lazy import
 
         return PydanticAIGateway(
             token_budget=settings.ai_token_budget,
             timeout_s=settings.ai_timeout_s,
         )
+
     return NullActionGateway()
 
 
@@ -184,6 +202,11 @@ def explain(req: ExplainRequest):
         data["scorecard"] = req.scorecard
     if req.sweep_space:
         data["sweep_space"] = req.sweep_space
+    # skill_id rides in `data` so the operator gateway can key propose_sweep recordings on it
+    # and the live gateway can ground its prose; `_deterministic_explain` ignores it, so the
+    # source-labelling comparison below is unaffected.
+    if req.skill_id:
+        data["skill_id"] = req.skill_id
 
     text = gw.explain(req.request, data, req.goal)
     # Honesty: stamp `source` by what was ACTUALLY produced, NOT by the gateway class. A live

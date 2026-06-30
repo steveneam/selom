@@ -43,6 +43,7 @@ describe("buildScorecardPayload", () => {
   it("flattens the nested score into the backend's flat shape", () => {
     const p = buildScorecardPayload(scorecard());
     expect(p).toEqual({
+      paper_id: "p1",
       tier: "reproduced",
       panel_count: 2,
       findings: { reproduced: 6, paper_irreproducible: 1 },
@@ -50,6 +51,10 @@ describe("buildScorecardPayload", () => {
       score: 72,
       selom_confidence: 88,
     });
+  });
+
+  it("carries paper_id so the operator gateway can key its recorded demo explanation", () => {
+    expect(buildScorecardPayload(scorecard())).toMatchObject({ paper_id: "p1" });
   });
 
   it("returns null when there is no graded score yet", () => {

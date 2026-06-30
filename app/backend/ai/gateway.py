@@ -19,6 +19,8 @@ it is AI-generated text grounded in the same data.  Degrade-clean in both direct
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from ai.models import ActionContext, ActionPlan
@@ -133,6 +135,25 @@ def _deterministic_explain(request_type: str, data: dict, goal: str) -> str:
     return "unavailable"
 
 
+def _operator_input_key(request_type: str, data: dict) -> str | None:
+    """Derive a stable per-INPUT key for an operator explain lookup.
+
+    The FE sends the same ``goal`` (or none) for every paper's "Explain this score" — only
+    the input data differs — so the operator keys on something that identifies the input, not
+    the goal: a scorecard's ``paper_id`` (the showcase slug rpgrip1 / jev / hani) for
+    ``explain_score``, the ``skill_id`` for ``propose_sweep``. Returns ``None`` when no
+    identifying field is present (the caller then falls back to the goal key, then deterministic).
+    """
+    if request_type == "explain_score":
+        sc = data.get("scorecard") or {}
+        key = sc.get("paper_id") or sc.get("slug")
+        return str(key) if key else None
+    if request_type == "propose_sweep":
+        key = data.get("skill_id") or (data.get("sweep_space") or {}).get("_skill_id")
+        return str(key) if key else None
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Protocol
 # ---------------------------------------------------------------------------
@@ -217,6 +238,43 @@ class OperatorActionGateway:
         self._plans: dict[str, ActionPlan] = {p.goal: p for p in items}
         self._explanations: dict[str, str] = {}
 
+    @classmethod
+    def from_recordings(cls, path: str | None = None) -> "OperatorActionGateway":
+        """Seed an operator gateway from a Claude-authored recordings JSON file.
+
+        This is the dev-default / canned-demo path (``SELOM_AI_GATEWAY=operator``): the
+        recorded outputs let the AI surfaces light up as ✨AI with **zero credit** spent
+        (the demo engine, [[selom-pricing-demo-strategy]]). ``path=None`` resolves to the
+        bundled ``ai/recordings/explain.json``. A missing / unreadable / malformed file
+        degrades clean to an empty operator (Null semantics until something is recorded) —
+        it never raises at startup.
+
+        File schema::
+
+            {"explanations": [{"request_type": "explain_score", "key": "rpgrip1",
+                               "text": "…"}],
+             "plans": []}
+
+        Explanations are keyed ``request_type:key`` where ``key`` is the per-INPUT id
+        (see :func:`_operator_input_key`); ``plans`` is reserved (goal-keyed) and empty today.
+        """
+        gw = cls()
+        resolved = path or str(Path(__file__).resolve().parent / "recordings" / "explain.json")
+        try:
+            with open(resolved, encoding="utf-8") as fh:
+                doc = json.load(fh)
+        except (OSError, json.JSONDecodeError, ValueError):
+            return gw
+        if not isinstance(doc, dict):
+            return gw
+        for entry in doc.get("explanations") or []:
+            if not isinstance(entry, dict):
+                continue
+            rt, key, text = entry.get("request_type"), entry.get("key"), entry.get("text")
+            if rt and key and text:
+                gw._explanations[f"{rt}:{key}"] = text
+        return gw
+
     def record(self, goal: str, plan: ActionPlan) -> None:
         """Add or replace a plan for ``goal`` (used as the operator works through a run)."""
         self._plans[goal] = plan
@@ -229,5 +287,15 @@ class OperatorActionGateway:
         return self._plans.get(goal, ActionPlan(goal=goal, actions=[]))
 
     def explain(self, request_type: str, data: dict, goal: str) -> str:
-        key = f"{request_type}:{goal}"
-        return self._explanations.get(key, _deterministic_explain(request_type, data, goal))
+        """Return a recorded explanation, keyed by INPUT first then goal; else deterministic.
+
+        Tries the per-input key (e.g. ``explain_score:rpgrip1``) so one recordings file lights
+        up each showcase paper distinctly, then the legacy ``request_type:goal`` key (the
+        programmatic ``record_explanation`` path), then the grounded deterministic fallback.
+        """
+        for candidate in (_operator_input_key(request_type, data), goal):
+            if candidate is not None:
+                recorded = self._explanations.get(f"{request_type}:{candidate}")
+                if recorded is not None:
+                    return recorded
+        return _deterministic_explain(request_type, data, goal)
