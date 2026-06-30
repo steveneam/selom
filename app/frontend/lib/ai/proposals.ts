@@ -8,7 +8,46 @@
  */
 
 import type { SkillParams } from "@/lib/skills/api";
-import type { AiActionDelta, AiActionType, AiProposal, HelperTurn } from "./types";
+import type { AiActionDelta, AiActionType, AiProposal, CapabilityGap, HelperTurn } from "./types";
+
+/**
+ * Result of extracting a proposed skill from a {@link HelperTurn} (route stage / SELECT mode).
+ * `skillId` is non-null when the turn contains a successful `select_skill` result (status
+ * `applied` or `staged`). `rationale` is the gateway's one-line reason for the pick (from
+ * the matching `ProposedAction`). `gap` is set when the intent was coherent but no skill fitted.
+ */
+export interface SelectedSkillResult {
+  skillId: string | null;
+  rationale?: string;
+  gap?: CapabilityGap;
+}
+
+/**
+ * Extract the proposed skill id from a route-stage {@link HelperTurn} (SELECT mode).
+ *
+ * Priority:
+ *   1. `turn.staged_params["_selected_skill"]` — the backend `_apply_select_skill` writes here.
+ *   2. The `select_skill` result's `target`.
+ * Both sources require the associated result to have status `applied` or `staged`.
+ * Returns `{ skillId: null, gap }` when no valid selection was made; `gap` is populated
+ * when a `no_fitting_skill` gap was recorded (the caller shows an honest note).
+ */
+export function selectedSkillFromTurn(turn: HelperTurn): SelectedSkillResult {
+  const selectResult = turn.results.find((r) => r.type === "select_skill");
+
+  if (selectResult && (selectResult.status === "applied" || selectResult.status === "staged")) {
+    // Priority 1: staged_params["_selected_skill"]; fallback to result.target.
+    const fromParams = turn.staged_params["_selected_skill"];
+    const skillId = fromParams !== undefined ? String(fromParams) : selectResult.target;
+    // Look up the gateway's rationale from the matching planned action.
+    const rationale = turn.plan.actions.find((a) => a.id === selectResult.action_id)?.rationale;
+    return { skillId, rationale };
+  }
+
+  // No successful selection — surface a no_fitting_skill gap if the gateway recorded one.
+  const noFitGap = turn.gaps.find((g) => g.unmet === "no_fitting_skill");
+  return { skillId: null, gap: noFitGap };
+}
 
 /** Figure-data controls stringify their values; the AI proposes typed. Compare as strings. */
 function sameVal(a: unknown, b: unknown): boolean {

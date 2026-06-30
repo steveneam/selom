@@ -1070,7 +1070,31 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
               )}
 
               {view === "skill" && (
-                <WorkbenchPanel installs={installs} proposal={proposal} running={running} onRun={runFlow} preselect={preselect} />
+                <WorkbenchPanel
+                  installs={installs}
+                  proposal={proposal}
+                  running={running}
+                  onRun={runFlow}
+                  preselect={preselect}
+                  routeComposer={
+                    <AskAi
+                      stage="route"
+                      mode="select"
+                      label="Ask AI which analysis"
+                      placeholder="e.g. which test for two groups?"
+                      hint="Pre-selects a skill below to confirm and run."
+                      context={{ skillId: null, params: {} }}
+                      onSelect={(skillId) => {
+                        const catalogId = `selom.${skillId}`;
+                        const skill = getSkill(catalogId);
+                        if (!skill) return null;
+                        workspaceStore.installSkill(catalogId);
+                        setPreselect((p) => ({ id: catalogId, n: (p?.n ?? 0) + 1 }));
+                        return skill.name;
+                      }}
+                    />
+                  }
+                />
               )}
 
               {view === "stats" &&

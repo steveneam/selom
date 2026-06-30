@@ -34,6 +34,7 @@ export function WorkbenchPanel({
   running,
   onRun,
   preselect,
+  routeComposer,
 }: {
   /** The installed-skill rows (workspace-level now) — only the id + skillId are read. */
   installs: { id: string; skillId: string }[];
@@ -43,6 +44,8 @@ export function WorkbenchPanel({
   /** A skill the command palette / Gene Sets surface asked to select, with optional
    *  param prefills (nonce → re-selectable). */
   preselect?: { id: string; n: number; params?: SkillParams } | null;
+  /** Optional AI route composer rendered at the top of the left column (Layer A, Phase 1). */
+  routeComposer?: React.ReactNode;
 }) {
   const [selected, setSelected] = React.useState<string | null>(null);
   const [dragOver, setDragOver] = React.useState(false);
@@ -108,6 +111,10 @@ export function WorkbenchPanel({
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
       <div className="space-y-5">
+        {/* Route composer (Layer A, Phase 1) — AI "which analysis?" pre-selector above the
+            deterministic quick-apply row. Rendered only when the parent provides it. */}
+        {routeComposer}
+
         {/* Quick apply — one-click favourites. */}
         {quick.length > 0 && (
           <div>
@@ -311,11 +318,11 @@ export function WorkbenchPanel({
                 <SkillTile skillId={inst.skillId} small />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <p className="truncate text-sm font-medium text-foreground">{skill?.name ?? inst.skillId}</p>
+                    <p className="truncate text-sm font-medium text-foreground" title={skill?.name ?? inst.skillId}>{skill?.name ?? inst.skillId}</p>
                     {verified ? <Badge variant="verified">Verified</Badge> : <Badge variant="community">Queued</Badge>}
                   </div>
                   {skill && (
-                    <p className="truncate text-[11px] text-muted-foreground">{skill.category}</p>
+                    <p className="truncate text-[11px] text-muted-foreground" title={skill.category}>{skill.category}</p>
                   )}
                 </div>
                 <Button

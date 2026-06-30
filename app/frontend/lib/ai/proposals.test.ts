@@ -15,9 +15,11 @@ import {
   dismissProposal,
   pendingCounter,
   proposalsFromTurn,
+  selectedSkillFromTurn,
   unacceptProposal,
 } from "./proposals";
-import type { AiProposal, HelperTurn } from "./types";
+import { getSkill } from "@/lib/catalog/seed";
+import type { AiProposal, CapabilityGap, HelperTurn } from "./types";
 
 function proposal(over: Partial<AiProposal> = {}): AiProposal {
   return {
@@ -169,6 +171,203 @@ describe("applyAcceptedProposals", () => {
     const out = applyAcceptedProposals(base, [proposal({ status: "proposed" })]);
     expect(out).toEqual(base);
     expect(out).not.toBe(base);
+  });
+});
+
+describe("selectedSkillFromTurn", () => {
+  function baseTurn(over: Partial<HelperTurn> = {}): HelperTurn {
+    return {
+      goal: "which test for two groups?",
+      plan: { goal: "which test for two groups?", notes: "", actions: [] },
+      results: [],
+      staged_params: {},
+      figure_spec: null,
+      gaps: [],
+      provenance_actions: [],
+      ...over,
+    };
+  }
+
+  it("returns null when no select_skill result is present (gateway off / no route action)", () => {
+    expect(selectedSkillFromTurn(baseTurn())).toEqual({ skillId: null, gap: undefined });
+  });
+
+  it("returns null when the select_skill result is rejected", () => {
+    const turn = baseTurn({
+      results: [
+        {
+          action_id: "s1",
+          type: "select_skill",
+          target: "umap",
+          tier: "recompute",
+          status: "rejected",
+          effect: {},
+          errors: ["unknown skill id"],
+          gap: null,
+        },
+      ],
+    });
+    expect(selectedSkillFromTurn(turn)).toEqual({ skillId: null, gap: undefined });
+  });
+
+  it("extracts skillId from staged_params['_selected_skill'] (primary source)", () => {
+    const turn = baseTurn({
+      results: [
+        {
+          action_id: "s1",
+          type: "select_skill",
+          target: "umap_fallback",
+          tier: "recompute",
+          status: "staged",
+          effect: {},
+          errors: [],
+          gap: null,
+        },
+      ],
+      staged_params: { _selected_skill: "umap" },
+    });
+    expect(selectedSkillFromTurn(turn)).toEqual({ skillId: "umap" });
+  });
+
+  it("falls back to result.target when _selected_skill is absent from staged_params", () => {
+    const turn = baseTurn({
+      results: [
+        {
+          action_id: "s1",
+          type: "select_skill",
+          target: "volcano",
+          tier: "recompute",
+          status: "applied",
+          effect: {},
+          errors: [],
+          gap: null,
+        },
+      ],
+    });
+    expect(selectedSkillFromTurn(turn)).toEqual({ skillId: "volcano" });
+  });
+
+  it("accepts status='applied' as a valid selection", () => {
+    const turn = baseTurn({
+      results: [
+        {
+          action_id: "s1",
+          type: "select_skill",
+          target: "deg",
+          tier: "recompute",
+          status: "applied",
+          effect: {},
+          errors: [],
+          gap: null,
+        },
+      ],
+    });
+    expect(selectedSkillFromTurn(turn).skillId).toBe("deg");
+  });
+
+  it("reports a no_fitting_skill gap when present and no successful result", () => {
+    const gap: CapabilityGap = {
+      stage: "route",
+      intent: "run a flow cytometry skill",
+      unmet: "no_fitting_skill",
+      attempted: {},
+      context_hash: "abc123",
+      skill_id: null,
+    };
+    const turn = baseTurn({ gaps: [gap] });
+    expect(selectedSkillFromTurn(turn)).toEqual({ skillId: null, gap });
+  });
+
+  it("does not report the gap when a successful selection exists alongside it", () => {
+    const gap: CapabilityGap = {
+      stage: "route",
+      intent: "some other intent",
+      unmet: "no_fitting_skill",
+      attempted: {},
+      context_hash: "xyz",
+      skill_id: null,
+    };
+    const turn = baseTurn({
+      results: [
+        {
+          action_id: "s1",
+          type: "select_skill",
+          target: "gsea",
+          tier: "recompute",
+          status: "staged",
+          effect: {},
+          errors: [],
+          gap: null,
+        },
+      ],
+      gaps: [gap],
+    });
+    // A successful selection takes priority; the gap is not surfaced.
+    expect(selectedSkillFromTurn(turn)).toEqual({ skillId: "gsea" });
+  });
+
+  it("returns the rationale from the matching plan action when present", () => {
+    const turn = baseTurn({
+      plan: {
+        goal: "which test?",
+        notes: "",
+        actions: [
+          {
+            id: "s1",
+            type: "select_skill",
+            target: "volcano",
+            payload: {},
+            rationale: "volcano is the standard DE visualisation for two-group comparisons",
+          },
+        ],
+      },
+      results: [
+        {
+          action_id: "s1",
+          type: "select_skill",
+          target: "volcano",
+          tier: "recompute",
+          status: "applied",
+          effect: {},
+          errors: [],
+          gap: null,
+        },
+      ],
+    });
+    const result = selectedSkillFromTurn(turn);
+    expect(result.skillId).toBe("volcano");
+    expect(result.rationale).toBe(
+      "volcano is the standard DE visualisation for two-group comparisons",
+    );
+  });
+});
+
+/**
+ * INVARIANT: the catalog is keyed `selom.<slug>`, not the bare backend slug.
+ * A bare slug MUST NOT resolve directly — the route stage normalizes via `selom.${slug}`.
+ * If BE/FE slug conventions drift this test fails loudly in CI before a silent no-op
+ * reaches the user (the bug this guards: `onSelect("umap_scrna")` would set preselect to
+ * a key that `getSkill` cannot find, silently doing nothing).
+ */
+describe("slug normalization invariant (route stage / FIX 1 guard)", () => {
+  // "selom.umap_scrna" is verified to exist in lib/catalog/seed.ts — it is the first
+  // Selom-native entry and a stable integration point for this contract.
+  const bareSlug = "umap_scrna";
+  const catalogId = `selom.${bareSlug}`;
+
+  it("bare slug does NOT resolve in the catalog (direct lookup returns undefined)", () => {
+    expect(getSkill(bareSlug)).toBeUndefined();
+  });
+
+  it("normalized selom.<slug> resolves to the correct catalog entry", () => {
+    const skill = getSkill(catalogId);
+    expect(skill).toBeDefined();
+    expect(skill?.id).toBe(catalogId);
+  });
+
+  it("normalized id round-trips through getSkill and preserves the display name", () => {
+    const skill = getSkill(catalogId);
+    expect(skill?.name).toBe("UMAP (single-cell)");
   });
 });
 

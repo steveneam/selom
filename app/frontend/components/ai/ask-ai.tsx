@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/ui/cn";
 import { proposeActions } from "@/lib/ai/api";
-import { proposalsFromTurn } from "@/lib/ai/proposals";
+import { proposalsFromTurn, selectedSkillFromTurn } from "@/lib/ai/proposals";
 import type { AiProposal } from "@/lib/ai/types";
 import type { FigureSpec } from "@/lib/figure/figure-spec";
 import type { SkillParams } from "@/lib/skills/api";
@@ -51,7 +51,9 @@ export function AskAi({
   mode,
   context,
   disabled,
+  hint,
   onStaged,
+  onSelect,
 }: {
   stage: AiStage;
   label: string;
@@ -59,52 +61,102 @@ export function AskAi({
   mode: AiMode;
   context: AiContext;
   disabled?: boolean;
+  /**
+   * One-line helper shown below the input for mode="select" only — describes what the
+   * composer does so the user knows it pre-selects (not runs) the skill.
+   * e.g. "Pre-selects a skill below to confirm and run."
+   */
+  hint?: string;
   /** Callback for mode="staged" — receives the proposed param changes to queue. */
   onStaged?: (proposals: AiProposal[]) => void;
-  // later phase — onLive, onAdvice, onSelect, onDraft (one per mode)
+  /**
+   * Callback for mode="select" — receives the bare registry slug and must normalize,
+   * resolve, and install it. Returns the resolved skill display name on success, or
+   * `null` when the slug cannot be found in the catalog (unresolved → honest note shown).
+   */
+  onSelect?: (skillId: string) => string | null;
+  // later phase — onLive, onAdvice, onDraft (one per mode)
 }) {
   const [goal, setGoal] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [note, setNote] = React.useState<string | null>(null);
 
   async function send() {
-    // Only `staged` is wired in Phase 0; other modes are later phases.
-    if (mode !== "staged") return;
     const g = goal.trim();
     if (!g || busy) return;
-    setBusy(true);
-    setNote(null);
-    try {
-      const turn = await proposeActions({
-        stage,
-        skill_id: context.skillId,
-        params: context.params,
-        goal: g,
-        figure_spec: (context.figureSpec as Record<string, unknown> | null | undefined) ?? null,
-        capability_surface: context.capabilitySurface ?? null,
-      });
-      const proposals = proposalsFromTurn(turn);
-      if (proposals.length > 0) {
-        onStaged?.(proposals);
-        setGoal("");
-      } else if (turn.plan.actions.length > 0) {
-        // The gateway DID propose, but only cosmetic actions (restyle/relabel) — they don't enter the
-        // recompute queue, and applying them live from turn.figure_spec isn't wired yet (deferred,
-        // gateway-off). Say that honestly rather than "nothing to propose" (which would be a lie).
-        setNote(
-          `The AI suggested ${turn.plan.actions.length} cosmetic change${turn.plan.actions.length === 1 ? "" : "s"} (restyle/relabel); applying those live isn't wired into this flow yet, so there are no input changes to stage.`,
-        );
-      } else {
-        setNote(
-          turn.plan.notes ||
-            "No suggestions — the AI gateway is off or had nothing to propose. Your editor is unaffected.",
-        );
+
+    if (mode === "staged") {
+      setBusy(true);
+      setNote(null);
+      try {
+        const turn = await proposeActions({
+          stage,
+          skill_id: context.skillId,
+          params: context.params,
+          goal: g,
+          figure_spec: (context.figureSpec as Record<string, unknown> | null | undefined) ?? null,
+          capability_surface: context.capabilitySurface ?? null,
+        });
+        const proposals = proposalsFromTurn(turn);
+        if (proposals.length > 0) {
+          onStaged?.(proposals);
+          setGoal("");
+        } else if (turn.plan.actions.length > 0) {
+          // The gateway DID propose, but only cosmetic actions (restyle/relabel) — they don't enter the
+          // recompute queue, and applying them live from turn.figure_spec isn't wired yet (deferred,
+          // gateway-off). Say that honestly rather than "nothing to propose" (which would be a lie).
+          setNote(
+            `The AI suggested ${turn.plan.actions.length} cosmetic change${turn.plan.actions.length === 1 ? "" : "s"} (restyle/relabel); applying those live isn't wired into this flow yet, so there are no input changes to stage.`,
+          );
+        } else {
+          setNote(
+            turn.plan.notes ||
+              "No suggestions — the AI gateway is off or had nothing to propose. Your editor is unaffected.",
+          );
+        }
+      } catch (e) {
+        setNote(e instanceof Error ? e.message : "Couldn't reach the AI helper.");
+      } finally {
+        setBusy(false);
       }
-    } catch (e) {
-      setNote(e instanceof Error ? e.message : "Couldn't reach the AI helper.");
-    } finally {
-      setBusy(false);
+    } else if (mode === "select") {
+      setBusy(true);
+      setNote(null);
+      try {
+        const turn = await proposeActions({
+          stage,
+          skill_id: context.skillId,
+          params: context.params,
+          goal: g,
+        });
+        const sel = selectedSkillFromTurn(turn);
+        if (sel.skillId) {
+          const name = onSelect?.(sel.skillId);
+          if (name) {
+            setNote(
+              `Selected ${name} below — ${sel.rationale || "review the inputs and Apply."}`,
+            );
+            setGoal("");
+          } else {
+            setNote(
+              `The AI suggested "${sel.skillId}", which isn't available in this workspace.`,
+            );
+          }
+        } else if (sel.gap?.unmet === "no_fitting_skill") {
+          setNote(`No fitting skill for that — recorded as a gap.`);
+        } else {
+          setNote(
+            turn.plan.notes ||
+              "No suggestion — the AI gateway is off or had nothing to propose. Your picker is unaffected.",
+          );
+        }
+      } catch (e) {
+        setNote(e instanceof Error ? e.message : "Couldn't reach the AI helper.");
+      } finally {
+        setBusy(false);
+      }
     }
+    // Other modes (live, advisory, draft) are later phases — fall through silently.
   }
 
   return (
@@ -130,13 +182,16 @@ export function AskAi({
           }}
           placeholder={placeholder}
           disabled={disabled || busy}
-          aria-label="Describe what you want the AI to adjust"
+          aria-label={label}
           className="h-8 flex-1 text-xs"
         />
         <Button size="sm" disabled={disabled || busy || !goal.trim()} onClick={() => void send()}>
           {busy ? "Asking…" : <><CornerDownLeft /> Ask</>}
         </Button>
       </div>
+      {mode === "select" && hint && !note && (
+        <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{hint}</p>
+      )}
       {note && <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{note}</p>}
     </div>
   );
