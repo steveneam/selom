@@ -59,7 +59,7 @@ import { useFigureCrud } from "./hooks/use-figure-crud";
 import { useFigureRun } from "./hooks/use-figure-run";
 import { AiPanel } from "@/components/ai/ai-panel";
 import { AiProposalRow } from "@/components/ai/ai-proposal-row";
-import { AiProposeComposer } from "@/components/ai/ai-propose-composer";
+import { AskAi } from "@/components/ai/ask-ai";
 import { applyAcceptedProposals } from "@/lib/ai/proposals";
 import { useAiHelpers } from "./hooks/use-ai-helpers";
 
@@ -970,11 +970,17 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                   {/* AI Helpers (S5): a single-shot "Ask AI to tune these inputs" composer — its
                       proposals land in the pending-changes banner above. Degrades clean (the gateway
                       is off by default → an empty plan → a quiet note, the editor unaffected). */}
-                  <AiProposeComposer
-                    skillId={activeFigure.skillId}
-                    params={fdParams}
-                    figureSpec={figure.spec ?? activeFigure.spec}
-                    onProposals={addAiProposals}
+                  <AskAi
+                    stage="analyze"
+                    mode="staged"
+                    label="Ask AI to tune these inputs"
+                    placeholder="e.g. tighten the clusters"
+                    context={{
+                      skillId: activeFigure.skillId,
+                      params: fdParams,
+                      figureSpec: figure.spec ?? activeFigure.spec,
+                    }}
+                    onStaged={addAiProposals}
                     disabled={running != null}
                   />
                   {/* Isolated (Task B1): the Figure-data inputs are bespoke per skill — if a control
