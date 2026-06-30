@@ -439,7 +439,7 @@ MT_ID_SET = "id_set"                    # gene/term ID-set + shared-core sizes �
 MT_PROPORTION = "proportion"            # %s / variance-explained / composition — a few points
 MT_CONTINUOUS = "continuous"            # slope / R² / NES / fold / silhouette — engine-tolerant
 MT_GSEA_TERM_COUNT = "gsea_term_count"  # enriched-term counts — engine-sensitive, WIDE
-MT_INTEGRATION = "integration_score"    # batch-mixing / LISI — engine-sensitive, WIDE + sign
+MT_INTEGRATION = "integration_score"    # batch-mixing / LISI / kBET / ASW — engine-sensitive, WIDE magnitude
 
 # metric_type -> (rel_tol, close_tol, ints_exact, direction_close).
 METRIC_TYPE_TOLERANCES: dict[str, tuple[float, float, bool, bool]] = {
@@ -448,7 +448,12 @@ METRIC_TYPE_TOLERANCES: dict[str, tuple[float, float, bool, bool]] = {
     MT_PROPORTION:      (0.02, 0.15, False, False),
     MT_CONTINUOUS:      (0.05, 0.25, False, True),
     MT_GSEA_TERM_COUNT: (0.10, 0.30, False, False),
-    MT_INTEGRATION:     (0.10, 0.50, False, True),
+    # direction_close is FALSE: every integration metric is bounded-positive (LISI>=1, kBET/ASW/NMI
+    # in [0,1], ARI ~>0), so a sign-agreement check is trivially true and would short-circuit to CLOSE
+    # before the magnitude band — grading a genuine mixing collapse (e.g. kBET 0.85 printed vs 0.03
+    # computed) as reproduced. Engine-sensitivity (Melody vs Harmony) is captured by the WIDE MAGNITUDE
+    # band (10% exact / 50% close), which actually gates. (review-gauntlet HIGH 2026-06-30.)
+    MT_INTEGRATION:     (0.10, 0.50, False, False),
 }
 
 _TOL_FIELDS = ("rel_tol", "close_tol", "ints_exact", "direction_close")
@@ -465,7 +470,14 @@ def infer_metric_type(metric: str, skill_id: str | None = None) -> str:
     s = (skill_id or "").lower()
     if s in {"gsea", "ssgsea"} or "enrichedterm" in m or m.endswith("terms") or "goterm" in m:
         return MT_GSEA_TERM_COUNT
-    if s == "integration" or any(k in m for k in ("lisi", "mixing", "batchmix", "ikbr")):
+    # skill_id is the strong signal — it types EVERY mixing_metrics panel (ARI/NMI/ASW/silhouette
+    # included, whose bare names are too generic to match as substrings: "ari" in "variance",
+    # "silhouette" is a general clustering coefficient the `cluster` skill also reports). The
+    # substrings only catch a characteristic, UNAMBIGUOUS integration metric name when skill_id is
+    # absent (the auto-extract path) — "silhouette" is deliberately NOT here (gauntlet 2026-06-30).
+    if s in {"integration", "mixing_metrics"} or any(
+        k in m for k in ("lisi", "mixing", "batchmix", "ikbr", "kbet")
+    ):
         return MT_INTEGRATION
     if m in {"detotal", "deup", "dedown"}:
         return MT_DE_COUNT

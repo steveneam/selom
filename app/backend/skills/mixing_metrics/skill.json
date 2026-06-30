@@ -1,0 +1,37 @@
+{
+  "id": "mixing_metrics",
+  "version": "0.1.0",
+  "title": "Integration mixing metrics",
+  "engine": "python",
+  "omics": "scrna-seq",
+  "entrypoint": "skills.mixing_metrics.run:run",
+  "origin": "commodity",
+  "inputs": [{ "name": "matrix", "kind": "anndata|10x_mtx|h5ad", "required": true }],
+  "param_spec": {
+    "batch_key":     { "type": "str",  "default": "sample", "note": "obs column carrying the batch/library label (iLISI/kBET/ASW-batch)" },
+    "label_key":     { "type": "str",  "default": "", "note": "obs column with cell-type/ground-truth labels (enables cLISI/ARI/NMI/ASW-label); empty = those metrics N/A" },
+    "embedding_key": { "type": "str",  "default": "", "note": "obsm key to score; empty auto-resolves X_pca_melody -> X_pca_harmony -> X_emb -> X_pca, else computes PCA" },
+    "n_neighbors":   { "type": "int",  "default": 30, "min": 5, "max": 200, "note": "kBET neighbourhood size" },
+    "perplexity":    { "type": "int",  "default": 30, "min": 5, "max": 100, "note": "LISI kernel perplexity (uses ~3x neighbours)" },
+    "normalize":     { "type": "bool", "default": true, "note": "normalize_total + log1p before PCA when computing an embedding from raw counts" },
+    "n_pcs":         { "type": "int",  "default": 50, "min": 2, "max": 200, "note": "PCs when an embedding must be computed" }
+  },
+  "outputs": [{ "name": "figure", "kind": "plotly_spec" }],
+  "background": "Computes the standard single-cell integration-benchmark metrics from an embedding + a batch/label vector: iLISI (batch mixing) and cLISI (cell-type separation) as the perplexity-calibrated inverse-Simpson neighbourhood diversity; kBET acceptance (per-neighbourhood chi-squared of local vs global batch frequency); ARI and NMI of a KMeans(k=#labels) clustering vs the ground-truth labels; and batch/label silhouette widths. LISI and kBET are clean-room reimplementations from the published definitions (no GPL harmonypy/kBET code); ARI/NMI/silhouette use scikit-learn (BSD). Batch metrics need >=2 batches; label-dependent metrics report N/A without a label key. The graded metric the integration-benchmark paper class prints, that Selom's integration skill could not previously read back.",
+  "references": [
+    { "type": "publication", "title": "Fast, sensitive and accurate integration of single-cell data with Harmony", "authors": "Korsunsky I, Millard N, Fan J, et al.", "year": 2019, "doi": "10.1038/s41592-019-0619-0", "note": "LISI metric — clean-room reimplementation from the definition (the harmonypy compute_lisi lineage is GPL)." },
+    { "type": "publication", "title": "A test metric for assessing single-cell RNA-seq batch correction (kBET)", "authors": "Buttner M, Miao Z, Wolf FA, Teichmann SA, Theis FJ", "year": 2019, "doi": "10.1038/s41592-018-0254-1", "note": "kBET — clean-room reimplementation from the definition (the R kBET package is GPL)." },
+    { "type": "tool", "title": "scikit-learn", "note": "ARI / NMI / silhouette (BSD-3)." }
+  ],
+  "catalog": {
+    "name": "Integration mixing metrics",
+    "summary": "Score how well a batch-correction / integration mixed the batches while preserving cell-type structure: iLISI, cLISI, kBET, ARI, NMI and silhouette computed from an embedding + a batch (and optional cell-type) label. The numbers the integration-benchmark papers print. Chains after Melody integration (reads the corrected embedding) or runs standalone (computes PCA). LISI/kBET are clean-room, no GPL dependency.",
+    "category": "single-cell",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".h5ad", ".csv"],
+    "chains_with": ["integration", "umap_scrna"],
+    "license": "Open-source (scikit-learn BSD; LISI/kBET clean-room)",
+    "popularity": 55
+  }
+}

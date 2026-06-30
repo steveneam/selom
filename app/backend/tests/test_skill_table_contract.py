@@ -31,6 +31,7 @@ from skills.registry import list_skill_ids
 # the code — it is documentation with a mechanical guard, not a hand-maintained guess.
 NATIVE = {
     "volcano", "deg", "proteomics_de", "enrichment", "cepo",          # attach in the stub
+    "mixing_metrics",                                                  # attach in the stub + run_real
     "gsea", "ssgsea",                                                  # conditional attach (real data)
     "diff_abundance", "markers", "normalization_qc", "pseudotime_genes",  # attach in run_real only
     "erg_traces", "erg_bwave_bar", "erg_intensity_response", "erg_flicker",  # attach in the stub (proprietary)
@@ -43,7 +44,7 @@ L4_ONLY = {"go_graph", "pathway", "string_network"}
 
 # The native skills whose STUB attaches a table with default params (the rest attach only in
 # ``run_real`` or conditionally on real data — covered by the source check, not runnable stubless).
-STUB_NATIVE = {"volcano", "deg", "proteomics_de", "enrichment", "cepo", "erg_traces",
+STUB_NATIVE = {"volcano", "deg", "proteomics_de", "enrichment", "cepo", "mixing_metrics", "erg_traces",
                "erg_bwave_bar", "erg_intensity_response", "erg_flicker"}
 
 

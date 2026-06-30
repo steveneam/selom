@@ -11,8 +11,13 @@ non-graded panel only from its status, so a real "Selom has no skill for this me
 there as an ambiguous `no_golden` (the paper printed a number, but in a family Selom can't compute)
 and is invisible to the heuristic. Those gaps live here, lifted by hand from the findings notes._
 
-### Integration mixing-metrics — LISI / iLISI / kBET / ARI / NMI / silhouette
+### Integration mixing-metrics — LISI / iLISI / kBET / ARI / NMI / silhouette  ✅ SHIPPED 2026-06-30
 
+- **CLOSED by the `mixing_metrics` skill** (`skills/mixing_metrics/`, spec `docs/mixing-metrics/spec.md`):
+  iLISI/cLISI/kBET/ARI/NMI/ASW over an embedding + batch/label vector. LISI + kBET are clean-room
+  (no GPL harmonypy/kBET); ARI/NMI/silhouette via scikit-learn. The grader's `metric_type` now routes
+  `mixing_metrics` → `MT_INTEGRATION` (wide+sign), so a measured Melody↔Harmony delta isn't mislabelled
+  irreproducible. The original gap write-up is kept below for provenance.
 - **Hit by:** Harmony (Korsunsky 2019), `findings-harmony.md`. Every benchmark figure (Fig 1–6)
   scores batch integration with a **mixing metric**, and those are the only numbers the paper prints.
 - **Why it's a gap, not a data problem:** Selom has `integration` + the clean-room **Melody**
