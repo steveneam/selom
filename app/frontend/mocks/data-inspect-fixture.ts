@@ -96,6 +96,45 @@ const AXES: Record<string, [string, string]> = {
   proteomics: ["samples", "proteins"],
 };
 
+// Design-hint mock (Layer A ingest): mirrors engine.questionnaire for the ONE case a header-only
+// mock can infer — bulk condition labels from the sample column names. scRNA design needs the obs
+// table (not in the header), so dev:mock returns no design for it; verify scRNA design on the live
+// backend ([[selom-mock-is-wire-only-verify-real]]).
+const COLUMN_NAMES_KEY = "__column_names__";
+const REP_RE = /_\d+$/;
+const CONTROL_RE = /\b(wt|ctrl|control|wild[\s_-]?type|vehicle|dmso|untreated|naive|baseline|mock|sham|0h|day0|d0)\b/i;
+
+function mockDesign(kind: string, rawCols: string[]): Record<string, unknown> {
+  const empty = {
+    needs_design: false, source: "none", modality: kind,
+    group_candidates: [], best_group: null, sample_col: null, note: "",
+  };
+  if (kind !== "bulk_counts") return empty;
+  const sampleCols = rawCols.slice(1); // header-only: assume the first column is the gene label
+  const order: string[] = [];
+  const counts: Record<string, number> = {};
+  for (const c of sampleCols) {
+    const label = c.replace(REP_RE, "");
+    if (!(label in counts)) order.push(label);
+    counts[label] = (counts[label] ?? 0) + 1;
+  }
+  if (order.length < 2) return empty;
+  const reference =
+    order.find((n) => CONTROL_RE.test(n) || CONTROL_RE.test(n.replace(/[\s_-]*\d+$/, ""))) ?? null;
+  const levels = order.map((name) => ({ name, n_replicates: counts[name], replicate_unit: "samples" }));
+  return {
+    needs_design: true,
+    source: "column_names",
+    modality: kind,
+    group_candidates: [
+      { key: COLUMN_NAMES_KEY, label: "sample columns", levels, n_levels: order.length, reference_guess: reference },
+    ],
+    best_group: COLUMN_NAMES_KEY,
+    sample_col: null,
+    note: `inferred ${order.length} condition(s) from the sample column names`,
+  };
+}
+
 const NOTE: Record<string, string> = {
   erg: "ERG measurements table — used as-is. No matrix cleaning (gene filtering / normalization) applies.",
   de_results: "Pre-computed results table — used as-is. No cleaning needed.",
@@ -191,5 +230,6 @@ export function mockInspect(filename: string, header: string, override?: string)
       n_numeric_cols: nNumeric,
       fits,
     },
+    design: mockDesign(kind, rawCols),
   };
 }

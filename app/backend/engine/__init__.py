@@ -14,6 +14,7 @@ from engine.databundle import DataBundle, classify
 from engine.cleaning import CleaningPlan, DataProfile, plan_cleaning, profile_data
 from engine.ingest import clear_input_cache, ingest, ingest_cached, ingest_many
 from engine.qc import run_qc
+from engine.questionnaire import DesignHints, suggest_design_hints
 from engine.route import route_data, route_profile
 from engine.models import (
     ALL_KINDS,
@@ -39,6 +40,8 @@ __all__ = [
     "run_qc",
     "route_data",
     "route_profile",
+    "suggest_design_hints",
+    "DesignHints",
     "plan_cleaning",
     "profile_data",
     "CleaningPlan",

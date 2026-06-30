@@ -10,6 +10,7 @@ function result(over: Partial<InspectResult> = {}): InspectResult {
     qc: { ran: true, ok: true, blocked: false, flags: [], stats: {} },
     routing: null,
     dataFit: null,
+    design: null,
     ...over,
   };
 }

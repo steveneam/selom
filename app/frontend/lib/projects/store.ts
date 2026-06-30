@@ -143,17 +143,23 @@ export function mergeFigures(local: Figure[], server: Figure[]): Figure[] {
   });
 }
 
-/** Datasets carry LOCAL-ONLY fields too — `routing` + `dataFit`, the Slice-2 data-aware route the FE
- *  persists (owner D2: no backend column, intentionally not in to/fromApiDataset). On a server-wins
- *  merge re-attach them from the local row, else a reconcile (hydrate / window-focus, queue idle)
- *  would clobber the data-driven "Recommended for your data" chips on reload. Generalizes
- *  `mergeFigures`' aiProposals preservation. [[selom-fe-review-framework]] */
+/** Datasets carry LOCAL-ONLY fields too — `routing` + `dataFit` + `design`, the data-aware route +
+ *  intake-design prefill the FE persists (owner D2: no backend column, intentionally not in
+ *  to/fromApiDataset). On a server-wins merge re-attach them from the local row, else a reconcile
+ *  (hydrate / window-focus, queue idle) would clobber the data-driven "Recommended for your data"
+ *  chips + the questionnaire's design prefill on reload. Generalizes `mergeFigures`' aiProposals
+ *  preservation. [[selom-fe-review-framework]] */
 export function mergeDatasets(local: Dataset[], server: Dataset[]): Dataset[] {
   const localById = new Map(local.map((d) => [d.id, d]));
   return mergeById(local, server).map((d) => {
     const prev = localById.get(d.id);
     if (!prev) return d;
-    return { ...d, routing: d.routing ?? prev.routing, dataFit: d.dataFit ?? prev.dataFit };
+    return {
+      ...d,
+      routing: d.routing ?? prev.routing,
+      dataFit: d.dataFit ?? prev.dataFit,
+      design: d.design ?? prev.design,
+    };
   });
 }
 
@@ -292,6 +298,7 @@ export const projectStore = {
       qc?: import("./types").QcReport;
       routing?: import("./types").Dataset["routing"];
       dataFit?: import("./types").Dataset["dataFit"];
+      design?: import("./types").Dataset["design"];
     },
   ) {
     setState({
@@ -304,12 +311,13 @@ export const projectStore = {
               qc: patch.qc ?? d.qc,
               routing: patch.routing ?? d.routing,
               dataFit: patch.dataFit ?? d.dataFit,
+              design: patch.design ?? d.design,
             }
           : d,
       ),
     });
-    // routing/dataFit are LOCAL-ONLY (owner D2: persisted in the FE store, no backend column) — they
-    // ride the localStorage mirror + reconcile merge-preserve, NOT the PATCH (mirrors aiProposals).
+    // routing/dataFit/design are LOCAL-ONLY (owner D2: persisted in the FE store, no backend column) —
+    // they ride the localStorage mirror + reconcile merge-preserve, NOT the PATCH (mirrors aiProposals).
     queue.enqueue({
       coalesceKey: `ds:${id}`,
       run: () => api.patch(`/datasets/${id}`, { modality: patch.modality, qc: patch.qc }),

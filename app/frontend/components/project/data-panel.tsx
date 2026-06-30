@@ -6,15 +6,35 @@ import { IntakeQuestionnaire } from "@/components/intake/intake-questionnaire";
 import { Dropzone } from "./dropzone";
 import { CleaningReport } from "./cleaning-report";
 import { DataTypeStrip } from "./data-type-strip";
+import { DataFitVerdict } from "@/components/reproduction/data-fit-panel";
+import { ConfidenceChip } from "@/components/ui/confidence-chip";
+import { BAND_TONE, CONFIDENCE_META } from "@/lib/reproduction/data-fit";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/ui/cn";
 import { modalityColor } from "@/lib/catalog/modality";
+import { getSkill } from "@/lib/catalog/seed";
 import { datasetDisplayName } from "@/lib/lineage/family";
-import { detectModality, proposeForModality, type IntakeProposal } from "@/lib/intake/mock";
+import { detectModality, proposeForModality, type IntakeAnswers, type IntakeProposal } from "@/lib/intake/mock";
 import { combineData, inspectData, modalityFromKind, qcFromInspect, type DataTypeOverride } from "@/lib/intake/inspect";
+import { designRunParams, type DesignChoice } from "@/lib/intake/design";
 import { projectStore } from "@/lib/projects/store";
 import type { Dataset } from "@/lib/projects/types";
+
+/** Inject the confirmed experimental design (the questionnaire's confirm-card) into the proposal's
+ *  DE step — the `deg` runner reads these params directly (reference/treatment/condition_col/…) and
+ *  records them in provenance, so a gateway-off re-run reproduces. No design → the proposal is
+ *  unchanged (an already-computed DE table / unsupervised run needs none). build-spec §3b. */
+function withDesign(proposal: IntakeProposal | null, choice: DesignChoice | null): IntakeProposal | null {
+  if (!proposal || !choice) return proposal;
+  const dp = designRunParams(choice);
+  return {
+    ...proposal,
+    steps: proposal.steps.map((s) =>
+      s.skillId === "selom.deg" ? { ...s, params: { ...s.params, ...dp } } : s,
+    ),
+  };
+}
 
 export interface AnalyzeArgs {
   datasetId: string;
@@ -81,12 +101,13 @@ export function DataPanel({
       if (!result) return;
       const modality = modalityFromKind(result.kind);
       const qc = qcFromInspect(result);
-      // Persist the Slice-2 data-aware route alongside QC so the data-driven recommendations survive
-      // reload (the chips read it from the dataset, not from an in-session proposal).
-      const { routing, dataFit } = result;
-      projectStore.updateDatasetProfile(dataset.id, { modality, qc, routing, dataFit });
+      // Persist the Slice-2 data-aware route + the intake DESIGN prefill alongside QC so the data-driven
+      // recommendations AND the questionnaire's confirm-card prefill survive reload (read from the
+      // dataset, not an in-session proposal).
+      const { routing, dataFit, design } = result;
+      projectStore.updateDatasetProfile(dataset.id, { modality, qc, routing, dataFit, design });
       setActive((a) => (a && a.dataset.id === dataset.id
-        ? { ...a, dataset: { ...a.dataset, modality, qc, routing, dataFit } }
+        ? { ...a, dataset: { ...a.dataset, modality, qc, routing, dataFit, design } }
         : a));
     },
     [],
@@ -250,6 +271,9 @@ export function DataPanel({
               const color = modalityColor(d.modality);
               const isActive = active?.dataset.id === d.id;
               const warns = d.qc?.guardrails.filter((g) => g.level !== "info").length ?? 0;
+              // Slice-3 fit band: the persisted data-fit confidence (followups #2) — a glance at
+              // whether this dataset is a good fit for what it routes to, without opening it.
+              const fitBand = d.dataFit?.confidence;
               return (
                 <button
                   key={d.id}
@@ -283,6 +307,14 @@ export function DataPanel({
                         : ""}
                     </p>
                   </div>
+                  {fitBand && (
+                    <ConfidenceChip
+                      tone={BAND_TONE[fitBand]}
+                      label={CONFIDENCE_META[fitBand].label}
+                      size="xs"
+                      title={CONFIDENCE_META[fitBand].short}
+                    />
+                  )}
                   {warns > 0 && (
                     <span
                       title={`${warns} guardrail flag${warns === 1 ? "" : "s"}`}
@@ -326,13 +358,25 @@ export function DataPanel({
                 }
               />
             )}
+            {/* Slice-3 (followups #1): the own-data fit verdict on the intake surface — the best-
+                fitting analysis's confidence band, reusing the reproduction verdict component. */}
+            <DataFitVerdict
+              fit={active.dataset.dataFit?.fits[0]}
+              skillName={
+                active.dataset.dataFit?.fits[0]
+                  ? getSkill(`selom.${active.dataset.dataFit.fits[0].skill_id}`)?.name
+                  : undefined
+              }
+            />
             <IntakeQuestionnaire
               modality={active.dataset.modality}
-              onSubmit={(answers) =>
+              design={active.dataset.design}
+              routing={active.dataset.routing}
+              onSubmit={(answers: IntakeAnswers, choice: DesignChoice | null) =>
                 onAnalyze({
                   datasetId: active.dataset.id,
                   file: active.file,
-                  proposal: proposeForModality(active.dataset.modality, answers),
+                  proposal: withDesign(proposeForModality(active.dataset.modality, answers), choice),
                   designFile,
                 })
               }

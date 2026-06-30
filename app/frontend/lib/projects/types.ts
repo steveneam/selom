@@ -11,6 +11,7 @@ import type { FigureSpec } from "@/lib/figure/figure-spec";
 import type { DataCheck, DataRouting, FigureLegend, SkillGuardrail, SkillMethods, SkillProvenance, StatsTable } from "@/lib/skills/api";
 import type { DataFit } from "@/lib/reproduction/data-fit";
 import type { DataFitSummary } from "@/lib/intake/inspect";
+import type { DesignHints } from "@/lib/intake/design";
 import type { AiProposal } from "@/lib/ai/types";
 
 export type Modality = "scRNA-seq" | "bulk RNA-seq" | "proteomics" | "unknown";
@@ -100,6 +101,13 @@ export interface Dataset {
    */
   routing?: DataRouting | null;
   dataFit?: DataFitSummary | null;
+  /**
+   * The deterministic DESIGN prefill for the intake questionnaire (Layer A ingest), from
+   * `/data/inspect` — candidate group/condition columns + levels + replicate counts + a control
+   * guess. Client-only (like `routing`/`dataFit`): persisted in the FE store, no backend column, so
+   * the layered confirm-card re-prefills after reload (preserved across reconcile by `mergeDatasets`).
+   */
+  design?: DesignHints | null;
   createdAt: number;
 }
 

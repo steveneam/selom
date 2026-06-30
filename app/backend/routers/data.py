@@ -17,7 +17,7 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
     # routing inventory in extract.ingest is the paper-side complement. `sheet` selects an xlsx sheet;
     # `hint` forces the modality (Kind); `profile` is the user's L3 data-type override (e.g. "erg").
     from engine import ALL_KINDS, ingest_cached, plan_cleaning, profile_data, route_profile, run_qc
-    from engine import compat
+    from engine import compat, suggest_design_hints
 
     if hint is not None and hint not in ALL_KINDS:
         raise HTTPException(status_code=400, detail=f"hint must be one of {ALL_KINDS}")
@@ -49,6 +49,11 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
             "n_numeric_cols": fa.n_numeric_cols,
             "fits": [f.model_dump() for f in fits],
         }
+        # The DESIGN layer for the intake questionnaire (Layer A ingest, deterministic, AI-off): the
+        # candidate group/condition column(s), their levels + replicate counts, and a control guess —
+        # what the engine did NOT detect before. The confirmed answers map onto the deg run params
+        # the runner already records (docs/intake-questionnaire/build-spec.md). Fail-soft → no design.
+        design = suggest_design_hints(bundle)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     finally:
@@ -62,6 +67,7 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
         "qc": bundle.qc.model_dump(),
         "routing": routing.model_dump(),           # suggested skill pipeline + honest note
         "data_fit": data_fit,                      # is-this-good-data verdict for own data (Slice 2)
+        "design": design.model_dump(),             # deterministic design prefill for the intake questionnaire
     }
 
 

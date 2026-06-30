@@ -1,6 +1,7 @@
 import type { CleaningStep, Guardrail, Modality, QcReport } from "@/lib/projects/types";
 import type { DataQcReport, DataRouting } from "@/lib/skills/api";
 import type { ConfidenceBand, DataFit } from "@/lib/reproduction/data-fit";
+import type { DesignHints } from "@/lib/intake/design";
 
 /**
  * The real engine front door for own-data intake — `POST /api/data/inspect`.
@@ -81,6 +82,7 @@ interface InspectResponse {
   qc: DataQcReport | null;
   routing: DataRouting | null;
   data_fit: DataFitSummary | null;
+  design: DesignHints | null;
 }
 
 export interface InspectResult {
@@ -92,6 +94,10 @@ export interface InspectResult {
   /** Per-skill data-fit + table shape (Slice 2) — persisted on the dataset, drives the data-aware
    *  "Recommended for your data" chips + the route composer's data context. */
   dataFit: DataFitSummary | null;
+  /** The deterministic DESIGN prefill for the intake questionnaire (Layer A ingest): candidate
+   *  group/condition columns, levels + replicate counts, a control guess. Persisted on the dataset
+   *  (client-only, like routing/dataFit) so the confirm-card re-prefills after reload. */
+  design: DesignHints | null;
 }
 
 /** Override choices the user can force (the L3 layer). `erg` rides the `profile` param; the
@@ -115,6 +121,7 @@ export async function inspectData(file: File, override?: DataTypeOverride): Prom
     return {
       kind: body.kind, profile: body.profile, plan: body.cleaning_plan,
       qc: body.qc, routing: body.routing, dataFit: body.data_fit ?? null,
+      design: body.design ?? null,
     };
   } catch {
     return null; // offline / dev:mock without a handler / uninspectable — caller falls back
