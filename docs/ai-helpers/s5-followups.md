@@ -14,6 +14,12 @@ passes over the S5 diff. The **bugs** they found are fixed in the S5 commit; the
   suggestions uncounted (header + tab badge now count all outstanding) · mock duplicate proposal id ·
   header badge missing `aria-label`.
 
+> **REORG 2026-06-30 — these now have homes (FE Experience Spine).** This backlog is no longer the
+> task-of-record; it is the source list. Routing: **#0** → `docs/ai-cross-stage-entry-points/spec.md`
+> (Layer A; figure-styling split to `docs/pillar-2-direct-manipulation/spec.md`). **#11–14** (+ cheap
+> #1/#5/#6) → that spec's **Phase 5 "AI-helper polish"**. **#2** reachability → its **Phase 3 (grade)**.
+> Index: `docs/fe-experience-spine/README.md`. Items below stay as the detailed evidence the specs cite.
+
 ## Deferred — enhancements (route through the retro)
 0. **Cross-stage AI entry points (owner-flagged 2026-06-30).** The "Ask AI" composer is wired ONLY at
    the figure-data (analyze) stage — intentional for S5. But the gateway spine (S1–S4) already supports

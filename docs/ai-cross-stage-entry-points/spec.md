@@ -1,131 +1,175 @@
-# Cross-stage AI entry points — design spec (build deferred)
+# Cross-stage AI entry points (Layer A — AI Assist) — build spec
 
-_2026-06-30 · NEXT#2, `s5-followups.md` #0. **Design-first / Prism-level** — the gateway spine (S1–S4)
-already supports stage-typed actions everywhere, but the "Ask AI" composer is wired ONLY at the figure-
-data (analyze) stage. This spec maps each stage's loop so the per-stage composers can be built against an
-agreed design rather than ad hoc. **This is a design deliverable; nothing is built from it yet** — the
-open questions at the end are for owner review._
+_2026-06-30 22:05 +10:00 (Australia/Sydney) · revised from the build-spec draft per owner directive
+(2026-06-30): **figure-styling AI moves to pillar-2** (the editor surface owns it); the **AI-explain
+enhancement backlog folds in here**. This is **Layer A** of the FE Experience Spine
+(`docs/fe-experience-spine/README.md`) — the horizontal AI-assist fabric over the engine spine.
+Build-approved (owner picked "cross-stage AI first"); each phase gets a thin build note +
+review-gauntlet + fe-review before code._
+
+## What the owner locked (2026-06-30)
+
+1. **Sequence — cross-stage AI first**, ahead of the quick FE wins and the Prism pillar.
+2. **AI interaction model — adopted in full**: **one surface** (the one-click default *flows into* chat;
+   never two disjoint modes), apply-discipline keyed to stage stakes (`live`/`staged`/`advisory`/`select`/
+   `draft`), **statistics advisory-only** (propose-never-auto).
+3. **Figure-styling AI → pillar-2.** The OUTPUT-stage `restyle_figure`/`relabel` composer is *conducted*
+   via this layer's `<AskAi mode="live">` but its surface + presets live in the editor; it ships as
+   pillar-2 slice 7 (`docs/pillar-2-direct-manipulation/spec.md`), not as a phase here.
+4. **Editable Prism table = hybrid by column** — a pillar-2 decision (the editor surface), cross-referenced
+   only.
 
 ## Goal
 
-Give the user an "Ask AI" affordance at each engine-spine stage where the gateway can already act, so the
-AI assists across the whole pipeline — not just figure-data tuning — while preserving the two invariants
-that make the write-path trustworthy:
+An "Ask AI" affordance at the engine-spine stages this layer owns, under one interaction model, preserving
+the seven spine invariants — especially: **AI compiles away** (every suggestion → a deterministic
+param/override; gateway-off re-run reproduces it) and **server-trusted provenance** (every figure-producing
+write stamped by the one chokepoint `provenance.stamp_ai_actions`; the FE posts the delta, never the
+attribution).
 
-1. **AI compiles away** — every AI suggestion resolves to a deterministic param/override the engine runs;
-   re-running from recorded params with no gateway reproduces the result.
-2. **Server-trusted provenance** — every AI write is stamped by the one chokepoint (NEXT#1,
-   `docs/provenance-chokepoint/spec.md`); the FE posts the delta, never the attribution tag.
+## The apply-discipline contract (the spine of every stage)
 
-## The spine stages and what the gateway already supports
+One reusable composer, one rule-set, parameterized per stage by **default affordance** + **apply-discipline**
+(both scale with consequence × reversibility).
 
-`ActionContext.stage ∈ {ingest, join, route, analyze, grade, output}`. Registered actions per stage
-(`ai/registry.py`, `ai/models.py ACTION_TYPES`):
+| Stage | Surface | Actions | Default affordance | **Apply-discipline** | Owner |
+|---|---|---|---|---|---|
+| **route** (Run-skill) | skill picker / Skill Match | `select_skill` | suggested-skill **chips** (+ rationale/confidence) | **SELECT** — pre-selects in picker; user confirms + runs | Layer A |
+| **ingest** (Data) | intake / data-check pane | `set_profile`·`set_design`·`map_columns`·`apply_cleaning_step` | one-click auto-detect (column/control mapping) | **STAGED** — auto-propose, human-confirm; joins the shared queue | Layer A |
+| **analyze** (Figure-data) | Ask-AI composer + pending banner | `set_param`·`add_filter`·`remove_filter` | goal box + chat | **STAGED** — pending queue, one explicit re-run | Layer A — ✅ shipped (S5; the template) |
+| **grade** (Statistics) | the Score / Stats stage | `explain_score` (informational) | **conversational / advisory** | **ADVISORY** — propose-only; never auto-apply | Layer A |
+| **methods** | the methods/legend card | `methods.build_body` (not a gateway action) | one-click ledger draft + chat polish | **DRAFT** — inline, AI-marked, user-editable | Layer A |
+| **output** (Styling) | figure styling controls | `restyle_figure`·`relabel` | one-click presets + chat | **LIVE** — JSON-Patch, instant + undoable | **pillar-2** (conducted via this composer) |
 
-| Stage | Surface today | Actions available | Wired? |
-|---|---|---|---|
-| **ingest** (Data) | the intake / data-check pane | `set_profile`, `set_design`, `map_columns`, `apply_cleaning_step` | ❌ no entry point |
-| **join** | (multi-file combine) | — (no actions yet) | n/a |
-| **route** (Run-skill) | the skill picker / Skill Match | `select_skill` | ❌ no entry point |
-| **analyze** (Figure-data) | the Ask-AI composer + pending-changes banner | `set_param`, `add_filter`, `remove_filter` | ✅ shipped (S5) |
-| **grade** (Score) | the Score stage | `explain_score` (informational) | ✅ shipped (AI-EXPLAIN) |
-| **output** (Styling) | the figure styling controls | `restyle_figure`, `relabel` (cosmetic) | ❌ no entry point |
+**Apply-discipline definitions:** **LIVE** (immediate JSON-Patch, undoable; cosmetic only) · **STAGED**
+(shared pending banner → one explicit re-run via the chokepoint) · **ADVISORY** (proposed with
+rationale/assumptions, *never* auto-applied; a separate deliberate apply) · **SELECT** (pre-selection; the
+*run* carries the decision into provenance) · **DRAFT** (AI-marked, fully editable prose on a deterministic
+ledger draft).
 
-So three stages need entry points (**ingest**, **route**, **output**); **analyze** + **grade** are done.
+**Net:** the "magic button" never returns a black box — it returns a reviewable param diff (OLD→NEW + why)
+a human could have typed, with undo + the ✨ provenance marker. The literature's *fix* for the magic-button
+trust problem, free from Selom's invariants.
 
-## The unifying pattern (reuse, don't re-invent)
+## Phase 0 — the reusable `<AskAi>` composer (precursor, no behaviour change)
 
-The analyze loop is the template. Generalize it into one reusable composer, parameterized per stage:
+Generalize `components/ai/ai-propose-composer.tsx` (today hardcoded to analyze — "Ask AI to tune these
+inputs") into a stage-parameterized composer. The backend is **already ready**: `proposeActions(req)`
+(`lib/ai/api.ts`) accepts `req.stage` and only defaults it to `"analyze"`.
 
-- **One `<AskAi stage=… context=…>` composer** — a text input + submit that calls
-  `proposeActions({ stage, skill_id, params, goal, figure_spec?, capability_surface? })`, maps the
-  `HelperTurn` via `proposalsFromTurn`, and routes the proposals to the stage's surface. The composer
-  itself is stage-agnostic; what differs is **(a)** the context it posts and **(b)** where the proposals
-  land + how they apply.
-- **Two action tiers drive two surfaces** (already true in analyze, generalize):
-  - **cosmetic** (applied live, JSON-Patch) → the change is immediate + undoable. Used by `output`
-    (`restyle_figure`/`relabel`) and any live-preview ingest tweak.
-  - **recompute** (staged) → enters a pending-changes queue and applies on ONE explicit re-run through
-    the #1 chokepoint. Used by `analyze` and by `ingest`/`route` (they change what the next run computes).
-- **Every write goes through the NEXT#1 chokepoint.** Ingest/route/output writes that produce a new
-  figure must stamp provenance via `stamp_ai_actions` — no stage gets its own attribution path.
+```tsx
+<AskAi
+  stage="route" | "ingest" | "analyze" | "grade" | "output"
+  label={…} placeholder={…}
+  context={{ skillId, params, figureSpec?, capabilitySurface? }}
+  mode="staged" | "live" | "advisory" | "select" | "draft"
+  onStaged | onLive | onAdvice | onSelect | onDraft={…}
+/>
+```
+
+- Keep `proposeActions` → `proposalsFromTurn` for `staged`.
+- Add the **live cosmetic apply path** the composer notes is *not wired yet* (`ai-propose-composer.tsx`
+  lines 57–63) — map `restyle_figure`/`relabel` from `turn.figure_spec` to JSON-Patch via
+  `useFigureStore().commit`. **This path is consumed by pillar-2's styling-AI**, but it lives in the shared
+  composer so every `mode="live"` caller reuses it.
+- The S5 analyze composer becomes `<AskAi stage="analyze" mode="staged">` — **byte-identical** (regression
+  guard the analyze path).
+- Gateway-off (locked): always renders (discoverable) but states honestly it's off and changes nothing.
 
 ## Per-stage loop design
 
-### ingest (Data stage) — `set_profile` · `set_design` · `map_columns` · `apply_cleaning_step`
+### Phase 1 — route (Run-skill) · SELECT
+- **Surface:** `<AskAi stage="route" mode="select">` on the skill picker / Skill Match results.
+- **Substrate:** the deterministic **Skill Match** keyword router stays *primary*
+  ([[selom-skill-keyword-index]]); `select_skill` is the AI **verifier/ranker** over it. The Lane-P quick
+  win **P3 — repoint the "top tags" from `popularity` to Skill-Match `route_data` suggestions** lands here
+  (it's the deterministic substrate the AI chip sits on); P2 (skill-name tooltips) + P4 (fill empty space)
+  ride along opportunistically.
+- **Effect:** the proposal **pre-selects** a registry-validated `skill_id` (like the sweep `Suggest`
+  pre-select); user confirms + runs. Unfitting intent → a `no_fitting_skill` gap, never a registry widen.
+- **Provenance (locked):** record only the **resulting run** (AI-routed), not the bare selection.
 
-- **Surface:** an "Ask AI about this data" composer on the data-check / intake pane (next to the
-  layered data-type label + cleaning plan).
-- **Context posted:** `stage:"ingest"`, the bundle's `data_columns` (already on `ActionContext`), the
-  profile + cleaning plan, the candidate `skill_id` if one is selected.
-- **Actions → effects:** `map_columns` → the `_column_override` reserved param (P1-HOOKS); `set_design`
-  → the design sheet selection; `apply_cleaning_step` → the cleaning toggle param; `set_profile` → the
-  data-type label override. None execute on their own — they **stage** into the next run's params.
-- **Apply mechanism:** these are *pre-run* settings. Two design choices (open question Q1): either they
-  feed the **same** analyze-stage staged-params queue (so the run that eventually fires carries them), or
-  the Data stage gets its own "apply to next run" affordance. Recommendation: stage into the shared run
-  params; surface in the pending-changes banner tagged by stage.
-- **Provenance:** recorded on the eventual run's `provenance.actions[]` via the chokepoint (these are the
-  AI's contribution to *how the data was read*, which is reproduction-critical).
+### Phase 2 — ingest (Data) · STAGED · most entangled
+- **Surface:** `<AskAi stage="ingest" mode="staged">` on the data-check / intake pane. Default = one-click
+  auto-detect (gene-ID column, control/treatment mapping).
+- **Context:** the bundle's `data_columns` (on `ActionContext`), profile + cleaning plan, candidate
+  `skill_id`.
+- **Effects:** `map_columns`→`_column_override` (P1-HOOKS) · `set_design`→design sheet · `apply_cleaning_step`
+  →cleaning toggle · `set_profile`→data-type label. All **stage** into the next run's params; high
+  consequence → the mapping is **always shown for confirmation**, never silent.
+- **Apply (locked):** enters the **shared** pending queue (below), tagged by stage; one re-run carries it.
+- **Provenance:** on the eventual run's `provenance.actions[]` via the chokepoint (how the data was read is
+  reproduction-critical).
+- **Note:** intersects the on-hold intake-questionnaire rethink ([[selom-intake-questionnaire-rethink]]) —
+  the AI auto-detect is the dynamic counterpart; sequence after/alongside deciding that form's fate.
 
-### route (Run-skill stage) — `select_skill`
+### Phase 3 — grade (Statistics) · ADVISORY · the deliberate-friction stage
+- **Surface:** `<AskAi stage="grade" mode="advisory">` on the Statistics / scorecard stage + the
+  reachability fix below.
+- **Near-term (no new backend actions):**
+  - Wire the **already-built-but-unreachable** `explain_score` onto the scorecard + `propose_sweep` onto the
+    sweep UI (`s5-followups.md` #2 — both tested + MSW-mocked, no UI today).
+  - The advisory composer answers "which test/correction?" with rationale + **assumptions + citations**,
+    *propose-only* — it does **not** mutate the analysis.
+- **Deferred (new grade-stage actions — own backend spec):** a true "apply a different test/correction"
+  needs registered actions (`grade` has only the informational `explain_score` today). When built, apply
+  stays **advisory** (a separate click after an assumptions checklist, GraphPad-style), never one-click.
+- **The owner's "AI = general change of the dataset"** lands in the **editable table (hybrid-by-column)**,
+  pillar-2 — cross-referenced, not built here.
 
-- **Surface:** an "Ask AI which analysis" composer on the skill picker / Skill Match results.
-- **Context posted:** `stage:"route"`, the data profile + columns, the user's goal.
-- **Action → effect:** `select_skill` proposes a `skill_id` (validated against the registry — the gateway
-  cannot invent a skill; an unfitting one becomes a `no_fitting_skill` gap).
-- **Apply mechanism:** selecting a skill is a navigation/selection act, not a figure write. Recommendation:
-  the proposal pre-selects the skill in the picker (like the sweep `Suggest` pre-select), the user
-  confirms + runs. The **run** itself then carries the route decision into provenance via the chokepoint
-  (the run was AI-routed). Open question Q2: does a route suggestion alone (no run yet) need a provenance
-  record, or only the resulting run? Recommendation: only the run (no figure exists until then).
-- **Overlap:** Skill Match already deterministically routes papers→skills ([[selom-skill-keyword-index]]).
-  `select_skill` is the AI verifier over that, not a replacement — keep the deterministic router primary.
+### Phase 4 — methods · DRAFT
+- **Surface (near-term):** a one-click "Draft methods/legend" + chat-polish `<AskAi stage="methods"
+  mode="draft">` on the **current** methods/legend card (`PublishConfidence`) — ships without waiting on
+  the IA split.
+- **Effect:** a deterministic draft from the run ledger via `methods.build_body` + `legends.py`
+  ([[selom-lit-synthesizer]]); chat refines ("match Nature's format", "add the FDR threshold").
+- **Migration:** when pillar-2 splits out the **Methods & Legend** stage (pillar-2 slice 6), this composer
+  moves there unchanged. (Pillar-2 owns the stage/IA; this layer owns the content generation.)
 
-### output (Styling stage) — `restyle_figure` · `relabel` (cosmetic)
+### Phase 5 — AI-helper polish (the AI-explain enhancement backlog)
+Fold in the deferred AI-explain enhancements from `docs/ai-helpers/s5-followups.md` — they are L-AI surface
+quality, not new stages:
+- **#11** sweep AI-prose Copy (carry `[AI-generated]`, symmetry with the explain Copy).
+- **#12** `approved_by` UI surface — NEXT#1 derives a server-trusted approver on every AI run; surface it in
+  the ✨ marker tooltip (`ai-marker.tsx`, cheap) and later the Activity feed.
+- **#13** staged-vs-committed model cue — label the staged preview's model "proposed by" (the documented
+  propose→apply drift, `docs/provenance-chokepoint/spec.md`).
+- **#14** "updated for the re-scored run" cue — a brief signal when an open explanation auto-swaps on
+  rescore (today only the spinner flashes).
+- Plus the still-open S5 enhancements where cheap: **#1** bulk "Accept all / Dismiss all" in the banner ·
+  **#5** re-ask dedup (replace previous suggestions for a param) · **#6** changed-control highlight on the
+  Marks/Threshold editors. (#2 explain/sweep reachability is built in Phase 3; #3/#4/#7 tracked separately.)
 
-- **Surface:** an "Ask AI" composer in the figure styling controls.
-- **Context posted:** `stage:"output"`, the current `figure_spec`, the goal.
-- **Actions → effects:** cosmetic JSON-Patch applied **live** to the figure spec (no recompute).
-- **Apply mechanism:** immediate + undoable (the analyze cosmetic path already exists). Cosmetic changes
-  don't alter the data/result, so the provenance question is lighter — open question Q3: do cosmetic AI
-  restyles get a `provenance.actions[]` entry (for "this figure's styling was AI-assisted") or are they
-  styling-only and uncredited? Recommendation: record them (consistency + honesty), tier `cosmetic`.
+## The pending-changes queue (one shared, stage-partitioned)
 
-## Cross-cutting UX decisions (the Prism-level calls — for review)
+One banner, partitioned by stage (already partitions by author). Holds **STAGED** changes only (`ingest` +
+`analyze`/params); one explicit re-run applies them together via the chokepoint. **LIVE** (output) applies
+immediately (no queue); **ADVISORY** (grade) is advisory cards (never auto-applied); **SELECT** (route) is a
+pre-selection; **DRAFT** (methods) is inline prose.
 
-- **Q1 — one pending queue or per-stage queues?** Recommendation: ONE pending-changes banner that
-  partitions by stage (the banner already partitions by author). Ingest + analyze recompute proposals
-  share the queue; the single explicit re-run applies them together. Avoids N banners.
-- **Q2 — route suggestion provenance.** Recommendation: record only the resulting run, not a bare
-  selection.
-- **Q3 — cosmetic-restyle provenance.** Recommendation: record (tier cosmetic) for honesty.
-- **Q4 — composer placement / density.** Each stage's composer must not crowd the deterministic controls
-  (the manual path stays primary; AI is assistive). fe-review (V·R·D·A·R·N) gates each.
-- **Q5 — gateway-off posture.** With the gateway off (default) every composer proposes nothing (empty
-  plan). The entry point should still render (discoverable, "lights up" when a key lands) but say so
-  honestly — same lit/unlit pattern as the explain helpers.
+## Phasing (build order)
 
-## Recommended phasing (when build is approved)
+0. **Extract `<AskAi>`** (no behaviour change; analyze byte-identical).
+1. **route** — SELECT; folds Lane-P P3 (suggested tags) + P2/P4.
+2. **ingest** — STAGED auto-detect-confirm; the shared queue; most careful (data-contract gates).
+3. **grade** — ADVISORY; `explain_score`/`propose_sweep` reachability first, then the advisory composer.
+4. **methods** — DRAFT on the current card; migrates to the dedicated stage later.
+5. **AI-helper polish** — the explain backlog (#11–14 + cheap #1/#5/#6).
 
-1. **Extract the reusable `AskAi` composer** from the analyze stage (no behaviour change) — the precursor.
-2. **output (styling)** first — cosmetic-only, lowest risk (no recompute, no data-contract gates), proves
-   the generalized composer.
-3. **route** next — pre-select + confirm, overlaps the existing sweep-suggest pattern.
-4. **ingest** last — highest value but most entangled (it changes how the data is read → the run params →
-   the data-contract gates); needs the most careful staged-vs-applied design.
+Each phase = its own build note + `review-gauntlet` (correctness) + `fe-review` (V·R·D·A·R·N) + verify on
+real data + live backend (NOT dev:mock) + commit (named paths, no AI sign-off).
 
-Each phase = its own build spec + review-gauntlet + fe-review.
+## Invariants (the seven spine invariants — all hold)
 
-## Invariants any build must hold
+Render = f(spec) · AI compiles away · one provenance chokepoint (no parallel path) · apply-discipline by
+consequence (statistics advisory-only) · deterministic path primary (one surface per stage; manual controls
+primary; AI output renders *in those controls*, never a separate artifact) · one pending queue ·
+inference-first editor contract. Plus: `tier` always registry-derived, never trusted from a proposal;
+unfulfillable-but-coherent intents → gaps (review-only), never auto-widen the registry.
 
-- The deterministic/manual path stays primary and fully usable with the gateway off.
-- Every figure-producing AI write stamps provenance via the NEXT#1 chokepoint — no parallel path.
-- `tier` is always registry-derived, never trusted from a proposal.
-- Unfulfillable-but-coherent intents become gaps (review-only), never auto-widen the registry.
+## Cross-references (not built here)
 
-## Open questions for review
-
-Q1 (shared vs per-stage pending queue) · Q2 (route provenance) · Q3 (cosmetic-restyle provenance) ·
-Q4 (composer placement per stage) · Q5 (gateway-off entry-point posture). Resolving these unblocks the
-phase-1 build spec.
+Pillar-2 (`docs/pillar-2-direct-manipulation/spec.md`) owns: figure-styling AI (slice 7), the editable
+table (hybrid-by-column), the methods/legend stage split, the color board, canvas chrome. The FE Experience
+Spine (`docs/fe-experience-spine/README.md`) is the index. The provenance chokepoint
+([[selom-provenance-stamping-chokepoint]]) is the one write-attribution every phase routes through.
