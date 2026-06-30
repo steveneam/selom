@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { GitCompareArrows, Info, Loader2 } from "lucide-react";
+import { Check, Copy, GitCompareArrows, Info, Loader2 } from "lucide-react";
 
 import { tierLabel } from "@/lib/reproduction/api";
 import type { FileFitReport } from "@/lib/reproduction/data-fit";
@@ -137,6 +137,7 @@ function ExplainScore({ scorecard }: { scorecard: Scorecard }) {
   const [loading, setLoading] = React.useState(false);
   const [result, setResult] = React.useState<ExplainResponse | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [copied, setCopied] = React.useState(false);
 
   async function run() {
     const payload = buildScorecardPayload(scorecard);
@@ -144,6 +145,7 @@ function ExplainScore({ scorecard }: { scorecard: Scorecard }) {
     setLoading(true);
     setError(null);
     setResult(null);
+    setCopied(false); // a re-score swap must not leave a stale "Copied" over text the user never copied
     try {
       setResult(await explain({ request: "explain_score", stage: "grade", scorecard: payload }));
     } catch (e) {
@@ -161,6 +163,41 @@ function ExplainScore({ scorecard }: { scorecard: Scorecard }) {
     setOpen(true);
     await run();
   }
+
+  // #8 — Copy the grounded explanation (a reproducer wants to capture the prose).
+  async function copy() {
+    if (!result?.text) return;
+    // Attribution travels with exported AI prose: the ✨ "AI" tag lives only on-screen, so a pasted
+    // explanation would otherwise read as the user's own. Prepend a marker for AI-generated text;
+    // a deterministic "Grounded summary" is copied verbatim (fe-review A-attributable, 2026-06-30).
+    const payload = result.source === "ai" ? `[AI-generated]\n\n${result.text}` : result.text;
+    try {
+      // No optional chaining: when navigator.clipboard is absent (non-secure context) accessing
+      // .writeText throws → caught → we do NOT flash a false "Copied" over an empty clipboard.
+      await navigator.clipboard.writeText(payload);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable/blocked → no false confirmation; the text stays on screen to select */
+    }
+  }
+
+  // #9 — refresh on re-score. ExplainScore caches the result; if the scorecard changes (a re-scored
+  // run) we must not show stale text. Key on the flat payload the helper actually reads: re-fetch when
+  // OPEN, drop the cache when CLOSED so the next open is fresh. (run() captures the latest scorecard.)
+  const payloadKey = React.useMemo(
+    () => JSON.stringify(buildScorecardPayload(scorecard) ?? null),
+    [scorecard],
+  );
+  const prevKey = React.useRef(payloadKey);
+  React.useEffect(() => {
+    if (prevKey.current === payloadKey) return; // initial mount or no change
+    prevKey.current = payloadKey;
+    // Re-sync the cached explanation to the changed score: re-fetch if open, else drop the stale cache.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional re-sync to an external scorecard change
+    if (open) void run(); else setResult(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run() reads the fresh scorecard closure
+  }, [payloadKey, open]);
 
   return (
     <div className="mt-3">
@@ -195,7 +232,18 @@ function ExplainScore({ scorecard }: { scorecard: Scorecard }) {
                 <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   Explanation
                 </span>
-                <ExplainSourceBadge source={result.source} />
+                <div className="flex items-center gap-2">
+                  <ExplainSourceBadge source={result.source} />
+                  <button
+                    type="button"
+                    onClick={copy}
+                    aria-label={copied ? "Copied" : "Copy explanation"}
+                    className="inline-flex cursor-pointer items-center gap-1 rounded border border-border bg-background/60 px-1.5 py-0.5 text-[10px] font-medium text-foreground/75 transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 [&_svg]:size-3"
+                  >
+                    {copied ? <Check className="text-emerald-500" /> : <Copy />}
+                    {copied ? "Copied" : "Copy"}
+                  </button>
+                </div>
               </div>
               <p className="text-xs leading-relaxed text-foreground/85">{result.text}</p>
             </>

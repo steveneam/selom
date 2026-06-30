@@ -54,3 +54,22 @@ recommender useful offline)._
     (grounded + reproducible); when `SELOM_AI_GATEWAY=live`, the `explain` `text` carries the AI's narrative
     reasoning, which the chip panel currently drops. Add an AI-attributed prose line (with the ✨ badge) below
     the chips when `source==="ai"`.
+
+## Deferred — fe-review gaps over the NEXT#1 + NEXT#3 diff (2026-06-30)
+
+_The confirmed A-attributable finding (Copy strips the AI tag) + the Copy false-positive + the stale-Copied-
+on-rescore edge shipped in the NEXT#3 commit. The Copy `focus-visible` ring shipped too. These are the
+deliberately-deferred enhancements the fe-review G1 (jobs-to-be-done) pass surfaced._
+11. **Sweep AI-prose has no Copy** — `ExplainScore` got a Copy button but the new sweep AI-prose line
+    (`source==="ai"`) is hand-select-only. Add the same attributed Copy for symmetry (carry `[AI-generated]`).
+12. **`approved_by` has no UI surface** — NEXT#1 now derives a server-trusted `approved_by` on every AI run,
+    but the applied ✨ marker tooltip (`ai-marker.tsx`) shows only actor·model·approved_at and the Activity
+    History row shows none of it. Surface the approver (the audit trail records who the user can't read). Cheap
+    in the marker tooltip; the Activity feed is a bigger add.
+13. **Staged-vs-committed model cue** — pre-commit the ✨ marker shows the client-held `proposal.model` (the
+    proposing model); post-commit it shows the server-stamped `action.model`. With the delta refactor the FE no
+    longer sends model, so the staged preview's model is the *proposing* gateway and can differ from the
+    apply-time one (the documented propose→apply drift, `docs/provenance-chokepoint/spec.md`). Add a reconciling
+    signal at the Re-run step, or label the staged model as "proposed by".
+14. **"Updated for the new score" cue** — the auto refresh-on-rescore re-fetches silently (only the spinner
+    flashes). Add a brief "updated for the re-scored run" cue when an open explanation swaps.

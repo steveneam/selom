@@ -135,6 +135,58 @@ def _deterministic_explain(request_type: str, data: dict, goal: str) -> str:
     return "unavailable"
 
 
+# ---------------------------------------------------------------------------
+# Live-gateway explain prompt (shared by both live gateways — NEXT#3 tightening)
+#
+# The live model was paraphrasing schema-less numbers (calling `panel_count`
+# "reviewers"). The fix is a labelled prompt + a system rule that forbids renaming
+# or inventing entities — used identically by VercelAIGateway and PydanticAIGateway
+# so the two cannot drift. The deterministic fallback above is untouched.
+# ---------------------------------------------------------------------------
+
+EXPLAIN_SYSTEM_PROMPT = (
+    "You are an analytical explainer for a scientific figure-reproduction tool. "
+    "You explain or suggest based ONLY on the structured data provided — you never "
+    "fabricate analytical results or values. Use each field with EXACTLY the meaning "
+    "given in the prompt; do NOT rename, re-interpret, or translate a field into a "
+    "different concept, and do NOT introduce entities that are not in the data "
+    "(there are no reviewers, comments, ratings, authors, or users here). "
+    "Be concise (≤120 words)."
+)
+
+
+def build_explain_prompt(request_type: str, data: dict, goal: str) -> str:
+    """The labelled user prompt for a live ``explain`` call — grounds each field by name.
+
+    Lists the meaning of every field the model will see (so ``panel_count`` is "figure
+    panels graded", never "reviewers") and appends the literal JSON so the values are
+    exact. Used by both live gateways; the deterministic path does not need it.
+    """
+    lines = [f"Request: {request_type}", f"User goal: {goal or '(none)'}"]
+    if request_type == "explain_score":
+        lines += [
+            "The data is a reproducibility SCORECARD for one paper's figures.",
+            "Field meanings (use these EXACTLY; do not rename or re-interpret):",
+            "- score: reproducibility score 0-100 (can the figure be regenerated from the data).",
+            "- tier: the reproducibility tier label for that score.",
+            "- selom_confidence: 0-100 confidence in OUR OWN reconstruction (a property of the tool).",
+            "- panel_count: the NUMBER OF FIGURE PANELS graded — NOT reviewers, comments, or people.",
+            "- findings: counts of outcome categories (e.g. reproduced, paper_irreproducible).",
+            "- coverage: a plain-language note on what was covered.",
+            "Explain what the score means and how to improve reproducibility, grounded only in these values.",
+        ]
+    elif request_type == "propose_sweep":
+        lines += [
+            "The data is the declared parameter SWEEP SPACE for a skill; each key is a tunable knob.",
+            "Each knob carries: label, type (range/number/select/switch), and its value space "
+            "(min/max/step, options, or current value).",
+            "Suggest which parameter(s) are most worth sweeping and why, grounded ONLY in the declared "
+            "value spaces — you cannot claim figure impact without running. Do not invent knobs not listed.",
+        ]
+    lines.append(f"Data (JSON): {json.dumps(data, indent=2)}")
+    return "\n".join(lines)
+
+
 def _operator_input_key(request_type: str, data: dict) -> str | None:
     """Derive a stable per-INPUT key for an operator explain lookup.
 

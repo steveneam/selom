@@ -8,6 +8,7 @@ import { type ParamField } from "@/lib/catalog/params";
 import { useSkillParams } from "@/lib/catalog/use-skill-params";
 import { explain } from "@/lib/ai/api";
 import { buildSweepSpace } from "@/lib/ai/explain-inputs";
+import { ExplainSourceBadge } from "@/components/ai/explain-source-badge";
 import type { ExplainResponse } from "@/lib/ai/types";
 import type { SkillParams } from "@/lib/skills/api";
 import type { ParamValue } from "@/lib/lineage/diff";
@@ -178,6 +179,15 @@ export function SweepForm({
             <p className="mt-1.5 text-[11px] text-muted-foreground">
               {suggestion.suggestions!.find((s) => s.param === param)!.reason}
             </p>
+          )}
+          {/* #10 — the AI's narrative reasoning, surfaced ONLY when the gateway produced it
+              (source==="ai"). The picks above stay deterministic + unbadged (grounded, reproducible);
+              this prose is the AI value-add, carrying the ✨ "AI" badge so the glyph never lies. */}
+          {suggestion.source === "ai" && suggestion.text && (
+            <div className="mt-2 flex flex-col gap-1 border-t border-border/60 pt-2">
+              <ExplainSourceBadge source="ai" />
+              <p className="text-[11px] leading-relaxed text-foreground/80">{suggestion.text}</p>
+            </div>
           )}
         </div>
       ) : null}

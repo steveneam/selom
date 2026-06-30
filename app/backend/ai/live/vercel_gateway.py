@@ -34,12 +34,6 @@ logger = logging.getLogger(__name__)
 
 _RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
 
-_EXPLAIN_SYSTEM = (
-    "You are an analytical explainer.  You explain or suggest based ONLY on the "
-    "structured data provided — you never fabricate analytical results or values. "
-    "Be concise (≤120 words)."
-)
-
 # Appended to the closed-vocabulary action system prompt for the JSON-only propose path.
 _JSON_INSTRUCTION = (
     '\n\nReturn ONLY a JSON object, no prose, no markdown fences:\n'
@@ -125,13 +119,13 @@ class VercelAIGateway:
 
     def explain(self, request_type: str, data: dict, goal: str) -> str:
         """Return AI-generated explanatory text grounded in ``data`` (degrade-clean)."""
-        from ai.gateway import _deterministic_explain
+        from ai.gateway import EXPLAIN_SYSTEM_PROMPT, _deterministic_explain, build_explain_prompt
 
         try:
             text = self._chat(
                 [
-                    {"role": "system", "content": _EXPLAIN_SYSTEM},
-                    {"role": "user", "content": self._explain_user_prompt(request_type, data, goal)},
+                    {"role": "system", "content": EXPLAIN_SYSTEM_PROMPT},
+                    {"role": "user", "content": build_explain_prompt(request_type, data, goal)},
                 ],
                 max_tokens=min(self._max_tokens, 400),
             ).strip()
@@ -151,16 +145,6 @@ class VercelAIGateway:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
-
-    @staticmethod
-    def _explain_user_prompt(request_type: str, data: dict, goal: str) -> str:
-        return "\n".join(
-            [
-                f"Request: {request_type}",
-                f"Goal: {goal}",
-                f"Data: {_json.dumps(data, indent=2)}",
-            ]
-        )
 
     def _propose_inner(self, context: ActionContext, goal: str) -> ActionPlan:
         # Lazy import: reuse the closed-vocabulary system prompt, the bounded prompt builder,

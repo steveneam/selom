@@ -22,6 +22,7 @@ from ai.gateway import (
     NullActionGateway,
     OperatorActionGateway,
     _deterministic_explain,
+    build_explain_prompt,
 )
 from ai.live.vercel_gateway import VercelAIGateway
 from ai.models import ActionContext
@@ -92,6 +93,51 @@ def test_vercel_explain_degrades_on_transport_error():
     assert gw.explain("explain_score", data, "g") == _deterministic_explain(
         "explain_score", data, "g"
     )
+
+
+# ---------------------------------------------------------------------------
+# NEXT#3 — tightened explain prompt (stop the field-name paraphrase)
+# ---------------------------------------------------------------------------
+
+def test_vercel_explain_prompt_labels_fields_and_forbids_renaming():
+    """The live prompt names each scorecard field (panel_count = figure panels, NOT reviewers) and the
+    system rule forbids renaming/inventing entities — so the model stops paraphrasing the schema."""
+    captured: dict = {}
+
+    def handler(req):
+        captured["body"] = json.loads(req.content)
+        return _completion("ok")
+
+    gw = _gateway(handler)
+    gw.explain("explain_score", {"scorecard": {"score": 80, "panel_count": 6}}, "explain it")
+
+    msgs = captured["body"]["messages"]
+    system = next(m["content"] for m in msgs if m["role"] == "system")
+    user = next(m["content"] for m in msgs if m["role"] == "user")
+    assert "do NOT rename" in system and "reviewers" in system
+    assert "panel_count" in user and "FIGURE PANELS" in user and "NOT reviewers" in user
+
+
+def test_build_explain_prompt_grounds_both_request_types():
+    """The shared prompt builder labels scorecard fields and describes the sweep space."""
+    sc = build_explain_prompt("explain_score", {"scorecard": {"panel_count": 3}}, "g")
+    assert "panel_count" in sc and "NOT reviewers" in sc and "reproducibility" in sc.lower()
+    sw = build_explain_prompt("propose_sweep", {"sweep_space": {"resolution": {"type": "range"}}}, "g")
+    assert "SWEEP SPACE" in sw and "do not invent knobs" in sw.lower()
+    # The literal data rides along so values stay exact.
+    assert '"panel_count": 3' in sc
+
+
+def test_both_live_gateways_use_the_shared_explain_prompt():
+    """No drift: both live gateways must ground explain via the one shared builder (NEXT#3)."""
+    from pathlib import Path as _P
+
+    backend = _P(__file__).resolve().parents[1]
+    for mod in ("ai/live/vercel_gateway.py", "ai/live/pydantic_gateway.py"):
+        src = (backend / mod).read_text(encoding="utf-8")
+        assert "build_explain_prompt" in src and "EXPLAIN_SYSTEM_PROMPT" in src, (
+            f"{mod} must use the shared build_explain_prompt + EXPLAIN_SYSTEM_PROMPT (no prompt drift)."
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -227,22 +227,13 @@ class PydanticAIGateway:
         prompt instructs the model to use only the supplied deterministic data —
         never to fabricate analytical values.
         """
-        import json as _json_inner
-
         from pydantic_ai import Agent
         from pydantic_ai.models.anthropic import AnthropicModel, AnthropicModelSettings
 
-        system = (
-            "You are an analytical explainer.  You explain or suggest based ONLY on the "
-            "structured data provided — you never fabricate analytical results or values. "
-            "Be concise (≤120 words)."
-        )
-        prompt_lines = [
-            f"Request: {request_type}",
-            f"Goal: {goal}",
-            f"Data: {_json_inner.dumps(data, indent=2)}",
-        ]
-        prompt = "\n".join(prompt_lines)
+        from ai.gateway import EXPLAIN_SYSTEM_PROMPT, build_explain_prompt
+
+        system = EXPLAIN_SYSTEM_PROMPT
+        prompt = build_explain_prompt(request_type, data, goal)
 
         model_instance = AnthropicModel(self._model)
         model_settings: AnthropicModelSettings = AnthropicModelSettings(
