@@ -90,18 +90,32 @@ inputs") into a stage-parameterized composer. The backend is **already ready**: 
 - **Provenance (locked):** record only the **resulting run** (AI-routed), not the bare selection.
 
 ### Phase 2 — ingest (Data) · STAGED · most entangled
-- **Surface:** `<AskAi stage="ingest" mode="staged">` on the data-check / intake pane. Default = one-click
-  auto-detect (gene-ID column, control/treatment mapping).
-- **Context:** the bundle's `data_columns` (on `ActionContext`), profile + cleaning plan, candidate
-  `skill_id`.
-- **Effects:** `map_columns`→`_column_override` (P1-HOOKS) · `set_design`→design sheet · `apply_cleaning_step`
-  →cleaning toggle · `set_profile`→data-type label. All **stage** into the next run's params; high
-  consequence → the mapping is **always shown for confirmation**, never silent.
-- **Apply (locked):** enters the **shared** pending queue (below), tagged by stage; one re-run carries it.
+**Owner-decided (2026-06-30, Q4): the ingest surface is a DYNAMIC, LAYERED questionnaire that the AI
+pre-fills** — not an `<AskAi>` box beside a static form. This activates the on-hold intake-questionnaire
+rethink ([[selom-intake-questionnaire-rethink]]) with a direction, and makes the questionnaire a **coupled
+deliverable with its own spec** (`docs/intake-questionnaire/spec.md` — written from the SpatialGE
+end-to-end review; carries the dispatch matrix + the two-layer model). The two pieces:
+
+- **The dynamic questionnaire (deterministic; the primary path).** Layered:
+  - **Layer 1 (structure):** from the detected data modality + intended analysis, decide *which*
+    sections/questions to even show (e.g. raw counts + ≥2 groups → ask: group column? n conditions?
+    replicates per condition?). Minimal question set, parameterized by (modality × analysis).
+  - **Layer 2 (details):** the per-entity expansion — e.g. 6 detected conditions → 6 labelled boxes
+    (**prefilled** when the deterministic engine is confident), with **add/remove** conditions by the user.
+  - **Anti-overwhelming principle (the SpatialGE lesson):** progressive disclosure + smart defaults +
+    hide-expert-knobs + plain language. SpatialGE exposes too much at once; Selom must not.
+- **The ingest AI (this phase) = auto-detect that PRE-FILLS the questionnaire.** `<AskAi stage="ingest">`
+  (one-click "auto-detect") proposes `map_columns`→`_column_override` (P1-HOOKS) · `set_design`→design
+  sheet · `apply_cleaning_step`→cleaning toggle · `set_profile`→data-type label — landing as **prefilled
+  questionnaire answers the user confirms/edits**, never silent. Deterministic path primary: the
+  questionnaire is fully usable with the gateway off (the engine's own detection fills what it can).
+- **Apply (locked):** confirmed answers **stage** into the next run's params via the **shared** pending
+  queue; one re-run carries them.
 - **Provenance:** on the eventual run's `provenance.actions[]` via the chokepoint (how the data was read is
   reproduction-critical).
-- **Note:** intersects the on-hold intake-questionnaire rethink ([[selom-intake-questionnaire-rethink]]) —
-  the AI auto-detect is the dynamic counterpart; sequence after/alongside deciding that form's fate.
+- **Sequencing:** this is the most entangled phase (it changes how the data is read → run params →
+  data-contract gates) AND now carries a coupled questionnaire-redesign. Keep it **last** in Layer A;
+  write the `intake-questionnaire` spec (post-SpatialGE-review) before building.
 
 ### Phase 3 — grade (Statistics) · ADVISORY · the deliberate-friction stage
 - **Surface:** `<AskAi stage="grade" mode="advisory">` on the Statistics / scorecard stage + the

@@ -84,6 +84,13 @@ _Technical sequencing is cheap/foundational-first; the **★ last-mile-core** ta
 (the interview north-star) — the slices that, together, make the Illustrator/Inkscape round-trip
 unnecessary. Prioritise landing the ★ set._
 
+0. **Canvas shell** (owner-decided 2026-06-30, interview Q3 — **full Inkscape-style rails up front**) — stand
+   up the editor frame first so the IA doesn't churn slice-to-slice: **tools rail (left) · command +
+   contextual-controls bar (top) · color-palette strip (bottom) · the artboard as hero (centre)**, with
+   empty/placeholder rails the later slices populate. This is the container; gridlines/color-board/rulers/
+   guides/draw-tools dock into it. Relocate the current tabbed inspector's groups into the right
+   contextual-controls bar. *Bigger early IA change, accepted by the owner over the incremental option.*
+   `fe-review` + `impeccable` gate the shell layout before the feature slices fill it.
 1. **Gridline controls** — a Style-panel group writing native Plotly layout patches
    (`showgrid/gridcolor/gridwidth/griddash` + `minor` major/minor + `dtick` spacing). Zero new infra;
    validates "Style panel writes layout patches". **Ship first.**
@@ -95,14 +102,24 @@ unnecessary. Prioritise landing the ★ set._
    `plotly_relayout`/resize. Same technique as `mark-drag.ts`. *(Alignment = an export cause.)*
 4. **★ Guides + snap-to-guide** — draggable H/V guides from the rulers; snap objects to guides + gridlines.
    Extends the ruler overlay; reuses the imperative drag plumbing. (Angled/axonometric guides = overkill.)
-5. **★ Annotation & drawing layer** (interview Q4 — promoted to core; the direct export cause) — free
-   **text boxes · arrows · callouts · lines · basic shapes** (rectangle, ellipse) placed on the figure.
+5. **★ Annotation & drawing layer** (interview — promoted to core; the direct export cause). Owner's
+   actual Illustrator toolset, in priority order:
+   - **(a) Significance bars + asterisks** — the special, scientific-specific one (generic vector editors
+     don't do it well; GraphPad's "stars on graph"). A bracket spanning two/more groups with a
+     `*`/`**`/`***`/`ns` label. **Semi-data-aware:** ideally it reads the p-value from the Statistics
+     table (so the asterisks are *correct*, not hand-typed) — a clean GRADE↔OUTPUT integration. Built as a
+     tagged `layout.shapes` bracket + an `annotation`, positioned via the overlay's `d2p`/`l2p`.
+   - **(b) Arrows + callout lines** — pointer arrows / leader lines (`layout.annotations` with `arrowhead`,
+     or `line` shapes).
+   - **(c) Free text labels/titles** — floating text boxes (panel letters A/B/C, gene names, custom
+     titles) as `paper`/`pixel`-referenced `layout.annotations`.
+   - **(d) Boxes / shapes / highlights** (secondary — owner did not flag these as a current export cause):
+     rectangle/ellipse/shaded regions via Plotly's native draw tools.
    Technical path: Plotly's **native draw tools** (`config.modeBarButtonsToAdd:
-   ['drawline','drawrect','drawcircle','drawopenpath','eraseshape']`) writing `layout.shapes`, + free text
-   as `paper`/`pixel`-referenced `layout.annotations`, + the overlay for selection/move handles. Stays
-   reproducible (shapes/annotations live in the spec; WYSIWYG export) and stays undoable (one `commit` per
-   add/move). **Hard line: basic primitives only — NO node/Bézier/path-boolean editing** (the Inkscape
-   trap, §7.5).
+   ['drawline','drawrect','drawcircle','drawopenpath','eraseshape']`) writing `layout.shapes`, free text +
+   arrows as `layout.annotations`, + the overlay for selection/move handles. Stays reproducible
+   (shapes/annotations live in the spec; WYSIWYG export) and undoable (one `commit` per add/move).
+   **Hard line: basic primitives only — NO node/Bézier/path-boolean editing** (the Inkscape trap, §7.5).
 6. **Editable table** (§4) — `derivePlotTable` + hybrid-by-column + manual-override marker. Includes the
    **white-table restyle** (Lane-P P1) as its visual precursor. Build the capabilities in the owner's
    priority order (interview Q3): **(1) fix/tweak a plotted value** [live, marked override] → **(2)
@@ -114,13 +131,18 @@ unnecessary. Prioritise landing the ★ set._
    recorded as a `provenance.actions[]` entry, tier `cosmetic`. *Conducted via Layer A's `<AskAi>`
    composer, but the surface/presets live in the editor* — this is the figure-styling AI folded out of the
    cross-stage spec per the owner directive.
-9. **Journal-styles phase-2 hookup** — the style **Store** / import-your-own / capture-as-a-style on top
-   of the shipped style registry ([[selom-journal-styles-feature]]); the "examples from other journals"
-   the owner wants AI to draw on for styling.
+9. **Journal-styles phase-2 hookup — DEFERRED (owner, 2026-06-30, interview Q1).** Owner is unsure a
+   journal/format *preset* is worth building now: GraphPad Prism doesn't have one, so it's not table-stakes;
+   it would be a *huge* time-saver **if** done well and **if** Selom is the final export destination (the
+   north-star), but it's hard to implement now. So: the styling-AI (slice 8) does **generic** aesthetic
+   changes (colour/font/line+text size) from the user's own input/examples **without** depending on a
+   journal-preset registry; the preset **Store** / capture-as-a-style stays parked
+   ([[selom-journal-styles-feature]]), revisited once the editor is the real export destination.
 
-**Toolbar layout** (across the slices): tools-left / commands + contextual controls-top / palette-bottom
-(Inkscape ergonomics) + the artboard as hero (figure-forward, already an owner-decided IA in
-figure-editor-contract §3.7).
+**Toolbar layout — DECIDED (owner, interview Q3): the full Inkscape-style rails, committed up front**
+(slice 0) — tools-left / commands + contextual-controls-top / palette-bottom + the artboard as hero
+(figure-forward, figure-editor-contract §3.7). The owner chose this over evolving the current tabbed
+inspector incrementally.
 
 ## 6. Methods/legend stage split (the IA change)
 
@@ -156,14 +178,16 @@ language imply it.
 
 ## 9. Owner decisions that gate the build
 
-1. **Run the full Prism discipline?** Research is **done** (canvas research, 2026-06-30). Do an **owner
-   interview** (how *you* edit a figure today; which Prism/Inkscape features you actually reach for) before
-   the design pass — *recommended*, matches pillar-1.
-2. **First slice = gridline controls** (cheapest, validates the loop), then color board? *Recommend yes.*
+**RESOLVED (owner, 2026-06-30):** Prism discipline run — interview **done** (`interview.md`). · Toolbar IA
+= **full Inkscape rails up front** (slice 0). · Draw-tools toolset = **significance bars + arrows/callouts +
+free text** core, boxes/shapes secondary (slice 5). · Journal presets = **deferred** (slice 9). ·
+Editable-table edits = **hybrid by column**, sequenced fix-value→relabel→highlight→show/reorder (§4).
+
+**STILL OPEN:**
+2. **First feature slice after the shell** = gridline controls (cheapest, validates the layout-patch loop),
+   then color board? *Recommend yes.*
 3. **Editable-table column language** — how to visually distinguish live-editable vs re-run columns
-   (colour? icon? section split?). A `fe-review` + `impeccable` design call before slice 5.
-4. **Toolbar IA** — adopt tools-left / commands-top / palette-bottom now, or evolve the current tabbed
-   inspector incrementally? (Affects how disruptive slices 1–4 feel.)
+   (colour? icon? section split?). A `fe-review` + `impeccable` design call before slice 6.
 5. **Sequencing vs Layer A** — pillar-2 design in parallel with the L-AI build (owner picked "cross-stage
    AI first"), or strictly after? *Recommend: design in parallel (it's writing), build after L-AI's first
    phases.*

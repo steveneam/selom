@@ -79,7 +79,9 @@ A uniform `<AskAi>` at each stage; one surface (the one-click default *flows int
 apply-discipline per invariant 4. **Figure-styling AI moved OUT of here → pillar-2** (it's intrinsic to the
 editor surface). Stages owned here: **route · ingest · analyze (shipped) · grade (advisory) · methods
 (draft)**. The **AI-explain enhancement backlog** (`docs/ai-helpers/s5-followups.md` #11–14, + #1–7) folds
-in here as the "AI-helper polish" slice.
+in here as the "AI-helper polish" slice. The **ingest** phase carries a coupled deliverable — the
+**dynamic, layered intake questionnaire** (`docs/intake-questionnaire/spec.md`): the engine prefills it
+(L1–L3 deterministic), the ingest `<AskAi>` sharpens it (L4 ✨); it is Layer A's *last*, most-entangled phase.
 
 ## 2. Layer E — Direct Manipulation / Prism phase 2 (`docs/pillar-2-direct-manipulation/spec.md`)
 
