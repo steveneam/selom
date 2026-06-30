@@ -30,6 +30,11 @@ export interface AiContext {
   params?: SkillParams;
   figureSpec?: FigureSpec | null;
   capabilitySurface?: Record<string, unknown> | null;
+  // Slice 2 — data-aware routing (mode="select"). The data DESCRIPTION (columns + engine kind +
+  // numeric-col count); the server derives the fit verdict itself. Null when no dataset is inspected.
+  dataColumns?: string[] | null;
+  dataKind?: string | null;
+  dataNumericCols?: number | null;
 }
 
 /**
@@ -128,6 +133,11 @@ export function AskAi({
           skill_id: context.skillId,
           params: context.params,
           goal: g,
+          // Data-aware routing: lets the gateway score its suggested skill against the real data
+          // (the select_skill compat gate). Omitted fields → the server skips the check (fail-soft).
+          data_columns: context.dataColumns ?? undefined,
+          data_kind: context.dataKind ?? undefined,
+          data_n_numeric_cols: context.dataNumericCols ?? undefined,
         });
         const sel = selectedSkillFromTurn(turn);
         if (sel.skillId) {

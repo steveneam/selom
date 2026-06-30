@@ -81,9 +81,12 @@ export function DataPanel({
       if (!result) return;
       const modality = modalityFromKind(result.kind);
       const qc = qcFromInspect(result);
-      projectStore.updateDatasetProfile(dataset.id, { modality, qc });
+      // Persist the Slice-2 data-aware route alongside QC so the data-driven recommendations survive
+      // reload (the chips read it from the dataset, not from an in-session proposal).
+      const { routing, dataFit } = result;
+      projectStore.updateDatasetProfile(dataset.id, { modality, qc, routing, dataFit });
       setActive((a) => (a && a.dataset.id === dataset.id
-        ? { ...a, dataset: { ...a.dataset, modality, qc } }
+        ? { ...a, dataset: { ...a.dataset, modality, qc, routing, dataFit } }
         : a));
     },
     [],

@@ -1,5 +1,6 @@
 import type { CleaningStep, Guardrail, Modality, QcReport } from "@/lib/projects/types";
 import type { DataQcReport, DataRouting } from "@/lib/skills/api";
+import type { ConfidenceBand, DataFit } from "@/lib/reproduction/data-fit";
 
 /**
  * The real engine front door for own-data intake — `POST /api/data/inspect`.
@@ -58,6 +59,20 @@ export interface CleaningPlan {
   note: string;
 }
 
+/**
+ * The data-fit summary the engine returns for the dropped file (backend /data/inspect `data_fit`,
+ * Slice 2): each routed skill scored against the actual data, plus the table shape the FE forwards
+ * to /ai/propose as the data context (`columns` / `n_numeric_cols`). `fits` reuses the per-skill
+ * {@link DataFit} wire shape (one source with the reproduction surface).
+ */
+export interface DataFitSummary {
+  quality: number;
+  confidence: ConfidenceBand;
+  columns: string[];
+  n_numeric_cols: number;
+  fits: DataFit[];
+}
+
 interface InspectResponse {
   filename: string;
   kind: string;
@@ -65,6 +80,7 @@ interface InspectResponse {
   cleaning_plan: CleaningPlan;
   qc: DataQcReport | null;
   routing: DataRouting | null;
+  data_fit: DataFitSummary | null;
 }
 
 export interface InspectResult {
@@ -73,6 +89,9 @@ export interface InspectResult {
   plan: CleaningPlan;
   qc: DataQcReport | null;
   routing: DataRouting | null;
+  /** Per-skill data-fit + table shape (Slice 2) — persisted on the dataset, drives the data-aware
+   *  "Recommended for your data" chips + the route composer's data context. */
+  dataFit: DataFitSummary | null;
 }
 
 /** Override choices the user can force (the L3 layer). `erg` rides the `profile` param; the
@@ -93,7 +112,10 @@ export async function inspectData(file: File, override?: DataTypeOverride): Prom
     if (!res.ok) return null;
     const body = (await res.json()) as InspectResponse;
     if (!body?.profile || !body?.cleaning_plan) return null;
-    return { kind: body.kind, profile: body.profile, plan: body.cleaning_plan, qc: body.qc, routing: body.routing };
+    return {
+      kind: body.kind, profile: body.profile, plan: body.cleaning_plan,
+      qc: body.qc, routing: body.routing, dataFit: body.data_fit ?? null,
+    };
   } catch {
     return null; // offline / dev:mock without a handler / uninspectable — caller falls back
   }

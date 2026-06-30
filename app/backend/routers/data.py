@@ -42,6 +42,11 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
         data_fit = {
             "quality": fa.quality,
             "confidence": fits[0].confidence if fits else ("uncertain" if fa.loadable else "unreadable"),
+            # Slice 2 (data-aware routing): the table shape the FE forwards to /ai/propose as the
+            # data context (data_columns / data_n_numeric_cols), so the route composer's skill
+            # suggestion is scored against the real data. Already on the FileAssessment — free.
+            "columns": fa.columns,
+            "n_numeric_cols": fa.n_numeric_cols,
             "fits": [f.model_dump() for f in fits],
         }
     except ValueError as e:

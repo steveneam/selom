@@ -26,6 +26,11 @@ export interface ProposeRequest {
   goal: string;
   figure_spec?: Record<string, unknown> | null;
   capability_surface?: Record<string, unknown> | null;
+  // Slice 2 — data context for data-aware routing (the route-stage select_skill gate). The server
+  // derives the fit verdict from these via engine.compat.fit; the client never asserts compatibility.
+  data_columns?: string[];
+  data_kind?: string;
+  data_n_numeric_cols?: number;
 }
 
 /**

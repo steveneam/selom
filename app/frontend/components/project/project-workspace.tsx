@@ -124,6 +124,13 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [proposal, setProposal] = React.useState<IntakeProposal | null>(null);
   const [datasetId, setDatasetId] = React.useState<string | undefined>(undefined);
   const [lastFile, setLastFile] = React.useState<File | null>(null);
+  // The dataset the workbench is acting on. Its persisted data-aware route (Slice 2) sources the
+  // data-fit "Recommended for your data" chips + the route composer's data context — read on load,
+  // so the recommendations survive reload (no longer tied to an in-session proposal).
+  const workbenchDataset = React.useMemo(
+    () => datasets.find((d) => d.id === datasetId) ?? null,
+    [datasets, datasetId],
+  );
   const [designFile, setDesignFile] = React.useState<File | null>(null);
   // A file dropped on the Overview hub — handed to the Data tab to ingest + intake.
   const [incomingFile, setIncomingFile] = React.useState<File | null>(null);
@@ -1073,6 +1080,12 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                 <WorkbenchPanel
                   installs={installs}
                   proposal={proposal}
+                  route={
+                    workbenchDataset
+                      ? { routing: workbenchDataset.routing ?? null, dataFit: workbenchDataset.dataFit ?? null }
+                      : null
+                  }
+                  modality={workbenchDataset?.modality ?? null}
                   running={running}
                   onRun={runFlow}
                   preselect={preselect}
@@ -1083,7 +1096,16 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                       label="Ask AI which analysis"
                       placeholder="e.g. which test for two groups?"
                       hint="Pre-selects a skill below to confirm and run."
-                      context={{ skillId: null, params: {} }}
+                      // Data-aware (Slice 2): the active dataset's columns/kind ride along so the
+                      // gateway scores its suggested skill against the real data (the route-stage
+                      // select_skill compat gate). The engine kind lives on the persisted routing.
+                      context={{
+                        skillId: null,
+                        params: {},
+                        dataColumns: workbenchDataset?.dataFit?.columns ?? null,
+                        dataKind: workbenchDataset?.routing?.kind ?? null,
+                        dataNumericCols: workbenchDataset?.dataFit?.n_numeric_cols ?? null,
+                      }}
                       onSelect={(skillId) => {
                         const catalogId = `selom.${skillId}`;
                         const skill = getSkill(catalogId);

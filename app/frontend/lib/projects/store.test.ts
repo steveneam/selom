@@ -12,8 +12,8 @@ vi.mock("@/lib/api/client", () => {
 });
 
 import { api } from "@/lib/api/client";
-import { mergeFigures, projectStore } from "./store";
-import type { Figure } from "./types";
+import { mergeDatasets, mergeFigures, projectStore } from "./store";
+import type { Dataset, Figure } from "./types";
 
 const flush = () => new Promise<void>((r) => setTimeout(r, 0));
 
@@ -109,5 +109,30 @@ describe("mergeFigures — the local-only aiProposals survives a server-wins rec
   it("leaves a server figure with no local counterpart untouched (no phantom proposals)", () => {
     const merged = mergeFigures([], [fig({ id: "f2" })]);
     expect(merged.find((f) => f.id === "f2")!.aiProposals).toBeUndefined();
+  });
+});
+
+describe("mergeDatasets — the local-only routing/dataFit survives a server-wins reconcile (Slice 2)", () => {
+  const dset = (over: Partial<Dataset>): Dataset =>
+    ({ id: "d1", projectId: "p", filename: "de.csv", modality: "bulk RNA-seq", createdAt: 1, ...over }) as Dataset;
+
+  it("re-attaches routing + dataFit when the server row (which lacks them) replaces the local dataset", () => {
+    const local = [
+      dset({
+        routing: { kind: "de_results", steps: [{ skill_id: "volcano", role: "analyze", reason: "" }], confident: true, note: "" },
+        dataFit: { quality: 100, confidence: "confident", columns: ["gene", "logFC", "padj"], n_numeric_cols: 2, fits: [] },
+      }),
+    ];
+    const server = [dset({ filename: "de.csv (from server)" })]; // same id, NO routing/dataFit keys
+    const merged = mergeDatasets(local, server);
+    const d1 = merged.find((d) => d.id === "d1")!;
+    expect(d1.filename).toBe("de.csv (from server)"); // server wins on synced fields
+    expect(d1.routing?.steps[0].skill_id).toBe("volcano"); // ...but the data-aware route is preserved
+    expect(d1.dataFit?.columns).toEqual(["gene", "logFC", "padj"]);
+  });
+
+  it("leaves a server dataset with no local counterpart untouched (no phantom route)", () => {
+    const merged = mergeDatasets([], [dset({ id: "d2" })]);
+    expect(merged.find((d) => d.id === "d2")!.routing).toBeUndefined();
   });
 });

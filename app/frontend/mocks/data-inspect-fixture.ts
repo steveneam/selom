@@ -151,6 +151,17 @@ export function mockInspect(filename: string, header: string, override?: string)
   };
   const routeIds = erg ? ergSteps : byKind[code] ?? [];
 
+  // data_fit (Slice 2): the per-skill fit + the table shape the FE forwards to /ai/propose as the
+  // data context. Header-only mock — columns are real, the numeric count is approximated (verify
+  // real fit content against the live backend, not here). Every routed skill is shown as a fit.
+  const rawCols = header.split(/[,\t]/).map((c) => c.trim()).filter(Boolean);
+  const nNumeric = Math.max(0, rawCols.length - 1); // assume the first column is the gene/sample label
+  const fits = routeIds.map((id) => ({
+    filename, skill_id: id, kind, score: 90, compatible: true,
+    verdict: "fit", qc_ok: true, reason: `fits ${id}`,
+    confidence: "confident", confidence_label: "",
+  }));
+
   return {
     filename,
     kind,
@@ -172,6 +183,13 @@ export function mockInspect(filename: string, header: string, override?: string)
       steps: routeIds.map((id) => ({ skill_id: id, role: "analyze", reason: "" })),
       confident: routeIds.length > 0 && !erg ? true : erg,
       note: erg ? "ERG / electrophysiology data — the electrophysiology figure skills." : "",
+    },
+    data_fit: {
+      quality: 100,
+      confidence: fits.length ? "confident" : "uncertain",
+      columns: rawCols,
+      n_numeric_cols: nNumeric,
+      fits,
     },
   };
 }

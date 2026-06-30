@@ -42,6 +42,10 @@ def test_inspect_clean_bulk_counts_ok():
     assert body["data_fit"]["confidence"] == "confident" and body["data_fit"]["quality"] == 100
     assert any(f["skill_id"] == "deg" and f["confidence"] == "confident"
                for f in body["data_fit"]["fits"])
+    # Slice 2 (data-aware routing): the table shape rides along so the FE can forward it to
+    # /ai/propose as the data context (data_columns / data_n_numeric_cols).
+    assert body["data_fit"]["columns"] == ["gene", "s0", "s1", "s2", "s3"]
+    assert body["data_fit"]["n_numeric_cols"] == 4   # s0..s3 (gene is the label column)
 
 
 def test_inspect_bulk_carries_dynamic_cleaning_plan():

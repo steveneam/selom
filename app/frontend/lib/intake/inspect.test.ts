@@ -9,6 +9,7 @@ function result(over: Partial<InspectResult> = {}): InspectResult {
             var_label: "columns", n_obs: 10, n_var: 4, steps: [], note: "Used as-is." },
     qc: { ran: true, ok: true, blocked: false, flags: [], stats: {} },
     routing: null,
+    dataFit: null,
     ...over,
   };
 }

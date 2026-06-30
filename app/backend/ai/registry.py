@@ -564,6 +564,13 @@ def _validate_select_skill(action, ctx) -> "ValidationOutcome":
             from engine.compat import FileAssessment
             from engine.compat import fit as compat_fit
 
+            # Real numeric-column count when the caller measured it; otherwise len(columns) so the
+            # gsea numeric sub-check (≥1 numeric col) is SATISFIED, never falsely tripped from
+            # missing info (don't gate on what we didn't measure). The over-count can only ever
+            # satisfy the floor, never invent a miss — the honest direction. _check_schema is shared
+            # with the D1 run gate, so we fix the caller's assessment, not the shared validator.
+            n_numeric = ctx.data_fit.get("n_numeric_cols")
+            columns = ctx.data_columns or []
             fa = FileAssessment(
                 path=ctx.data_fit.get("path", ""),
                 filename=ctx.data_fit.get("filename", ""),
@@ -572,8 +579,8 @@ def _validate_select_skill(action, ctx) -> "ValidationOutcome":
                 # Use score as a proxy for quality (same 0-100 scale, reasonable approx).
                 quality=ctx.data_fit.get("score", 80),
                 qc_ok=ctx.data_fit.get("qc_ok", True),
-                columns=ctx.data_columns or [],
-                n_numeric_cols=0,
+                columns=columns,
+                n_numeric_cols=n_numeric if n_numeric is not None else len(columns),
             )
             result = compat_fit(target_skill, fa)
             if result.gated:

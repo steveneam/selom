@@ -8,8 +8,9 @@
  */
 
 import type { FigureSpec } from "@/lib/figure/figure-spec";
-import type { DataCheck, FigureLegend, SkillGuardrail, SkillMethods, SkillProvenance, StatsTable } from "@/lib/skills/api";
+import type { DataCheck, DataRouting, FigureLegend, SkillGuardrail, SkillMethods, SkillProvenance, StatsTable } from "@/lib/skills/api";
 import type { DataFit } from "@/lib/reproduction/data-fit";
+import type { DataFitSummary } from "@/lib/intake/inspect";
 import type { AiProposal } from "@/lib/ai/types";
 
 export type Modality = "scRNA-seq" | "bulk RNA-seq" | "proteomics" | "unknown";
@@ -90,6 +91,15 @@ export interface Dataset {
    */
   currentSha256?: string;
   qc?: QcReport;
+  /**
+   * The data-aware route the engine computed for this dataset at inspect time (Slice 2) — the
+   * suggested skill pipeline (`routing`) + the per-skill data-fit ranking and table shape
+   * (`dataFit`). Persisted with the dataset (from `/data/inspect`) so the data-driven
+   * "Recommended for your data" chips survive reload, and so the route composer can send the
+   * dataset's columns/kind as data context. Optional → legacy datasets load unchanged.
+   */
+  routing?: DataRouting | null;
+  dataFit?: DataFitSummary | null;
   createdAt: number;
 }
 

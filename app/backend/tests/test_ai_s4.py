@@ -786,3 +786,128 @@ def test_registry_literal_completeness_with_select_skill():
     assert "select_skill" in registry_keys
     assert "select_skill" in types_tuple
     assert "select_skill" in literal_members
+
+
+# ============================================================================
+# PART E — Slice 2: data-aware /ai/propose wiring + gsea numeric-count fix
+# ============================================================================
+
+class _CaptureGateway:
+    """A non-Null gateway that captures the ActionContext propose() built, returns an empty plan."""
+
+    model_id = "test-capture"
+
+    def __init__(self):
+        self.ctx = None
+
+    def propose(self, context, goal):
+        self.ctx = context
+        return ActionPlan(goal=goal, actions=[])
+
+    def explain(self, request_type, data, goal):  # pragma: no cover - propose path only
+        return ""
+
+
+class _SelectSkillGateway:
+    """Proposes a single select_skill action toward ``target`` — exercises the route gate via propose()."""
+
+    model_id = "test-select"
+
+    def __init__(self, target):
+        self._target = target
+
+    def propose(self, context, goal):
+        return ActionPlan(
+            goal=goal,
+            actions=[Action(type="select_skill", target=self._target, payload={"skill_id": self._target})],
+        )
+
+    def explain(self, request_type, data, goal):  # pragma: no cover - propose path only
+        return ""
+
+
+def test_propose_populates_data_fit_from_request(monkeypatch):
+    """propose() threads data_columns/data_kind/data_n_numeric_cols into ctx.data_fit (R2).
+
+    The verdict is NOT in the request — only the description; propose() builds the data_fit dict
+    the route gate then scores via engine.compat.fit.
+    """
+    from engine.models import DE_RESULTS
+    from routers import ai as ai_router
+
+    cap = _CaptureGateway()
+    monkeypatch.setattr(ai_router, "get_action_gateway", lambda: cap)
+
+    ai_router.propose(ai_router.ProposeRequest(
+        stage="route", goal="make a volcano",
+        data_columns=["gene", "logFC", "padj"], data_kind=DE_RESULTS, data_n_numeric_cols=2,
+    ))
+    assert cap.ctx is not None
+    assert cap.ctx.data_columns == ["gene", "logFC", "padj"]
+    assert cap.ctx.data_fit is not None
+    assert cap.ctx.data_fit["kind"] == DE_RESULTS
+    assert cap.ctx.data_fit["n_numeric_cols"] == 2
+
+
+def test_propose_without_data_context_leaves_data_fit_none(monkeypatch):
+    """No data context → ctx.data_fit stays None (zero-regression; the analyze composer path)."""
+    from routers import ai as ai_router
+
+    cap = _CaptureGateway()
+    monkeypatch.setattr(ai_router, "get_action_gateway", lambda: cap)
+    ai_router.propose(ai_router.ProposeRequest(stage="analyze", goal="tidy the figure"))
+    assert cap.ctx.data_fit is None
+    assert cap.ctx.data_columns is None
+
+
+def test_propose_data_aware_route_gate_fires_on_mismatch(monkeypatch):
+    """End-to-end through propose(): a select_skill toward a table skill on a single-cell matrix →
+    no_fitting_skill gap (R3 — the route gate is reachable once data_fit is populated)."""
+    from engine.models import SC_COUNTS
+    from routers import ai as ai_router
+
+    monkeypatch.setattr(ai_router, "get_action_gateway", lambda: _SelectSkillGateway("volcano"))
+    turn = ai_router.propose(ai_router.ProposeRequest(
+        stage="route", goal="run a volcano",
+        data_columns=[], data_kind=SC_COUNTS, data_n_numeric_cols=0,
+    ))
+    assert turn["results"][0]["status"] == "gap"
+    assert any(gp["unmet"] == "no_fitting_skill" for gp in turn["gaps"])
+
+
+def test_propose_data_aware_route_gate_passes_on_fit(monkeypatch):
+    """A select_skill toward volcano on a DE table with the right columns → staged, no gap (R3)."""
+    from engine.models import DE_RESULTS
+    from routers import ai as ai_router
+
+    monkeypatch.setattr(ai_router, "get_action_gateway", lambda: _SelectSkillGateway("volcano"))
+    turn = ai_router.propose(ai_router.ProposeRequest(
+        stage="route", goal="run a volcano",
+        data_columns=["gene", "logFC", "padj"], data_kind=DE_RESULTS, data_n_numeric_cols=2,
+    ))
+    assert turn["results"][0]["status"] == "staged"
+    assert turn["gaps"] == []
+
+
+def test_select_skill_gsea_not_false_gated_with_numeric_count():
+    """gsea needs a gene col + ≥1 numeric score. With the real numeric count provided, a ranked
+    gene list validates ok (R4 — the old n_numeric_cols=0 hardcode would have falsely gated it)."""
+    from engine.models import DE_RESULTS
+
+    data_fit = {"kind": DE_RESULTS, "n_numeric_cols": 2, "score": 85, "qc_ok": True}
+    ctx = ActionContext(stage="route", data_fit=data_fit, data_columns=["gene", "score"])
+    action = Action(type="select_skill", target="gsea", payload={"skill_id": "gsea"})
+    outcome = validate_action(action, ctx)
+    assert outcome.ok, f"gsea should fit a gene+score table; errors: {outcome.errors}"
+
+
+def test_select_skill_gsea_satisfies_numeric_when_count_unknown():
+    """When the numeric count is unknown (None), the gsea numeric sub-check is satisfied from the
+    column list rather than falsely tripped (R4 — don't gate on what we didn't measure)."""
+    from engine.models import DE_RESULTS
+
+    data_fit = {"kind": DE_RESULTS, "n_numeric_cols": None, "score": 85, "qc_ok": True}
+    ctx = ActionContext(stage="route", data_fit=data_fit, data_columns=["gene", "score"])
+    action = Action(type="select_skill", target="gsea", payload={"skill_id": "gsea"})
+    outcome = validate_action(action, ctx)
+    assert outcome.ok, f"unknown numeric count must not false-gate gsea; errors: {outcome.errors}"

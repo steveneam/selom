@@ -14,7 +14,9 @@ import { isFieldDisabled, visibleParamFields } from "@/lib/catalog/params";
 import { useSkillParams } from "@/lib/catalog/use-skill-params";
 import { getSkill } from "@/lib/catalog/seed";
 import { recommendedSkills } from "@/lib/catalog/quick-apply";
-import type { SkillParams } from "@/lib/skills/api";
+import type { DataRouting, SkillParams } from "@/lib/skills/api";
+import type { DataFitSummary } from "@/lib/intake/inspect";
+import type { Modality } from "@/lib/projects/types";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 
 const DND_TYPE = "application/x-selom-skill";
@@ -32,6 +34,8 @@ const DND_TYPE = "application/x-selom-skill";
 export function WorkbenchPanel({
   installs,
   proposal,
+  route,
+  modality,
   running,
   onRun,
   preselect,
@@ -40,6 +44,11 @@ export function WorkbenchPanel({
   /** The installed-skill rows (workspace-level now) — only the id + skillId are read. */
   installs: { id: string; skillId: string }[];
   proposal: IntakeProposal | null;
+  /** The active dataset's persisted data-aware route (Slice 2) — the source of the data-fit
+   *  "Recommended for your data" chips for an inspected dataset. */
+  route?: { routing: DataRouting | null; dataFit: DataFitSummary | null } | null;
+  /** The active dataset's modality — the mock-chip fallback for demo/sample data with no route. */
+  modality?: Modality | null;
   running: string | null;
   onRun: (step: ProposedStep) => void;
   /** A skill the command palette / Gene Sets surface asked to select, with optional
@@ -93,10 +102,16 @@ export function WorkbenchPanel({
   const selectedSkill = selected ? getSkill(selected) : undefined;
   const { fields: schema, loading: paramsLoading } = useSkillParams(selected);
 
-  // The "Recommended for your data" chips = the skills the engine RECOMMENDED for this dataset (the
-  // proposal's pipeline). Empty when there's no proposal → the row is hidden entirely (we never show a
-  // popularity list under a recommendation's label). Resolved + deduped against the catalog.
-  const quick = recommendedSkills(proposal);
+  // The "Recommended for your data" chips = the skills the engine RECOMMENDED for this dataset.
+  // Data-fit-ranked from the inspected route when present (survives reload — read off the dataset),
+  // else the modality mock for demo/sample data; empty → the row hides entirely (never a popularity
+  // list under a recommendation's label). Resolved + deduped against the catalog.
+  const quick = recommendedSkills(route ?? null, modality ?? null);
+  // Surface WHY each chip is recommended (Slice 2): the per-skill data-fit verdict for an inspected
+  // dataset, looked up by the (normalized) skill id. Drives a tooltip so the data-fit ranking + the
+  // fit reason aren't invisible. Undefined for the demo/sample mock path (no inspected fit).
+  const fitFor = (catalogId: string) =>
+    route?.dataFit?.fits.find((f) => `selom.${f.skill_id}` === catalogId || f.skill_id === catalogId);
 
   // The installed-skills list, filtered by the search box (name or category).
   const q = filter.trim().toLowerCase();
@@ -126,10 +141,17 @@ export function WorkbenchPanel({
                 const Icon = skillIcon(s);
                 const color = skillColor(s);
                 const busy = running === s.id;
+                // Why this chip: the data-fit verdict + reason for an inspected dataset (e.g.
+                // "Confident — … . bulk count matrix — fits deg"), else just the skill name.
+                const fit = fitFor(s.id);
+                const why = fit
+                  ? [fit.confidence_label, fit.reason].filter(Boolean).join(" — ")
+                  : s.name;
                 return (
                   <button
                     key={s.id}
                     draggable
+                    title={why}
                     onDragStart={(e) => {
                       e.dataTransfer.setData(DND_TYPE, s.id);
                       e.dataTransfer.setData("text/plain", s.id);

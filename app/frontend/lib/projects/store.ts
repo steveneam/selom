@@ -143,13 +143,27 @@ export function mergeFigures(local: Figure[], server: Figure[]): Figure[] {
   });
 }
 
+/** Datasets carry LOCAL-ONLY fields too — `routing` + `dataFit`, the Slice-2 data-aware route the FE
+ *  persists (owner D2: no backend column, intentionally not in to/fromApiDataset). On a server-wins
+ *  merge re-attach them from the local row, else a reconcile (hydrate / window-focus, queue idle)
+ *  would clobber the data-driven "Recommended for your data" chips on reload. Generalizes
+ *  `mergeFigures`' aiProposals preservation. [[selom-fe-review-framework]] */
+export function mergeDatasets(local: Dataset[], server: Dataset[]): Dataset[] {
+  const localById = new Map(local.map((d) => [d.id, d]));
+  return mergeById(local, server).map((d) => {
+    const prev = localById.get(d.id);
+    if (!prev) return d;
+    return { ...d, routing: d.routing ?? prev.routing, dataFit: d.dataFit ?? prev.dataFit };
+  });
+}
+
 async function reconcile() {
   if (queue.pending > 0) return; // a write is in flight — server is stale, don't clobber
   try {
     const srv = await reconcileFetch();
     setState({
       projects: mergeById(state.projects, srv.projects),
-      datasets: mergeById(state.datasets, srv.datasets),
+      datasets: mergeDatasets(state.datasets, srv.datasets),
       installs: mergeById(state.installs, srv.installs),
       figures: mergeFigures(state.figures, srv.figures),
       geneSets: mergeById(state.geneSets, srv.geneSets),
@@ -268,14 +282,34 @@ export const projectStore = {
     });
     return d;
   },
-  /** Apply the live engine inspect result to a dataset (real modality + cleaning/QC report). */
-  updateDatasetProfile(id: string, patch: { modality?: Modality; qc?: import("./types").QcReport }) {
+  /** Apply the live engine inspect result to a dataset (real modality + cleaning/QC report, plus the
+   *  Slice-2 data-aware route: suggested pipeline + per-skill data-fit + table shape). Persisting
+   *  routing/dataFit here is what makes the "Recommended for your data" chips survive reload. */
+  updateDatasetProfile(
+    id: string,
+    patch: {
+      modality?: Modality;
+      qc?: import("./types").QcReport;
+      routing?: import("./types").Dataset["routing"];
+      dataFit?: import("./types").Dataset["dataFit"];
+    },
+  ) {
     setState({
       ...state,
       datasets: state.datasets.map((d) =>
-        d.id === id ? { ...d, modality: patch.modality ?? d.modality, qc: patch.qc ?? d.qc } : d,
+        d.id === id
+          ? {
+              ...d,
+              modality: patch.modality ?? d.modality,
+              qc: patch.qc ?? d.qc,
+              routing: patch.routing ?? d.routing,
+              dataFit: patch.dataFit ?? d.dataFit,
+            }
+          : d,
       ),
     });
+    // routing/dataFit are LOCAL-ONLY (owner D2: persisted in the FE store, no backend column) — they
+    // ride the localStorage mirror + reconcile merge-preserve, NOT the PATCH (mirrors aiProposals).
     queue.enqueue({
       coalesceKey: `ds:${id}`,
       run: () => api.patch(`/datasets/${id}`, { modality: patch.modality, qc: patch.qc }),

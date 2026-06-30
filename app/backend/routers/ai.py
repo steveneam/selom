@@ -82,11 +82,16 @@ def get_action_gateway() -> ActionGateway:
 class ProposeRequest(BaseModel):
     """Inbound context for an AI helper proposal.
 
-    ``data_fit`` is intentionally absent — it is derived server-side from the
-    engine, never trusted from the client, so the ActionContext is populated with
-    ``data_fit=None`` here (Slice 2 adds server-side derivation when the dataset
-    is known).  Actions are NOT accepted from this payload; the gateway proposes
-    them from the goal + context alone.
+    Slice 2 — data-aware routing.  The client describes its data (``data_columns`` +
+    ``data_kind`` + ``data_n_numeric_cols``, all sourced from ``POST /data/inspect``);
+    the server still derives the fit *verdict* itself (``engine.compat.fit``, inside
+    ``_validate_select_skill``) — a column list + kind is data *description*, never a
+    verdict, so the honesty rule holds (the client cannot assert ``compatible``).  When
+    no data context is supplied (e.g. the analyze composer), ``data_fit`` stays ``None``
+    and the route-stage compat gate is skipped (fail-soft, unchanged behaviour).
+
+    Actions are NOT accepted from this payload; the gateway proposes them from the
+    goal + context alone.
     """
 
     stage: str = "analyze"
@@ -95,6 +100,10 @@ class ProposeRequest(BaseModel):
     goal: str = ""
     figure_spec: dict | None = None
     capability_surface: dict | None = None
+    # Slice 2 — data context for data-aware routing (the route-stage select_skill gate).
+    data_columns: list[str] | None = None
+    data_kind: str | None = None
+    data_n_numeric_cols: int | None = None
 
 
 @router.post("/ai/propose")
@@ -104,14 +113,30 @@ def propose(req: ProposeRequest):
     With the default NullActionGateway this always returns an empty plan — the
     correct zero-regression baseline.  Set SELOM_AI_GATEWAY=live + ANTHROPIC_API_KEY
     to wire the live PydanticAIGateway.
+
+    Slice 2: when the request carries data context, ``ctx.data_fit`` is populated so
+    the route-stage ``select_skill`` action is scored against the data
+    (``_validate_select_skill`` → ``engine.compat.fit``).  ``data_fit`` here carries
+    only the *description* (kind, numeric-column count) — the verdict is computed
+    server-side from ``data_columns``, never trusted from the client.
     """
+    data_fit: dict | None = None
+    if req.data_columns is not None or req.data_kind is not None or req.data_n_numeric_cols is not None:
+        data_fit = {
+            "kind": req.data_kind or "unknown",
+            "n_numeric_cols": req.data_n_numeric_cols,  # None ⇒ unknown (registry satisfies the numeric floor)
+            # Permissive defaults — the fit VERDICT comes from compat.fit on the columns, not these.
+            "score": 80,
+            "qc_ok": True,
+        }
     ctx = ActionContext(
         stage=req.stage,
         skill_id=req.skill_id,
         params=req.params,
         figure_spec=req.figure_spec,
         capability_surface=req.capability_surface,
-        data_fit=None,
+        data_fit=data_fit,
+        data_columns=req.data_columns,
     )
     turn = run_helper_turn(ctx, req.goal, get_action_gateway())
     return turn.model_dump()
