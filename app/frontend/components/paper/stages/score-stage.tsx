@@ -30,7 +30,7 @@ export function ScoreStage({ paper, run }: { paper: SavedPaper; run: PaperRun })
     const hasUnmatched = panelDrives.some((d) => d.status === "data_unmatched");
     return (
       <>
-        <ScoreReport ledger={ledger} dataFits={dataFits} />
+        <ScoreReport ledger={ledger} dataFits={dataFits} showExplain />
         <CitedDatasets accessions={accessions} hasUnmatched={hasUnmatched} />
         <DataPicker paper={paper} run={run} panelDrives={panelDrives} dataFits={dataFits} />
       </>

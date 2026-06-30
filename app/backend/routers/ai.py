@@ -23,7 +23,7 @@ from typing import Literal
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from ai.gateway import ActionGateway, NullActionGateway
+from ai.gateway import ActionGateway, NullActionGateway, _deterministic_explain, rank_sweep_space
 from ai.loop import run_helper_turn
 from ai.models import ActionContext
 from config import settings
@@ -186,10 +186,23 @@ def explain(req: ExplainRequest):
         data["sweep_space"] = req.sweep_space
 
     text = gw.explain(req.request, data, req.goal)
+    # Honesty: stamp `source` by what was ACTUALLY produced, NOT by the gateway class. A live
+    # PydanticAIGateway degrades to the BYTE-IDENTICAL deterministic summary on timeout/error (its
+    # fallback IS `_deterministic_explain`), so a class check would mislabel that fallback as "ai" —
+    # and the FE ✨ "AI" badge would then claim AI produced text it didn't. Comparing against the
+    # same fallback detects the degrade exactly; an identical-by-coincidence model output is labelled
+    # the safe way (deterministic), never falsely AI (owner steer; gauntlet HIGH 2026-06-30).
+    produced_by_ai = not isinstance(gw, NullActionGateway) and text != _deterministic_explain(
+        req.request, data, req.goal
+    )
+    # The structured ranking is ALWAYS the deterministic one (pure data, never the gateway):
+    # the live AI's prose may vary, but the picks the UI preselects stay reproducible + grounded.
+    suggestions = rank_sweep_space(req.sweep_space) if req.request == "propose_sweep" else []
     return {
         "request": req.request,
         "text": text,
-        "source": "deterministic" if isinstance(gw, NullActionGateway) else "ai",
+        "source": "ai" if produced_by_ai else "deterministic",
+        "suggestions": suggestions,
     }
 
 

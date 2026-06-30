@@ -137,4 +137,24 @@ describe("explain", () => {
     expect(out.source).toBe("deterministic");
     expect(out.text).toContain("82");
   });
+
+  it("surfaces the ranked sweep suggestions for propose_sweep (the preselect source)", async () => {
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve(
+        jsonRes(200, {
+          request: "propose_sweep",
+          text: "Suggested sweeps: Cluster resolution …",
+          source: "deterministic",
+          suggestions: [{ param: "resolution", label: "Cluster resolution", reason: "widest declared range" }],
+        }),
+      ),
+    );
+    const out = await explain({ request: "propose_sweep", sweep_space: { resolution: { type: "range" } } });
+    expect(out.suggestions?.[0].param).toBe("resolution");
+  });
+
+  it("throws a friendly message on a non-OK response", async () => {
+    vi.stubGlobal("fetch", () => Promise.resolve(jsonRes(500, {})));
+    await expect(explain({ request: "explain_score" })).rejects.toThrow(/explanation/i);
+  });
 });

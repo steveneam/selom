@@ -28,6 +28,67 @@ from ai.models import ActionContext, ActionPlan
 # Deterministic fallbacks for explain (used by Null + Operator gateways).
 # ---------------------------------------------------------------------------
 
+def _is_num(x) -> bool:
+    """A real number (a ``bool`` is not a sweep value)."""
+    return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+
+def _fmt_num(n) -> str:
+    """Trim a number for prose (``3.0`` → ``3``, ``0.01`` → ``0.01``)."""
+    return f"{n:g}"
+
+
+def _knob_metrics(spec: dict, ptype) -> tuple[float, str, int]:
+    """``(breadth, reason, kind)`` for one declared sweep knob.
+
+    Grounded ONLY in the knob's *declared* value space — it ranks how much there is
+    to sweep, never a claim about figure impact (which can't be known without running).
+    ``kind`` is the sort priority (numeric 3 > select 2 > switch 1 > unknown 0); a missing
+    ``type`` is inferred from the presence of ``min``/``max`` (numeric) or ``options`` (select).
+
+    ``ptype`` is the cross-lane FE ``ParamField['type']`` string (``lib/catalog/params.ts``):
+    ``range``/``number`` → numeric, ``select`` → select, ``switch`` → switch, ``text`` → the
+    unknown/no-range bucket (ranked last). A NEW FE param type not listed here falls through to
+    breadth-0 and ranks last (fails soft, never raises). ``test_knob_metrics_handles_every_paramfield_type``
+    pins this mapping so a change trips a test rather than silently dropping a sweepable knob.
+    """
+    mn, mx, st = spec.get("min"), spec.get("max"), spec.get("step")
+    has_range = _is_num(mn) and _is_num(mx) and mx > mn
+    if ptype in ("range", "number") or (ptype is None and has_range):
+        if has_range:
+            step = st if (_is_num(st) and st > 0) else (mx - mn) / 10
+            steps = max(1, round((mx - mn) / step))
+            return steps, f"widest declared range ({_fmt_num(mn)}–{_fmt_num(mx)}, ~{steps} steps)", 3
+        return 1, "numeric knob", 3
+    opts = spec.get("options")
+    n_opts = len(opts) if isinstance(opts, list) else 0
+    if ptype == "select" or (ptype is None and n_opts):
+        return n_opts, f"{n_opts} options", 2
+    if ptype == "switch":
+        return 2, "on / off", 1
+    return 0, "no declared range", 0
+
+
+def rank_sweep_space(sweep_space: dict | None) -> list[dict]:
+    """Rank the sweepable knobs by declared value-space breadth — the grounded recommender.
+
+    Pure data → reproducible: the same ranking regardless of gateway, so the live AI's
+    prose can vary while the structured picks the UI preselects stay deterministic.  Sorts
+    by kind priority (numeric > select > switch > unknown), then breadth desc, then label;
+    returns the top three as ``{param, label, reason}`` (never fabricates a value).
+    """
+    if not isinstance(sweep_space, dict):
+        return []
+    ranked: list[dict] = []
+    for key, spec in sweep_space.items():
+        spec = spec if isinstance(spec, dict) else {}
+        label = spec.get("label") or key
+        breadth, reason, kind = _knob_metrics(spec, spec.get("type"))
+        ranked.append({"param": key, "label": label, "reason": reason, "_b": breadth, "_k": kind})
+    ranked.sort(key=lambda r: (-r["_k"], -r["_b"], str(r["label"]).lower()))
+    return [{"param": r["param"], "label": r["label"], "reason": r["reason"]} for r in ranked[:3]]
+
+
 def _deterministic_explain(request_type: str, data: dict, goal: str) -> str:
     """Build a deterministic explanation from the caller-supplied data.
 
@@ -39,23 +100,35 @@ def _deterministic_explain(request_type: str, data: dict, goal: str) -> str:
         sc = data.get("scorecard") or {}
         score = sc.get("score", "n/a")
         tier = sc.get("tier", "unknown")
-        panels = sc.get("panels", [])
+        conf = sc.get("selom_confidence")
+        # Prefer an explicit ``panels`` list; else fall back to a ``panel_count`` scalar (what
+        # the FE sends). Do NOT default ``panels`` to ``[]`` — an empty list would shadow the
+        # scalar and always read 0 (caught on the live engine, not the green suite).
+        panels = sc.get("panels")
         n_panels = len(panels) if isinstance(panels, list) else sc.get("panel_count", 0)
-        return (
-            f"Score: {score}/100 (tier: {tier}). "
-            f"{n_panels} panel(s) scored. "
-            "Improve by supplying data that matches the paper's figures more closely."
-        )
+        head = f"Reproducibility {score}/100 (tier: {tier})"
+        if conf is not None:
+            head += f", Selom confidence {conf}/100"
+        summary = f"{head}. {n_panels} panel(s) scored."
+        findings = sc.get("findings") if isinstance(sc.get("findings"), dict) else {}
+        bits = []
+        if findings.get("reproduced"):
+            bits.append(f"{findings['reproduced']} reproduced")
+        if findings.get("paper_irreproducible"):
+            bits.append(f"{findings['paper_irreproducible']} paper-irreproducible")
+        if bits:
+            summary += " " + ", ".join(bits) + "."
+        return summary + " Improve by supplying data that matches the paper's figures more closely."
     if request_type == "propose_sweep":
-        sw = data.get("sweep_space") or {}
-        if not sw:
+        suggestions = rank_sweep_space(data.get("sweep_space"))
+        if not suggestions:
             return (
                 "No sweep space provided — specify parameters and their ranges to sweep."
             )
-        params = list(sw.keys())
+        parts = ", ".join(f"{s['label']} ({s['reason']})" for s in suggestions)
         return (
-            f"Consider sweeping: {', '.join(params)}. "
-            "Focus on parameters with the widest impact range first."
+            f"Suggested sweeps: {parts}. "
+            "Numeric knobs with the widest declared range vary the result the most — start there."
         )
     return "unavailable"
 

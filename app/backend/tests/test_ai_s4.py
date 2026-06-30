@@ -629,6 +629,137 @@ def test_explain_does_not_go_through_apply_plan():
     assert "staged_params" not in resp
 
 
+def test_rank_sweep_space_orders_numeric_then_select_then_switch():
+    """The grounded recommender ranks numeric > select > switch, breadth desc, caps at 3."""
+    from ai.gateway import rank_sweep_space
+
+    sweep_space = {
+        "a_switch": {"type": "switch"},
+        "b_select": {"type": "select", "options": ["x", "y", "z"]},
+        "c_wide": {"type": "range", "min": 0.0, "max": 10.0, "step": 0.1},   # ~100 steps
+        "d_narrow": {"type": "range", "min": 0.0, "max": 1.0, "step": 0.5},  # ~2 steps
+    }
+    ranked = rank_sweep_space(sweep_space)
+
+    assert [s["param"] for s in ranked] == ["c_wide", "d_narrow", "b_select"], (
+        "numeric (by breadth) first, then select, switch drops off the top-3 cap"
+    )
+    assert "100 steps" in ranked[0]["reason"]
+    assert ranked[2]["reason"] == "3 options"
+
+
+def test_rank_sweep_space_infers_kind_and_degrades_clean():
+    """Missing ``type`` is inferred from min/max (numeric); junk input never raises."""
+    from ai.gateway import rank_sweep_space
+
+    assert rank_sweep_space(None) == []
+    assert rank_sweep_space({}) == []
+    # min/max with no declared type → inferred numeric (ranks above an empty knob).
+    ranked = rank_sweep_space({"inferred": {"min": 0.01, "max": 0.1}, "empty": {}})
+    assert ranked[0]["param"] == "inferred"
+    assert ranked[1]["reason"] == "no declared range"
+    # Uses a friendly label when provided.
+    labelled = rank_sweep_space({"k": {"type": "switch", "label": "Clean traces"}})
+    assert labelled[0]["label"] == "Clean traces"
+
+
+def test_explain_endpoint_propose_sweep_returns_ranked_suggestions():
+    """POST /ai/explain for propose_sweep carries the structured ranking the UI preselects from."""
+    from routers.ai import explain, ExplainRequest
+
+    req = ExplainRequest(
+        request="propose_sweep",
+        goal="which params to sweep",
+        sweep_space={
+            "resolution": {"type": "range", "min": 0.1, "max": 2.0, "step": 0.1},
+            "cluster": {"type": "select", "options": ["none", "row", "column", "both"]},
+        },
+    )
+    resp = explain(req)
+
+    assert resp["suggestions"][0]["param"] == "resolution"  # numeric ranks first
+    assert {s["param"] for s in resp["suggestions"]} == {"resolution", "cluster"}
+    assert "resolution" in resp["text"] or "Cluster" in resp["text"]
+
+
+def test_explain_endpoint_explain_score_has_empty_suggestions():
+    """explain_score carries no sweep suggestions (the field is propose_sweep-only)."""
+    from routers.ai import explain, ExplainRequest
+
+    resp = explain(
+        ExplainRequest(
+            request="explain_score",
+            scorecard={"score": 72, "tier": "reproduced", "selom_confidence": 88, "panel_count": 8},
+        )
+    )
+    assert resp["suggestions"] == []
+    assert "88" in resp["text"]  # the enriched text surfaces Selom confidence
+    assert "8 panel(s)" in resp["text"]  # a scalar panel_count (not a panels[] list) still counts
+
+
+class _StubGateway:
+    """A non-Null gateway stand-in whose explain output we control (no live key needed)."""
+
+    model_id = "test-live"
+
+    def __init__(self, text_fn):
+        self._text_fn = text_fn
+
+    def propose(self, context, goal):  # pragma: no cover - explain path only
+        from ai.models import ActionPlan
+
+        return ActionPlan(goal=goal, actions=[])
+
+    def explain(self, request_type, data, goal):
+        return self._text_fn(request_type, data, goal)
+
+
+def test_explain_source_deterministic_when_live_gateway_falls_back(monkeypatch):
+    """A live gateway that degrades to the deterministic fallback is labelled source='deterministic'.
+
+    The ✨ "AI" badge must never claim AI produced text the model didn't (it degrades to the
+    byte-identical `_deterministic_explain` on timeout/error). Source is stamped by what was
+    actually produced, not the gateway class.
+    """
+    from routers import ai as ai_router
+    from ai.gateway import _deterministic_explain
+
+    fallback_gw = _StubGateway(lambda rt, data, goal: _deterministic_explain(rt, data, goal))
+    monkeypatch.setattr(ai_router, "get_action_gateway", lambda: fallback_gw)
+
+    resp = ai_router.explain(
+        ai_router.ExplainRequest(request="explain_score", scorecard={"score": 50, "tier": "Low", "panel_count": 3})
+    )
+    assert resp["source"] == "deterministic"  # fell back → NOT ✨ AI
+
+
+def test_explain_source_ai_when_live_gateway_produces_text(monkeypatch):
+    """A live gateway returning genuine model text is labelled source='ai'."""
+    from routers import ai as ai_router
+
+    live_gw = _StubGateway(lambda rt, data, goal: "A bespoke model explanation grounded in the data.")
+    monkeypatch.setattr(ai_router, "get_action_gateway", lambda: live_gw)
+
+    resp = ai_router.explain(
+        ai_router.ExplainRequest(request="explain_score", scorecard={"score": 50, "tier": "Low", "panel_count": 3})
+    )
+    assert resp["source"] == "ai"
+
+
+def test_knob_metrics_handles_every_paramfield_type():
+    """Pin the cross-lane FE ParamField['type'] → ranker bucket mapping (an unguarded string contract).
+
+    Mirror of lib/catalog/params.ts ParamField['type'] = range|number|text|switch|select. A new FE
+    type lands in the breadth-0 'no declared range' bucket and ranks last; this asserts the known set
+    so a mapping change (or a newly added type the ranker should understand) trips here, not silently.
+    """
+    from ai.gateway import _knob_metrics
+
+    spec = {"min": 0, "max": 10, "step": 1, "options": ["a", "b"]}
+    kinds = {t: _knob_metrics(spec, t)[2] for t in ("range", "number", "select", "switch", "text")}
+    assert kinds == {"range": 3, "number": 3, "select": 2, "switch": 1, "text": 0}
+
+
 # ============================================================================
 # PART D — Registry/Literal completeness still passes with select_skill added
 # ============================================================================

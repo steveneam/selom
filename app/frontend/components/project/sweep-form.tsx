@@ -1,11 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { Play, X } from "lucide-react";
+import { Lightbulb, Loader2, Play, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/ui/cn";
 import { type ParamField } from "@/lib/catalog/params";
 import { useSkillParams } from "@/lib/catalog/use-skill-params";
+import { explain } from "@/lib/ai/api";
+import { buildSweepSpace } from "@/lib/ai/explain-inputs";
+import type { ExplainResponse } from "@/lib/ai/types";
 import type { SkillParams } from "@/lib/skills/api";
 import type { ParamValue } from "@/lib/lineage/diff";
 
@@ -54,6 +57,33 @@ export function SweepForm({
   const values = React.useMemo(() => parseValues(field, raw), [field, raw]);
   const canRun = !!field && values.length >= 2 && !running;
 
+  // "Suggest" — ask the grounded recommender which knob is worth sweeping (informational, not a
+  // mutation). It preselects the top-ranked param (which re-suggests that knob's values); the user
+  // still reviews + clicks Run. Deterministic by default; the ✨ badge shows only when a key is live.
+  const [suggesting, setSuggesting] = React.useState(false);
+  const [suggestion, setSuggestion] = React.useState<ExplainResponse | null>(null);
+  const [suggestError, setSuggestError] = React.useState<string | null>(null);
+
+  async function suggest() {
+    setSuggesting(true);
+    setSuggestError(null);
+    try {
+      const res = await explain({
+        request: "propose_sweep",
+        stage: "analyze",
+        skill_id: skillId,
+        sweep_space: buildSweepSpace(sweepable, baseParams),
+      });
+      setSuggestion(res);
+      const top = res.suggestions?.[0]?.param;
+      if (top && sweepable.some((f) => f.key === top)) setParam(top);
+    } catch (e) {
+      setSuggestError(e instanceof Error ? e.message : "Couldn't suggest parameters.");
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="rounded-lg border border-border bg-card/60 px-3.5 py-3 text-xs text-muted-foreground">
@@ -77,17 +107,80 @@ export function SweepForm({
     <div className="rounded-lg border border-stage-skill/35 bg-[color-mix(in_oklab,var(--stage-skill)_6%,var(--card))] p-3.5">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-semibold text-foreground">Sweep a parameter</p>
-        <button
-          onClick={onCancel}
-          aria-label="Close sweep"
-          className="grid size-6 place-items-center rounded text-muted-foreground/70 hover:bg-accent hover:text-foreground [&_svg]:size-3.5"
-        >
-          <X />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={suggest}
+            disabled={suggesting}
+            title="Suggest which parameter is worth sweeping"
+            className="inline-flex cursor-pointer items-center gap-1 rounded border border-border bg-background/60 px-2 py-0.5 text-[11px] font-medium text-foreground/80 transition-colors hover:bg-accent hover:text-foreground disabled:cursor-default disabled:opacity-60 [&_svg]:size-3"
+          >
+            {suggesting ? <Loader2 className="animate-spin" /> : <Lightbulb />} Suggest
+          </button>
+          <button
+            onClick={onCancel}
+            aria-label="Close sweep"
+            className="grid size-6 cursor-pointer place-items-center rounded text-muted-foreground/70 hover:bg-accent hover:text-foreground [&_svg]:size-3.5"
+          >
+            <X />
+          </button>
+        </div>
       </div>
       <p className="mt-0.5 text-[11px] text-muted-foreground">
         Run this skill once per value → linked sibling versions you can compare.
       </p>
+
+      {suggestError ? (
+        <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">{suggestError}</p>
+      ) : suggestion && (suggestion.suggestions?.length ?? 0) > 0 ? (
+        // Ranked picks as clickable chips (the recommender returns top-3; render all, don't just
+        // auto-apply #0). These are ALWAYS the deterministic ranking — no AI badge here (the AI only
+        // varies the explain_score prose; the picks stay grounded + reproducible). Selected chip is
+        // highlighted, so when the user picks a non-suggested knob the panel reads as advice, not a
+        // stale contradiction. Dismissable.
+        <div className="mt-2 rounded-md border border-border bg-background/50 px-2.5 py-2">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Suggested knobs · ranked by range
+            </span>
+            <button
+              type="button"
+              onClick={() => setSuggestion(null)}
+              aria-label="Dismiss suggestions"
+              className="grid size-4 cursor-pointer place-items-center rounded text-muted-foreground/70 hover:bg-accent hover:text-foreground [&_svg]:size-3"
+            >
+              <X />
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {suggestion.suggestions!.map((s) => {
+              const selected = s.param === param;
+              return (
+                <button
+                  key={s.param}
+                  type="button"
+                  onClick={() => setParam(s.param)}
+                  title={s.reason}
+                  aria-pressed={selected}
+                  className={cn(
+                    "inline-flex cursor-pointer items-center rounded-full border px-2 py-0.5 text-[11px] transition-colors",
+                    selected
+                      ? "border-stage-skill/60 bg-stage-skill/15 text-foreground"
+                      : "border-border bg-background/60 text-foreground/80 hover:bg-accent hover:text-foreground",
+                  )}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+          {suggestion.suggestions!.find((s) => s.param === param) && (
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+              {suggestion.suggestions!.find((s) => s.param === param)!.reason}
+            </p>
+          )}
+        </div>
+      ) : null}
 
       <div className="mt-3 grid gap-3 sm:grid-cols-[160px_1fr]">
         <label className="block">

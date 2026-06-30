@@ -92,16 +92,67 @@ export function mockGaps(): GapBacklogEntry[] {
   ];
 }
 
-/** Deterministic explanatory text grounded in the supplied artifact (mirrors the Null gateway). */
-export function mockExplain(req: string, data: { scorecard?: { score?: number }; sweep_space?: Record<string, unknown> }): string {
-  if (req === "explain_score") {
-    const score = data.scorecard?.score;
-    return score != null
-      ? `This figure scored ${score}/100 for reproducibility (mock summary).`
-      : "Reproducibility scorecard (mock summary).";
+/** A declared sweep knob (mirror of the FE `SweepKnob` / backend sweep_space entry). */
+interface MockKnob {
+  label?: string;
+  type?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: string[];
+}
+
+function isNum(x: unknown): x is number {
+  return typeof x === "number" && Number.isFinite(x);
+}
+
+/** `(breadth, reason, kind)` for one knob — mirrors `ai/gateway.py::_knob_metrics`. */
+function knobMetrics(spec: MockKnob): { breadth: number; reason: string; kind: number } {
+  const { min: mn, max: mx, step: st, type, options } = spec;
+  const hasRange = isNum(mn) && isNum(mx) && mx > mn;
+  if (type === "range" || type === "number" || (type == null && hasRange)) {
+    if (hasRange) {
+      const step = isNum(st) && st > 0 ? st : (mx - mn) / 10;
+      const steps = Math.max(1, Math.round((mx - mn) / step));
+      return { breadth: steps, reason: `widest declared range (${mn}–${mx}, ~${steps} steps)`, kind: 3 };
+    }
+    return { breadth: 1, reason: "numeric knob", kind: 3 };
   }
-  const keys = Object.keys(data.sweep_space ?? {});
-  return keys.length
-    ? `Consider sweeping: ${keys.join(", ")} (mock suggestion).`
-    : "No sweep space provided (mock suggestion).";
+  const nOpts = Array.isArray(options) ? options.length : 0;
+  if (type === "select" || (type == null && nOpts)) return { breadth: nOpts, reason: `${nOpts} options`, kind: 2 };
+  if (type === "switch") return { breadth: 2, reason: "on / off", kind: 1 };
+  return { breadth: 0, reason: "no declared range", kind: 0 };
+}
+
+/** Ranked sweep picks — mirrors `ai/gateway.py::rank_sweep_space` (the preselect source). */
+export function mockSweepSuggestions(
+  sweepSpace: Record<string, unknown> | undefined,
+): { param: string; label: string; reason: string }[] {
+  if (!sweepSpace || typeof sweepSpace !== "object") return [];
+  return Object.entries(sweepSpace)
+    .map(([param, raw]) => {
+      const spec = (raw ?? {}) as MockKnob;
+      const { breadth, reason, kind } = knobMetrics(spec);
+      return { param, label: spec.label || param, reason, breadth, kind };
+    })
+    .sort((a, b) => b.kind - a.kind || b.breadth - a.breadth || a.label.toLowerCase().localeCompare(b.label.toLowerCase()))
+    .slice(0, 3)
+    .map(({ param, label, reason }) => ({ param, label, reason }));
+}
+
+/** Deterministic explanatory text grounded in the supplied artifact (mirrors the Null gateway). */
+export function mockExplain(req: string, data: { scorecard?: Record<string, unknown>; sweep_space?: Record<string, unknown> }): string {
+  if (req === "explain_score") {
+    const sc = data.scorecard ?? {};
+    const score = sc.score ?? "n/a";
+    const tier = sc.tier ?? "unknown";
+    const conf = sc.selom_confidence;
+    let head = `Reproducibility ${score}/100 (tier: ${tier})`;
+    if (conf != null) head += `, Selom confidence ${conf}/100`;
+    return `${head}. Improve by supplying data that matches the paper's figures more closely. (mock summary)`;
+  }
+  const ranked = mockSweepSuggestions(data.sweep_space);
+  if (!ranked.length) return "No sweep space provided — specify parameters and their ranges to sweep. (mock)";
+  const parts = ranked.map((s) => `${s.label} (${s.reason})`).join(", ");
+  return `Suggested sweeps: ${parts}. Numeric knobs with the widest declared range vary the result the most. (mock)`;
 }

@@ -123,11 +123,28 @@ export interface ExplainRequest {
   sweep_space?: Record<string, unknown> | null;
 }
 
+/**
+ * One ranked sweep recommendation (`propose_sweep` only). Always the DETERMINISTIC
+ * ranking — pure data grounded in the declared sweep space (knob value-space breadth),
+ * computed server-side regardless of the gateway, so the picked param is reproducible
+ * even when the prose is AI. The Sweep form preselects `suggestions[0].param`.
+ */
+export interface SweepSuggestion {
+  /** The param key to sweep (a key present in the posted sweep_space). */
+  param: string;
+  /** The friendly label (falls back to `param`). */
+  label: string;
+  /** The grounded reason — e.g. "widest declared range (0.1–2.0, ~19 steps)". */
+  reason: string;
+}
+
 /** `POST /ai/explain` response — `source` is "deterministic" when the gateway is off. */
 export interface ExplainResponse {
   request: ExplainRequest["request"];
   text: string;
   source: "deterministic" | "ai";
+  /** Ranked picks for `propose_sweep` (empty for `explain_score`). */
+  suggestions?: SweepSuggestion[];
 }
 
 /**

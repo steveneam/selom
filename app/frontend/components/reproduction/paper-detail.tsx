@@ -42,7 +42,7 @@ export function PaperDetail({ slug }: { slug: string }) {
         ))}
       />
 
-      <ScoreReport ledger={ledger} />
+      <ScoreReport ledger={ledger} showExplain />
     </div>
   );
 }

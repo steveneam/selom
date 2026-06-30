@@ -39,3 +39,18 @@ passes over the S5 diff. The **bugs** they found are fixed in the S5 commit; the
    param grid only, not the bespoke Marks/Threshold figure-data controls; extend for one changed-state language.
 7. **Actor-tag forgery hardening** (carried from S5 backlog) — `/ai/apply` trusts the client-stamped
    `approved_by`/`approved_at`; have the FE post the staged delta so the backend re-derives a server-trusted tag.
+
+## Deferred — AI-explain wiring (NEXT#1, 2026-06-30 · gauntlet + fe-review)
+
+_The HIGH source-honesty fix, the sweep top-3 chips, cursor-pointer, the explain Retry, and the
+mock/param-type guards shipped in the wiring commit. These are the deliberately-deferred enhancements
+(docs/ai-explain-wiring/spec.md is the shipped scope: make the two helpers reachable + the sweep
+recommender useful offline)._
+8. **Explain — Copy / "add to methods"** — the grounded explanation is prose a reproducer would want to
+   capture; there is no Copy control, and the repo has a methods-synth feature it could feed.
+9. **Explain — refresh on re-score** — `ExplainScore` caches the result in local state; an open panel
+   won't re-run if the scorecard prop updates (a re-scored run). Re-fetch on scorecard change, or stale-flag it.
+10. **Sweep — surface live AI prose** — the picks (`suggestions[]`) are ALWAYS deterministic by design
+    (grounded + reproducible); when `SELOM_AI_GATEWAY=live`, the `explain` `text` carries the AI's narrative
+    reasoning, which the chip panel currently drops. Add an AI-attributed prose line (with the ✨ badge) below
+    the chips when `source==="ai"`.

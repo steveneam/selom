@@ -1,11 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { GitCompareArrows } from "lucide-react";
+import { GitCompareArrows, Info, Loader2 } from "lucide-react";
 
 import { tierLabel } from "@/lib/reproduction/api";
 import type { FileFitReport } from "@/lib/reproduction/data-fit";
-import type { Ledger, PaperScore } from "@/lib/reproduction/types";
+import type { Ledger, PaperScore, Scorecard } from "@/lib/reproduction/types";
+import { explain } from "@/lib/ai/api";
+import { buildScorecardPayload } from "@/lib/ai/explain-inputs";
+import type { ExplainResponse } from "@/lib/ai/types";
+import { ExplainSourceBadge } from "@/components/ai/explain-source-badge";
 import { DataFitPanel } from "./data-fit-panel";
 import { ReproHeatmap } from "./repro-heatmap";
 import { PanelTable } from "./panel-table";
@@ -21,17 +25,27 @@ import { PanelTable } from "./panel-table";
 export function ScoreReport({
   ledger,
   dataFits = [],
+  showExplain = false,
 }: {
   ledger: Ledger;
   /** The dropped-data fit ranking the run fed on (Slice 2) — surfaced on the live Score stage only;
    *  the showcase detail omits it (empty → the panel renders nothing). */
   dataFits?: FileFitReport[];
+  /** Show the grounded "Explain this score" helper on the interpretation card — live Score stage
+   *  only (the static showcase detail leaves it off so its staged fixture stays a clean demo). */
+  showExplain?: boolean;
 }) {
   const sc = ledger.scorecard;
   const score = sc?.score ?? null;
   return (
     <>
-      {score && <ScoreHeader score={score} findings={sc?.findings ?? {}} />}
+      {score && (
+        <ScoreHeader
+          score={score}
+          findings={sc?.findings ?? {}}
+          explainScorecard={showExplain ? sc : null}
+        />
+      )}
 
       {sc && <FindingsBanner findings={sc.findings} />}
 
@@ -75,7 +89,16 @@ export function ScoreReport({
 }
 
 /** The two-axis headline: reproducibility (paper+data) vs Selom-confidence (our tool). */
-function ScoreHeader({ score, findings }: { score: PaperScore; findings: Record<string, number> }) {
+function ScoreHeader({
+  score,
+  findings,
+  explainScorecard,
+}: {
+  score: PaperScore;
+  findings: Record<string, number>;
+  /** When set (live Score stage), render the grounded "Explain this score" helper. */
+  explainScorecard?: Scorecard | null;
+}) {
   const repro = score.reproducibility;
   const conf = score.selom_confidence;
   return (
@@ -97,7 +120,88 @@ function ScoreHeader({ score, findings }: { score: PaperScore; findings: Record<
       <div className="flex flex-col justify-center rounded-xl border border-border bg-card/50 p-5">
         <p className="text-sm leading-relaxed text-foreground/90">{interpret(score, findings)}</p>
         <p className="mt-2 text-xs text-muted-foreground">{score.coverage}</p>
+        {explainScorecard && <ExplainScore scorecard={explainScorecard} />}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The grounded "Explain this score" helper (informational — NOT a mutation). Posts the flat
+ * scorecard to `/ai/explain` and expands the returned text inline. Deterministic by default
+ * (gateway OFF) → labelled "Grounded summary"; the ✨ "AI" badge appears only when a live key
+ * produced it. The deterministic score above is never affected — failures degrade to a calm note.
+ */
+function ExplainScore({ scorecard }: { scorecard: Scorecard }) {
+  const [open, setOpen] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const [result, setResult] = React.useState<ExplainResponse | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  async function run() {
+    const payload = buildScorecardPayload(scorecard);
+    if (!payload) return;
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      setResult(await explain({ request: "explain_score", stage: "grade", scorecard: payload }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't generate an explanation.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function toggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    setOpen(true);
+    await run();
+  }
+
+  return (
+    <div className="mt-3">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background/60 px-2.5 py-1 text-xs font-medium text-foreground/80 transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+      >
+        <Info className="size-3.5" /> {open ? "Hide explanation" : "Explain this score"}
+      </button>
+      {open && (
+        <div className="mt-2 rounded-lg border border-border bg-background/50 px-3 py-2.5">
+          {loading ? (
+            <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" /> Reading the scorecard…
+            </p>
+          ) : error ? (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              {error} The score above is unaffected.{" "}
+              <button
+                type="button"
+                onClick={run}
+                className="cursor-pointer font-medium text-foreground underline underline-offset-2 hover:text-primary"
+              >
+                Try again
+              </button>
+            </p>
+          ) : result ? (
+            <>
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Explanation
+                </span>
+                <ExplainSourceBadge source={result.source} />
+              </div>
+              <p className="text-xs leading-relaxed text-foreground/85">{result.text}</p>
+            </>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

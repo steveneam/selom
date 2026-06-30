@@ -10,7 +10,7 @@ import { mockExtractChart } from "./extract-fixture";
 import { mockInspect } from "./data-inspect-fixture";
 import { SKILL_PARAM_SPECS } from "./skill-spec-fixture";
 import { persistenceHandlers } from "./persistence-handlers";
-import { mockExplain, mockGaps, mockHelperTurn } from "./ai-fixture";
+import { mockExplain, mockGaps, mockHelperTurn, mockSweepSuggestions } from "./ai-fixture";
 import type { AiAction } from "@/lib/ai/types";
 import { REPRO_LEDGERS, REPRO_PAPERS } from "@/lib/reproduction/fixture";
 
@@ -215,13 +215,15 @@ export const handlers = [
   http.post("/api/ai/explain", async ({ request }) => {
     const body = (await request.json().catch(() => ({}))) as {
       request?: string;
-      scorecard?: { score?: number };
+      scorecard?: Record<string, unknown>;
       sweep_space?: Record<string, unknown>;
     };
+    const req = body.request ?? "explain_score";
     return HttpResponse.json({
-      request: body.request ?? "explain_score",
-      text: mockExplain(body.request ?? "explain_score", body),
+      request: req,
+      text: mockExplain(req, body),
       source: "deterministic",
+      suggestions: req === "propose_sweep" ? mockSweepSuggestions(body.sweep_space) : [],
     });
   }),
   // 7c FE-state persistence (projectStore/workspaceStore optimistic writes + reconcile GETs).
