@@ -13,6 +13,7 @@ import { skillColor, skillIcon } from "@/lib/catalog/modality";
 import { isFieldDisabled, visibleParamFields } from "@/lib/catalog/params";
 import { useSkillParams } from "@/lib/catalog/use-skill-params";
 import { getSkill } from "@/lib/catalog/seed";
+import { pickQuickApply } from "@/lib/catalog/quick-apply";
 import type { SkillParams } from "@/lib/skills/api";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 
@@ -22,7 +23,7 @@ const DND_TYPE = "application/x-selom-skill";
  * The Workbench: installed skills + (when present) the LLM's proposed pipeline.
  *
  * A skill can be applied to the data several ways, all converging on the same run:
- *   - the Quick apply row (most-used skills, one click),
+ *   - the one-click chips (skills recommended for the loaded data, else most-used favourites),
  *   - press "Apply" on a skill card,
  *   - click a card to SELECT it, tweak its inline params, then Apply,
  *   - DRAG a card into the "Apply a skill" zone.
@@ -92,12 +93,10 @@ export function WorkbenchPanel({
   const selectedSkill = selected ? getSkill(selected) : undefined;
   const { fields: schema, loading: paramsLoading } = useSkillParams(selected);
 
-  // Quick apply = the most popular Verified installed skills (one-click favourites).
-  const quick = installs
-    .map((i) => getSkill(i.skillId))
-    .filter((s): s is NonNullable<typeof s> => !!s && s.tier === "verified")
-    .sort((a, b) => b.popularity - a.popularity)
-    .slice(0, 4);
+  // One-click chips. When the dataset has a proposal, these are the skills RECOMMENDED for it (the
+  // engine's proposed pipeline) — `dataAware` then labels the row honestly; otherwise they're the
+  // most-used installed favourites. Resolved + deduped against the catalog (see lib/catalog/quick-apply).
+  const { dataAware, skills: quick } = pickQuickApply(proposal, installs);
 
   // The installed-skills list, filtered by the search box (name or category).
   const q = filter.trim().toLowerCase();
@@ -119,7 +118,7 @@ export function WorkbenchPanel({
         {quick.length > 0 && (
           <div>
             <p className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
-              <Sparkles className="size-3 text-primary" /> Quick apply
+              <Sparkles className="size-3 text-primary" /> {dataAware ? "Recommended for your data" : "Frequently used"}
             </p>
             <div className="flex flex-wrap gap-2">
               {quick.map((s) => {
