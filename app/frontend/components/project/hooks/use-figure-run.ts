@@ -18,7 +18,7 @@ import {
   type SkillProvenance,
 } from "@/lib/skills/api";
 import { applyAiActions } from "@/lib/ai/api";
-import type { AiAction } from "@/lib/ai/types";
+import type { AiActionDelta } from "@/lib/ai/types";
 import type { RailView } from "../workrail";
 
 /**
@@ -70,7 +70,7 @@ export interface FigureRun {
   rerunFigure: (fig: Figure) => Promise<void>;
   runSweep: (param: string, values: ParamValue[]) => Promise<void>;
   rerunFigureWithParams: (params: SkillParams) => Promise<void>;
-  rerunFigureWithAi: (params: SkillParams, aiActions: AiAction[]) => Promise<void>;
+  rerunFigureWithAi: (params: SkillParams, aiActions: AiActionDelta[]) => Promise<void>;
 }
 
 /**
@@ -342,7 +342,7 @@ export function useFigureRun({
   // re-run from the recorded params reproduces it with no gateway. The origin figure's proposal
   // queue is consumed on success (its durable proof becomes the new figure's provenance).
   const rerunFigureWithAi = React.useCallback(
-    async (params: SkillParams, aiActions: AiAction[]) => {
+    async (params: SkillParams, aiActions: AiActionDelta[]) => {
       const origin = activeFigure;
       if (!origin?.skillId) return;
       // Nothing AI-approved (all proposals reverted) → fall back to the plain edited-inputs re-run.

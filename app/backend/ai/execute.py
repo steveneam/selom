@@ -213,13 +213,18 @@ def commit_recompute(
     figure, table = runner(skill_id, data_path, merged)
     spec = load_skill(skill_id)
 
-    # Stamp approval onto every action record before it lands in the bundle.
+    # Stamp attribution through the ONE chokepoint (NEXT#1) — never merge approved_by into a raw
+    # actions dict here. stamp_ai_actions re-derives actor/model/approved_by/approved_at and keeps
+    # only the descriptive delta, so this path cannot become a second, forgeable stamping site. The
+    # model is the one apply_plan already recorded on the proposal (same model across a turn).
     actions_to_record: list[dict] | None = None
     if provenance_actions:
-        actions_to_record = [
-            {**a, "approved_by": approved_by, "approved_at": str(approved_at) if approved_at else None}
-            for a in provenance_actions
-        ]
+        actions_to_record = provenance.stamp_ai_actions(
+            provenance_actions,
+            model=provenance_actions[0].get("model") or "operator",
+            approved_by=approved_by,
+            approved_at=str(approved_at) if approved_at else None,
+        )
 
     prov = provenance.build(
         spec, data_path, filename, merged, actions=actions_to_record
@@ -230,5 +235,6 @@ def commit_recompute(
         "provenance": prov,
         "params": resolved_params(spec, merged),
     }
-
-    # S2: POST /ai/apply wires commit_recompute to the live gateway + dataset/upload data flow
+    # NOTE: the live AI write-path is POST /ai/apply (routers/ai.py → _execute_skill_run); it stamps
+    # provenance via the same provenance.stamp_ai_actions chokepoint. commit_recompute is the in-process
+    # variant used by the AI-compiles-away tests.

@@ -67,6 +67,45 @@ def environment_snapshot() -> dict:
     }
 
 
+def stamp_ai_actions(
+    client_actions: list[dict],
+    *,
+    model: str,
+    approved_by: str | None,
+    approved_at: str | None,
+    actor: str = "ai",
+) -> list[dict]:
+    """THE server-controlled chokepoint for AI-write attribution (NEXT#1).
+
+    The figure's ``provenance.actions[]`` is the integrity boundary of the AI write-path:
+    "AI compiles away" only holds if the recorded actor tag is *trustworthy*. So this is the
+    **only** place AI attribution is produced — it re-derives ``actor`` / ``model`` /
+    ``approved_by`` / ``approved_at`` from the server (the active gateway + the verified tenant
+    + the server clock) and **never trusts the caller's stamps**.
+
+    Each output record is rebuilt from scratch, keeping ONLY the descriptive fields the client
+    legitimately supplies (``action_id`` / ``type`` / ``target`` / ``prompt`` — ``prompt`` is the
+    user's own goal, not a security-sensitive attribution, and the server cannot know each
+    proposal's originating goal). Any client-supplied ``actor`` / ``model`` / ``approved_by`` /
+    ``approved_at`` (or any extra key) is discarded — a forged tag cannot survive.
+
+    See ``docs/provenance-chokepoint/spec.md`` and ``[[selom-provenance-stamping-chokepoint]]``.
+    """
+    return [
+        {
+            "action_id": str(a.get("action_id", "")),
+            "actor": actor,
+            "type": str(a.get("type", "")),
+            "target": str(a.get("target", "")),
+            "prompt": str(a.get("prompt", "")),
+            "model": model,
+            "approved_by": approved_by,
+            "approved_at": approved_at,
+        }
+        for a in client_actions
+    ]
+
+
 def build(
     spec: SkillSpec,
     data_path: str,

@@ -129,8 +129,9 @@ export function useAiHelpers({
   // edited-inputs re-run. "AI compiles away" — the deterministic run is identical either way.
   function rerunPending() {
     // Only emit AI actions for params whose value is STILL the AI's (authorOf gate inside) — a
-    // user-overridden accepted proposal must not tag the human's value as AI-authored.
-    const actions = approvedActions(aiProposals, fdBaseParams, fdParams, "user", new Date().toISOString());
+    // user-overridden accepted proposal must not be stamped as AI-authored. The server derives the
+    // attribution (actor/model/approved_by/approved_at) at /ai/apply; the FE posts only the delta.
+    const actions = approvedActions(aiProposals, fdBaseParams, fdParams);
     if (actions.length > 0) void rerunFigureWithAi(fdParams, actions);
     else void rerunFigureWithParams(fdParams);
   }

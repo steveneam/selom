@@ -77,6 +77,12 @@ export interface CapabilityGap {
  * (backend provenance.build `actions[]` entry). This is what the ✨ marker reads
  * for its tooltip and the Activity feed renders. `actor` is "ai" for gateway
  * proposals (an "operator" dogfood action is also possible).
+ *
+ * This is the SERVER-PRODUCED record (read from a run's provenance). The FE never
+ * builds it — the attribution fields (actor/model/approved_by/approved_at) are
+ * derived server-side at /ai/apply (the NEXT#1 chokepoint). To POST an approval the
+ * FE sends only the {@link AiActionDelta} (the descriptive delta); the server stamps
+ * the rest. See docs/provenance-chokepoint/spec.md.
  */
 export interface AiAction {
   action_id: string;
@@ -88,6 +94,14 @@ export interface AiAction {
   approved_by: string;
   approved_at: string;
 }
+
+/**
+ * The approved action **delta** POSTed to `/ai/apply` — "what to apply", NOT the actor
+ * tag. The server re-derives the trusted attribution (actor/model/approved_by/approved_at)
+ * itself, so the FE deliberately does not send those fields (a client cannot forge a
+ * provenance tag). `prompt` is the user's own goal (descriptive), kept here.
+ */
+export type AiActionDelta = Pick<AiAction, "action_id" | "type" | "target" | "prompt">;
 
 /** Full outcome of one propose→validate→(stage|apply) pass (backend `HelperTurn`). */
 export interface HelperTurn {

@@ -8,7 +8,7 @@
  */
 
 import type { SkillParams } from "@/lib/skills/api";
-import type { AiAction, AiActionType, AiProposal, HelperTurn } from "./types";
+import type { AiActionDelta, AiActionType, AiProposal, HelperTurn } from "./types";
 
 /** Figure-data controls stringify their values; the AI proposes typed. Compare as strings. */
 function sameVal(a: unknown, b: unknown): boolean {
@@ -92,33 +92,31 @@ export function proposalsFromTurn(turn: HelperTurn): AiProposal[] {
 }
 
 /**
- * The actor-tagged action log to POST to `/ai/apply` — built from the ACCEPTED proposals,
- * stamping the client-side approval (`approved_by` / `approved_at`). The backend requires a
- * non-empty list with each entry actor-tagged (`{actor:"ai", type, target}`), else 400.
+ * The approved action **delta** to POST to `/ai/apply` — built from the ACCEPTED proposals. It carries
+ * only "what to apply" (`{action_id, type, target, prompt}`); the backend re-derives the trusted
+ * attribution (`actor` / `model` / `approved_by` / `approved_at`) itself at the NEXT#1 chokepoint, so
+ * the FE deliberately does NOT stamp them (a client cannot forge a provenance tag). The backend requires
+ * a non-empty list with each entry carrying `type` + `target`, else 400. See
+ * docs/provenance-chokepoint/spec.md.
  */
 export function approvedActions(
   proposals: AiProposal[],
   base: SkillParams,
   staged: SkillParams,
-  approvedBy: string,
-  approvedAt: string,
-): AiAction[] {
+): AiActionDelta[] {
   return proposals
     .filter((p) => p.status === "accepted")
-    // Only tag a param as AI-authored when the AI's value is STILL the staged one. If the user
-    // hand-edited the control after accepting, authorOf() flips to "user" (the live ✨ marker drops
-    // too) — emitting an AI action here would mis-attribute the human's value to the AI in the
-    // immutable provenance.actions[] audit trail. Param-less (cosmetic) actions pass through.
+    // Only emit a param key whose staged value is STILL the AI's. If the user hand-edited the control
+    // after accepting, authorOf() flips to "user" (the live ✨ marker drops too) — emitting it here
+    // would have the server stamp the human's value as AI-authored in the immutable provenance.actions[]
+    // audit trail. Param-less (cosmetic) actions pass through. (This author filter is part of selecting
+    // the delta — it stays on the FE even though attribution is now stamped server-side.)
     .filter((p) => p.paramKey === undefined || authorOf(p.paramKey, base, staged, proposals) === "ai")
     .map((p) => ({
       action_id: p.id,
-      actor: p.actor || "ai",
       type: p.type,
       target: p.paramKey ?? "",
       prompt: p.prompt ?? "",
-      model: p.model ?? "",
-      approved_by: approvedBy,
-      approved_at: approvedAt,
     }));
 }
 

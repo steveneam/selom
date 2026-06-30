@@ -18,14 +18,17 @@ from __future__ import annotations
 
 import json as _json
 import os
+from datetime import UTC, datetime
 from typing import Literal
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from ai.gateway import ActionGateway, NullActionGateway, _deterministic_explain, rank_sweep_space
 from ai.loop import run_helper_turn
 from ai.models import ActionContext
+from auth import AuthContext, require_user
+from companions import provenance
 from config import settings
 from routers._run import _execute_skill_run, _save_upload, _stringify_params
 
@@ -242,19 +245,24 @@ async def apply_approved(
     params: str = Form("{}"),
     ai_actions: str = Form("[]"),
     design: UploadFile | None = File(None),
+    ctx: AuthContext = Depends(require_user),
 ):
     """Execute user-approved AI actions through the same gated run path as human runs.
 
     Accepts the user-approved final params (base + staged delta already merged
-    client-side) and the actor-tagged ``provenance_actions`` from the ``HelperTurn``
-    (with ``approved_by`` / ``approved_at`` stamped by the client).  Passes them
-    through the EXACT same ``_execute_skill_run`` body as ``POST /skills/{id}/run``:
-    QC gate → D1 data-contract gate → D2 frame-schema gate → skill execution →
-    table synthesis → provenance builder.  No second gated path.
+    client-side) and the approved action **delta** (``action_id`` / ``type`` /
+    ``target`` / ``prompt`` — what to apply).  Passes them through the EXACT same
+    ``_execute_skill_run`` body as ``POST /skills/{id}/run``: QC gate → D1
+    data-contract gate → D2 frame-schema gate → skill execution → table synthesis →
+    provenance builder.  No second gated path.
 
-    The provenance bundle's ``actions`` field carries the actor-tagged log so the
-    result is auditable.  Re-running from ``provenance.params`` with no gateway
-    reproduces the figure byte-for-byte (AI compiles away invariant).
+    **Provenance is server-controlled (NEXT#1).**  The attribution recorded in
+    ``provenance.actions[]`` (``actor`` / ``model`` / ``approved_by`` /
+    ``approved_at``) is NOT trusted from the request — it is re-derived here from
+    the active gateway, the verified tenant (``ctx.user_id``), and the server clock
+    via the one chokepoint ``provenance.stamp_ai_actions``.  A forged tag cannot
+    survive.  Re-running from ``provenance.params`` with no gateway reproduces the
+    figure byte-for-byte (AI compiles away invariant).
 
     Parameters (multipart form)
     ---------------------------
@@ -270,11 +278,11 @@ async def apply_approved(
         JSON-encoded dict of the FINAL approved params (base merged with the
         user-approved staged delta).
     ai_actions:
-        JSON-encoded list of approved ``provenance_actions`` from the HelperTurn
-        (each entry: action_id, actor, type, target, prompt, model,
-        approved_by, approved_at).
+        JSON-encoded list of the approved action **delta** — each entry carries the
+        descriptive ``{action_id, type, target, prompt}``.  Any caller-supplied
+        ``actor`` / ``model`` / ``approved_by`` / ``approved_at`` is **ignored**:
+        the server derives the trusted attribution itself (forgery-proof).
     """
-    # S5: harden actor-tag against client forgery (FE posts staged delta separately; backend re-derives the tag). Backlog.
     from skills.registry import list_skill_ids
 
     if skill_id not in set(list_skill_ids()):
@@ -293,20 +301,29 @@ async def apply_approved(
     if not actions_list:
         raise HTTPException(
             status_code=400,
-            detail="/ai/apply requires a non-empty ai_actions log (the approved, actor-tagged actions)",
+            detail="/ai/apply requires a non-empty ai_actions log (the approved action delta)",
         )
 
+    # Validate the DELTA shape only (descriptive integrity) — actor/model/approved_* are NEVER
+    # required nor trusted from the caller; the server stamps them below.
     for entry in actions_list:
-        if (
-            not isinstance(entry, dict)
-            or entry.get("actor") != "ai"
-            or not entry.get("type")
-            or "target" not in entry
-        ):
+        if not isinstance(entry, dict) or not entry.get("type") or "target" not in entry:
             raise HTTPException(
                 status_code=400,
-                detail="malformed ai_actions entry: each must carry actor='ai', type, target",
+                detail="malformed ai_actions entry: each must carry type and target",
             )
+
+    # Server-controlled provenance (NEXT#1, docs/provenance-chokepoint/spec.md): derive the trusted
+    # attribution and route ONLY the stamped list to the run path — the raw `actions_list` (with any
+    # forged actor/model/approved_*) never reaches provenance.build. `model` is the gateway active at
+    # apply time (a propose→apply env flip would reflect the apply-time gateway — the server-trusted
+    # value, strictly better than a forgeable client string; see spec "Accepted limitation").
+    trusted_actions = provenance.stamp_ai_actions(
+        actions_list,
+        model=get_action_gateway().model_id,
+        approved_by=ctx.user_id,
+        approved_at=datetime.now(UTC).isoformat(),
+    )
 
     path = _save_upload(matrix)
     # Thread the design sheet (sample→condition/time) exactly as the human /skills/{id}/run path does
@@ -324,5 +341,5 @@ async def apply_approved(
         _stringify_params(params_dict),
         override,
         design_path,
-        ai_actions=actions_list,
+        ai_actions=trusted_actions,
     )

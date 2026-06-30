@@ -261,6 +261,10 @@ def test_apply_endpoint_provenance_has_ai_actions(tmp_path, monkeypatch):
     """POST /ai/apply routes through _execute_skill_run and returns provenance.actions
     with actor='ai'.  Proves the 'same gateway as humans' execution invariant: the
     endpoint uses the exact same QC / D1 / D2 gates as POST /skills/{id}/run.
+
+    ALSO the NEXT#1 forgery guard: the request stamps forged attribution
+    (approved_by/model/approved_at) — the server MUST overwrite all of it with the
+    derived values (dev tenant, gateway model_id, server clock), never echo the client.
     """
     monkeypatch.setenv("SELOM_SKILLS_ENGINE", "stub")
     from fastapi.testclient import TestClient
@@ -272,16 +276,17 @@ def test_apply_endpoint_provenance_has_ai_actions(tmp_path, monkeypatch):
         encoding="utf-8",
     )
 
+    # A FORGED delta: client claims a different approver, model, and approval time.
     ai_actions = [
         {
             "action_id": "abc123",
-            "actor": "ai",
+            "actor": "human",  # forged — server must record "ai"
             "type": "set_param",
             "target": "fc_threshold",
             "prompt": "increase the threshold",
-            "model": "claude-opus-4-8",
-            "approved_by": "user-1",
-            "approved_at": "2026-06-29T12:00:00Z",
+            "model": "evil-model",  # forged — server must record the gateway model_id
+            "approved_by": "attacker",  # forged — server must record the verified tenant
+            "approved_at": "1999-01-01T00:00:00Z",  # forged — server must record the server clock
         }
     ]
 
@@ -305,8 +310,18 @@ def test_apply_endpoint_provenance_has_ai_actions(tmp_path, monkeypatch):
     assert "provenance" in body
     prov = body["provenance"]
     assert "actions" in prov, "provenance must carry the ai_actions log"
-    assert prov["actions"][0]["actor"] == "ai"
-    assert prov["actions"][0]["action_id"] == "abc123"
+    rec = prov["actions"][0]
+    # Descriptive delta survives.
+    assert rec["action_id"] == "abc123"
+    assert rec["type"] == "set_param"
+    assert rec["target"] == "fc_threshold"
+    assert rec["prompt"] == "increase the threshold"
+    # Attribution is SERVER-derived, never the forged client values.
+    assert rec["actor"] == "ai"
+    assert rec["model"] == "null", "default gateway is NullActionGateway → model_id 'null'"
+    assert rec["approved_by"] == "dev-user", "the verified dev tenant, not the forged 'attacker'"
+    assert rec["approved_at"] != "1999-01-01T00:00:00Z", "the server clock, not the forged time"
+    assert rec["approved_at"], "approved_at is stamped server-side"
 
 
 def test_apply_endpoint_threads_design_sheet(tmp_path, monkeypatch):
@@ -484,7 +499,6 @@ def test_operator_run_stamps_operator_in_provenance():
     Proves that the model_id is threaded from the gateway through run_helper_turn
     into apply_plan and stamped on the provenance entry.
     """
-    from ai.execute import apply_plan
     from ai.gateway import OperatorActionGateway
 
     plan = ActionPlan(
@@ -597,16 +611,18 @@ def test_apply_endpoint_malformed_entry_missing_target_is_400(tmp_path, monkeypa
     assert "malformed" in response.json()["detail"]
 
 
-def test_apply_endpoint_malformed_entry_wrong_actor_is_400(tmp_path, monkeypatch):
-    """POST /ai/apply with actor != 'ai' returns 400 (forged/human actor tag rejected)."""
+def test_apply_endpoint_forged_actor_is_overwritten_not_rejected(tmp_path, monkeypatch):
+    """POST /ai/apply with a forged actor != 'ai' is ACCEPTED (a well-formed delta) and the
+    server OVERWRITES the actor with 'ai' (NEXT#1 — attribution is server-controlled, never
+    trusted from the caller; the client can't forge the recorded actor tag)."""
     monkeypatch.setenv("SELOM_SKILLS_ENGINE", "stub")
     from fastapi.testclient import TestClient
     from main import app
 
     tiny_csv = tmp_path / "de.csv"
-    tiny_csv.write_text("gene,logFC,padj\nA,1,0.01\n", encoding="utf-8")
+    tiny_csv.write_text("gene,logFC,padj\nGeneA,2.5,0.001\nGeneB,-1.8,0.01\n", encoding="utf-8")
 
-    bad_actions = [{"actor": "human", "type": "set_param", "target": "fc_threshold"}]
+    forged = [{"actor": "human", "type": "set_param", "target": "fc_threshold", "action_id": "f1"}]
 
     client = TestClient(app)
     with open(tiny_csv, "rb") as fh:
@@ -615,13 +631,14 @@ def test_apply_endpoint_malformed_entry_wrong_actor_is_400(tmp_path, monkeypatch
             data={
                 "skill_id": "volcano",
                 "goal": "test",
-                "ai_actions": json.dumps(bad_actions),
+                "params": json.dumps({"fc_threshold": "1.5"}),
+                "ai_actions": json.dumps(forged),
             },
             files={"matrix": ("de.csv", fh, "text/csv")},
         )
 
-    assert response.status_code == 400
-    assert "malformed" in response.json()["detail"]
+    assert response.status_code == 200, response.text
+    assert response.json()["provenance"]["actions"][0]["actor"] == "ai"
 
 
 def test_apply_endpoint_valid_tagged_entry_is_200_and_recorded(tmp_path, monkeypatch):
@@ -666,5 +683,9 @@ def test_apply_endpoint_valid_tagged_entry_is_200_and_recorded(tmp_path, monkeyp
     body = response.json()
     assert "provenance" in body
     assert "actions" in body["provenance"]
-    assert body["provenance"]["actions"][0]["actor"] == "ai"
-    assert body["provenance"]["actions"][0]["action_id"] == "z9"
+    rec = body["provenance"]["actions"][0]
+    assert rec["actor"] == "ai"
+    assert rec["action_id"] == "z9"
+    # Server-derived attribution overwrites the client's "user-1" / "claude-opus-4-8".
+    assert rec["approved_by"] == "dev-user"
+    assert rec["model"] == "null"

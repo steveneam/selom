@@ -11,7 +11,7 @@
 
 import { parseSkillRunResponse, type SkillParams, type SkillRunResponse } from "@/lib/skills/api";
 import type {
-  AiAction,
+  AiActionDelta,
   ExplainRequest,
   ExplainResponse,
   GapBacklogEntry,
@@ -53,17 +53,18 @@ export async function proposeActions(req: ProposeRequest): Promise<HelperTurn> {
  * Multipart POST to /ai/apply (matrix + skill_id + goal + override + params JSON +
  * ai_actions JSON). The backend routes it through `_execute_skill_run` — the same QC /
  * data-contract / frame-schema gates and the same provenance builder — then stamps the
- * actor-tagged `ai_actions` onto `provenance.actions[]`. The response is byte-identical to
- * a normal run, so it reuses {@link parseSkillRunResponse} (one error/parse path, no drift).
+ * SERVER-derived attribution onto `provenance.actions[]` (the NEXT#1 chokepoint re-derives
+ * actor/model/approved_by/approved_at; the posted delta carries none of them). The response is
+ * byte-identical to a normal run, so it reuses {@link parseSkillRunResponse} (one error/parse path).
  *
- * `aiActions` must be non-empty and each entry actor-tagged (`{actor:"ai", type, target,…}`);
+ * `aiActions` is the approved DELTA — non-empty, each entry `{action_id, type, target, prompt}`;
  * the backend rejects an empty/malformed log with 400.
  */
 export async function applyAiActions(
   skillId: string,
   file: File,
   params: SkillParams,
-  aiActions: AiAction[],
+  aiActions: AiActionDelta[],
   opts: { goal?: string; override?: boolean; design?: File | null } = {},
 ): Promise<SkillRunResponse> {
   const fd = new FormData();

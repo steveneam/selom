@@ -57,6 +57,54 @@ def test_build_records_typed_params_and_input(tmp_path):
     assert bundle["input"]["n_bytes"] == 128
 
 
+def test_stamp_ai_actions_discards_forged_attribution():
+    """The chokepoint (NEXT#1) keeps ONLY the descriptive delta and re-derives every attribution
+    field server-side — a forged actor/model/approved_by/approved_at cannot survive."""
+    forged = [
+        {
+            "action_id": "a1",
+            "type": "set_param",
+            "target": "resolution",
+            "prompt": "tighten",
+            # all forged — must be overwritten:
+            "actor": "human",
+            "model": "evil-model",
+            "approved_by": "attacker",
+            "approved_at": "1999-01-01T00:00:00Z",
+            "extra_forged_key": "should be dropped",
+        }
+    ]
+    out = provenance.stamp_ai_actions(
+        forged, model="gw-model", approved_by="tenant-7", approved_at="2026-06-30T10:00:00+00:00"
+    )
+    assert len(out) == 1
+    rec = out[0]
+    # Descriptive fields pass through.
+    assert rec["action_id"] == "a1"
+    assert rec["type"] == "set_param"
+    assert rec["target"] == "resolution"
+    assert rec["prompt"] == "tighten"
+    # Attribution is the injected server values, never the forged ones.
+    assert rec["actor"] == "ai"
+    assert rec["model"] == "gw-model"
+    assert rec["approved_by"] == "tenant-7"
+    assert rec["approved_at"] == "2026-06-30T10:00:00+00:00"
+    # No extra/forged keys leak into the immutable record.
+    assert set(rec) == {
+        "action_id", "actor", "type", "target", "prompt", "model", "approved_by", "approved_at",
+    }
+
+
+def test_stamp_ai_actions_tolerates_missing_descriptive_fields():
+    """A sparse delta (only type+target, the validated minimum) stamps clean with empty descriptives."""
+    out = provenance.stamp_ai_actions(
+        [{"type": "set_param", "target": "x"}],
+        model="m", approved_by="u", approved_at="t",
+    )
+    assert out[0]["action_id"] == "" and out[0]["prompt"] == ""
+    assert out[0]["actor"] == "ai" and out[0]["model"] == "m"
+
+
 def test_run_endpoint_returns_figure_provenance_methods():
     res = client.post(
         "/skills/cluster/run?resolution=2.0",

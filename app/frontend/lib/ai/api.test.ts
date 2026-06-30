@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  */
 
 import { applyAiActions, explain, fetchGaps, proposeActions } from "./api";
-import type { AiAction, HelperTurn } from "./types";
+import type { AiActionDelta, HelperTurn } from "./types";
 
 function jsonRes(status: number, body: unknown): Response {
   return {
@@ -51,11 +51,13 @@ describe("proposeActions", () => {
 });
 
 describe("applyAiActions", () => {
-  const actions: AiAction[] = [
-    { action_id: "a1", actor: "ai", type: "set_param", target: "resolution", prompt: "", model: "m", approved_by: "user", approved_at: "t" },
+  // The POST shape is the descriptive DELTA only — no actor/model/approved_by/approved_at (the server
+  // re-derives those at the NEXT#1 chokepoint). A forgeable tag must never leave the FE.
+  const actions: AiActionDelta[] = [
+    { action_id: "a1", type: "set_param", target: "resolution", prompt: "" },
   ];
 
-  it("POSTs multipart to /api/ai/apply with the approved actions + final params", async () => {
+  it("POSTs multipart to /api/ai/apply with the approved delta + final params (no attribution)", async () => {
     const calls: { url: string; init: RequestInit }[] = [];
     vi.stubGlobal("fetch", (url: string, init: RequestInit) => {
       calls.push({ url, init });
@@ -70,7 +72,10 @@ describe("applyAiActions", () => {
     expect(fd.get("skill_id")).toBe("umap_scrna");
     expect(fd.get("goal")).toBe("tighten");
     expect(JSON.parse(fd.get("params") as string)).toEqual({ resolution: 1.2 });
-    expect(JSON.parse(fd.get("ai_actions") as string)).toHaveLength(1);
+    const posted = JSON.parse(fd.get("ai_actions") as string);
+    expect(posted).toHaveLength(1);
+    // The wire must not carry forgeable attribution.
+    expect(Object.keys(posted[0]).sort()).toEqual(["action_id", "prompt", "target", "type"]);
     expect(out.figure.data[0].type).toBe("scatter");
   });
 

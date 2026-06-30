@@ -128,31 +128,29 @@ describe("approvedActions", () => {
   const base = { resolution: 1.0 } as Record<string, string | number | boolean>;
   const staged = { resolution: 1.2 } as Record<string, string | number | boolean>; // the AI's value, still staged
 
-  it("builds an actor-tagged log for accepted proposals whose value is still staged", () => {
+  it("builds the descriptive delta (no attribution) for accepted proposals whose value is still staged", () => {
     const proposals = [
       proposal({ id: "a1", status: "accepted" }),
       proposal({ id: "a2", status: "proposed" }), // not accepted → excluded
     ];
-    const out = approvedActions(proposals, base, staged, "user", "2026-06-29T12:00:00Z");
+    const out = approvedActions(proposals, base, staged);
     expect(out).toHaveLength(1);
-    expect(out[0]).toMatchObject({
-      action_id: "a1",
-      actor: "ai",
-      type: "set_param",
-      target: "resolution",
-      approved_by: "user",
-      approved_at: "2026-06-29T12:00:00Z",
-    });
+    // The delta carries ONLY {action_id, type, target, prompt} — the server (chokepoint) derives the
+    // attribution. A forgeable actor/model/approved_by/approved_at must NOT be emitted here.
+    expect(out[0]).toEqual({ action_id: "a1", type: "set_param", target: "resolution", prompt: "" });
+    expect(out[0]).not.toHaveProperty("actor");
+    expect(out[0]).not.toHaveProperty("approved_by");
+    expect(out[0]).not.toHaveProperty("model");
   });
 
   it("DROPS an accepted proposal the user has since overridden (no false AI attribution)", () => {
     const proposals = [proposal({ id: "a1", status: "accepted", value: 1.2 })];
-    // the user hand-edited resolution to 1.5 → it's no longer the AI's value → must not be AI-tagged
-    expect(approvedActions(proposals, base, { resolution: 1.5 }, "user", "t")).toEqual([]);
+    // the user hand-edited resolution to 1.5 → it's no longer the AI's value → must not be in the delta
+    expect(approvedActions(proposals, base, { resolution: 1.5 })).toEqual([]);
   });
 
   it("is empty when nothing is accepted (the caller falls back to a plain re-run)", () => {
-    expect(approvedActions([proposal({ status: "proposed" })], base, staged, "user", "t")).toEqual([]);
+    expect(approvedActions([proposal({ status: "proposed" })], base, staged)).toEqual([]);
   });
 });
 

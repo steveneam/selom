@@ -11,7 +11,7 @@ import { mockInspect } from "./data-inspect-fixture";
 import { SKILL_PARAM_SPECS } from "./skill-spec-fixture";
 import { persistenceHandlers } from "./persistence-handlers";
 import { mockExplain, mockGaps, mockHelperTurn, mockSweepSuggestions } from "./ai-fixture";
-import type { AiAction } from "@/lib/ai/types";
+import type { AiAction, AiActionDelta } from "@/lib/ai/types";
 import { REPRO_LEDGERS, REPRO_PAPERS } from "@/lib/reproduction/fixture";
 
 // Mirrors the live contract from app/backend/main.py:
@@ -186,21 +186,33 @@ export const handlers = [
     } catch {
       /* malformed → empty */
     }
-    let actions: AiAction[] = [];
+    let delta: AiActionDelta[] = [];
     try {
-      actions = JSON.parse(String(fd.get("ai_actions") ?? "[]")) as AiAction[];
+      delta = JSON.parse(String(fd.get("ai_actions") ?? "[]")) as AiActionDelta[];
     } catch {
       /* malformed → empty */
     }
-    // Mirror the 400 the backend raises on an empty/missing ai_actions log.
-    if (!Array.isArray(actions) || actions.length === 0) {
+    // Mirror the 400 the backend raises on an empty/missing ai_actions delta.
+    if (!Array.isArray(delta) || delta.length === 0) {
       return HttpResponse.json(
-        { detail: "/ai/apply requires a non-empty ai_actions log (the approved, actor-tagged actions)" },
+        { detail: "/ai/apply requires a non-empty ai_actions log (the approved action delta)" },
         { status: 400 },
       );
     }
     const bundle = mockBundle(skillId, params as Record<string, string>);
-    // The AI-assisted run stamps the actor-tagged log onto provenance.actions[] (the audit trail).
+    // Mirror the NEXT#1 chokepoint: the SERVER stamps the trusted attribution — the posted delta carries
+    // only {action_id, type, target, prompt}; actor/model/approved_by/approved_at are derived here, never
+    // echoed from the client (a client cannot forge a provenance tag). See docs/provenance-chokepoint/spec.md.
+    const actions: AiAction[] = delta.map((d) => ({
+      action_id: String(d.action_id ?? ""),
+      actor: "ai",
+      type: String(d.type ?? ""),
+      target: String(d.target ?? ""),
+      prompt: String(d.prompt ?? ""),
+      model: "mock-gateway",
+      approved_by: "dev-user",
+      approved_at: "2026-06-30T00:00:00+00:00",
+    }));
     bundle.provenance = { ...bundle.provenance, actions };
     return HttpResponse.json({
       figure: stubUmapFigure(),

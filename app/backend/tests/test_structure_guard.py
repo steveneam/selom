@@ -111,6 +111,46 @@ def test_ai_apply_router_uses_execute_skill_run():
     )
 
 
+def test_ai_apply_stamps_provenance_through_the_chokepoint():
+    """POST /ai/apply must stamp AI attribution through the ONE server chokepoint — no parallel path.
+
+    The figure's provenance.actions[] is the integrity boundary of the AI write-path: a forgeable
+    actor/model/approved_by tag silently lies about who authored a figure. So /ai/apply must route the
+    posted delta through provenance.stamp_ai_actions (which re-derives actor/model/approved_by/approved_at
+    server-side) and hand the run path ONLY the stamped list — never the raw client actions. A future
+    edit that feeds _execute_skill_run the unstamped list would re-open the forgery hole; this fails it.
+    See docs/provenance-chokepoint/spec.md, [[selom-provenance-stamping-chokepoint]].
+    """
+    ai_router_src = (BACKEND / "routers" / "ai.py").read_text(encoding="utf-8")
+    assert "provenance.stamp_ai_actions(" in ai_router_src, (
+        "routers/ai.py must derive provenance attribution via provenance.stamp_ai_actions "
+        "(the one server-controlled chokepoint), not trust caller-supplied stamps."
+    )
+    assert "ai_actions=trusted_actions" in ai_router_src, (
+        "routers/ai.py must pass the STAMPED list (trusted_actions) to _execute_skill_run."
+    )
+    assert "ai_actions=actions_list" not in ai_router_src, (
+        "routers/ai.py must NOT hand the raw client actions_list to _execute_skill_run — that bypasses "
+        "the stamping chokepoint and re-opens the attribution-forgery hole."
+    )
+    # No parallel path: routers/ai.py is the ONLY router that feeds _execute_skill_run an ai_actions list.
+    for path in (BACKEND / "routers").glob("*.py"):
+        if path.name == "ai.py":
+            continue
+        assert "ai_actions=" not in path.read_text(encoding="utf-8"), (
+            f"routers/{path.name} passes ai_actions to the run path — AI provenance must be stamped "
+            "only via routers/ai.py → provenance.stamp_ai_actions (no parallel write path)."
+        )
+    # The in-process variant (ai/execute.py commit_recompute, used by the AI-compiles-away tests) must
+    # stamp through the SAME chokepoint — not merge approved_by into a raw actions dict (gauntlet
+    # spine-consistency, 2026-06-30).
+    exec_src = (BACKEND / "ai" / "execute.py").read_text(encoding="utf-8")
+    assert "stamp_ai_actions" in exec_src, (
+        "ai/execute.py (commit_recompute) must stamp attribution via provenance.stamp_ai_actions, "
+        "not build a parallel actions record."
+    )
+
+
 def test_ai_action_registry_matches_action_types():
     """ACTION_REGISTRY keys, ACTION_TYPES tuple, and ActionType Literal must be identical.
 
