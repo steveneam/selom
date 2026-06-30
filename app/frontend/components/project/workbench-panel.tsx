@@ -13,7 +13,7 @@ import { skillColor, skillIcon } from "@/lib/catalog/modality";
 import { isFieldDisabled, visibleParamFields } from "@/lib/catalog/params";
 import { useSkillParams } from "@/lib/catalog/use-skill-params";
 import { getSkill } from "@/lib/catalog/seed";
-import { pickQuickApply } from "@/lib/catalog/quick-apply";
+import { recommendedSkills } from "@/lib/catalog/quick-apply";
 import type { SkillParams } from "@/lib/skills/api";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 
@@ -23,7 +23,7 @@ const DND_TYPE = "application/x-selom-skill";
  * The Workbench: installed skills + (when present) the LLM's proposed pipeline.
  *
  * A skill can be applied to the data several ways, all converging on the same run:
- *   - the one-click chips (skills recommended for the loaded data, else most-used favourites),
+ *   - the one-click chips (skills recommended for the loaded data; hidden when there are none),
  *   - press "Apply" on a skill card,
  *   - click a card to SELECT it, tweak its inline params, then Apply,
  *   - DRAG a card into the "Apply a skill" zone.
@@ -93,10 +93,10 @@ export function WorkbenchPanel({
   const selectedSkill = selected ? getSkill(selected) : undefined;
   const { fields: schema, loading: paramsLoading } = useSkillParams(selected);
 
-  // One-click chips. When the dataset has a proposal, these are the skills RECOMMENDED for it (the
-  // engine's proposed pipeline) — `dataAware` then labels the row honestly; otherwise they're the
-  // most-used installed favourites. Resolved + deduped against the catalog (see lib/catalog/quick-apply).
-  const { dataAware, skills: quick } = pickQuickApply(proposal, installs);
+  // The "Recommended for your data" chips = the skills the engine RECOMMENDED for this dataset (the
+  // proposal's pipeline). Empty when there's no proposal → the row is hidden entirely (we never show a
+  // popularity list under a recommendation's label). Resolved + deduped against the catalog.
+  const quick = recommendedSkills(proposal);
 
   // The installed-skills list, filtered by the search box (name or category).
   const q = filter.trim().toLowerCase();
@@ -114,11 +114,12 @@ export function WorkbenchPanel({
             deterministic quick-apply row. Rendered only when the parent provides it. */}
         {routeComposer}
 
-        {/* Quick apply — one-click favourites. */}
+        {/* Recommended for your data — the engine's proposed skills, one click. Hidden when there's
+            no proposal (no popularity fallback — the row only ever shows real recommendations). */}
         {quick.length > 0 && (
           <div>
             <p className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
-              <Sparkles className="size-3 text-primary" /> {dataAware ? "Recommended for your data" : "Frequently used"}
+              <Sparkles className="size-3 text-primary" /> Recommended for your data
             </p>
             <div className="flex flex-wrap gap-2">
               {quick.map((s) => {
