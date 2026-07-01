@@ -112,7 +112,9 @@ export function ExportMenu({
       <Button
         variant="outline"
         size="sm"
-        className="relative z-50 gap-1.5"
+        // Raise the trigger above its OWN scrim (z-40) ONLY while the menu is open — otherwise a
+        // permanent z-50 makes the button poke THROUGH the z-40 AI panel overlay when that's open.
+        className={`relative gap-1.5 ${open ? "z-50" : ""}`}
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="dialog"
         aria-expanded={open}
