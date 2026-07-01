@@ -105,6 +105,10 @@ export function IntakeQuestionnaire({
 
   const candidate = candidateFor(design, groupKey);
   const levels = candidate?.levels ?? [];
+  // A time-course design (ordered timepoints) renders a timeline + runs the deg time-course mode — no
+  // control/treatment contrast, so the contrast selects, the ≥2-replicate warning, and the messy-name
+  // AI refiner (which maps names → a contrast) don't apply.
+  const isTimeCourse = candidate?.kind === "time_course";
 
   // Switch the group factor → re-default the contrast to that candidate's control guess + next level.
   function pickGroup(key: string) {
@@ -138,8 +142,9 @@ export function IntakeQuestionnaire({
 
   const refReps = levels.find((l) => l.name === reference)?.n_replicates;
   const treatReps = levels.find((l) => l.name === treatment)?.n_replicates;
-  const lowReps = needsDesign && ((refReps ?? 0) < 2 || (treatReps ?? 0) < 2);
-  const designValid = !needsDesign || (!!reference && !!treatment && reference !== treatment);
+  const lowReps = needsDesign && !isTimeCourse && ((refReps ?? 0) < 2 || (treatReps ?? 0) < 2);
+  const designValid =
+    !needsDesign || isTimeCourse || (!!reference && !!treatment && reference !== treatment);
 
   function submit() {
     const choice: DesignChoice | null =
@@ -147,10 +152,12 @@ export function IntakeQuestionnaire({
         ? {
             groupKey,
             source: design!.source,
+            kind: isTimeCourse ? "time_course" : "categorical",
             reference,
             treatment,
             levels: levels.map((l) => l.name),
             sampleCol: sampleCol || null,
+            ...(isTimeCourse ? { timeRows: candidate.time_rows ?? [] } : {}),
           }
         : null;
     // AI attribution (2b): carry the refiner's set_design action ONLY when its proposal was CONFIRMED
@@ -214,7 +221,7 @@ export function IntakeQuestionnaire({
           {design!.note && (
             <p className="text-[11px] leading-relaxed text-muted-foreground">
               {design!.note}
-              {candidate.reference_guess &&
+              {!isTimeCourse && candidate.reference_guess &&
                 ` · “${candidate.reference_guess}” guessed as the control — confirm below`}
             </p>
           )}
@@ -242,6 +249,38 @@ export function IntakeQuestionnaire({
             </p>
           )}
 
+          {isTimeCourse ? (
+            /* Time-course (2c): an ordered timeline, not a 2-group contrast — the run tests a trend
+               across time (deg time-course mode), with the earliest timepoint as the baseline. */
+            <div className="space-y-2">
+              <p className="text-[11px] text-muted-foreground">
+                Ordered timepoints — genes are tested for a trend across time (baseline = earliest).
+              </p>
+              <ol className="flex flex-wrap items-center gap-1.5" aria-label="Timepoints in order">
+                {levels.map((lv, i) => (
+                  <React.Fragment key={lv.name}>
+                    {i > 0 && (
+                      <span aria-hidden className="text-muted-foreground/50">
+                        →
+                      </span>
+                    )}
+                    <li className="flex items-center gap-1.5 rounded-lg border border-border bg-card/60 px-2.5 py-1.5">
+                      <span className="text-sm font-medium text-foreground">{lv.name}</span>
+                      {i === 0 && (
+                        <span className="rounded border border-primary/40 px-1 py-px text-[9px] uppercase tracking-wide text-primary">
+                          baseline
+                        </span>
+                      )}
+                      <span className="tabular text-[11px] text-muted-foreground">
+                        {lv.n_replicates} {lv.replicate_unit}
+                      </span>
+                    </li>
+                  </React.Fragment>
+                ))}
+              </ol>
+            </div>
+          ) : (
+            <>
           {/* Layer 2 — the detected conditions + replicate counts (confirm the detection). */}
           <div className="grid gap-2 sm:grid-cols-2">
             {levels.map((lv) => {
@@ -351,13 +390,23 @@ export function IntakeQuestionnaire({
             context={{ dataColumns: dataColumns ?? null }}
             onIngest={applyIngestProposal}
           />
+            </>
+          )}
         </div>
       )}
 
       {/* The "ready to run" confirm card — the questionnaire's payoff (build-spec §3 / spec §7.6). */}
       <div className="rounded-xl border border-border bg-card/60 p-3.5">
         <p className="text-xs text-muted-foreground">
-          {needsDesign && designValid ? (
+          {needsDesign && isTimeCourse ? (
+            <>
+              Detected: <span className="font-medium text-foreground">{modality}</span> ·{" "}
+              <span className="font-medium text-foreground">
+                time-course across {levels.length} timepoints
+              </span>{" "}
+              ({levels[0]?.name} → {levels[levels.length - 1]?.name}) — correct?
+            </>
+          ) : needsDesign && designValid ? (
             <>
               Detected: <span className="font-medium text-foreground">{modality}</span> ·{" "}
               <span className="font-medium text-foreground">{levels.length} conditions</span> (

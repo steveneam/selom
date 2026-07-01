@@ -130,6 +130,112 @@ def test_fail_soft_on_bad_payload():
     assert hints.modality == BULK_COUNTS
 
 
+# --- bulk time-course (2c) --------------------------------------------------------------------------
+
+def test_bulk_timecourse_detected_and_time_sorted():
+    # Columns encode an ordered timepoint axis (t0/t24/t120), 2 reps each. Detection must tag the
+    # candidate time_course, sort the levels by NUMERIC time (120 > 24, even though "120" < "24"
+    # alphabetically — proving it's numeric, not lexical), and emit one design row per sample column.
+    df = pd.DataFrame({
+        "gene": [f"g{i}" for i in range(5)],
+        "t0_1": range(5), "t0_2": range(5),
+        "t24_1": range(5), "t24_2": range(5),
+        "t120_1": range(5), "t120_2": range(5),
+    })
+    hints = suggest_design_hints(DataBundle(payload=df, kind=BULK_COUNTS))
+    assert hints.needs_design is True
+    assert hints.source == "column_names"
+    cand = hints.group_candidates[0]
+    assert cand.kind == "time_course"
+    assert [lv.name for lv in cand.levels] == ["t0", "t24", "t120"]      # numeric order, not alphabetical
+    assert cand.reference_guess == "t0"                                  # baseline = earliest timepoint
+    rows = {r.sample: r.time for r in cand.time_rows}
+    assert rows == {
+        "t0_1": 0.0, "t0_2": 0.0, "t24_1": 24.0, "t24_2": 24.0, "t120_1": 120.0, "t120_2": 120.0,
+    }
+
+
+def test_bulk_timecourse_times_equal_the_deg_runner_parser():
+    # DETECTED == CONSUMED: the emitted times must equal the deg runner's own _numeric_time on the
+    # stripped label — the design detector reuses that parser directly (no shadow copy).
+    from skills.deg.run_real import _numeric_time
+
+    df = pd.DataFrame({
+        "gene": [f"g{i}" for i in range(4)],
+        "day0_1": range(4), "day0_2": range(4), "day3_1": range(4), "day7_1": range(4),
+    })
+    hints = suggest_design_hints(DataBundle(payload=df, kind=BULK_COUNTS))
+    cand = hints.group_candidates[0]
+    assert cand.kind == "time_course"
+    for r in cand.time_rows:
+        label = r.sample.rsplit("_", 1)[0]                 # drop the _rep suffix the runner strips
+        assert r.time == _numeric_time(label)
+
+
+def test_bulk_two_timepoints_stays_categorical():
+    # <3 distinct timepoints → not enough for a trend → the categorical contrast fallback (no worse
+    # than today): a 2-level design with no time_rows.
+    df = pd.DataFrame({
+        "gene": [f"g{i}" for i in range(4)],
+        "0h_1": range(4), "0h_2": range(4), "24h_1": range(4), "24h_2": range(4),
+    })
+    hints = suggest_design_hints(DataBundle(payload=df, kind=BULK_COUNTS))
+    cand = hints.group_candidates[0]
+    assert cand.kind == "categorical"
+    assert cand.time_rows == []
+    assert cand.n_levels == 2
+
+
+def test_bulk_timecourse_needs_four_samples():
+    # 3 timepoints but only 3 samples (1 rep each) < the deg runner's 4-sample floor → categorical,
+    # so we never present a time-course the runner would reject at run time (DETECTED == CONSUMED).
+    df = pd.DataFrame({
+        "gene": [f"g{i}" for i in range(4)],
+        "0h": range(4), "24h": range(4), "48h": range(4),
+    })
+    hints = suggest_design_hints(DataBundle(payload=df, kind=BULK_COUNTS))
+    cand = hints.group_candidates[0]
+    assert cand.kind == "categorical"
+
+
+def test_bulk_bare_numeric_labels_not_timecourse():
+    # A bare number with no time affix (1/2/3) is as likely a replicate index as a timepoint — it must
+    # NOT be called a time-course (E4: fall back to categorical rather than fabricate a time axis).
+    df = pd.DataFrame({
+        "gene": [f"g{i}" for i in range(4)],
+        "1_1": range(4), "1_2": range(4), "2_1": range(4), "3_1": range(4),
+    })
+    hints = suggest_design_hints(DataBundle(payload=df, kind=BULK_COUNTS))
+    cand = hints.group_candidates[0]
+    assert cand.kind == "categorical"
+
+
+def test_bulk_non_time_labels_stay_categorical():
+    # Plain condition labels (WT/KO/HET) are not timepoints — a normal categorical contrast, no time_rows.
+    df = pd.DataFrame({
+        "gene": [f"g{i}" for i in range(4)],
+        "WT_1": range(4), "WT_2": range(4), "KO_1": range(4), "HET_1": range(4),
+    })
+    hints = suggest_design_hints(DataBundle(payload=df, kind=BULK_COUNTS))
+    cand = hints.group_candidates[0]
+    assert cand.kind == "categorical"
+    assert cand.time_rows == []
+
+
+def test_inspect_carries_timecourse_design():
+    csv = (
+        b"gene,t0_1,t0_2,t24_1,t24_2,t48_1,t48_2\n"
+        + b"".join(f"g{i},{i},{i + 1},{i + 2},{i + 3},{i + 4},{i + 5}\n".encode() for i in range(20))
+    )
+    r = client.post("/data/inspect", files={"matrix": ("counts.csv", csv, "text/csv")})
+    assert r.status_code == 200
+    cand = r.json()["design"]["group_candidates"][0]
+    assert cand["kind"] == "time_course"
+    assert [lv["name"] for lv in cand["levels"]] == ["t0", "t24", "t48"]
+    assert len(cand["time_rows"]) == 6
+    assert {row["sample"]: row["time"] for row in cand["time_rows"]}["t48_2"] == 48.0
+
+
 # --- scRNA: candidate condition columns from obs ----------------------------------------------------
 
 def test_scrna_obs_condition_column_with_sample_replicates():

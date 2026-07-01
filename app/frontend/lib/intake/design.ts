@@ -18,15 +18,29 @@ export interface LevelHint {
   replicate_unit: string;
 }
 
+/** One synthesized design-sheet row for a time-course run: a sample column → its numeric timepoint.
+ *  The engine parses the time once (via the deg runner's `_numeric_time`); the FE serializes these
+ *  verbatim into the design CSV the runner re-consumes, so DETECTED == CONSUMED (no FE re-parse). */
+export interface TimeRow {
+  sample: string;
+  time: number;
+}
+
 /** A candidate design factor: a column (or the bulk header-inferred pseudo-column) + its levels. */
 export interface GroupCandidate {
   /** An obs / design-sheet column name, or the sentinel `__column_names__` for bulk headers. */
   key: string;
   label: string;
+  /** "time_course" when the levels form an ordered timepoint axis (0h/24h/48h) — the confirm-card
+   *  renders a timeline (a trend across time), not a 2-group contrast. "categorical"/absent otherwise. */
+  kind?: "categorical" | "time_course";
   levels: LevelHint[];
   n_levels: number;
-  /** A control/reference level among `levels` (null when no keyword matched). */
+  /** A control/reference level among `levels` (null when no keyword matched). For a time-course this
+   *  is the baseline (earliest) timepoint. */
   reference_guess: string | null;
+  /** time_course only: one row per sample column (id → numeric time) → the synthesized design sheet. */
+  time_rows?: TimeRow[];
 }
 
 /** The deterministic design prefill the engine returns for a dropped file (engine DesignHints). */
@@ -65,6 +79,9 @@ export interface DesignChoice {
   /** The chosen group factor: an obs/sheet column, or `__column_names__` for bulk headers. */
   groupKey: string;
   source: DesignHints["source"];
+  /** "time_course" runs go through the deg time-course mode with a synthesized design sheet; the
+   *  reference/treatment contrast doesn't apply. "categorical"/absent = a normal 2-group contrast. */
+  kind?: "categorical" | "time_course";
   /** The reference (control) level — logFC is computed treatment-vs-reference. */
   reference: string;
   /** The treatment level — the other side of the 2-group contrast. */
@@ -73,6 +90,8 @@ export interface DesignChoice {
   levels: string[];
   /** scRNA: the detected sample column, threaded so pseudobulk aggregates by replicate. */
   sampleCol?: string | null;
+  /** time_course only: the design-sheet rows serialized as the run's designFile. */
+  timeRows?: TimeRow[];
 }
 
 /** Look up a candidate by key (the active group factor). */
@@ -87,6 +106,20 @@ export function defaultDesignChoice(hints: DesignHints | null | undefined): Desi
   const cand = candidateFor(hints, hints.best_group);
   if (!cand || cand.levels.length < 2) return null;
   const levels = cand.levels.map((l) => l.name);
+  if (cand.kind === "time_course") {
+    // A time-course has no control/treatment contrast — the baseline is the earliest timepoint. Keep
+    // reference/treatment populated (first/last) so the shape stays valid, but they don't drive the run.
+    return {
+      groupKey: cand.key,
+      source: hints.source,
+      kind: "time_course",
+      reference: levels[0],
+      treatment: levels[levels.length - 1],
+      levels,
+      sampleCol: hints.sample_col ?? null,
+      timeRows: cand.time_rows ?? [],
+    };
+  }
   const reference = cand.reference_guess ?? levels[0];
   const treatment = levels.find((l) => l !== reference) ?? levels[1];
   return {
@@ -105,6 +138,11 @@ export function defaultDesignChoice(hints: DesignHints | null | undefined): Desi
  * (`mode=pseudobulk` + `condition_col`/`sample_col`); a design sheet keys on `group_col`.
  */
 export function designRunParams(choice: DesignChoice): Record<string, string> {
+  if (choice.kind === "time_course") {
+    // The deg time-course mode fits time as a continuous covariate (Wald-tested) — no reference/treatment
+    // contrast. It reads the synthesized design sheet (id + `time`); `time_col=time` matches its column.
+    return { mode: "timecourse", time_col: "time" };
+  }
   const params: Record<string, string> = { reference: choice.reference, treatment: choice.treatment };
   if (choice.source === "obs") {
     params.mode = "pseudobulk";
@@ -116,4 +154,23 @@ export function designRunParams(choice: DesignChoice): Record<string, string> {
     params.group_col = choice.groupKey;
   }
   return params;
+}
+
+/** Escape a value for a CSV cell (quote when it contains a comma, quote, or newline). */
+function csvCell(v: string): string {
+  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+}
+
+/**
+ * Serialize a time-course choice into the design-sheet CSV the deg time-course runner reads: an id
+ * column (`sample_id`, one of the runner's id aliases) + a numeric `time` column, one row per sample.
+ * The engine already parsed the numeric times (DETECTED == CONSUMED), so this is a verbatim
+ * serialization — a gateway-off re-run from the recorded params + this sheet reproduces. Returns null
+ * for a non-time-course choice or when there are no rows (the caller then keeps any attached sheet).
+ */
+export function timeCourseDesignFile(choice: DesignChoice): File | null {
+  const rows = choice.timeRows ?? [];
+  if (choice.kind !== "time_course" || rows.length === 0) return null;
+  const body = rows.map((r) => `${csvCell(r.sample)},${r.time}`).join("\n");
+  return new File([`sample_id,time\n${body}\n`], "timecourse-design.csv", { type: "text/csv" });
 }

@@ -44,6 +44,25 @@ _MAX_LEVELS = 12
 # A sample/replicate column can carry more levels than a condition (one per biological replicate), but
 # not the thousands of a per-cell barcode — bound the FE sample-col picker's candidate list.
 _MAX_SAMPLE_LEVELS = 100
+# Time-course floors — mirror the deg `_timecourse` runner exactly (DETECTED == CONSUMED): it needs
+# >=3 distinct timepoints spanned by >=4 samples, else it raises. Detecting a time-course the runner
+# would reject just trades a categorical fallback for a run error, so gate on the same numbers.
+_MIN_TIMECOURSE_LEVELS = 3
+_MIN_TIMECOURSE_SAMPLES = 4
+
+# An ordered-timepoint label: a number carrying a recognizable time affix — a leading prefix
+# (t0 · day3 · p14 · week2) OR a trailing unit (24h · 3d · 2wk). A BARE number (no affix: "1"/"2"/"3")
+# is deliberately NOT a timepoint — it is as likely a replicate index, so the design falls back to
+# categorical (E4: no worse than today). The NUMBER itself is parsed by the deg runner's `_numeric_time`
+# (imported directly below), never a shadow copy.
+_TIME_LABEL_RE = re.compile(
+    r"(?i)^\s*"
+    r"(?:(?P<prefix>t|p|d|day|wk|week)[\s_-]?)?"
+    r"(?P<num>\d+(?:\.\d+)?)"
+    r"[\s_-]?"
+    r"(?P<unit>h|hr|hrs|hour|hours|d|day|days|w|wk|week|weeks|min|mins|sec|secs|s|mo|month|months)?"
+    r"\s*$"
+)
 
 
 class LevelHint(BaseModel):
@@ -54,14 +73,26 @@ class LevelHint(BaseModel):
     replicate_unit: str = "samples"   # "samples" (biological replicates) | "cells" (no sample col found)
 
 
+class TimeRow(BaseModel):
+    """One synthesized design-sheet row for a time-course run: a sample column mapped to its numeric
+    timepoint. The engine parses the time ONCE (via the deg runner's ``_numeric_time``); the FE
+    serializes these rows verbatim into the ``sample_id`` + ``time`` design CSV the ``deg`` time-course
+    runner re-consumes — so DETECTED == CONSUMED (no FE re-parse of messy sample names)."""
+
+    sample: str                 # the count-matrix sample column name (the design-sheet id)
+    time: float                 # the numeric timepoint parsed from that column's label
+
+
 class GroupCandidate(BaseModel):
     """A candidate design factor: a column (or the bulk header-inferred pseudo-column) + its levels."""
 
     key: str                    # an obs / design-sheet column name, OR the sentinel "__column_names__"
     label: str                  # human label ("genotype" / "sample columns")
+    kind: str = "categorical"   # "categorical" (a 2-group contrast) | "time_course" (an ordered time axis)
     levels: list[LevelHint] = Field(default_factory=list)
     n_levels: int = 0
     reference_guess: str | None = None   # a control/reference level among `levels` (None if no match)
+    time_rows: list[TimeRow] = Field(default_factory=list)   # time_course only: the synthesized sheet rows
 
 
 class DesignHints(BaseModel):
@@ -137,6 +168,15 @@ def _bulk_hints(bundle: Any, kind: str) -> DesignHints:
     if len(levels) < _MIN_LEVELS:
         return DesignHints(needs_design=False, source="none", modality=kind,
                            note="all sample columns map to one condition — no contrast")
+    # Time-course (2c): when every condition label is an ordered timepoint, present the design as a
+    # time-course (a trend across time) rather than a 2-group contrast — the run goes through the deg
+    # time-course mode with a design sheet synthesized from these detected timepoints.
+    tc = _timecourse_candidate(labels, levels)
+    if tc is not None:
+        return DesignHints(
+            needs_design=True, source="column_names", modality=kind,
+            group_candidates=[tc], best_group=tc.key,
+            note=f"detected a time-course across {tc.n_levels} timepoints")
     cand = GroupCandidate(
         key=_COLUMN_NAMES_KEY, label="sample columns",
         levels=[LevelHint(name=name, n_replicates=n, replicate_unit="samples") for name, n in levels],
@@ -249,6 +289,49 @@ def _levels_from_labels(labels: dict[str, str]) -> list[tuple[str, int]]:
             order.append(label)
         counts[label] = counts.get(label, 0) + 1
     return [(name, counts[name]) for name in order]
+
+
+def _timepoint_numeric(label: str) -> float | None:
+    """The numeric timepoint of an ordered-timepoint label, or None when it is not one. The gate is a
+    recognizable time affix (:data:`_TIME_LABEL_RE`) so a bare replicate index isn't mistaken for a
+    timepoint; the NUMBER is then read by the deg runner's ``_numeric_time`` (imported directly — no
+    shadow copy, DETECTED == CONSUMED). See :func:`_rep_regex` for why there is no local fallback."""
+    from skills.deg.run_real import _numeric_time
+
+    m = _TIME_LABEL_RE.match(str(label))
+    if not m or not (m.group("prefix") or m.group("unit")):
+        return None
+    try:
+        return _numeric_time(str(label))
+    except ValueError:
+        return None
+
+
+def _timecourse_candidate(labels: dict[str, str], levels: list[tuple[str, int]]) -> GroupCandidate | None:
+    """A ``time_course`` :class:`GroupCandidate` when the bulk condition labels form an ordered timepoint
+    axis: EVERY distinct label parses as a timepoint, there are >= :data:`_MIN_TIMECOURSE_LEVELS` distinct
+    timepoints, and >= :data:`_MIN_TIMECOURSE_SAMPLES` samples span them (the runner's floors). Levels are
+    sorted by NUMERIC time (not alphabetically), and ``time_rows`` carries one row per sample column for
+    the synthesized design sheet. Returns None on any miss → the caller keeps the categorical candidate
+    (E4: no worse than today)."""
+    if len(labels) < _MIN_TIMECOURSE_SAMPLES:      # the runner needs >=4 samples spanning the timepoints
+        return None
+    times: dict[str, float] = {}
+    for name, _ in levels:
+        t = _timepoint_numeric(name)
+        if t is None:                              # a non-time label → not a uniform time axis
+            return None
+        times[name] = t
+    if len({round(t, 6) for t in times.values()}) < _MIN_TIMECOURSE_LEVELS:
+        return None
+    ordered = sorted(levels, key=lambda nc: times[nc[0]])
+    level_hints = [LevelHint(name=name, n_replicates=n, replicate_unit="samples") for name, n in ordered]
+    time_rows = [TimeRow(sample=col, time=times[label]) for col, label in labels.items()]
+    return GroupCandidate(
+        key=_COLUMN_NAMES_KEY, label="timepoints", kind="time_course",
+        levels=level_hints, n_levels=len(level_hints),
+        reference_guess=level_hints[0].name,       # the earliest timepoint is the baseline
+        time_rows=time_rows)
 
 
 def _guess_reference(levels: list[str]) -> str | None:

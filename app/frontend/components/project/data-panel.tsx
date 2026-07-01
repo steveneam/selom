@@ -17,7 +17,7 @@ import { getSkill } from "@/lib/catalog/seed";
 import { datasetDisplayName } from "@/lib/lineage/family";
 import { detectModality, proposeForModality, type IntakeAnswers, type IntakeProposal } from "@/lib/intake/mock";
 import { combineData, inspectData, modalityFromKind, qcFromInspect, type DataTypeOverride } from "@/lib/intake/inspect";
-import { designRunParams, type DesignChoice } from "@/lib/intake/design";
+import { designRunParams, timeCourseDesignFile, type DesignChoice } from "@/lib/intake/design";
 import { projectStore } from "@/lib/projects/store";
 import type { AiActionDelta } from "@/lib/ai/types";
 import type { Dataset } from "@/lib/projects/types";
@@ -408,7 +408,10 @@ export function DataPanel({
                   datasetId: active.dataset.id,
                   file: active.file,
                   proposal: withDesign(proposeForModality(active.dataset.modality, answers), choice, aiActions),
-                  designFile,
+                  // A time-course run needs a design sheet (id + `time`); synthesize it from the detected
+                  // timepoints when the user hasn't attached a real one (an attached sheet stays authoritative).
+                  designFile:
+                    (choice?.kind === "time_course" && !designFile && timeCourseDesignFile(choice)) || designFile,
                 })
               }
               onSkip={() =>
