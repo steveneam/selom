@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { combineData, modalityFromKind, qcFromInspect, type InspectResult } from "./inspect";
+import { combineData, inspectData, modalityFromKind, qcFromInspect, type InspectResult } from "./inspect";
 
 function result(over: Partial<InspectResult> = {}): InspectResult {
   return {
@@ -40,6 +40,48 @@ describe("combineData", () => {
   it("fail-soft → null on a non-OK response", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 400 })));
     expect(await combineData([new File(["a"], "x.csv"), new File(["b"], "y.csv")])).toBeNull();
+  });
+});
+
+describe("inspectData", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function okResponse(): Response {
+    return new Response(
+      JSON.stringify({
+        filename: "counts.csv",
+        kind: "bulk_counts",
+        profile: { code: "bulk_counts", label: "Bulk", confidence: "likely", reason: "", overridden: false },
+        cleaning_plan: { kind: "bulk_counts", profile: "bulk_counts", applies: true, obs_label: "samples",
+                         var_label: "genes", n_obs: 4, n_var: 10, steps: [], note: "" },
+        qc: null, routing: null, data_fit: null, design: null,
+      }),
+      { headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  it("sends only the matrix when no design sheet is attached", async () => {
+    let body: FormData | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init: RequestInit) => {
+      body = init.body as FormData;
+      return okResponse();
+    }));
+    await inspectData(new File(["x"], "counts.csv"));
+    expect(body?.has("matrix")).toBe(true);
+    expect(body?.has("design")).toBe(false);
+  });
+
+  it("attaches the design sheet (followups #5) so it becomes the design source of truth", async () => {
+    let body: FormData | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init: RequestInit) => {
+      body = init.body as FormData;
+      return okResponse();
+    }));
+    const design = new File(["sample,genotype\ns1,WT\n"], "design.csv");
+    const res = await inspectData(new File(["x"], "counts.csv"), undefined, design);
+    expect(res).not.toBeNull();
+    expect(body?.has("design")).toBe(true);
+    expect((body?.get("design") as File).name).toBe("design.csv");
   });
 });
 

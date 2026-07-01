@@ -159,6 +159,37 @@ def test_scrna_obs_condition_column_with_sample_replicates():
     assert cand.reference_guess == "Control"
 
 
+def test_scrna_sample_col_candidates_offered_for_the_picker():
+    # followups #6: the FE sample-col picker needs candidate obs id columns. The detected sample alias
+    # leads; other bounded categoricals are offered so the user can override when detection missed.
+    ad = pytest.importorskip("anndata")
+    import numpy as np
+
+    samples = ["ctrl_a", "ctrl_b", "mut_a", "mut_b"]
+    cond_of = {"ctrl_a": "Control", "ctrl_b": "Control", "mut_a": "Mutant", "mut_b": "Mutant"}
+    rows = [(s, cond_of[s]) for s in samples for _ in range(3)]
+    obs = pd.DataFrame(
+        {"donor": [s for s, _ in rows], "condition": [c for _, c in rows]},
+        index=[f"cell{i}" for i in range(len(rows))],
+    )
+    adata = ad.AnnData(X=np.ones((len(rows), 4), dtype="float32"), obs=obs)
+
+    hints = suggest_design_hints(DataBundle(payload=adata, kind=SC_COUNTS))
+    assert hints.sample_col == "donor"                     # the detected replicate column (alias)
+    assert hints.sample_col_candidates[0] == "donor"       # alias priority leads the picker
+    assert "condition" in hints.sample_col_candidates      # other bounded categoricals are offered too
+
+
+def test_bulk_has_no_sample_col_candidates():
+    # No obs on a bulk table → the sample-col picker is scRNA-only; the field stays empty.
+    df = pd.DataFrame({
+        "gene": [f"g{i}" for i in range(4)],
+        "PDE6B_1": range(4), "PDE6B_2": range(4), "Control_1": range(4), "Control_2": range(4),
+    })
+    hints = suggest_design_hints(DataBundle(payload=df, kind=BULK_COUNTS))
+    assert hints.sample_col_candidates == []
+
+
 def test_scrna_without_sample_column_counts_cells_with_unit_note():
     ad = pytest.importorskip("anndata")
     import numpy as np
@@ -193,6 +224,29 @@ def test_inspect_carries_design_for_bulk_counts():
     assert cand["n_levels"] == 2
     assert {lv["name"] for lv in cand["levels"]} == {"Control", "Mut"}
     assert cand["reference_guess"] == "Control"
+
+
+def test_inspect_uses_attached_design_sheet_as_source_of_truth():
+    # followups #5: an attached sample sheet is the reproducible mis-grouping fix — /data/inspect now
+    # threads it into suggest_design_hints so the confirm-card reflects the sheet, not just column names.
+    csv = (
+        b"gene,s1,s2,s3,s4\n"
+        + b"".join(f"g{i},{i},{i + 1},{i + 2},{i + 3}\n".encode() for i in range(20))
+    )
+    sheet = b"sample,genotype\ns1,WT\ns2,WT\ns3,KO\ns4,KO\n"
+    r = client.post(
+        "/data/inspect",
+        files={
+            "matrix": ("counts.csv", csv, "text/csv"),
+            "design": ("design.csv", sheet, "text/csv"),
+        },
+    )
+    assert r.status_code == 200
+    design = r.json()["design"]
+    assert design["source"] == "design_sheet"
+    assert design["needs_design"] is True
+    cand = design["group_candidates"][0]
+    assert {lv["name"] for lv in cand["levels"]} == {"WT", "KO"}
 
 
 def test_inspect_design_absent_for_de_results():

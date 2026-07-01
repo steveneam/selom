@@ -38,6 +38,9 @@ export interface DesignHints {
   best_group: string | null;
   /** scRNA: the detected biological-replicate column (the deg `sample_col`). */
   sample_col?: string | null;
+  /** scRNA: obs id-like columns the user can pick as the sample/replicate column when detection missed
+   *  it (followups #6). Empty for bulk (no obs). Pseudobulk aggregates by this column, not by cells. */
+  sample_col_candidates?: string[];
   note: string;
 }
 

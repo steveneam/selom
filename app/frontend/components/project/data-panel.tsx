@@ -76,6 +76,8 @@ export function DataPanel({
 }) {
   const [active, setActive] = React.useState<Active | null>(null);
   const [designFile, setDesignFile] = React.useState<File | null>(null);
+  // The active data-type override (the L3 layer) — tracked so a design-sheet re-inspect preserves it.
+  const [override, setOverride] = React.useState<DataTypeOverride | undefined>(undefined);
   // Cleaning steps the user has switched off for the active dataset (before/after editor).
   const [disabledSteps, setDisabledSteps] = React.useState<Set<string>>(new Set());
   // The live engine inspect is in flight for the active dataset (drop or data-type override).
@@ -94,9 +96,9 @@ export function DataPanel({
   // explicit data-type choice (the L3 layer). Tagged by dataset id so a late response from a
   // previous file can't clobber a newer active dataset.
   const runInspect = React.useCallback(
-    async (dataset: Dataset, file: File, override?: DataTypeOverride) => {
+    async (dataset: Dataset, file: File, over?: DataTypeOverride, designSheet?: File | null) => {
       setInspecting(true);
-      const result = await inspectData(file, override);
+      const result = await inspectData(file, over, designSheet);
       setInspecting(false);
       if (!result) return;
       const modality = modalityFromKind(result.kind);
@@ -121,16 +123,18 @@ export function DataPanel({
     if (reattach) {
       setActive({ dataset: reattach, file, real: true });
       setDisabledSteps(new Set());
+      setOverride(undefined);
       projectStore.markDatasetUpdated(reattach.id);
       onReattach?.(reattach.id, file);
-      void runInspect(reattach, file);
+      void runInspect(reattach, file, undefined, designFile);
       return;
     }
     const modality = detectModality(file.name);
     const dataset = projectStore.addDataset(projectId, file.name, modality);
     setActive({ dataset, file, real: true });
     setDisabledSteps(new Set());
-    void runInspect(dataset, file);
+    setOverride(undefined);
+    void runInspect(dataset, file, undefined, designFile);
   }
 
   // Drop SEVERAL files → combine them into one multi-condition dataset (C6): each file is a
@@ -154,7 +158,8 @@ export function DataPanel({
       const dataset = projectStore.addDataset(projectId, result.file.name, detectModality(result.file.name));
       setActive({ dataset, file: result.file, real: true });
       setDisabledSteps(new Set());
-      void runInspect(dataset, result.file);
+      setOverride(undefined);
+      void runInspect(dataset, result.file, undefined, designFile);
     });
   }
 
@@ -162,13 +167,28 @@ export function DataPanel({
   // re-classify.
   function setDataType(code: DataTypeOverride) {
     if (!active?.real) return;
-    void runInspect(active.dataset, active.file, code);
+    setOverride(code);
+    void runInspect(active.dataset, active.file, code, designFile);
   }
 
   // Clear an explicit override → re-inspect with no hint, falling back to the auto-detected type.
   function resetDataType() {
     if (!active?.real) return;
-    void runInspect(active.dataset, active.file);
+    setOverride(undefined);
+    void runInspect(active.dataset, active.file, undefined, designFile);
+  }
+
+  // Attach / remove a design sheet → update state AND re-inspect the active dataset so the confirm-card
+  // reflects the sheet as the design source of truth BEFORE the run, not only at run time (followups
+  // #5), preserving the current data-type override. Done from the dropzone handlers (an event), not an
+  // effect, so re-inspect stays an explicit user action.
+  function attachDesign(f: File) {
+    setDesignFile(f);
+    if (active?.real) void runInspect(active.dataset, active.file, override, f);
+  }
+  function removeDesign() {
+    setDesignFile(null);
+    if (active?.real) void runInspect(active.dataset, active.file, override, null);
   }
 
   // Consume a file handed over from the Overview drop. Guard with a ref so a given
@@ -187,6 +207,7 @@ export function DataPanel({
     // A re-opened dataset's real bytes are gone (only metadata persists) — synthesize a placeholder
     // and mark it not-real, so its persisted profile shows read-only (no bogus re-classify of "mock").
     setActive({ dataset, file: new File(["mock"], dataset.filename), real: false });
+    setOverride(undefined);
   }
 
   return (
@@ -244,14 +265,14 @@ export function DataPanel({
               size="icon"
               className="size-7 text-muted-foreground hover:text-destructive"
               aria-label="Remove design sheet"
-              onClick={() => setDesignFile(null)}
+              onClick={removeDesign}
             >
               <X />
             </Button>
           </div>
         ) : (
           <Dropzone
-            onFile={setDesignFile}
+            onFile={attachDesign}
             accept=".csv,.tsv,.xlsx"
             title="Add a design / sample sheet"
             hint="Optional — maps samples to conditions for bulk & time-course DE"

@@ -41,6 +41,9 @@ _CONTROL_RE = re.compile(
 # >=2 levels; >12 is a per-cell annotation / id, not a design factor).
 _MIN_LEVELS = 2
 _MAX_LEVELS = 12
+# A sample/replicate column can carry more levels than a condition (one per biological replicate), but
+# not the thousands of a per-cell barcode — bound the FE sample-col picker's candidate list.
+_MAX_SAMPLE_LEVELS = 100
 
 
 class LevelHint(BaseModel):
@@ -75,6 +78,9 @@ class DesignHints(BaseModel):
     group_candidates: list[GroupCandidate] = Field(default_factory=list)
     best_group: str | None = None       # key of the best candidate (pre-selects the group dropdown)
     sample_col: str | None = None       # scRNA: the detected biological-replicate column (deg sample_col)
+    sample_col_candidates: list[str] = Field(default_factory=list)   # scRNA: obs id-like columns for the
+    #   FE sample-col picker (followups #6) — so the user can name/override the replicate column when the
+    #   detection missed it (pseudobulk aggregates by biological replicate, not cells). Empty for bulk.
     note: str = ""
 
 
@@ -171,7 +177,22 @@ def _scrna_hints(bundle: Any, kind: str) -> DesignHints:
     return DesignHints(
         needs_design=True, source="obs", modality=kind,
         group_candidates=candidates, best_group=best.key, sample_col=sample_col,
+        sample_col_candidates=_sample_col_candidates(obs, obs_cols, sample_aliases),
         note=f"replicates counted as {unit}")
+
+
+def _sample_col_candidates(obs: Any, obs_cols: list[str], sample_aliases: tuple[str, ...]) -> list[str]:
+    """Obs columns that could be the biological-replicate / sample-id column, for the FE picker
+    (followups #6): the known sample aliases first (priority order), then any other non-continuous obs
+    column with a bounded number of distinct values. A per-cell barcode (thousands of uniques) is not a
+    sample id, so it's excluded by the ``_MAX_SAMPLE_LEVELS`` cap."""
+    out: list[str] = [c for c in sample_aliases if c in obs_cols]
+    for c in obs_cols:
+        if c in out:
+            continue
+        if _is_categorical_series(obs[c]) and _MIN_LEVELS <= _nunique(obs[c]) <= _MAX_SAMPLE_LEVELS:
+            out.append(c)
+    return out
 
 
 def _obs_candidate(obs: Any, col: str, sample_col: str | None) -> GroupCandidate | None:

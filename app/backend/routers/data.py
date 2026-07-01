@@ -10,18 +10,21 @@ router = APIRouter()
 
 @router.post("/data/inspect")
 async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str | None = None,
-                       profile: str | None = None):
+                       profile: str | None = None, design: UploadFile | None = File(None)):
     # Engine spine front door (P1, docs/engine-spine/spec.md): drop a data file -> its layered
     # data-type (format -> keywords -> modality), an "is-my-data-clean?" QC report, AND the dynamic
     # cleaning plan for that type. Product A's entry point; library-only, runs no analysis. The cheap
     # routing inventory in extract.ingest is the paper-side complement. `sheet` selects an xlsx sheet;
     # `hint` forces the modality (Kind); `profile` is the user's L3 data-type override (e.g. "erg").
+    # `design` is an optional sample sheet — when attached it becomes the design source of truth for the
+    # questionnaire prefill (Layer A ingest followups #5: the reproducible fix for a mis-grouping).
     from engine import ALL_KINDS, ingest_cached, plan_cleaning, profile_data, route_profile, run_qc
     from engine import compat, suggest_design_hints
 
     if hint is not None and hint not in ALL_KINDS:
         raise HTTPException(status_code=400, detail=f"hint must be one of {ALL_KINDS}")
     path = _save_upload(matrix)
+    design_path = _save_upload(design) if design is not None else None
     try:
         bundle = ingest_cached(path, hint=hint, sheet=sheet)  # C3 parsed-input cache
         bundle.source.filename = pathlib.Path(matrix.filename or "").name  # honest name (drives L1)
@@ -53,11 +56,14 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
         # candidate group/condition column(s), their levels + replicate counts, and a control guess —
         # what the engine did NOT detect before. The confirmed answers map onto the deg run params
         # the runner already records (docs/intake-questionnaire/build-spec.md). Fail-soft → no design.
-        design = suggest_design_hints(bundle)
+        # An attached sample sheet (design_path) is the source of truth (auto-join, never hand-match).
+        design_hints = suggest_design_hints(bundle, design_path=design_path)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     finally:
         pathlib.Path(path).unlink(missing_ok=True)
+        if design_path is not None:
+            pathlib.Path(design_path).unlink(missing_ok=True)
     return {
         "filename": matrix.filename or "",
         "kind": bundle.kind,
@@ -67,7 +73,7 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
         "qc": bundle.qc.model_dump(),
         "routing": routing.model_dump(),           # suggested skill pipeline + honest note
         "data_fit": data_fit,                      # is-this-good-data verdict for own data (Slice 2)
-        "design": design.model_dump(),             # deterministic design prefill for the intake questionnaire
+        "design": design_hints.model_dump(),       # deterministic design prefill for the intake questionnaire
     }
 
 

@@ -52,6 +52,9 @@ export function IntakeQuestionnaire({
   const [groupKey, setGroupKey] = React.useState<string>(initial?.groupKey ?? "");
   const [reference, setReference] = React.useState<string>(initial?.reference ?? "");
   const [treatment, setTreatment] = React.useState<string>(initial?.treatment ?? "");
+  // scRNA: the biological-replicate column (followups #6). Seeded from detection; the user can pick the
+  // right one when it wasn't detected (else pseudobulk counts cells as replicates, inflating n).
+  const [sampleCol, setSampleCol] = React.useState<string>(initial?.sampleCol ?? "");
 
   // Re-seed the contrast when the dataset's design changes (new file / re-inspect / reload
   // re-attach). React-documented "adjust state when a prop changes" — a render-time reset keyed on
@@ -62,6 +65,7 @@ export function IntakeQuestionnaire({
     setGroupKey(initial?.groupKey ?? "");
     setReference(initial?.reference ?? "");
     setTreatment(initial?.treatment ?? "");
+    setSampleCol(initial?.sampleCol ?? "");
   }
 
   const candidate = candidateFor(design, groupKey);
@@ -75,6 +79,20 @@ export function IntakeQuestionnaire({
     const ref = cand?.reference_guess ?? names[0] ?? "";
     setReference(ref);
     setTreatment(names.find((n) => n !== ref) ?? names[1] ?? "");
+  }
+
+  // "Reset to detected" (followups #7): restore the engine's prefill after any contrast/sample edit.
+  const designEdited =
+    !!initial &&
+    (groupKey !== initial.groupKey ||
+      reference !== initial.reference ||
+      treatment !== initial.treatment ||
+      (sampleCol || "") !== (initial.sampleCol || ""));
+  function resetToDetected() {
+    setGroupKey(initial?.groupKey ?? "");
+    setReference(initial?.reference ?? "");
+    setTreatment(initial?.treatment ?? "");
+    setSampleCol(initial?.sampleCol ?? "");
   }
 
   const analysisName = React.useMemo(() => {
@@ -97,7 +115,7 @@ export function IntakeQuestionnaire({
             reference,
             treatment,
             levels: levels.map((l) => l.name),
-            sampleCol: design!.sample_col ?? null,
+            sampleCol: sampleCol || null,
           }
         : null;
     onSubmit(answers, choice);
@@ -132,9 +150,30 @@ export function IntakeQuestionnaire({
       {/* Design layer — only when the analysis consumes one (deg from counts / pseudobulk). */}
       {needsDesign && candidate && (
         <div className="space-y-3 rounded-xl border border-stage-data/40 bg-[color-mix(in_oklab,var(--stage-data)_6%,transparent)] p-4">
-          <p className="text-xs font-medium text-foreground">Experimental design</p>
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-xs font-medium text-foreground">Experimental design</p>
+            {designEdited && (
+              <button
+                type="button"
+                onClick={resetToDetected}
+                className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+              >
+                Reset to detected
+              </button>
+            )}
+          </div>
 
-          {design!.group_candidates.length > 1 && (
+          {/* Why the engine prefilled this design — the plain-English note + that "control" is a GUESS
+              (followups #3). The user confirms against it, not a blank form. */}
+          {design!.note && (
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {design!.note}
+              {candidate.reference_guess &&
+                ` · “${candidate.reference_guess}” guessed as the control — confirm below`}
+            </p>
+          )}
+
+          {design!.group_candidates.length > 1 ? (
             <div className="space-y-1.5">
               <Label htmlFor="design-group">Group / condition column</Label>
               <Select value={groupKey} onValueChange={pickGroup}>
@@ -150,6 +189,11 @@ export function IntakeQuestionnaire({
                 </SelectContent>
               </Select>
             </div>
+          ) : (
+            // Single candidate: show WHICH column the conditions came from, read-only (followups #4).
+            <p className="text-[11px] text-muted-foreground">
+              Conditions from <span className="font-medium text-foreground">{candidate.label}</span>
+            </p>
           )}
 
           {/* Layer 2 — the detected conditions + replicate counts (confirm the detection). */}
@@ -165,10 +209,18 @@ export function IntakeQuestionnaire({
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-foreground" title={lv.name}>
                       {lv.name}
-                      {role && (
+                      {role ? (
                         <span className="ml-1.5 rounded border border-primary/40 px-1 py-px text-[9px] uppercase tracking-wide text-primary">
                           {role}
                         </span>
+                      ) : (
+                        // A level that is neither reference nor treatment is EXCLUDED from this pairwise
+                        // contrast (deg compares two groups) — surface it, don't hide it (followups #2).
+                        levels.length > 2 && (
+                          <span className="ml-1.5 rounded border border-muted-foreground/30 px-1 py-px text-[9px] uppercase tracking-wide text-muted-foreground">
+                            not compared
+                          </span>
+                        )
                       )}
                     </p>
                     <p className={`tabular text-[11px] ${low ? "text-warn" : "text-muted-foreground"}`}>
@@ -214,6 +266,33 @@ export function IntakeQuestionnaire({
               </Select>
             </div>
           </div>
+
+          {/* scRNA replicate column (followups #6): pseudobulk aggregates by biological replicate, not
+              cells — let the user name it when detection missed it, else n is inflated. */}
+          {design!.source === "obs" && (design!.sample_col_candidates?.length ?? 0) > 0 && (
+            <div className="space-y-1.5">
+              <Label htmlFor="design-sample">Replicate / sample column</Label>
+              <Select value={sampleCol} onValueChange={setSampleCol}>
+                <SelectTrigger id="design-sample" aria-label="Replicate / sample column">
+                  <SelectValue placeholder="Select…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {design!.sample_col_candidates!.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!sampleCol && (
+                <p className="inline-flex items-center gap-1.5 text-[11px] text-warn">
+                  <TriangleAlert className="size-3.5" />
+                  No sample column detected — pick the one identifying biological replicates, else cells
+                  count as replicates (inflated n).
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -229,10 +308,16 @@ export function IntakeQuestionnaire({
             </>
           ) : needsDesign ? (
             <>Pick a control and a treatment to define the contrast.</>
-          ) : (
+          ) : analysisName ? (
             <>
-              Detected: <span className="font-medium text-foreground">{modality}</span> — ready to
-              {analysisName ? ` make ${analysisName}.` : " analyze."}
+              Detected: <span className="font-medium text-foreground">{modality}</span> — ready to make{" "}
+              {analysisName}.
+            </>
+          ) : (
+            // routing didn't resolve a skill (followups #8): don't imply a silent run — point at Skip.
+            <>
+              Detected: <span className="font-medium text-foreground">{modality}</span> — no analysis
+              auto-detected. <span className="font-medium text-foreground">Skip</span> below to pick a skill.
             </>
           )}
         </p>

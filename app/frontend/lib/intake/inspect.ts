@@ -105,11 +105,18 @@ export interface InspectResult {
 export type DataTypeOverride = "erg" | "sc_counts" | "bulk_counts" | "de_results" | "proteomics" | "generic_table";
 
 /** Inspect a dropped file against the live engine. `override` is the user's explicit data-type
- *  choice. Returns `null` on any failure (fail-soft). */
-export async function inspectData(file: File, override?: DataTypeOverride): Promise<InspectResult | null> {
+ *  choice; `design` is an optional attached sample sheet — when present it becomes the design source
+ *  of truth for the questionnaire prefill (followups #5, the reproducible mis-grouping fix). Returns
+ *  `null` on any failure (fail-soft). */
+export async function inspectData(
+  file: File,
+  override?: DataTypeOverride,
+  design?: File | null,
+): Promise<InspectResult | null> {
   try {
     const fd = new FormData();
     fd.append("matrix", file);
+    if (design) fd.append("design", design);
     const params = new URLSearchParams();
     if (override === "erg") params.set("profile", "erg");
     else if (override) params.set("hint", override);
