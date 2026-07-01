@@ -116,9 +116,12 @@ def _bulk_hints(bundle: Any, kind: str) -> DesignHints:
     df = getattr(bundle, "payload", None)
     if df is None or not _is_dataframe(df):
         return DesignHints(needs_design=False, source="none", modality=kind)
-    # The numeric columns ARE the sample columns: a genes x samples count matrix is read with the
-    # gene-id as a string first column (engine.ingest._load_csv, no index_col), so it drops out here.
-    sample_cols = [str(c) for c in df.columns if _is_numeric_series(df[c])]
+    # Mirror the deg runner's column model EXACTLY (detection == what the run consumes): the runner's
+    # _read_counts reads the matrix with index_col=0, i.e. it drops column 0 (the gene id) POSITIONALLY
+    # and keeps every remaining column regardless of dtype. Selecting by dtype instead would diverge when
+    # gene ids are numeric (Entrez ids / an unnamed integer index — common in GEO count matrices): the
+    # gene-id column would be counted as a phantom sample. So drop column 0 positionally, like the run.
+    sample_cols = [str(c) for c in df.columns[1:]]
     if len(sample_cols) < _MIN_LEVELS:
         return DesignHints(needs_design=False, source="none", modality=kind,
                            note="not enough sample columns to form a contrast")
@@ -237,34 +240,27 @@ def _guess_reference(levels: list[str]) -> str | None:
 
 
 def _rep_regex() -> str:
-    """The deg runner's trailing-replicate-suffix regex (reused so detection == the run's labelling)."""
-    try:
-        from skills.deg.run_real import DEFAULT_REP_REGEX
+    """The deg runner's trailing-replicate-suffix regex, imported DIRECTLY (no shadow copy) so the
+    questionnaire consumes the EXACT label logic the run does. Deliberately no ``try/except`` fallback:
+    a hard-coded copy would be the parallel path the reuse exists to avoid (it would drift silently and,
+    unlike E4's honest empty hint, emit a *confident* stale one). If ``skills.deg.run_real`` renames the
+    symbol, this raises → the outer :func:`suggest_design_hints` E4 handler degrades to an honest empty
+    hint, and the drift guard (``test_reuses_the_deg_runner_label_constants``) fails loudly."""
+    from skills.deg.run_real import DEFAULT_REP_REGEX
 
-        return DEFAULT_REP_REGEX
-    except Exception:  # noqa: BLE001 — keep working even if the skill module shifts
-        return r"_\d+$"
+    return DEFAULT_REP_REGEX
 
 
 def _obs_aliases() -> tuple[tuple[str, ...], tuple[str, ...]]:
-    """The deg runner's condition + sample obs aliases (reused so detection == the run's resolution)."""
-    try:
-        from skills.deg.run_real import _CONDITION_FALLBACKS, _SAMPLE_FALLBACKS
+    """The deg runner's condition + sample obs aliases, imported DIRECTLY (no shadow copy) — see
+    :func:`_rep_regex` for why there is no fallback."""
+    from skills.deg.run_real import _CONDITION_FALLBACKS, _SAMPLE_FALLBACKS
 
-        return _CONDITION_FALLBACKS, _SAMPLE_FALLBACKS
-    except Exception:  # noqa: BLE001
-        return (
-            ("condition", "Condition", "genotype", "group", "treatment", "disease", "status"),
-            ("sample", "Sample", "sample_id", "donor", "orig.ident", "library", "batch"),
-        )
+    return _CONDITION_FALLBACKS, _SAMPLE_FALLBACKS
 
 
 def _is_dataframe(obj: Any) -> bool:
     return any(t.__name__ == "DataFrame" for t in type(obj).__mro__)
-
-
-def _is_numeric_series(series: Any) -> bool:
-    return getattr(getattr(series, "dtype", None), "kind", "") in "iuf"
 
 
 def _is_categorical_series(series: Any) -> bool:

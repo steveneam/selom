@@ -532,11 +532,12 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 
   return (
     <div
-      className="flex h-full flex-col px-5 py-6 transition-[padding] duration-200 lg:px-7"
-      // When the AI panel (a fixed right dock) is open, reserve its width so it never overlays the
-      // figure-data dock or the banner's Re-run button — the content shifts left instead of being
-      // covered (the right-padding overrides the lg:px-7 right inset only while open).
-      style={aiPanelOpen ? { paddingRight: 376 } : undefined}
+      className="flex h-full flex-col px-5 py-6 lg:px-7"
+      // The AI panel is a fixed right-side OVERLAY (owner directive): while open it floats OVER the
+      // content rather than reserving width. Content keeps its full width, so no stage is squeezed —
+      // previously a `paddingRight: 376` reserve collapsed the two-column DataPanel to ~149px columns
+      // (even the pre-existing data-type select clipped) whenever the panel was open at ≤~1400px. The
+      // panel is a dock you open/close, so occluding the rightmost content while open is expected.
     >
       {/* header */}
       <div className="flex flex-wrap items-center gap-3">
@@ -700,9 +701,9 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           {view === "figure" ? (
             figure.spec ? (
               <div className="flex h-full flex-col gap-3">
-                {/* flex-wrap so the toolbar wraps within the content column instead of overflowing
-                    under the fixed AI panel at ≤~1400px (the paddingRight reserve alone didn't stop a
-                    single non-wrapping row from running past it). */}
+                {/* flex-wrap so a long toolbar wraps within the content column at narrow widths rather
+                    than forcing a single overflowing row. (The AI panel now overlays rather than
+                    reserving width, so nothing is pushed — this is just graceful narrow-width wrapping.) */}
                 <div className="flex flex-wrap items-center gap-1.5">
                   {frozen ? (
                     <>

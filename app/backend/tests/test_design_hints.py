@@ -53,6 +53,42 @@ def test_bulk_control_keyword_guess_matches_dogfood_naming():
     assert cand.reference_guess == "Control"
 
 
+def test_bulk_numeric_gene_id_not_counted_as_a_sample():
+    # GEO-style: an all-integer gene id (Entrez) as the first column. The deg runner drops column 0
+    # POSITIONALLY (_read_counts reads index_col=0), so detection must too — the gene-id column must NOT
+    # become a phantom condition level. Regression: dtype-filtering counted a numeric gene-id as a
+    # sample, manufacturing a spurious level and a treatment the runner would 400 on (detection != run).
+    df = pd.DataFrame({
+        "Geneid": [100 + i for i in range(5)],            # all-integer gene ids (numeric first column)
+        "WT_1": range(5), "WT_2": range(5), "WT_3": range(5),
+        "KO_1": range(5), "KO_2": range(5), "KO_3": range(5),
+    })
+    hints = suggest_design_hints(DataBundle(payload=df, kind=BULK_COUNTS))
+    assert hints.needs_design is True
+    cand = hints.group_candidates[0]
+    assert cand.n_levels == 2
+    assert {lv.name for lv in cand.levels} == {"WT", "KO"}   # NOT {"Geneid", "WT", "KO"}
+    assert {lv.name: lv.n_replicates for lv in cand.levels} == {"WT": 3, "KO": 3}
+    assert cand.reference_guess == "WT"
+
+
+def test_reuses_the_deg_runner_label_constants():
+    # The design detector must consume the SAME label logic the deg run consumes (detection == run).
+    # These symbols are the contract; a rename/move in skills.deg.run_real must fail LOUDLY here, not
+    # silently degrade the questionnaire to a stale copy (the shadow-copy fallback was removed).
+    from engine.questionnaire import _obs_aliases, _rep_regex
+    from skills.deg.run_real import (
+        DEFAULT_REP_REGEX,
+        _CONDITION_FALLBACKS,
+        _SAMPLE_FALLBACKS,
+    )
+
+    assert _rep_regex() == DEFAULT_REP_REGEX
+    cond, sample = _obs_aliases()
+    assert cond == _CONDITION_FALLBACKS
+    assert sample == _SAMPLE_FALLBACKS
+
+
 def test_bulk_single_condition_needs_no_design():
     # All sample columns collapse to one label -> there is no contrast to capture.
     df = pd.DataFrame({

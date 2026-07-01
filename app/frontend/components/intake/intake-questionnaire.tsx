@@ -125,7 +125,7 @@ export function IntakeQuestionnaire({
         <div className="flex items-baseline gap-2 text-sm">
           <span className="text-muted-foreground">You want to make:</span>
           <span className="font-medium text-foreground">{analysisName}</span>
-          <span className="text-[11px] text-muted-foreground/70">· or pick another from the chips →</span>
+          <span className="text-[11px] text-muted-foreground/70">· or choose another below</span>
         </div>
       )}
 
@@ -255,7 +255,7 @@ export function IntakeQuestionnaire({
       {/* Free-text context — demoted to an optional fold (it still feeds the AI proposal). */}
       <details className="group rounded-xl border border-border/70">
         <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground">
-          <Sparkles className="size-3.5 text-primary/70" />
+          <Sparkles className="size-3.5 text-stage-ai/70" />
           Add context for the AI (optional)
           <ChevronDown className="ml-auto size-3.5 transition-transform group-open:rotate-180" />
         </summary>
