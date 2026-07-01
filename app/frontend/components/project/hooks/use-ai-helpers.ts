@@ -3,9 +3,12 @@
 import * as React from "react";
 import { projectStore } from "@/lib/projects/store";
 import {
+  acceptAllProposed,
   acceptProposal,
   approvedActions,
+  dismissAllProposed,
   dismissProposal,
+  mergeAiProposals,
   pendingCounter,
   unacceptProposal,
   type PendingCounter,
@@ -41,6 +44,10 @@ export interface AiHelpers {
   aiTurns: ActivityTurn[];
   acceptAiProposal: (id: string) => void;
   dismissAiProposal: (id: string) => void;
+  /** Accept every still-proposed suggestion at once (banner "Accept all", #1) — stages all their values. */
+  acceptAllAiProposals: () => void;
+  /** Dismiss every still-proposed suggestion at once (banner "Dismiss all", #1) — accepted rows kept. */
+  dismissAllAiProposals: () => void;
   revertAiProposal: (id: string) => void;
   addAiProposals: (fresh: AiProposal[]) => void;
   rerunPending: () => void;
@@ -103,6 +110,28 @@ export function useAiHelpers({
     if (!activeFigureId) return;
     projectStore.setFigureProposals(activeFigureId, dismissProposal(aiProposals, id));
   }
+  // Accept ALL still-proposed suggestions (#1) — stage every proposed value in one params update, then
+  // flip them all to accepted. Mirrors acceptAiProposal, batched (no per-row clicking through a plan).
+  function acceptAllAiProposals() {
+    if (!activeFigureId) return;
+    const proposed = aiProposals.filter((p) => p.status === "proposed");
+    if (proposed.length === 0) return;
+    setFdParams((prev) => {
+      const next = { ...prev };
+      for (const p of proposed) {
+        if (p.paramKey !== undefined && p.value !== undefined) next[p.paramKey] = p.value;
+      }
+      return next;
+    });
+    projectStore.setFigureProposals(activeFigureId, acceptAllProposed(aiProposals));
+  }
+  // Dismiss ALL still-proposed suggestions (#1) — they were never staged, so no params change; accepted
+  // rows stay (Revert is their control).
+  function dismissAllAiProposals() {
+    if (!activeFigureId) return;
+    if (!aiProposals.some((p) => p.status === "proposed")) return;
+    projectStore.setFigureProposals(activeFigureId, dismissAllProposed(aiProposals));
+  }
   // Revert an accepted proposal → restore its base value (leaves the diff, decrements the counter)
   // and return the suggestion to "proposed" so it can be re-accepted.
   function revertAiProposal(id: string) {
@@ -119,10 +148,12 @@ export function useAiHelpers({
     }
     projectStore.setFigureProposals(activeFigureId, unacceptProposal(aiProposals, id));
   }
-  // Append a fresh batch of AI proposals (from the propose composer) to the open figure's queue.
+  // Append a fresh batch of AI proposals (from the propose composer) to the open figure's queue,
+  // REPLACING any prior still-proposed suggestion for the same param (#5 re-ask dedup) so a second Ask
+  // for one knob doesn't stack two rows.
   function addAiProposals(fresh: AiProposal[]) {
     if (!activeFigureId) return;
-    projectStore.setFigureProposals(activeFigureId, [...aiProposals, ...fresh]);
+    projectStore.setFigureProposals(activeFigureId, mergeAiProposals(aiProposals, fresh));
   }
   // The one explicit "Re-run" for the pending-changes banner: route through /ai/apply when any
   // AI proposal is accepted (so the figure gets actor-tagged provenance.actions[]), else the plain
@@ -158,6 +189,8 @@ export function useAiHelpers({
     aiTurns,
     acceptAiProposal,
     dismissAiProposal,
+    acceptAllAiProposals,
+    dismissAllAiProposals,
     revertAiProposal,
     addAiProposals,
     rerunPending,

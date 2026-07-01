@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Lightbulb, Loader2, Play, X } from "lucide-react";
+import { Check, Copy, Lightbulb, Loader2, Play, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/ui/cn";
 import { type ParamField } from "@/lib/catalog/params";
@@ -64,10 +64,12 @@ export function SweepForm({
   const [suggesting, setSuggesting] = React.useState(false);
   const [suggestion, setSuggestion] = React.useState<ExplainResponse | null>(null);
   const [suggestError, setSuggestError] = React.useState<string | null>(null);
+  const [proseCopied, setProseCopied] = React.useState(false);
 
   async function suggest() {
     setSuggesting(true);
     setSuggestError(null);
+    setProseCopied(false); // a fresh Suggest must not leave a stale "Copied" over new (or no) prose
     try {
       const res = await explain({
         request: "propose_sweep",
@@ -82,6 +84,22 @@ export function SweepForm({
       setSuggestError(e instanceof Error ? e.message : "Couldn't suggest parameters.");
     } finally {
       setSuggesting(false);
+    }
+  }
+
+  // #11 — Copy the AI reasoning prose (symmetry with the explain-score Copy). Only the source==="ai"
+  // narrative is copyable; it carries an [AI-generated] marker so pasted text never reads as the user's
+  // own (the ✨ tag lives only on-screen). The deterministic picks above are not prose to copy.
+  async function copyProse() {
+    if (suggestion?.source !== "ai" || !suggestion.text) return;
+    try {
+      // No optional chaining on navigator.clipboard: in a non-secure context it's absent → throws →
+      // caught → no false "Copied" flash (matches score-report's Copy).
+      await navigator.clipboard.writeText(`[AI-generated]\n\n${suggestion.text}`);
+      setProseCopied(true);
+      window.setTimeout(() => setProseCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable/blocked → no false confirmation; the text stays on screen to select */
     }
   }
 
@@ -184,8 +202,19 @@ export function SweepForm({
               (source==="ai"). The picks above stay deterministic + unbadged (grounded, reproducible);
               this prose is the AI value-add, carrying the ✨ "AI" badge so the glyph never lies. */}
           {suggestion.source === "ai" && suggestion.text && (
-            <div className="mt-2 flex flex-col gap-1 border-t border-border/60 pt-2">
-              <ExplainSourceBadge source="ai" />
+            <div className="mt-2 border-t border-border/60 pt-2">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <ExplainSourceBadge source="ai" />
+                <button
+                  type="button"
+                  onClick={copyProse}
+                  aria-label={proseCopied ? "Copied" : "Copy AI reasoning"}
+                  className="inline-flex cursor-pointer items-center gap-1 rounded border border-border bg-background/60 px-1.5 py-0.5 text-[10px] font-medium text-foreground/75 transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 [&_svg]:size-3"
+                >
+                  {proseCopied ? <Check className="text-emerald-500" /> : <Copy />}
+                  {proseCopied ? "Copied" : "Copy"}
+                </button>
+              </div>
               <p className="text-[11px] leading-relaxed text-foreground/80">{suggestion.text}</p>
             </div>
           )}

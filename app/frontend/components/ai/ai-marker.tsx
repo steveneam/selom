@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/ui/cn";
-import { formatApprovedAt } from "@/lib/ai/format";
+import { appliedMarkerTip, proposedMarkerTip, stagedMarkerTip } from "@/lib/ai/format";
 import type { AiAction } from "@/lib/ai/types";
 
 /**
@@ -42,12 +42,14 @@ export function AiMarker({
 }) {
   const px = size === "xs" ? "size-3" : "size-3.5";
   const verb = onRevert ? (state === "proposed" ? " — click to dismiss" : " — click to revert") : "";
+  // The tooltip bodies are pure helpers (lib/ai/format) so #12 (applied → approved_by) and #13 (staged
+  // → "proposed by <model>") are unit-tested in the node env, not only through a rendered marker.
   const tip =
-    state === "applied"
-      ? `${tagLabel(action)}${verb}`
+    (state === "applied"
+      ? appliedMarkerTip(action)
       : state === "staged"
-        ? `Staged by AI${model ? ` · ${model}` : ""}${verb}`
-        : `Proposed by AI${model ? ` · ${model}` : ""}${verb}`;
+        ? stagedMarkerTip(model)
+        : proposedMarkerTip(model)) + verb;
   // The full tag rides the accessible name too — not just the mouse-only `title` — so keyboard + SR
   // users get the same attribution, prefixed with the state so it's self-describing out of context.
   const stateWord =
@@ -92,14 +94,4 @@ export function AiMarker({
       {glyph}
     </button>
   );
-}
-
-/** "AI · gpt · Jun 29, 14:32" — the provenance tag for an applied marker's tooltip. */
-function tagLabel(action?: AiAction): string {
-  if (!action) return "Applied by AI";
-  const parts = [action.actor || "ai"];
-  if (action.model) parts.push(action.model);
-  const when = formatApprovedAt(action.approved_at);
-  if (when) parts.push(when);
-  return parts.join(" · ");
 }

@@ -7,7 +7,14 @@ import { describe, expect, it } from "vitest";
  * the provenance timestamp format and the action verb map.
  */
 
-import { describeAction, formatApprovedAt } from "./format";
+import {
+  appliedMarkerTip,
+  describeAction,
+  formatApprovedAt,
+  proposedMarkerTip,
+  stagedMarkerTip,
+} from "./format";
+import type { AiAction } from "./types";
 
 describe("formatApprovedAt", () => {
   it("returns an empty string for a missing or unparseable timestamp (tolerant tooltip)", () => {
@@ -35,5 +42,36 @@ describe("describeAction", () => {
 
   it("falls back to a generic verb for an unknown type", () => {
     expect(describeAction({ type: "future_action" as never })).toBe("Changed");
+  });
+});
+
+describe("the ✨ marker tooltips (#12 approver · #13 'proposed by')", () => {
+  const action: AiAction = {
+    action_id: "a1", actor: "ai", type: "set_param", target: "resolution", prompt: "tighten",
+    model: "llama-3.3-70b", approved_by: "user-42", approved_at: "2026-06-29T14:32:00Z",
+  };
+
+  it("applied tip surfaces actor · model · date · approved_by (#12)", () => {
+    const tip = appliedMarkerTip(action);
+    expect(tip).toContain("ai");
+    expect(tip).toContain("llama-3.3-70b");
+    expect(tip).toMatch(/Jun/);
+    expect(tip).toContain("approved by user-42"); // the server-trusted approver is now surfaced
+  });
+
+  it("applied tip omits an absent approver / model / date (no blank fields)", () => {
+    const tip = appliedMarkerTip({ actor: "ai", model: "", approved_at: "", approved_by: "" });
+    expect(tip).toBe("ai");
+    expect(appliedMarkerTip(undefined)).toBe("Applied by AI");
+  });
+
+  it("staged tip labels the model 'proposed by' — it's the proposing gateway, not the committed one (#13)", () => {
+    expect(stagedMarkerTip("llama-3.3-70b")).toBe("Staged by AI · proposed by llama-3.3-70b");
+    expect(stagedMarkerTip()).toBe("Staged by AI"); // no model → no trailing separator
+  });
+
+  it("proposed tip shows the proposing model plainly", () => {
+    expect(proposedMarkerTip("claude-x")).toBe("Proposed by AI · claude-x");
+    expect(proposedMarkerTip()).toBe("Proposed by AI");
   });
 });

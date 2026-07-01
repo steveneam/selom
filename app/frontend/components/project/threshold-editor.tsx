@@ -3,6 +3,8 @@
 import * as React from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/ui/cn";
+import { changedRingClass } from "@/lib/ui/changed-ring";
 import {
   bucketCounts,
   clampThresholds,
@@ -11,6 +13,9 @@ import {
 } from "@/lib/volcano/thresholds";
 import type { FigureSpec } from "@/lib/figure/figure-spec";
 import type { SkillParams } from "@/lib/skills/api";
+
+/** The figure-data params this editor writes — the single source the panel diffs for the #6 changed ring. */
+export const THRESHOLD_PARAM_KEYS = ["fc_threshold", "fdr_threshold"] as const;
 
 /**
  * Threshold editor (docs/figure-data-capabilities/generalization-spec.md §F) — the numeric half of the
@@ -38,12 +43,17 @@ export function ThresholdEditor({
   figureSpec,
   params,
   onParamsChange,
+  changedAuthor = null,
 }: {
   /** The active figure spec — its bucket traces supply the points for the live count. */
   figureSpec: FigureSpec | null | undefined;
   params: SkillParams;
   /** The figure-data setParams (functional updates so back-to-back fc/fdr edits don't clobber). */
   onParamsChange: React.Dispatch<React.SetStateAction<SkillParams>>;
+  /** #6 — the changed-state author over this editor's params (computed by the panel over
+   *  {@link THRESHOLD_PARAM_KEYS}): "user" (amber) / "ai" (fuchsia) / null. Rings the editor to match
+   *  the param grid's one changed-state language. */
+  changedAuthor?: "ai" | "user" | null;
 }) {
   const base = React.useMemo(() => readThresholds(figureSpec ?? null), [figureSpec]);
   const points = React.useMemo(() => gatherPoints(figureSpec ?? null), [figureSpec]);
@@ -58,7 +68,7 @@ export function ThresholdEditor({
     onParamsChange((p) => ({ ...p, fdr_threshold: clampThresholds({ fc, fdr: v }).fdr }));
 
   return (
-    <div className="rounded-xl border border-border bg-card/60 p-4">
+    <div className={cn("rounded-xl border border-border bg-card/60 p-4 transition-shadow", changedRingClass(changedAuthor))}>
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           <SlidersHorizontal className="size-3.5" /> Thresholds

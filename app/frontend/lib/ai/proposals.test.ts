@@ -8,12 +8,16 @@ import { describe, expect, it } from "vitest";
  */
 
 import {
+  acceptAllProposed,
   acceptProposal,
   applyAcceptedProposals,
   approvedActions,
   authorOf,
+  authorOfKeys,
   designFromIngestActions,
+  dismissAllProposed,
   dismissProposal,
+  mergeAiProposals,
   pendingCounter,
   proposalsFromTurn,
   selectedSkillFromTurn,
@@ -65,6 +69,70 @@ describe("authorOf", () => {
     const staged = { resolution: "1.2" }; // a control wrote the string form
     const proposals = [proposal({ status: "accepted", value: 1.2 })];
     expect(authorOf("resolution", base, staged, proposals)).toBe("ai");
+  });
+});
+
+describe("authorOfKeys (#6 — the bespoke-editor changed ring over a key set)", () => {
+  const base = { fc_threshold: 1, fdr_threshold: 0.05 } as Record<string, string | number | boolean>;
+  const keys = ["fc_threshold", "fdr_threshold"];
+
+  it("returns null when no key in the set is changed", () => {
+    expect(authorOfKeys(keys, base, { ...base }, [])).toBeNull();
+  });
+
+  it("returns 'user' when any key is a manual edit", () => {
+    expect(authorOfKeys(keys, base, { fc_threshold: 2, fdr_threshold: 0.05 }, [])).toBe("user");
+  });
+
+  it("prefers 'ai' when any key still carries an accepted AI value (fuchsia beats amber)", () => {
+    const staged = { fc_threshold: 2, fdr_threshold: 0.01 }; // fc = manual, fdr = AI
+    const proposals = [proposal({ id: "t1", paramKey: "fdr_threshold", value: 0.01, status: "accepted" })];
+    expect(authorOfKeys(keys, base, staged, proposals)).toBe("ai");
+  });
+});
+
+describe("mergeAiProposals (#5 — re-ask dedup)", () => {
+  it("replaces a prior still-proposed suggestion for the same param (one row, not two)", () => {
+    const existing = [proposal({ id: "a1", paramKey: "resolution", value: 1.2 })];
+    const fresh = [proposal({ id: "a2", paramKey: "resolution", value: 1.4 })];
+    const out = mergeAiProposals(existing, fresh);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ id: "a2", value: 1.4 });
+  });
+
+  it("keeps an ACCEPTED proposal for the param — a re-ask offers a new suggestion beside it", () => {
+    const existing = [proposal({ id: "a1", paramKey: "resolution", value: 1.2, status: "accepted" })];
+    const fresh = [proposal({ id: "a2", paramKey: "resolution", value: 1.4 })];
+    const out = mergeAiProposals(existing, fresh);
+    expect(out.map((p) => p.id)).toEqual(["a1", "a2"]); // accepted kept + fresh appended
+  });
+
+  it("does not touch proposals for OTHER params", () => {
+    const existing = [proposal({ id: "a1", paramKey: "n_neighbors", value: 30 })];
+    const fresh = [proposal({ id: "a2", paramKey: "resolution", value: 1.4 })];
+    expect(mergeAiProposals(existing, fresh).map((p) => p.id)).toEqual(["a1", "a2"]);
+  });
+
+  it("is a no-op when the fresh batch is empty", () => {
+    const existing = [proposal({ id: "a1" })];
+    expect(mergeAiProposals(existing, [])).toBe(existing);
+  });
+});
+
+describe("acceptAllProposed / dismissAllProposed (#1 — banner bulk actions)", () => {
+  const mixed = [
+    proposal({ id: "a1", status: "proposed" }),
+    proposal({ id: "a2", status: "accepted" }),
+    proposal({ id: "a3", status: "proposed" }),
+  ];
+
+  it("acceptAll flips every proposed row to accepted, leaving accepted ones untouched", () => {
+    const out = acceptAllProposed(mixed);
+    expect(out.map((p) => p.status)).toEqual(["accepted", "accepted", "accepted"]);
+  });
+
+  it("dismissAll drops every proposed row but keeps accepted (staged) ones", () => {
+    expect(dismissAllProposed(mixed).map((p) => p.id)).toEqual(["a2"]);
   });
 });
 

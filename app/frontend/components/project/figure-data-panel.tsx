@@ -4,8 +4,8 @@ import * as React from "react";
 import { RefreshCw, RotateCcw, SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/ui/cn";
 import { ParamControl } from "./param-control";
-import { MarksEditor } from "./marks-editor";
-import { ThresholdEditor } from "./threshold-editor";
+import { MarksEditor, MARKS_PARAM_KEYS } from "./marks-editor";
+import { ThresholdEditor, THRESHOLD_PARAM_KEYS } from "./threshold-editor";
 import { DataCheckPanel } from "./data-check";
 import { DataFitVerdict } from "@/components/reproduction/data-fit-panel";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,8 @@ import { PaneShell } from "@/components/ui/pane-shell";
 import { AiMarker } from "@/components/ai/ai-marker";
 import { isFieldDisabled, visibleParamFields, type ParamField } from "@/lib/catalog/params";
 import { useSkillParams, type ParamSpecSeed } from "@/lib/catalog/use-skill-params";
-import { authorOf } from "@/lib/ai/proposals";
+import { authorOf, authorOfKeys } from "@/lib/ai/proposals";
+import { changedRingClass } from "@/lib/ui/changed-ring";
 import type { PaneState } from "@/lib/ui/pane-state";
 import type { FigureSpec } from "@/lib/figure/figure-spec";
 import type { SkillParams } from "@/lib/skills/api";
@@ -160,13 +161,20 @@ export function FigureDataPanel({
           onParamsChange={setParams}
           markLabelsShown={markLabelsShown}
           onMarkLabelsShownChange={onMarkLabelsShownChange}
+          // #6 — the bespoke editor shares the param grid's changed-state ring over its own keys.
+          changedAuthor={authorOfKeys(MARKS_PARAM_KEYS, baseParams, params, proposals)}
         />
       )}
 
       {/* Volcano FC/p-value thresholds (generalization-spec §F) — gated on the declared thresholds
           capability. Points re-colour live (the parent preview applies them); re-run updates the table. */}
       {canEditThresholds && (
-        <ThresholdEditor figureSpec={figureSpec} params={params} onParamsChange={setParams} />
+        <ThresholdEditor
+          figureSpec={figureSpec}
+          params={params}
+          onParamsChange={setParams}
+          changedAuthor={authorOfKeys(THRESHOLD_PARAM_KEYS, baseParams, params, proposals)}
+        />
       )}
 
       {/* Inputs → re-run. A stable slot across loading / error / empty / ready (Task B3). */}
@@ -186,13 +194,7 @@ export function FigureDataPanel({
             return (
               <div
                 key={f.key}
-                className={cn(
-                  "rounded-lg p-2 transition-shadow",
-                  author === "user" &&
-                    "bg-[color-mix(in_oklab,var(--stage-figuredata)_9%,transparent)] ring-1 ring-stage-figuredata/45",
-                  author === "ai" &&
-                    "bg-[color-mix(in_oklab,var(--stage-ai)_9%,transparent)] ring-1 ring-stage-ai/45",
-                )}
+                className={cn("rounded-lg p-2 transition-shadow", changedRingClass(author))}
               >
                 {/* The ✨ marker rides ParamControl's `badge` slot (inline beside the label), NOT an
                     absolute overlay — an overlay covered the control's right-aligned value readout. It

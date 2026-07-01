@@ -19,6 +19,38 @@ export function formatApprovedAt(iso?: string): string {
   });
 }
 
+/**
+ * The APPLIED (committed) ✨ marker's provenance tooltip — "AI · model · Jun 29, 14:32 · approved by
+ * <id>". #12 surfaces `approved_by`, the server-trusted approver the chokepoint stamps at /ai/apply
+ * (the audit trail the marker otherwise never showed). Empty fields are omitted, never printed blank.
+ */
+export function appliedMarkerTip(
+  action?: Pick<AiAction, "actor" | "model" | "approved_at" | "approved_by">,
+): string {
+  if (!action) return "Applied by AI";
+  const parts = [action.actor || "ai"];
+  if (action.model) parts.push(action.model);
+  const when = formatApprovedAt(action.approved_at);
+  if (when) parts.push(when);
+  if (action.approved_by) parts.push(`approved by ${action.approved_by}`);
+  return parts.join(" · ");
+}
+
+/**
+ * The STAGED (pre-commit) ✨ marker tooltip — "Staged by AI · proposed by <model>". #13: the model
+ * shown is the PROPOSING gateway; with the delta refactor the FE no longer sends model to /ai/apply,
+ * so the apply-time model can differ. Labelling it "proposed by" keeps the staged preview from
+ * claiming it is the committed model (the documented propose→apply drift).
+ */
+export function stagedMarkerTip(model?: string): string {
+  return `Staged by AI${model ? ` · proposed by ${model}` : ""}`;
+}
+
+/** The PROPOSED (un-acted) ✨ marker tooltip — "Proposed by AI · <model>". */
+export function proposedMarkerTip(model?: string): string {
+  return `Proposed by AI${model ? ` · ${model}` : ""}`;
+}
+
 /** Plain-language verb for an action type — the human-readable left side of a feed/banner row. */
 export function describeAction(a: Pick<AiAction, "type">): string {
   switch (a.type) {

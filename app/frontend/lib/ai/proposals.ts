@@ -135,6 +135,27 @@ export function authorOf(
   return p && sameVal(p.value, staged[key]) ? "ai" : "user";
 }
 
+/**
+ * The strongest author across a SET of param keys — for a bespoke multi-key figure-data control
+ * (the Marks editor's `manual_marks`/`marks`/`mark_labels`, the Threshold editor's `fc_threshold`/
+ * `fdr_threshold`). "ai" if ANY key still carries an accepted AI value, else "user" if any key is
+ * changed, else null. Lets those editors share the param grid's one changed-state ring (#6).
+ */
+export function authorOfKeys(
+  keys: readonly string[],
+  base: SkillParams,
+  staged: SkillParams,
+  proposals: AiProposal[],
+): "ai" | "user" | null {
+  let changed = false;
+  for (const k of keys) {
+    const a = authorOf(k, base, staged, proposals);
+    if (a === "ai") return "ai"; // an AI-authored key dominates (fuchsia beats amber)
+    if (a === "user") changed = true;
+  }
+  return changed ? "user" : null;
+}
+
 export interface PendingCounter {
   /** Total pending params (staged ≠ base) — equals the existing `fdDirty` count. */
   total: number;
@@ -240,10 +261,38 @@ export function applyAcceptedProposals(base: SkillParams, proposals: AiProposal[
   return next;
 }
 
+/**
+ * Append a fresh batch of proposals, REPLACING any prior still-`proposed` suggestion for the same
+ * param (#5 re-ask dedup). Asking twice for one knob without accepting yields ONE row (the latest),
+ * not a stacked pair. An `accepted` (staged) proposal is KEPT — a re-ask then offers a new suggestion
+ * beside the user's committed choice rather than silently dropping it. Param-less (cosmetic) fresh
+ * proposals never dedup (no key to match on).
+ */
+export function mergeAiProposals(existing: AiProposal[], fresh: AiProposal[]): AiProposal[] {
+  if (fresh.length === 0) return existing;
+  const freshKeys = new Set(
+    fresh.map((p) => p.paramKey).filter((k): k is string => k !== undefined),
+  );
+  const kept = existing.filter(
+    (p) => !(p.status === "proposed" && p.paramKey !== undefined && freshKeys.has(p.paramKey)),
+  );
+  return [...kept, ...fresh];
+}
+
 // ── queue transitions (pure) ───────────────────────────────────────────────────
 /** Mark a proposal accepted (the caller also stages its value into the figure-data params). */
 export function acceptProposal(proposals: AiProposal[], id: string): AiProposal[] {
   return proposals.map((p) => (p.id === id ? { ...p, status: "accepted" } : p));
+}
+/** Accept EVERY still-`proposed` suggestion at once — the banner's "Accept all" (#1). The caller
+ *  stages each accepted proposal's value into the figure-data params. Accepted rows are untouched. */
+export function acceptAllProposed(proposals: AiProposal[]): AiProposal[] {
+  return proposals.map((p) => (p.status === "proposed" ? { ...p, status: "accepted" } : p));
+}
+/** Drop EVERY still-`proposed` suggestion at once — the banner's "Dismiss all" (#1). Accepted
+ *  (staged) rows are kept (Revert is their control); only un-acted suggestions are cleared. */
+export function dismissAllProposed(proposals: AiProposal[]): AiProposal[] {
+  return proposals.filter((p) => p.status !== "proposed");
 }
 /** Return a proposal to "proposed" (on revert-to-base — keeps the suggestion offered). */
 export function unacceptProposal(proposals: AiProposal[], id: string): AiProposal[] {

@@ -47,6 +47,8 @@ export function FigureDataView({
   rerunPending,
   acceptAiProposal,
   dismissAiProposal,
+  acceptAllAiProposals,
+  dismissAllAiProposals,
   revertAiProposal,
   addAiProposals,
   onOpenFigure,
@@ -72,6 +74,8 @@ export function FigureDataView({
   rerunPending: () => void;
   acceptAiProposal: (id: string) => void;
   dismissAiProposal: (id: string) => void;
+  acceptAllAiProposals: () => void;
+  dismissAllAiProposals: () => void;
   revertAiProposal: (id: string) => void;
   addAiProposals: (fresh: AiProposal[]) => void;
   onOpenFigure: (f: Figure) => void;
@@ -140,18 +144,44 @@ export function FigureDataView({
             </div>
           </div>
           {aiProposals.length > 0 && (
-            <ul className="space-y-1.5 border-t border-stage-figuredata/25 pt-2.5">
-              {aiProposals.map((p) => (
-                <AiProposalRow
-                  key={p.id}
-                  proposal={p}
-                  onAccept={acceptAiProposal}
-                  onDismiss={dismissAiProposal}
-                  onRevert={revertAiProposal}
-                  disabled={running != null}
-                />
-              ))}
-            </ul>
+            <div className="border-t border-stage-figuredata/25 pt-2.5">
+              {/* Bulk actions (#1): only worth showing with 2+ un-acted suggestions — one row's own
+                  Accept/Dismiss suffice below that. Accept all stages every proposed value at once. */}
+              {aiProposals.filter((p) => p.status === "proposed").length >= 2 && (
+                <div className="mb-1.5 flex items-center justify-end gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-[11px]"
+                    disabled={running != null}
+                    onClick={acceptAllAiProposals}
+                  >
+                    Accept all
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-[11px] text-muted-foreground hover:text-destructive"
+                    disabled={running != null}
+                    onClick={dismissAllAiProposals}
+                  >
+                    Dismiss all
+                  </Button>
+                </div>
+              )}
+              <ul className="space-y-1.5">
+                {aiProposals.map((p) => (
+                  <AiProposalRow
+                    key={p.id}
+                    proposal={p}
+                    onAccept={acceptAiProposal}
+                    onDismiss={dismissAiProposal}
+                    onRevert={revertAiProposal}
+                    disabled={running != null}
+                  />
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       )}

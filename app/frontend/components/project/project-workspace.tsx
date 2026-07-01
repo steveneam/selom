@@ -167,6 +167,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     aiTurns,
     acceptAiProposal,
     dismissAiProposal,
+    acceptAllAiProposals,
+    dismissAllAiProposals,
     revertAiProposal,
     addAiProposals,
     rerunPending,
@@ -657,6 +659,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
               rerunPending={rerunPending}
               acceptAiProposal={acceptAiProposal}
               dismissAiProposal={dismissAiProposal}
+              acceptAllAiProposals={acceptAllAiProposals}
+              dismissAllAiProposals={dismissAllAiProposals}
               revertAiProposal={revertAiProposal}
               addAiProposals={addAiProposals}
               onOpenFigure={openFigure}

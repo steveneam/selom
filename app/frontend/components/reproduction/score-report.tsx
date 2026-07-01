@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, Copy, GitCompareArrows, Info, Loader2 } from "lucide-react";
+import { Check, Copy, GitCompareArrows, Info, Loader2, RefreshCw } from "lucide-react";
 
 import { tierLabel } from "@/lib/reproduction/api";
 import type { FileFitReport } from "@/lib/reproduction/data-fit";
@@ -138,6 +138,9 @@ function ExplainScore({ scorecard }: { scorecard: Scorecard }) {
   const [result, setResult] = React.useState<ExplainResponse | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
+  // #14 — when an OPEN explanation auto-swaps because the score was re-run, the refresh is otherwise
+  // silent (only the spinner flashes). This flags a brief "updated for the re-scored run" cue.
+  const [reScored, setReScored] = React.useState(false);
 
   async function run() {
     const payload = buildScorecardPayload(scorecard);
@@ -160,6 +163,7 @@ function ExplainScore({ scorecard }: { scorecard: Scorecard }) {
       setOpen(false);
       return;
     }
+    setReScored(false); // a manual open is not a re-score swap — no cue
     setOpen(true);
     await run();
   }
@@ -195,9 +199,17 @@ function ExplainScore({ scorecard }: { scorecard: Scorecard }) {
     prevKey.current = payloadKey;
     // Re-sync the cached explanation to the changed score: re-fetch if open, else drop the stale cache.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional re-sync to an external scorecard change
-    if (open) void run(); else setResult(null);
+    if (open) { setReScored(true); void run(); } else setResult(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run() reads the fresh scorecard closure
   }, [payloadKey, open]);
+
+  // Auto-dismiss the re-scored cue ~3s AFTER it becomes visible (the fresh result lands, not while the
+  // swap is still fetching) so it reads as a brief acknowledgement, not a persistent badge.
+  React.useEffect(() => {
+    if (!(reScored && result && !loading)) return;
+    const t = window.setTimeout(() => setReScored(false), 3000);
+    return () => window.clearTimeout(t);
+  }, [reScored, result, loading]);
 
   return (
     <div className="mt-3">
@@ -228,6 +240,15 @@ function ExplainScore({ scorecard }: { scorecard: Scorecard }) {
             </p>
           ) : result ? (
             <>
+              {reScored && (
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className="mb-1.5 inline-flex items-center gap-1 text-[10px] font-medium text-stage-ai"
+                >
+                  <RefreshCw className="size-3" aria-hidden /> Updated for the re-scored run
+                </p>
+              )}
               <div className="mb-1.5 flex items-center justify-between gap-2">
                 <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   Explanation

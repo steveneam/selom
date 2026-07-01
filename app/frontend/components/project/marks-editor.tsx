@@ -5,6 +5,7 @@ import { RotateCcw, Crosshair } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/ui/cn";
+import { changedRingClass } from "@/lib/ui/changed-ring";
 import {
   clearManualMark,
   manualMarkCount,
@@ -20,6 +21,10 @@ import {
 } from "@/lib/erg/marks";
 import type { SkillParams } from "@/lib/skills/api";
 
+/** The figure-data params this editor writes — the single source the panel diffs for the #6 changed
+ *  ring (so a new mark param is covered without the panel re-listing keys). */
+export const MARKS_PARAM_KEYS = ["manual_marks", "marks", "mark_labels"] as const;
+
 /**
  * Marks editor (docs/records/erg-manual-marks/spec.md R5) — the numeric half of the operator override, in
  * the Figure-data stage where re-runs live. It reads the skill-seeded landmark times
@@ -34,6 +39,7 @@ export function MarksEditor({
   onParamsChange,
   markLabelsShown = true,
   onMarkLabelsShownChange,
+  changedAuthor = null,
 }: {
   seededMarks: SeededMark[];
   params: SkillParams;
@@ -43,6 +49,10 @@ export function MarksEditor({
   /** Live "show a/b labels" state (owned by the parent so the preview restyles instantly). */
   markLabelsShown?: boolean;
   onMarkLabelsShownChange?: (shown: boolean) => void;
+  /** #6 — the changed-state author over this editor's params (computed by the panel over
+   *  {@link MARKS_PARAM_KEYS}): "user" (amber) / "ai" (fuchsia) / null. Rings the whole editor to
+   *  match the param grid's one changed-state language. */
+  changedAuthor?: "ai" | "user" | null;
 }) {
   const manual = React.useMemo(() => parseManualMarks(params.manual_marks), [params.manual_marks]);
   const nManual = manualMarkCount(manual);
@@ -85,7 +95,7 @@ export function MarksEditor({
     }));
 
   return (
-    <div className="rounded-xl border border-border bg-card/60 p-4">
+    <div className={cn("rounded-xl border border-border bg-card/60 p-4 transition-shadow", changedRingClass(changedAuthor))}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
