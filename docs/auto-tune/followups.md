@@ -6,6 +6,44 @@
 > items are the intentionally-deferred phases + the D4-deferred richer surface — captured so none are
 > lost, not owed on Phase 1.
 
+## NEXT (ranked first) — Auto-tune clobbers the design contrast + downgrades the method on a bulk `deg` figure
+
+> Found in the project-workspace-refactor browser smoke (2026-07-01, real backend, a real `deg` figure).
+> **Owner-approved to scope + fix next session.** This is a *correctness* issue (a "best-practice" button
+> proposing a scientifically-wrong method + wiping the experimental design), ranked above the cosmetic D4
+> items below. NOT a "look up better numbers" gap — the numbers are already right; the *policy* is wrong.
+
+**Symptom.** On a bulk-RNA-seq `deg` figure whose contrast is set (`reference=CE4_4_iRPE`,
+`treatment=CE4_5_iRPE`, `method=pydeseq2`, `mode=bulk`), clicking **Auto-tune inputs** proposes:
+`mode bulk→auto · method pydeseq2→wilcoxon · reference CE4_4_iRPE→"" · treatment CE4_5_iRPE→""`.
+That would **wipe the design contrast** and **downgrade the method** — `pydeseq2→wilcoxon` is the *wrong
+direction* for bulk (DESeq2 is the bulk best practice; Wilcoxon is the single-cell default).
+
+**Root cause.** `engine/recommend.py:recommend_params` builds its baseline from **every** param's
+`param_spec` default (`recommend.py:81-83`), then the curated layer only moves `n_hvg` (umap/cluster).
+The module's docstring correctly declares design params (`reference/treatment/condition_col/sample_col`)
+are **ingest's job, not this recommender's** — but the *raw default baseline* still emits them (as
+`scaled=False`, `why="skill default"`), and the FE `stageableRecommendations` (`lib/skills/api.ts`) diffs
+those raw defaults against the figure's *committed, design-correct* values → stages the difference. The
+scope boundary leaks through the FE staging. (The shipped UMAP verify missed it because that figure's
+non-`n_hvg` params already equalled their defaults, so nothing else diffed.)
+
+**Fix (one policy rule, FE `stageableRecommendations`).** Stage a rec as a change **only when it's a
+curated move (`scaled===true`) OR the figure's current value for that key is empty/unset** — a raw static
+default (`scaled=false`) must never *overwrite* a committed non-default. `ParamRec.scaled` already carries
+exactly this distinction (curated best-practice move vs. static baseline). Result: Auto-tune on a
+well-configured `deg` figure becomes a clean no-op → *"Already at the best-practice settings"*, while it
+still fires `n_hvg→2000` on a UMAP figure that needs it and still fills genuinely-empty inputs.
+
+**Test.** `stageableRecommendations` unit: (a) deg recs (all `scaled=false`) + a base with
+`reference/treatment/method` set → `applied=[]` (no clobber); (b) a `scaled` `n_hvg` rec + a base with
+`n_hvg` unset → `applied=[n_hvg]`; (c) a `scaled` rec whose key the user hand-staged → still `skipped`
+(existing behaviour, unchanged). Keep the backend as-is (its curated layer is already correctly scoped)
+or add a one-line note; the real fix is the FE staging policy.
+
+**Separate, later (not this fix).** A *cited* expansion of the small curated allowlist (which knobs beyond
+`n_hvg` deserve a defensible best-practice default) — additive, literature-backed, its own change.
+
 ## Fixed in the Phase 1 commit (2026-07-01)
 
 - **[gauntlet · design, medium] Deterministic path was not the primary CTA.** Auto-tune was `outline`

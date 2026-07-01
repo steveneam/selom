@@ -86,8 +86,8 @@ dispatch layer: route by situation, don't wait to be asked.**
 |---|---|
 | A consequential/ambiguous change, before code | forcing-questions (`AskUserQuestion`) → `spec` (write, pause for review) |
 | Breaking a spec into work | `plan` / agile slices |
-| Reviewing a diff / before commit | **`review-gauntlet` workflow** (correctness/invariants — repro-integrity · spine-consistency · license · design) **+ `fe-review` workflow on any FE diff** (interaction/layout/affordance — the V·R·D·A·R·N lens); both in `.claude/workflows/`, invoke by `scriptPath` |
-| FE work or any FE audit/review | **`fe-review`** (the FE peer of the gauntlet; V·R·D·A·R·N + G1 user-task + G2 rendered-in-context) — it conducts the design skills: **ui-ux-pro-max** · **frontend-design** · **impeccable** |
+| Reviewing a **phase/milestone** diff (NOT each small task — the workflows are token-heavy and low-value at small scope; batch them to the milestone boundary) | **`review-gauntlet` workflow** (correctness/invariants — repro-integrity · spine-consistency · license · design) **+ `fe-review` workflow when the milestone touches FE** (interaction/layout/affordance — the V·R·D·A·R·N lens); both in `.claude/workflows/`, invoke by `scriptPath` |
+| A **milestone-level** FE change, or a requested FE audit/review | **`fe-review`** (the FE peer of the gauntlet; V·R·D·A·R·N + G1 user-task + G2 rendered-in-context) — it conducts the design skills: **ui-ux-pro-max** · **frontend-design** · **impeccable** |
 | Implementing a scoped change | `developer` agent / `implement` / `tdd` / `refactor` |
 | Confirming a change works | `verify` / `browser-verify` — real data + live backend, **not dev:mock** |
 | Stuck after 2 tries | build a helper + capture the gap (`step-back-build-helpers-when-stuck`) |
@@ -96,17 +96,19 @@ dispatch layer: route by situation, don't wait to be asked.**
 | Committing | `commit` conventions — named paths (never `git add -A`), no AI sign-off, owner pushes |
 
 Pipelines (run end-to-end, the same way each time): **Design loop** = forcing-Qs → `spec` →
-`review-gauntlet` → approve → build → `verify` → `commit` → Ratchet · **Change review** = diff →
-`review-gauntlet` (+ `fe-review` if the diff touches FE) → fix → `verify` · **Reflect** = consume the
-CapabilityGap backlog → propose spine improvements.
+`review-gauntlet` → approve → build → `verify` → `commit` → Ratchet · **Change review** (run at a
+**phase/milestone boundary, not each task**) = diff → `review-gauntlet` (+ `fe-review` if it touches FE)
+→ fix → `verify` · **Reflect** = consume the CapabilityGap backlog → propose spine improvements.
 
 ## Notes
 
 - This repo runs on **Opus 4.8** (xhigh effort) — owner-directed 2026-06-13, pinned in `.claude/settings.json` (`model=claude-opus-4-8`, `effortLevel=xhigh`); superseded the prior Fable 5 default.
 - Commercial/licensing gates are **deferred** — build now, gate before launch (see `LAUNCH-GATES.md`).
-- For frontend work — and **always for a frontend audit/review** — run **`fe-review`** (the FE peer
+- At a **frontend milestone** — or on a requested FE audit/review — run **`fe-review`** (the FE peer
   of `review-gauntlet`: the V·R·D·A·R·N mutation lens + a G1 user-task walkthrough + a G2
-  rendered-in-context pass; `.claude/workflows/fe-review.js`, spec `docs/fe-review/spec.md`). It
+  rendered-in-context pass; `.claude/workflows/fe-review.js`, spec `docs/fe-review/spec.md`). Reserve
+  it (and the gauntlet) for phase/milestone completion — **not** each small task; they're token-heavy
+  and add little at small scope (owner-directed 2026-07-01). It
   **conducts** the three design skills — **ui-ux-pro-max** (knowledge), **frontend-design**
   (generation), **impeccable** (dispatch the right mode: `critique` for interaction/affordance,
   `audit` for a11y/perf/theming, `polish` to finish). `impeccable` is installed locally under
