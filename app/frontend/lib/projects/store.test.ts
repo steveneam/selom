@@ -86,6 +86,16 @@ describe("projectStore — sync read / async write (sub-spec §2.2)", () => {
   });
 });
 
+describe("addDataset — the real path never fabricates qc (A2 ratchet: the pbmc3k mock-QC honesty bug)", () => {
+  it("a freshly added REAL dataset starts with qc === undefined, never a fabricated stand-in", () => {
+    const pj = projectStore.createProject("Real project");
+    const d = projectStore.addDataset(pj.id, "sample.h5ad", "scRNA-seq");
+    expect(d.qc).toBeUndefined();
+    // The snapshot agrees — no fabricated dims persisted to the store/mirror either.
+    expect(projectStore.getSnapshot().datasets.find((x) => x.id === d.id)?.qc).toBeUndefined();
+  });
+});
+
 describe("mergeFigures — the local-only aiProposals survives a server-wins reconcile (S5)", () => {
   const fig = (over: Partial<Figure>): Figure =>
     ({ id: "f1", projectId: "p", title: "F", createdAt: 1, ...over }) as Figure;

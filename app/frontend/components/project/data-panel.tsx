@@ -15,7 +15,7 @@ import { cn } from "@/lib/ui/cn";
 import { modalityColor } from "@/lib/catalog/modality";
 import { getSkill } from "@/lib/catalog/seed";
 import { datasetDisplayName } from "@/lib/lineage/family";
-import { detectModality, proposeForModality, type IntakeAnswers, type IntakeProposal } from "@/lib/intake/mock";
+import { detectModality, proposeForModality, proposeFromQc, type IntakeAnswers, type IntakeProposal } from "@/lib/intake/mock";
 import { combineData, inspectData, modalityFromKind, qcFromInspect, type DataTypeOverride } from "@/lib/intake/inspect";
 import { designRunParams, timeCourseDesignFile, type DesignChoice } from "@/lib/intake/design";
 import { projectStore } from "@/lib/projects/store";
@@ -107,9 +107,19 @@ export function DataPanel({
   const runInspect = React.useCallback(
     async (dataset: Dataset, file: File, over?: DataTypeOverride, designSheet?: File | null) => {
       setInspecting(true);
+      // A2 fix: track the in-flight/failed state explicitly (rather than silently keeping whatever
+      // qc — real or none — the dataset already had) so the UI can render an honest "Inspecting…" /
+      // "Couldn't inspect this file" instead of ever showing a fabricated verdict.
+      projectStore.setInspectState(dataset.id, "pending");
       const result = await inspectData(file, over, designSheet);
       setInspecting(false);
-      if (!result) return;
+      if (!result) {
+        projectStore.setInspectState(dataset.id, "failed");
+        setActive((a) => (a && a.dataset.id === dataset.id
+          ? { ...a, dataset: { ...a.dataset, inspectState: "failed" } }
+          : a));
+        return;
+      }
       const modality = modalityFromKind(result.kind);
       const qc = qcFromInspect(result);
       // Persist the Slice-2 data-aware route + the intake DESIGN prefill alongside QC so the data-driven
@@ -118,7 +128,7 @@ export function DataPanel({
       const { routing, dataFit, design } = result;
       projectStore.updateDatasetProfile(dataset.id, { modality, qc, routing, dataFit, design });
       setActive((a) => (a && a.dataset.id === dataset.id
-        ? { ...a, dataset: { ...a.dataset, modality, qc, routing, dataFit, design } }
+        ? { ...a, dataset: { ...a.dataset, modality, qc, routing, dataFit, design, inspectState: undefined } }
         : a));
     },
     [],
@@ -330,11 +340,22 @@ export function DataPanel({
                     <p className="truncate text-sm font-medium text-foreground">{datasetDisplayName(d)}</p>
                     <p className="tabular text-xs text-muted-foreground">
                       {d.label ? `${d.filename} · ` : ""}
-                      {d.qc?.profileLabel ?? d.modality}
-                      {d.qc ? ` · ${d.qc.nObs.toLocaleString()} × ${d.qc.nVar.toLocaleString()}` : ""}
-                      {d.qc?.applies && d.qc.cleaningSteps?.length
-                        ? ` · ${d.qc.cleaningSteps.length} cleaning steps`
-                        : ""}
+                      {/* A2 fix: a dataset with no real qc yet ever shows an honest in-flight/failed
+                          state — never fabricated dims. Once `qc` is real (even if stale mid-reinspect)
+                          it keeps showing the last known-good verdict. */}
+                      {!d.qc && d.inspectState === "pending" ? (
+                        "Inspecting…"
+                      ) : !d.qc && d.inspectState === "failed" ? (
+                        "Couldn't inspect this file"
+                      ) : (
+                        <>
+                          {d.qc?.profileLabel ?? d.modality}
+                          {d.qc ? ` · ${d.qc.nObs.toLocaleString()} × ${d.qc.nVar.toLocaleString()}` : ""}
+                          {d.qc?.applies && d.qc.cleaningSteps?.length
+                            ? ` · ${d.qc.cleaningSteps.length} cleaning steps`
+                            : ""}
+                        </>
+                      )}
                     </p>
                   </div>
                   {fitBand && (
@@ -373,7 +394,7 @@ export function DataPanel({
               onSetDataType={setDataType}
               onResetDataType={resetDataType}
             />
-            {active.dataset.qc && (
+            {active.dataset.qc ? (
               <CleaningReport
                 qc={active.dataset.qc}
                 modality={active.dataset.modality}
@@ -387,6 +408,15 @@ export function DataPanel({
                   })
                 }
               />
+            ) : active.dataset.inspectState === "failed" ? (
+              // A2 fix: no real qc and inspect definitively failed — say so, never guess at dims.
+              <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                Couldn&apos;t inspect this file — try again, or set the data type manually above.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground" role="status">
+                Inspecting…
+              </p>
             )}
             {/* Slice-3 (followups #1): the own-data fit verdict on the intake surface — the best-
                 fitting analysis's confidence band, reusing the reproduction verdict component. */}
@@ -400,6 +430,10 @@ export function DataPanel({
             />
             <IntakeQuestionnaire
               modality={active.dataset.modality}
+              // A4 fix: `modality` is only a confirmed classification once a real inspect succeeded
+              // (`qc` set) — otherwise it's still just the filename heuristic, and the confirm card
+              // must say so rather than "Detected".
+              modalityGuessed={!active.dataset.qc}
               design={active.dataset.design}
               routing={active.dataset.routing}
               dataColumns={active.dataset.dataFit?.columns}
@@ -407,7 +441,16 @@ export function DataPanel({
                 onAnalyze({
                   datasetId: active.dataset.id,
                   file: active.file,
-                  proposal: withDesign(proposeForModality(active.dataset.modality, answers), choice, aiActions),
+                  // A1 fix: once a real qc exists, the proposal's summary/cleaning/guardrails come
+                  // from IT, never the modality mock's fabricated stand-ins; the mock is the fallback
+                  // only while no real qc is known yet.
+                  proposal: withDesign(
+                    active.dataset.qc
+                      ? proposeFromQc(active.dataset.modality, active.dataset.qc, answers)
+                      : proposeForModality(active.dataset.modality, answers),
+                    choice,
+                    aiActions,
+                  ),
                   // A time-course run needs a design sheet (id + `time`); synthesize it from the detected
                   // timepoints when the user hasn't attached a real one (an attached sheet stays authoritative).
                   designFile:

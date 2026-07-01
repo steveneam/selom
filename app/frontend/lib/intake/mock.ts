@@ -6,6 +6,11 @@ import type { AiActionDelta } from "@/lib/ai/types";
  * §4 / §7). Stands in for `POST /upload` (ingest+QC) and `POST /intake` (the LLM
  * proposal) until phase B2. The LLM proposes; the user approves — nothing here
  * auto-runs an analysis.
+ *
+ * Honesty boundary (A1/A2 fix): `mockQcReport` / `proposeForModality` are the PRE-inspect / no-qc
+ * fallback and the demo-seed's labeled example data ONLY — neither may drive a REAL dataset's
+ * displayed dims/cleaning/guardrails once a real `/data/inspect` has run. `proposeFromQc` is the
+ * real-qc-driven proposal; callers pick between the two based on whether the dataset's `qc` is set.
  */
 
 export interface IntakeQuestion {
@@ -23,8 +28,10 @@ export interface ProposedStep {
   skillId: string;
   rationale: string;
   params: Record<string, string | number | boolean>;
-  /** 0–1 model confidence; rendered, never hidden. */
-  confidence: number;
+  /** 0–1 confidence — OMITTED. These are pipeline SUGGESTIONS (which skill fits this modality), not
+   *  a measurement against the dataset; a number here reads as measured and Selom is a reproduction
+   *  SaaS, so none is fabricated. Optional only for a future skill that supplies a genuine one. */
+  confidence?: number;
   /** Layer A 2b: the approved AI action delta for THIS step's run — present only when the ingest AI
    *  refiner proposed the design AND the user confirmed it unchanged. Its presence routes the run
    *  through /ai/apply (✨ attribution via the chokepoint) instead of a plain runSkill. */
@@ -180,54 +187,103 @@ export function mockQcReport(modality: Modality): QcReport {
   }
 }
 
-/** Mock LLM proposal (design §4.3) — deterministic by modality. */
-export function proposeForModality(modality: Modality, answers: IntakeAnswers): IntakeProposal {
-  const qc = mockQcReport(modality);
-  const want = answers.goal || answers.cell_type || answers.contrast || "your question";
-
+/** The suggested pipeline (skillId/rationale/params) by modality — the same SUGGESTIONS whether
+ *  they end up wrapped with a real dataset's measured qc ({@link proposeFromQc}) or with no qc yet
+ *  ({@link proposeForModality}). No confidence is attached here (see `ProposedStep.confidence`). */
+function stepsForModality(modality: Modality, answers: IntakeAnswers): ProposedStep[] {
   switch (modality) {
     case "scRNA-seq":
-      return {
-        summary: `Single-cell dataset (${qc.nObs.toLocaleString()} cells). You want: ${want}.`,
-        cleaning: qc.cleaning, guardrails: qc.guardrails,
-        steps: [
-          { skillId: "selom.umap_scrna", rationale: "Embed + cluster to reveal cell-type structure.",
-            params: { n_neighbors: 15, resolution: 1.0, color_by: "leiden" }, confidence: 0.86 },
-          { skillId: "selom.deg", rationale: "Rank markers to label the clusters you care about.",
-            params: { group: "leiden", method: "wilcoxon" }, confidence: 0.71 },
-        ],
-        alternatives: ["clawbio.scrna-orchestrator"],
-      };
+      return [
+        { skillId: "selom.umap_scrna", rationale: "Embed + cluster to reveal cell-type structure.",
+          params: { n_neighbors: 15, resolution: 1.0, color_by: "leiden" } },
+        { skillId: "selom.deg", rationale: "Rank markers to label the clusters you care about.",
+          params: { group: "leiden", method: "wilcoxon" } },
+      ];
     case "bulk RNA-seq":
-      return {
-        summary: `Bulk RNA-seq (${qc.nObs} samples). You want: ${want}.`,
-        cleaning: qc.cleaning, guardrails: qc.guardrails,
-        steps: [
-          { skillId: "selom.deg", rationale: "Differential expression for the contrast of interest.",
-            params: { method: "pydeseq2", contrast: answers.contrast || "treated_vs_control" }, confidence: 0.83 },
-          { skillId: "selom.volcano", rationale: "Visualize DE with FDR/log2FC thresholds + top labels.",
-            params: { fdr: 0.05, lfc: 1.0, label_top: 15 }, confidence: 0.8 },
-          { skillId: "selom.enrichment", rationale: "Interpret the hit list against GO / Reactome.",
-            params: { gene_sets: "GO_Biological_Process,Reactome" }, confidence: 0.62 },
-        ],
-        alternatives: ["selom.heatmap"],
-      };
+      return [
+        { skillId: "selom.deg", rationale: "Differential expression for the contrast of interest.",
+          params: { method: "pydeseq2", contrast: answers.contrast || "treated_vs_control" } },
+        { skillId: "selom.volcano", rationale: "Visualize DE with FDR/log2FC thresholds + top labels.",
+          params: { fdr: 0.05, lfc: 1.0, label_top: 15 } },
+        { skillId: "selom.enrichment", rationale: "Interpret the hit list against GO / Reactome.",
+          params: { gene_sets: "GO_Biological_Process,Reactome" } },
+      ];
     case "proteomics":
-      return {
-        summary: `Mass-spec proteomics (${qc.nObs} samples). You want: ${want}.`,
-        cleaning: qc.cleaning, guardrails: qc.guardrails,
-        steps: [
-          { skillId: "selom.proteomics_de", rationale: "Differential abundance across your condition.",
-            params: { fdr: 0.05, lfc: 1.0, imputation: "MinProb" }, confidence: 0.74 },
-          { skillId: "selom.enrichment", rationale: "Pathway context for the changed proteins.",
-            params: { gene_sets: "Reactome" }, confidence: 0.58 },
-        ],
-        alternatives: [],
-      };
+      return [
+        { skillId: "selom.proteomics_de", rationale: "Differential abundance across your condition.",
+          params: { fdr: 0.05, lfc: 1.0, imputation: "MinProb" } },
+        { skillId: "selom.enrichment", rationale: "Pathway context for the changed proteins.",
+          params: { gene_sets: "Reactome" } },
+      ];
     default:
-      return {
-        summary: "Couldn't detect the data type — confirm the modality to get a proposal.",
-        cleaning: qc.cleaning, guardrails: qc.guardrails, steps: [], alternatives: [],
-      };
+      return [];
   }
+}
+
+const ALTERNATIVES_BY_MODALITY: Record<Modality, string[]> = {
+  "scRNA-seq": ["clawbio.scrna-orchestrator"],
+  "bulk RNA-seq": ["selom.heatmap"],
+  proteomics: [],
+  unknown: [],
+};
+
+/** The proposal summary sentence from a real (measured) sample/cell count `n`. */
+function summaryForModality(modality: Modality, n: number, want: string): string {
+  switch (modality) {
+    case "scRNA-seq":
+      return `Single-cell dataset (${n.toLocaleString()} cells). You want: ${want}.`;
+    case "bulk RNA-seq":
+      return `Bulk RNA-seq (${n} samples). You want: ${want}.`;
+    case "proteomics":
+      return `Mass-spec proteomics (${n} samples). You want: ${want}.`;
+    default:
+      return "Couldn't detect the data type — confirm the modality to get a proposal.";
+  }
+}
+
+/**
+ * Build the pipeline proposal from a dataset's REAL `/data/inspect` qc (A1 fix — Selom is a
+ * reproduction SaaS; once the real cell/sample count and cleaning/guardrails are known, the
+ * "Proposed analysis" card must use them, never the modality mock's fabricated stand-ins). Reuses
+ * the same per-modality step SUGGESTIONS as {@link proposeForModality}; `summary`/`cleaning`/
+ * `guardrails` come straight from `qc`.
+ */
+export function proposeFromQc(modality: Modality, qc: QcReport, answers: IntakeAnswers): IntakeProposal {
+  const want = answers.goal || answers.cell_type || answers.contrast || "your question";
+  return {
+    summary: summaryForModality(modality, qc.nObs, want),
+    cleaning: qc.cleaning,
+    guardrails: qc.guardrails,
+    steps: stepsForModality(modality, answers),
+    alternatives: ALTERNATIVES_BY_MODALITY[modality],
+  };
+}
+
+/** The proposal summary sentence with NO measured count — used ONLY before any real qc is known. */
+function summaryForUnknownQc(modality: Modality, want: string): string {
+  switch (modality) {
+    case "scRNA-seq":
+      return `Single-cell dataset. You want: ${want}.`;
+    case "bulk RNA-seq":
+      return `Bulk RNA-seq dataset. You want: ${want}.`;
+    case "proteomics":
+      return `Mass-spec proteomics dataset. You want: ${want}.`;
+    default:
+      return "Couldn't detect the data type — confirm the modality to get a proposal.";
+  }
+}
+
+/** The pre-inspect fallback proposal (design §4.3) — used ONLY when no dataset qc is known yet
+ *  (inspect pending/failed, or the caller has no dataset at all — e.g. the modality-mock chip
+ *  fallback). Deterministic by modality, and — since there is no real qc — never asserts a
+ *  specific cell/sample count, cleaning step, or guardrail it hasn't actually measured. */
+export function proposeForModality(modality: Modality, answers: IntakeAnswers): IntakeProposal {
+  const want = answers.goal || answers.cell_type || answers.contrast || "your question";
+  return {
+    summary: summaryForUnknownQc(modality, want),
+    cleaning: [],
+    guardrails: [],
+    steps: stepsForModality(modality, answers),
+    alternatives: ALTERNATIVES_BY_MODALITY[modality],
+  };
 }

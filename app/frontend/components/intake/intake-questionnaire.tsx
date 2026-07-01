@@ -36,6 +36,7 @@ import type { Modality } from "@/lib/projects/types";
  */
 export function IntakeQuestionnaire({
   modality,
+  modalityGuessed,
   design,
   routing,
   dataColumns,
@@ -43,6 +44,10 @@ export function IntakeQuestionnaire({
   onSkip,
 }: {
   modality: Modality;
+  /** A4 fix: true when `modality` is only the filename heuristic (no successful inspect yet) — the
+   *  confirm card says "Guessed from filename" instead of "Detected" so a failed/pending inspect
+   *  never reads as a real classification. Defaults to false (detected) for existing callers. */
+  modalityGuessed?: boolean;
   design?: DesignHints | null;
   routing?: DataRouting | null;
   /** The dataset's column names — forwarded to the ingest AI refiner so it can map messy sample
@@ -54,6 +59,7 @@ export function IntakeQuestionnaire({
   onSubmit: (answers: IntakeAnswers, choice: DesignChoice | null, aiActions?: AiActionDelta[]) => void;
   onSkip: () => void;
 }) {
+  const modalityVerb = modalityGuessed ? "Guessed from filename" : "Detected";
   const needsDesign = !!design?.needs_design;
   const [answers, setAnswers] = React.useState<IntakeAnswers>({});
 
@@ -400,7 +406,7 @@ export function IntakeQuestionnaire({
         <p className="text-xs text-muted-foreground">
           {needsDesign && isTimeCourse ? (
             <>
-              Detected: <span className="font-medium text-foreground">{modality}</span> ·{" "}
+              {modalityVerb}: <span className="font-medium text-foreground">{modality}</span> ·{" "}
               <span className="font-medium text-foreground">
                 time-course across {levels.length} timepoints
               </span>{" "}
@@ -408,7 +414,7 @@ export function IntakeQuestionnaire({
             </>
           ) : needsDesign && designValid ? (
             <>
-              Detected: <span className="font-medium text-foreground">{modality}</span> ·{" "}
+              {modalityVerb}: <span className="font-medium text-foreground">{modality}</span> ·{" "}
               <span className="font-medium text-foreground">{levels.length} conditions</span> (
               {treatment} vs {reference}
               {refReps != null && treatReps != null ? ` · n=${treatReps} vs ${refReps}` : ""}) — correct?
@@ -417,13 +423,13 @@ export function IntakeQuestionnaire({
             <>Pick a control and a treatment to define the contrast.</>
           ) : analysisName ? (
             <>
-              Detected: <span className="font-medium text-foreground">{modality}</span> — ready to make{" "}
+              {modalityVerb}: <span className="font-medium text-foreground">{modality}</span> — ready to make{" "}
               {analysisName}.
             </>
           ) : (
             // routing didn't resolve a skill (followups #8): don't imply a silent run — point at Skip.
             <>
-              Detected: <span className="font-medium text-foreground">{modality}</span> — no analysis
+              {modalityVerb}: <span className="font-medium text-foreground">{modality}</span> — no analysis
               auto-detected. <span className="font-medium text-foreground">Skip</span> below to pick a skill.
             </>
           )}

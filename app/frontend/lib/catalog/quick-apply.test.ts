@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { recommendedSkills, dedupById } from "./quick-apply";
+import { dedupById, isDataAwareRecommendation, recommendedSkills } from "./quick-apply";
 import type { DataFitSummary } from "@/lib/intake/inspect";
 import type { DataFit } from "@/lib/reproduction/data-fit";
 import type { DataRouting } from "@/lib/skills/api";
@@ -87,6 +87,17 @@ describe("recommendedSkills — honest no-fit for REAL inspected data (never mas
       "bulk RNA-seq",
     );
     expect(r).toEqual([]);
+  });
+});
+
+describe("isDataAwareRecommendation — A3 fix: never label the modality-mock fallback per-dataset", () => {
+  it("is true when a real routing exists (the chips came from the inspected route)", () => {
+    expect(isDataAwareRecommendation(route(["deg"]))).toBe(true);
+  });
+
+  it("is false for a real dataset whose inspect failed (routing null) — no route, no fabricated per-dataset label", () => {
+    expect(isDataAwareRecommendation(null)).toBe(false);
+    expect(isDataAwareRecommendation({ routing: null, dataFit: null })).toBe(false);
   });
 });
 

@@ -77,7 +77,9 @@ export function ProposalPlan({
         ) : (
           proposal.steps.map((step, i) => {
             const skill = getSkill(step.skillId);
-            const pct = Math.round(step.confidence * 100);
+            // `confidence` is only ever set by a genuine per-step measurement (none exist today) —
+            // never fabricated for a step suggestion, so the bar is omitted rather than showing 0%.
+            const pct = step.confidence != null ? Math.round(step.confidence * 100) : null;
             const busy = running === step.skillId;
             return (
               <div key={i} className="rounded-lg border border-border bg-card/60 p-3">
@@ -103,12 +105,14 @@ export function ProposalPlan({
                     </span>
                   ))}
                 </div>
-                <div className="mt-2 flex items-center gap-2 pl-7">
-                  <div className="h-1 w-24 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-primary/70" style={{ width: `${pct}%` }} />
+                {pct != null && (
+                  <div className="mt-2 flex items-center gap-2 pl-7">
+                    <div className="h-1 w-24 overflow-hidden rounded-full bg-muted">
+                      <div className="h-full rounded-full bg-primary/70" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="tabular text-[10px] text-muted-foreground">{pct}% confidence</span>
                   </div>
-                  <span className="tabular text-[10px] text-muted-foreground">{pct}% confidence</span>
-                </div>
+                )}
               </div>
             );
           })

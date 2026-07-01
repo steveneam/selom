@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import { mockQcReport } from "@/lib/intake/mock";
 import { api } from "@/lib/api/client";
 import type { FigureSpec } from "@/lib/figure/figure-spec";
-import type { Dataset, Figure, GeneSet, Modality, Project, ProjectState, SkillInstall } from "./types";
+import type { Dataset, Figure, GeneSet, Modality, Project, ProjectState, QcReport, SkillInstall } from "./types";
 import {
   fromApiDataset, fromApiFigure, fromApiGeneSet, fromApiInstall, fromApiProject,
   queue, reconcileFetch, toApiFigure, toApiGeneSet, useSyncStatus,
@@ -69,8 +69,11 @@ function randomSha(): string {
   return hexFrom(`${Math.random()}`);
 }
 
-function ds(projectId: string, id: string, filename: string, modality: Modality, t: number): Dataset {
-  return { id, projectId, filename, modality, currentSha256: hexFrom(id), qc: mockQcReport(modality), createdAt: t };
+/** `qc` is explicit (not auto-fabricated) — the demo seed passes `mockQcReport(...)` (a labeled
+ *  example); a REAL dataset created via `addDataset` passes none, so it starts honestly `undefined`
+ *  until a live `/data/inspect` succeeds (A2 fix — never render fabricated dims as the user's data). */
+function ds(projectId: string, id: string, filename: string, modality: Modality, t: number, qc?: QcReport): Dataset {
+  return { id, projectId, filename, modality, currentSha256: hexFrom(id), qc, createdAt: t };
 }
 
 /** Deterministic seed (stable ids → no hydration mismatch). Dev scaffolding — for a real signed-in
@@ -82,9 +85,11 @@ function seed(): ProjectState {
     { id: "demo-tumor", name: "Tumor bulk DEG", color: "#fb923c", createdAt: t - 86_400_000 },
     { id: "demo-phospho", name: "Phosphoproteomics", color: "#a78bfa", createdAt: t - 2 * 86_400_000 },
   ];
+  // Demo datasets keep an explicit, labeled example QC (they live under demo-* ids) — a REAL dataset
+  // never takes this path (see `addDataset`).
   const datasets: Dataset[] = [
-    ds("demo-pbmc", "demo-pbmc-ds", "pbmc3k.h5ad", "scRNA-seq", t),
-    ds("demo-tumor", "demo-tumor-ds", "tumor_counts.csv", "bulk RNA-seq", t - 86_400_000),
+    ds("demo-pbmc", "demo-pbmc-ds", "pbmc3k.h5ad", "scRNA-seq", t, mockQcReport("scRNA-seq")),
+    ds("demo-tumor", "demo-tumor-ds", "tumor_counts.csv", "bulk RNA-seq", t - 86_400_000, mockQcReport("bulk RNA-seq")),
   ];
   const installs: SkillInstall[] = [
     { id: "i1", projectId: "demo-pbmc", skillId: "selom.umap_scrna", installedAt: t },
@@ -312,6 +317,9 @@ export const projectStore = {
               routing: patch.routing ?? d.routing,
               dataFit: patch.dataFit ?? d.dataFit,
               design: patch.design ?? d.design,
+              // This is only ever called on a successful inspect (A2) — clear any stale
+              // pending/failed flag so the dataset list / cleaning pane stop showing it.
+              inspectState: undefined,
             }
           : d,
       ),
@@ -321,6 +329,17 @@ export const projectStore = {
     queue.enqueue({
       coalesceKey: `ds:${id}`,
       run: () => api.patch(`/datasets/${id}`, { modality: patch.modality, qc: patch.qc }),
+    });
+  },
+  /** Mark a live `/data/inspect` as in flight ("pending") or definitively failed ("failed") for a
+   *  dataset (A2 fix) — so the dataset list card + the active cleaning pane can render an honest
+   *  "Inspecting…" / "Couldn't inspect this file" instead of ever guessing at dims. Client-only: no
+   *  API call, and not preserved across a server reconcile (a stuck "pending" self-heals on the next
+   *  focus/hydrate rather than lying forever). Cleared by `updateDatasetProfile` on success. */
+  setInspectState(id: string, inspectState: Dataset["inspectState"]) {
+    setState({
+      ...state,
+      datasets: state.datasets.map((d) => (d.id === id ? { ...d, inspectState } : d)),
     });
   },
   /** Rename a dataset (an empty label clears the override back to the filename). */

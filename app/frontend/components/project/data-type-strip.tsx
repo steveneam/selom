@@ -87,7 +87,9 @@ export function DataTypeStrip({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
-              Detected data type
+              {/* A4 fix: without a live qc verdict, `label` below is only the filename heuristic —
+                  say so, rather than implying a real classification happened. */}
+              {inspecting ? "Detecting data type" : qc ? "Detected data type" : "Guessed from filename"}
             </span>
             {confidence && !inspecting && (
               <ConfidenceChip

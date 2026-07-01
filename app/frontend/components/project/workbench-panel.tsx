@@ -13,7 +13,7 @@ import { skillColor, skillIcon } from "@/lib/catalog/modality";
 import { isFieldDisabled, visibleParamFields } from "@/lib/catalog/params";
 import { useSkillParams } from "@/lib/catalog/use-skill-params";
 import { getSkill } from "@/lib/catalog/seed";
-import { recommendedSkills } from "@/lib/catalog/quick-apply";
+import { isDataAwareRecommendation, recommendedSkills } from "@/lib/catalog/quick-apply";
 import type { DataRouting, SkillParams } from "@/lib/skills/api";
 import type { DataFitSummary } from "@/lib/intake/inspect";
 import type { Modality } from "@/lib/projects/types";
@@ -107,6 +107,10 @@ export function WorkbenchPanel({
   // else the modality mock for demo/sample data; empty → the row hides entirely (never a popularity
   // list under a recommendation's label). Resolved + deduped against the catalog.
   const quick = recommendedSkills(route ?? null, modality ?? null);
+  // A3 fix: "Recommended for your data" implies a per-dataset verdict — only true when the real
+  // inspect route drove the chips. The modality-mock fallback (demo/sample, or a real dataset whose
+  // inspect failed) gets an honest, non-per-dataset heading instead.
+  const dataAware = isDataAwareRecommendation(route ?? null);
   // Surface WHY each chip is recommended (Slice 2): the per-skill data-fit verdict for an inspected
   // dataset, looked up by the (normalized) skill id. Drives a tooltip so the data-fit ranking + the
   // fit reason aren't invisible. Undefined for the demo/sample mock path (no inspected fit).
@@ -134,7 +138,8 @@ export function WorkbenchPanel({
         {quick.length > 0 && (
           <div>
             <p className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
-              <Sparkles className="size-3 text-primary" /> Recommended for your data
+              <Sparkles className="size-3 text-primary" />{" "}
+              {dataAware ? "Recommended for your data" : `Common for ${modality ?? "this data type"}`}
             </p>
             <div className="flex flex-wrap gap-2">
               {quick.map((s) => {

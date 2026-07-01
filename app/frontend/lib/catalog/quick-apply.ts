@@ -85,6 +85,10 @@ function recommendedFromProposal(proposal: IntakeProposal | null): CatalogSkill[
  * fallback ONLY for a NOT-inspected dataset (demo/sample, or bytes lost) — a data-type-appropriate
  * list so demo data still shows chips (owner D3), not a popularity fallback (the module's honesty
  * promise — fe-review gap, 2026-07-01).
+ *
+ * A3 fix: the caller must not label this fallback's chips "Recommended for YOUR data" — that phrase
+ * implies a per-dataset verdict, and a REAL dataset whose inspect failed has none. Use
+ * {@link isDataAwareRecommendation} to pick the heading (see `WorkbenchPanel`).
  */
 export function recommendedSkills(
   route: { routing: DataRouting | null; dataFit: DataFitSummary | null } | null,
@@ -92,4 +96,12 @@ export function recommendedSkills(
 ): CatalogSkill[] {
   if (route?.routing) return recommendedFromRoute(route.routing, route.dataFit);
   return modality ? recommendedFromProposal(proposeForModality(modality, {})) : [];
+}
+
+/** Whether `recommendedSkills` used the real, per-dataset data-fit route (true) or the generic
+ *  modality-mock fallback (false) — drives whether the chip row can honestly say "for your data". */
+export function isDataAwareRecommendation(
+  route: { routing: DataRouting | null; dataFit: DataFitSummary | null } | null,
+): boolean {
+  return !!route?.routing;
 }

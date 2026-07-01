@@ -91,7 +91,16 @@ export interface Dataset {
    * with no real bytes, it's a stable real-looking stand-in the client maintains.)
    */
   currentSha256?: string;
+  /** Present ONLY once a real qc verdict exists (seed demo data, or a completed `/data/inspect`
+   *  success) — a real dataset added via `addDataset` starts `undefined`. Never a fabricated
+   *  stand-in: an in-flight or failed inspect is tracked separately via `inspectState`, so the UI
+   *  can render an honest "Inspecting…" / "Couldn't inspect this file" instead of guessed dims. */
   qc?: QcReport;
+  /** Whether a live `/data/inspect` is in flight ("pending") or has definitively failed ("failed")
+   *  for this dataset. Undefined once `qc` is set (a success clears it) or before any inspect has
+   *  run. Client-only UI state — not synced to the backend, not preserved across a server reconcile
+   *  (self-heals on the next focus/hydrate rather than getting stuck mid-flight). */
+  inspectState?: "pending" | "failed";
   /**
    * The data-aware route the engine computed for this dataset at inspect time (Slice 2) — the
    * suggested skill pipeline (`routing`) + the per-skill data-fit ranking and table shape
