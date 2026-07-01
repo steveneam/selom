@@ -15,6 +15,7 @@ from engine.cleaning import CleaningPlan, DataProfile, plan_cleaning, profile_da
 from engine.ingest import clear_input_cache, ingest, ingest_cached, ingest_many
 from engine.qc import run_qc
 from engine.questionnaire import DesignHints, suggest_design_hints
+from engine.recommend import ParamRec, ParamRecs, RecommendContext, recommend_params
 from engine.route import route_data, route_profile
 from engine.models import (
     ALL_KINDS,
@@ -42,6 +43,10 @@ __all__ = [
     "route_profile",
     "suggest_design_hints",
     "DesignHints",
+    "recommend_params",
+    "RecommendContext",
+    "ParamRecs",
+    "ParamRec",
     "plan_cleaning",
     "profile_data",
     "CleaningPlan",

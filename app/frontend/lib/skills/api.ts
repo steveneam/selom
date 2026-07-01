@@ -154,6 +154,101 @@ export class DataCheckError extends Error {
 
 export type SkillParams = Record<string, string | number | boolean>;
 
+/** One recommended parameter from the deterministic Auto-tune recommender (backend
+ *  engine/recommend.py ParamRec). `scaled` is true only when a curated rule moved `value` off the
+ *  static `default`; `why` is the plain-language reason. */
+export interface ParamRec {
+  key: string;
+  value: string | number | boolean;
+  default: string | number | boolean;
+  why: string;
+  scaled: boolean;
+}
+
+/** The full recommended param set for one skill (backend ParamRecs). */
+export interface ParamRecs {
+  skill_id: string;
+  recs: ParamRec[];
+  note: string;
+}
+
+/** The data DESCRIPTION forwarded to the recommender — never a verdict (mirrors the route composer's
+ *  data-aware context). All optional; the server degrades a missing field to the static default. */
+export interface RecommendContext {
+  data_columns?: string[] | null;
+  data_kind?: string | null;
+  data_n_numeric_cols?: number | null;
+  design?: unknown | null;
+}
+
+/** One applied recommendation: the key + its OLD→NEW values + the plain-language reason — the
+ *  reviewable, no-black-box diff the outcome note shows (spec §What / R9). */
+export interface RecChange {
+  key: string;
+  from: string | number | boolean;
+  to: string | number | boolean;
+  why: string;
+}
+
+/**
+ * Split the recommended params against the current staged + committed-base values (pure —
+ * unit-testable, no fetch/React). A rec is APPLIED only when its key is UNTOUCHED by the user (its
+ * staged value still equals `baseVal` — the committed base, else the skill default the run would use)
+ * AND its recommended value differs from that base. So Auto-tune fills best practice into inputs the
+ * user hasn't set, and:
+ *   - it never silently overwrites a hand-edited staged value — a user-touched key that the rec would
+ *     have changed is reported in `skipped` ("left your edits as-is"), never clobbered (fixes the
+ *     silent-overwrite breach);
+ *   - every APPLIED change genuinely differs from the figure base, so it shows the amber pending cue
+ *     and the count in the note matches what's visibly staged (fixes the note-vs-visible mismatch).
+ * String-compared (controls stringify their values; the proposal path compares the same way).
+ */
+export function stageableRecommendations(
+  recs: ParamRec[],
+  staged: SkillParams,
+  base: SkillParams,
+): { changes: SkillParams; applied: RecChange[]; skipped: string[] } {
+  const changes: SkillParams = {};
+  const applied: RecChange[] = [];
+  const skipped: string[] = [];
+  for (const rec of recs) {
+    const baseVal = base[rec.key] ?? rec.default;   // what the run uses when this input is untouched
+    const cur = staged[rec.key] ?? baseVal;         // the current effective (staged) value
+    if (String(cur) !== String(baseVal)) {
+      // The user has already staged a change to this key — don't overwrite it. Report it only if the
+      // recommendation would actually have differed (so "left N as-is" is honest, not noise).
+      if (String(rec.value) !== String(cur)) skipped.push(rec.key);
+      continue;
+    }
+    if (String(rec.value) !== String(baseVal)) {
+      changes[rec.key] = rec.value;
+      applied.push({ key: rec.key, from: baseVal, to: rec.value, why: rec.why });
+    }
+  }
+  return { changes, applied, skipped };
+}
+
+/**
+ * Fetch the DETERMINISTIC best-practice params for a skill given the data context (the Layer A
+ * "Auto-tune" button — docs/auto-tune/spec.md). No AI gateway, no key: works with the gateway off.
+ * `skillId` is the bare runtime slug (call {@link runtimeSkillId} first). Throws on a non-2xx
+ * response (incl. 404 for an unknown skill).
+ */
+export async function recommendParams(
+  skillId: string,
+  ctx: RecommendContext = {},
+): Promise<ParamRecs> {
+  const res = await fetch(`/api/skills/${encodeURIComponent(skillId)}/recommend-params`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(ctx),
+  });
+  if (!res.ok) {
+    throw new Error(`Couldn't fetch recommendations (${res.status}).`);
+  }
+  return (await res.json()) as ParamRecs;
+}
+
 /**
  * Resolve a Skill Store catalog id to the backend's runnable skill id.
  *

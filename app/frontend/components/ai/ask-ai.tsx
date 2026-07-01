@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles, CornerDownLeft } from "lucide-react";
+import { Sparkles, CornerDownLeft, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/ui/cn";
@@ -23,6 +23,13 @@ export type AiStage = "route" | "ingest" | "analyze" | "grade" | "output";
  *   draft    — AI-marked, fully editable prose (methods) — later phase
  */
 export type AiMode = "staged" | "live" | "advisory" | "select" | "draft";
+
+/** The result of a one-click Auto-tune (deterministic best-practice defaults; no AI). */
+export interface AutoTuneOutcome {
+  ok: boolean;
+  /** A short summary to show below the composer — the reviewable diff / honest note. */
+  note: string;
+}
 
 /** Context bundle forwarded to the gateway (mirrors backend ProposeRequest fields). */
 export interface AiContext {
@@ -59,6 +66,10 @@ export function AskAi({
   hint,
   onStaged,
   onSelect,
+  onAutoTune,
+  autoTuneLabel,
+  pendingActive,
+  scopeKey,
 }: {
   stage: AiStage;
   label: string;
@@ -80,11 +91,62 @@ export function AskAi({
    * `null` when the slug cannot be found in the catalog (unresolved → honest note shown).
    */
   onSelect?: (skillId: string) => string | null;
+  /**
+   * Optional one-click "Auto-tune" — the DETERMINISTIC best-practice default for this stage
+   * (docs/auto-tune/spec.md). When provided, a neutral (non-✨) button renders ABOVE the AI chat
+   * ("the one-click default flows into chat"); the handler applies/stages the engine's recommendation
+   * and returns a note. Absent → no button (byte-identical to a chat-only composer). This is NOT the
+   * AI path — it needs no gateway and carries no ✨ marker.
+   */
+  onAutoTune?: () => Promise<AutoTuneOutcome>;
+  /** Auto-tune button label (e.g. "Auto-tune", "Draft methods"). Defaults to "Auto-tune". */
+  autoTuneLabel?: string;
+  /** Whether staged changes are currently pending (the caller's dirty flag). When it goes true→false
+   *  (a Reset or a committed Re-run) the Auto-tune outcome note is cleared so it can't keep asserting
+   *  pending changes exist. Only meaningful with `onAutoTune`. */
+  pendingActive?: boolean;
+  /** A scope key (e.g. dataset:skill:figure) — when it changes, the Auto-tune outcome note is cleared
+   *  (the prior result no longer applies to the new figure). Only meaningful with `onAutoTune`. */
+  scopeKey?: string;
   // later phase — onLive, onAdvice, onDraft (one per mode)
 }) {
   const [goal, setGoal] = React.useState("");
   const [busy, setBusy] = React.useState(false);
+  const [tuning, setTuning] = React.useState(false);
   const [note, setNote] = React.useState<string | null>(null);
+  // The Auto-tune outcome is kept SEPARATE from the AI chat note so a deterministic result never
+  // renders inside the ✨ AI surface (it is not AI output) — it shows in the neutral block below.
+  const [tuneNote, setTuneNote] = React.useState<string | null>(null);
+
+  async function autoTune() {
+    if (!onAutoTune || tuning || busy) return;
+    setTuning(true);
+    setTuneNote(null);
+    try {
+      const r = await onAutoTune();
+      setTuneNote(r.note);
+    } catch (e) {
+      setTuneNote(e instanceof Error ? e.message : "Couldn't auto-tune.");
+    } finally {
+      setTuning(false);
+    }
+  }
+
+  // Keep the Auto-tune outcome note honest by adjusting state DURING render on the relevant prop
+  // changes (React's "store info from previous renders" pattern, same as project-workspace's fdScope
+  // reset) — not an effect. Clear the note when its staged changes are reversed (Reset) or committed
+  // (Re-run) — pending goes true→false — or when the figure scope changes; never on the click's own
+  // false→true edge. setTuneNote(null) when already null is a no-op, so this can't loop.
+  const [prevScope, setPrevScope] = React.useState(scopeKey);
+  if (scopeKey !== prevScope) {
+    setPrevScope(scopeKey);
+    setTuneNote(null);
+  }
+  const [prevPending, setPrevPending] = React.useState(!!pendingActive);
+  if (!!pendingActive !== prevPending) {
+    setPrevPending(!!pendingActive);
+    if (!pendingActive) setTuneNote(null);
+  }
 
   async function send() {
     const g = goal.trim();
@@ -169,7 +231,9 @@ export function AskAi({
     // Other modes (live, advisory, draft) are later phases — fall through silently.
   }
 
-  return (
+  // The ✨ AI chat surface (the typed-goal path) — rendered byte-identically whether or not the
+  // Auto-tune button is present, so opting a stage into Auto-tune never regresses the chat.
+  const aiChat = (
     <div
       className={cn(
         "rounded-xl border p-3",
@@ -195,14 +259,59 @@ export function AskAi({
           aria-label={label}
           className="h-8 flex-1 text-xs"
         />
-        <Button size="sm" disabled={disabled || busy || !goal.trim()} onClick={() => void send()}>
+        <Button
+          size="sm"
+          // When Auto-tune is present it is the primary CTA (the deterministic path is primary and
+          // always works); the AI chat — gateway-off by default — steps back to the outline variant.
+          // Standalone (no Auto-tune, e.g. the route composer) "Ask" stays the primary action.
+          variant={onAutoTune ? "outline" : "default"}
+          disabled={disabled || busy || !goal.trim()}
+          onClick={() => void send()}
+        >
           {busy ? "Asking…" : <><CornerDownLeft /> Ask</>}
         </Button>
       </div>
       {mode === "select" && hint && !note && (
         <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{hint}</p>
       )}
-      {note && <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{note}</p>}
+      {note && (
+        <p role="status" aria-live="polite" className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+          {note}
+        </p>
+      )}
+    </div>
+  );
+
+  if (!onAutoTune) return aiChat;
+
+  // One surface, two paths: the DETERMINISTIC one-click Auto-tune (neutral — no ✨, no gateway) sits
+  // above and "flows into" the AI chat. Its outcome shows in this neutral block, never in the ✨ box.
+  return (
+    <div className="space-y-2.5">
+      <div className="rounded-xl border border-border bg-card p-3">
+        <Button
+          type="button"
+          // The deterministic one-click default is the PRIMARY CTA (spine invariant: deterministic
+          // path primary). Neutral --primary weight, never the --stage-ai/✨ AI accent (spec R8).
+          variant="default"
+          size="sm"
+          className="w-full"
+          disabled={disabled || tuning || busy}
+          aria-busy={tuning}
+          onClick={() => void autoTune()}
+        >
+          <SlidersHorizontal />
+          {tuning ? "Tuning…" : (autoTuneLabel ?? "Auto-tune")}
+        </Button>
+        <p
+          role="status"
+          aria-live="polite"
+          className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground"
+        >
+          {tuneNote ?? "Best-practice defaults — no AI. Review the changed inputs below, then re-run."}
+        </p>
+      </div>
+      {aiChat}
     </div>
   );
 }

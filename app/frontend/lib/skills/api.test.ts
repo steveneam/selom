@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  * which provides `fetch`/`FormData`/`File`; we stub `fetch` to assert the wire contract.
  */
 
-import { DataCheckError, runSkill } from "./api";
+import { DataCheckError, recommendParams, runSkill, stageableRecommendations, type ParamRec } from "./api";
 
 function jsonRes(status: number, body: unknown): Response {
   return {
@@ -99,5 +99,78 @@ describe("runSkill — is-my-data-clean guardrail", () => {
     await expect(p).rejects.toThrow(/doesn't fit volcano/);
     await expect(p).rejects.not.toThrow(/Couldn't run this skill/); // shown as-is, not wrapped
     await expect(p.catch((e) => e)).resolves.not.toBeInstanceOf(DataCheckError);
+  });
+});
+
+/**
+ * Auto-tune (Layer A, docs/auto-tune/spec.md) — the DETERMINISTIC recommender client + the pure
+ * staging helper. `stageableRecommendations` decides which recs actually change the run (only those
+ * feed the pending queue); `recommendParams` is the fetch wrapper.
+ */
+describe("stageableRecommendations", () => {
+  const rec = (key: string, value: ParamRec["value"], def: ParamRec["value"], scaled = false): ParamRec => ({
+    key, value, default: def, why: scaled ? `set ${key}` : "skill default", scaled,
+  });
+
+  it("applies a rec whose value differs from the base the run would use (with the old→new+why diff)", () => {
+    const { changes, applied, skipped } = stageableRecommendations([rec("n_hvg", 2000, 0, true)], {}, {});
+    expect(changes).toEqual({ n_hvg: 2000 });
+    expect(applied).toEqual([{ key: "n_hvg", from: 0, to: 2000, why: "set n_hvg" }]);
+    expect(skipped).toEqual([]);
+  });
+
+  it("skips an unchanged baseline rec (value === base)", () => {
+    const { applied } = stageableRecommendations([rec("method", "wilcoxon", "wilcoxon")], {}, {});
+    expect(applied).toEqual([]);
+  });
+
+  it("is a no-op when the recommendation already equals the current staged value", () => {
+    const { applied, skipped } = stageableRecommendations([rec("n_hvg", 2000, 0, true)], { n_hvg: 2000 }, {});
+    expect(applied).toEqual([]);
+    expect(skipped).toEqual([]); // matches the user's value → nothing to skip, nothing to apply
+  });
+
+  it("does NOT overwrite a user's hand-edited staged value — it reports it as skipped", () => {
+    // user staged n_hvg=500 (≠ base 0); the rec would set 2000 → decline + report, never clobber.
+    const { changes, applied, skipped } = stageableRecommendations([rec("n_hvg", 2000, 0, true)], { n_hvg: 500 }, {});
+    expect(changes).toEqual({});
+    expect(applied).toEqual([]);
+    expect(skipped).toEqual(["n_hvg"]);
+  });
+
+  it("counts applied against the committed BASE (from = base), so the note matches the visible cue", () => {
+    // base fdr=0.05; rec fdr=0.01, untouched → applied with from=0.05.
+    const { applied } = stageableRecommendations([rec("fdr", 0.01, 0.05, true)], {}, { fdr: 0.05 });
+    expect(applied).toEqual([{ key: "fdr", from: 0.05, to: 0.01, why: "set fdr" }]);
+  });
+
+  it("compares as strings (a numeric rec equals a stringified base value)", () => {
+    const { applied } = stageableRecommendations([rec("top_n", 15, 15)], {}, { top_n: "15" });
+    expect(applied).toEqual([]);
+  });
+});
+
+describe("recommendParams", () => {
+  it("posts to the recommend-params endpoint and returns the parsed recs", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", (url: string) => {
+      calls.push(url);
+      return Promise.resolve(
+        jsonRes(200, {
+          skill_id: "umap_scrna",
+          recs: [{ key: "n_hvg", value: 2000, default: 0, why: "hvg", scaled: true }],
+          note: "Set 1 best-practice input.",
+        }),
+      );
+    });
+    const out = await recommendParams("umap_scrna", { data_kind: "sc_counts" });
+    expect(calls[0]).toContain("/api/skills/umap_scrna/recommend-params");
+    expect(out.recs[0].value).toBe(2000);
+    expect(out.recs[0].scaled).toBe(true);
+  });
+
+  it("throws on a 404 (unknown skill)", async () => {
+    vi.stubGlobal("fetch", () => Promise.resolve(jsonRes(404, {})));
+    await expect(recommendParams("nope")).rejects.toThrow(/404/);
   });
 });

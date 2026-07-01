@@ -32,6 +32,31 @@ export const handlers = [
     const id = String(params.skillId);
     return HttpResponse.json({ id, param_spec: SKILL_PARAM_SPECS[id] ?? {} });
   }),
+  // Auto-tune (Layer A, docs/auto-tune/spec.md): the DETERMINISTIC best-practice params for a skill.
+  // Mirrors the backend WIRE (engine/recommend.py) — baseline = the param-spec defaults + the one
+  // curated rule (umap_scrna/cluster n_hvg → ~2000). Content is verified on the real backend, not here
+  // ([[selom-mock-is-wire-only-verify-real]]); this proves the shape for dev:mock + vitest.
+  http.post("/api/skills/:skillId/recommend-params", ({ params }) => {
+    const id = String(params.skillId);
+    const spec = SKILL_PARAM_SPECS[id];
+    if (!spec) return new HttpResponse(null, { status: 404 });
+    const recs = Object.entries(spec).map(([key, entry]) => {
+      const def = (entry as { default: string | number | boolean }).default;
+      if ((id === "umap_scrna" || id === "cluster") && key === "n_hvg") {
+        return { key, value: 2000, default: def, scaled: true,
+          why: "select the top ~2000 highly-variable genes before PCA (standard scRNA practice)" };
+      }
+      return { key, value: def, default: def, why: "skill default", scaled: false };
+    });
+    const n = recs.filter((r) => r.scaled).length;
+    return HttpResponse.json({
+      skill_id: id,
+      recs,
+      note: n
+        ? `Set ${n} best-practice input${n === 1 ? "" : "s"} for your data — review below, then re-run.`
+        : "These are the best-practice defaults for this skill.",
+    });
+  }),
   // Gene-set catalog (gene-set builder Phase A): search + members from the offline fixture.
   http.get("/api/gene-sets", ({ request }) => {
     const url = new URL(request.url);

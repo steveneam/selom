@@ -29,6 +29,32 @@ def describe(skill_id: str):
     return load_skill(skill_id).model_dump()        # registry-driven UI reads this
 
 
+class RecommendRequest(BaseModel):
+    # The data DESCRIPTION the FE forwards (mirrors the data-aware-routing context) — never a verdict.
+    # All optional: a missing field degrades its rule to the static default. Mirrors engine.RecommendContext
+    # (the router owns the wire DTO, the engine owns the logic — same split as routers/ai.py ProposeRequest).
+    data_columns: list[str] | None = None
+    data_kind: str | None = None
+    data_n_numeric_cols: int | None = None
+    design: dict | None = None
+
+
+@router.post("/skills/{skill_id}/recommend-params")
+def recommend_params_route(skill_id: str, body: RecommendRequest):
+    # Layer A "Auto-tune" (docs/auto-tune/spec.md): the DETERMINISTIC best-practice params for this
+    # skill given the data description — no AI gateway, no key, works gateway-off. The FE stages the
+    # returned diff into the shared pending queue as human-authored changes (no ✨ marker). Unknown
+    # skill → 404. The engine (engine/recommend.py) is imported inside the handler to keep it off the
+    # hot router-import path (same discipline as routers/data.py).
+    from engine.recommend import RecommendContext, recommend_params
+
+    try:
+        recs = recommend_params(skill_id, RecommendContext(**body.model_dump()))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"unknown skill '{skill_id}'")
+    return recs.model_dump()
+
+
 @router.post("/skills/{skill_id}/run")
 async def run(skill_id: str, request: Request, matrix: UploadFile, design: UploadFile | None = File(None)):
     # Synchronous one-shot — the proven fast path for light skills (B1). Heavy skills

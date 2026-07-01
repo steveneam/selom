@@ -52,6 +52,7 @@ import { versionFamily } from "@/lib/lineage/versions";
 import { familyColorMap } from "@/lib/lineage/family";
 import { readStyleStamp } from "@/lib/figure/figure-spec";
 import type { SkillParams } from "@/lib/skills/api";
+import { recommendParams, runtimeSkillId, stageableRecommendations } from "@/lib/skills/api";
 import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
 import { pushUndo } from "@/lib/workspace/undo";
 import { useWorkspaceView } from "./hooks/use-workspace-view";
@@ -989,6 +990,43 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                       figureSpec: figure.spec ?? activeFigure.spec,
                     }}
                     onStaged={addAiProposals}
+                    // The DETERMINISTIC one-click default (Layer A Auto-tune, docs/auto-tune/spec.md):
+                    // fetch the engine's best-practice params for this skill + data, stage the diff into
+                    // the SAME pending queue as human-authored changes (no ✨, no gateway) — one re-run
+                    // above commits them. Design params stay ingest's job, so they never appear here.
+                    onAutoTune={async () => {
+                      if (!activeFigure.skillId) {
+                        return { ok: false, note: "No skill to tune yet — run a skill first." };
+                      }
+                      const recs = await recommendParams(runtimeSkillId(activeFigure.skillId), {
+                        data_columns: activeDataset?.dataFit?.columns ?? null,
+                        data_kind: activeDataset?.routing?.kind ?? null,
+                        data_n_numeric_cols: activeDataset?.dataFit?.n_numeric_cols ?? null,
+                        design: activeDataset?.design ?? null,
+                      });
+                      // Diff against the committed base (fdBaseParams) AND leave any input the user has
+                      // already hand-staged untouched — so the note matches the visible amber cue and
+                      // Auto-tune never silently overwrites an in-progress edit.
+                      const { changes, applied, skipped } = stageableRecommendations(
+                        recs.recs, fdParams, fdBaseParams,
+                      );
+                      const skipMsg = skipped.length
+                        ? ` Left your ${skipped.length} edited input${skipped.length === 1 ? "" : "s"} (${skipped.join(", ")}) as-is.`
+                        : "";
+                      if (applied.length === 0) {
+                        return { ok: true, note: `Already at the best-practice settings — nothing to change.${skipMsg}` };
+                      }
+                      setFdParams((prev) => ({ ...prev, ...changes }));
+                      // The reviewable, no-black-box diff: each changed input as OLD→NEW + why (spec §What / R9).
+                      const diff = applied.map((a) => `${a.key} ${a.from}→${a.to} (${a.why})`).join(" · ");
+                      return {
+                        ok: true,
+                        note: `Set ${applied.length} best-practice input${applied.length === 1 ? "" : "s"}: ${diff}.${skipMsg} Review the changed inputs below, then re-run.`,
+                      };
+                    }}
+                    autoTuneLabel="Auto-tune inputs"
+                    pendingActive={fdDirty}
+                    scopeKey={fdScope}
                     disabled={running != null}
                   />
                   {/* Isolated (Task B1): the Figure-data inputs are bespoke per skill — if a control
