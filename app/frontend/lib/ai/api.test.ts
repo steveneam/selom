@@ -158,6 +158,25 @@ describe("explain", () => {
     expect(out.suggestions?.[0].param).toBe("resolution");
   });
 
+  it("threads grade_advice + the stats method descriptor and returns the advisory (Phase 3)", async () => {
+    let sentBody: Record<string, unknown> = {};
+    vi.stubGlobal("fetch", (_url: string, init: RequestInit) => {
+      sentBody = JSON.parse(String(init.body));
+      return Promise.resolve(
+        jsonRes(200, {
+          request: "grade_advice",
+          text: "Test: pyDESeq2 Wald. Correction: BH FDR.",
+          source: "deterministic",
+        }),
+      );
+    });
+    const out = await explain({ request: "grade_advice", stats: { skill_id: "deg", mode: "bulk" } });
+    expect(sentBody.request).toBe("grade_advice");
+    expect(sentBody.stats).toEqual({ skill_id: "deg", mode: "bulk" });
+    expect(out.source).toBe("deterministic");
+    expect(out.text).toContain("pyDESeq2");
+  });
+
   it("throws a friendly message on a non-OK response", async () => {
     vi.stubGlobal("fetch", () => Promise.resolve(jsonRes(500, {})));
     await expect(explain({ request: "explain_score" })).rejects.toThrow(/explanation/i);

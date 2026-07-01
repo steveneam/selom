@@ -1,5 +1,5 @@
 {
-  "_comment": "Claude-authored operator-gateway recordings — the canned demo engine (SELOM_AI_GATEWAY=operator). `explanations` are grounded ONLY in each paper's real scorecard (reproducibility/tier/confidence/findings), keyed by request_type:scorecard.paper_id. `plans` are goal-keyed ActionPlans replayed by propose() — the ingest design refiner's zero-credit demo (a scripted goal; the mapper never applies a proposed level absent from the detected design, so an illustrative payload is safe). No fabricated values, ≤120 words, mirrors the live gateway. Spec: docs/ai-gateway-wiring/spec.md + docs/ai-cross-stage-entry-points/build-spec.md. propose_sweep is intentionally left to the deterministic ranker (rank_sweep_space).",
+  "_comment": "Claude-authored operator-gateway recordings — the canned demo engine (SELOM_AI_GATEWAY=operator). `explanations` are grounded facts keyed by request_type:key — explain_score by scorecard.paper_id (reproducibility/tier/confidence/findings), grade_advice by skill_id:mode (the figure's statistical test + assumptions, from ai.grade). `plans` are goal-keyed ActionPlans replayed by propose() — the ingest design refiner's zero-credit demo (a scripted goal; the mapper never applies a proposed level absent from the detected design, so an illustrative payload is safe). No fabricated values, ≤120 words, mirrors the live gateway. Spec: docs/ai-gateway-wiring/spec.md + docs/ai-cross-stage-entry-points/build-spec.md. propose_sweep is intentionally left to the deterministic ranker (rank_sweep_space).",
   "explanations": [
     {
       "request_type": "explain_score",
@@ -15,6 +15,11 @@
       "request_type": "explain_score",
       "key": "hani",
       "text": "Reproducibility 96/100 earns the top 'verified' tier at full Selom confidence (100/100). All 5 in-scope panels scored, 9 panel comparisons reproduced, and there are no paper-irreproducible or discrepant findings — Selom recovered the published figures from the data essentially exactly. 1 panel is out-of-scope, a non-gradable figure type. This is the cleanest of the showcase reproductions: the small gap from 100 reflects minor numeric rounding rather than any structural disagreement. No action is needed to trust these panels — they are a faithful, end-to-end reproduction of the paper's results."
+    },
+    {
+      "request_type": "grade_advice",
+      "key": "deg:bulk",
+      "text": "This DEG figure uses pyDESeq2 — a negative-binomial GLM with a Wald test on the condition coefficient — and reports Benjamini-Hochberg adjusted p-values (padj). It assumes you fed it raw integer counts (not normalized or logged), with at least two independent biological replicates per group; three or more is safer. Trust the padj column, not the raw p, when picking significant genes. If your replicates span batches, add the batch as a covariate so the contrast isn't confounded; with a large or complex design, limma-voom fits faster with similar results."
     }
   ],
   "plans": [

@@ -258,6 +258,7 @@ export const handlers = [
       request?: string;
       scorecard?: Record<string, unknown>;
       sweep_space?: Record<string, unknown>;
+      stats?: Record<string, unknown>;
     };
     const req = body.request ?? "explain_score";
     return HttpResponse.json({

@@ -188,7 +188,14 @@ export function mockSweepSuggestions(
 }
 
 /** Deterministic explanatory text grounded in the supplied artifact (mirrors the Null gateway). */
-export function mockExplain(req: string, data: { scorecard?: Record<string, unknown>; sweep_space?: Record<string, unknown> }): string {
+export function mockExplain(
+  req: string,
+  data: {
+    scorecard?: Record<string, unknown>;
+    sweep_space?: Record<string, unknown>;
+    stats?: Record<string, unknown>;
+  },
+): string {
   if (req === "explain_score") {
     const sc = data.scorecard ?? {};
     const score = sc.score ?? "n/a";
@@ -197,6 +204,10 @@ export function mockExplain(req: string, data: { scorecard?: Record<string, unkn
     let head = `Reproducibility ${score}/100 (tier: ${tier})`;
     if (conf != null) head += `, Selom confidence ${conf}/100`;
     return `${head}. Improve by supplying data that matches the paper's figures more closely. (mock summary)`;
+  }
+  if (req === "grade_advice") {
+    const skill = (data.stats?.skill_id as string) ?? "this analysis";
+    return `Statistics for ${skill}: check the test's assumptions (replicates, independence, input scale) before trusting the p-values. (mock advisory)`;
   }
   const ranked = mockSweepSuggestions(data.sweep_space);
   if (!ranked.length) return "No sweep space provided — specify parameters and their ranges to sweep. (mock)";

@@ -132,6 +132,18 @@ def _deterministic_explain(request_type: str, data: dict, goal: str) -> str:
             f"Suggested sweeps: {parts}. "
             "Numeric knobs with the widest declared range vary the result the most — start there."
         )
+    if request_type == "grade_advice":
+        from ai.grade import grade_card
+
+        card = grade_card(data.get("stats"))
+        if card:
+            return card
+        skill = (data.get("stats") or {}).get("skill_id") or "this analysis"
+        return (
+            f"Statistics for {skill}: the test and its assumptions depend on the skill and its "
+            "parameters. Check that your data meets the test's assumptions (replicates, independence, "
+            "input scale) before trusting the p-values, and switch tests if it doesn't."
+        )
     return "unavailable"
 
 
@@ -183,6 +195,13 @@ def build_explain_prompt(request_type: str, data: dict, goal: str) -> str:
             "Suggest which parameter(s) are most worth sweeping and why, grounded ONLY in the declared "
             "value spaces — you cannot claim figure impact without running. Do not invent knobs not listed.",
         ]
+    elif request_type == "grade_advice":
+        lines += [
+            "The data describes the STATISTICAL METHOD of a figure (its skill_id and, for deg, its mode).",
+            "Explain which statistical test and multiple-testing correction it uses, its key "
+            "assumptions, and when a different test would be more appropriate — grounded ONLY in the "
+            "method described. ADVISORY only: never tell the user you changed or applied anything.",
+        ]
     lines.append(f"Data (JSON): {json.dumps(data, indent=2)}")
     return "\n".join(lines)
 
@@ -203,6 +222,13 @@ def _operator_input_key(request_type: str, data: dict) -> str | None:
     if request_type == "propose_sweep":
         key = data.get("skill_id") or (data.get("sweep_space") or {}).get("_skill_id")
         return str(key) if key else None
+    if request_type == "grade_advice":
+        st = data.get("stats") or {}
+        key = st.get("skill_id")
+        if not key:
+            return None
+        # deg's advice differs by mode → key includes it so one recording per (skill, mode) is possible.
+        return f"{key}:{st['mode']}" if st.get("mode") else str(key)
     return None
 
 

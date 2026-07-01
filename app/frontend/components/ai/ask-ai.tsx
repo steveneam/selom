@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/ui/cn";
 import { proposeActions } from "@/lib/ai/api";
 import { proposalsFromTurn, selectedSkillFromTurn } from "@/lib/ai/proposals";
-import type { AiProposal, HelperTurn } from "@/lib/ai/types";
+import { ExplainSourceBadge } from "@/components/ai/explain-source-badge";
+import type { AiProposal, ExplainResponse, HelperTurn } from "@/lib/ai/types";
 import type { FigureSpec } from "@/lib/figure/figure-spec";
 import type { SkillParams } from "@/lib/skills/api";
 
@@ -67,6 +68,7 @@ export function AskAi({
   onStaged,
   onSelect,
   onIngest,
+  onExplain,
   onAutoTune,
   autoTuneLabel,
   pendingActive,
@@ -102,6 +104,14 @@ export function AskAi({
    */
   onIngest?: (turn: HelperTurn) => string | null;
   /**
+   * Callback for the INFORMATIONAL modes (mode="advisory" grade · mode="draft" methods) — the caller
+   * wires it to `explain({ request, ... })` grounded in its stage artifact (the figure's stats method
+   * for grade; the deterministic methods text for methods). AskAi calls it on Ask and renders the
+   * returned text with an AI/deterministic source badge (✨ only when `source==="ai"`). Returns null →
+   * the honest "nothing to explain" note. Gateway-off still returns a grounded card (source="deterministic").
+   */
+  onExplain?: (goal: string) => Promise<ExplainResponse | null>;
+  /**
    * Optional one-click "Auto-tune" — the DETERMINISTIC best-practice default for this stage
    * (docs/auto-tune/spec.md). When provided, a neutral (non-✨) button renders ABOVE the AI chat
    * ("the one-click default flows into chat"); the handler applies/stages the engine's recommendation
@@ -124,6 +134,8 @@ export function AskAi({
   const [busy, setBusy] = React.useState(false);
   const [tuning, setTuning] = React.useState(false);
   const [note, setNote] = React.useState<string | null>(null);
+  // The informational (advisory/draft) explain result — rendered with an AI/deterministic source badge.
+  const [result, setResult] = React.useState<ExplainResponse | null>(null);
   // The Auto-tune outcome is kept SEPARATE from the AI chat note so a deterministic result never
   // renders inside the ✨ AI surface (it is not AI output) — it shows in the neutral block below.
   const [tuneNote, setTuneNote] = React.useState<string | null>(null);
@@ -266,8 +278,26 @@ export function AskAi({
       } finally {
         setBusy(false);
       }
+    } else if (mode === "advisory" || mode === "draft") {
+      // Informational path: call the caller's explain resolver and render the returned text + source
+      // badge. Deterministic-primary — gateway off still returns a grounded card (source="deterministic").
+      setBusy(true);
+      setNote(null);
+      try {
+        const r = (await onExplain?.(g)) ?? null;
+        if (r) {
+          setResult(r);
+          setGoal("");
+        } else {
+          setNote("Nothing to explain here yet — run a skill that produces a statistic first.");
+        }
+      } catch (e) {
+        setNote(e instanceof Error ? e.message : "Couldn't reach the AI helper.");
+      } finally {
+        setBusy(false);
+      }
     }
-    // Other modes (live, advisory, draft) are later phases — fall through silently.
+    // mode="live" (cosmetic JSON-Patch) is a later phase — falls through silently.
   }
 
   // The ✨ AI chat surface (the typed-goal path) — rendered byte-identically whether or not the
@@ -317,6 +347,18 @@ export function AskAi({
         <p role="status" aria-live="polite" className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
           {note}
         </p>
+      )}
+      {result && (
+        <div className="mt-2 rounded-lg border border-border bg-background/50 px-3 py-2.5">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              {mode === "draft" ? "Draft" : "Advisory"}
+            </span>
+            {/* ✨ AI only when the gateway actually produced it; a grounded deterministic card is labelled so. */}
+            <ExplainSourceBadge source={result.source} />
+          </div>
+          <p className="whitespace-pre-wrap text-xs leading-relaxed text-foreground/85">{result.text}</p>
+        </div>
       )}
     </div>
   );

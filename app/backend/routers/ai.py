@@ -202,14 +202,20 @@ class ExplainRequest(BaseModel):
                          grounded in the scorecard fields (score, tier, panels).
     ``propose_sweep``  — suggest which parameters to sweep, grounded in the
                          declared sweep-space dict (param → range/options).
+    ``grade_advice``   — statistics advisory for a figure: which test / correction it
+                         uses and what it assumes, grounded in the ``stats`` method
+                         descriptor (skill_id + mode). Advisory only, never a mutation.
     """
 
-    request: Literal["explain_score", "propose_sweep"]
+    request: Literal["explain_score", "propose_sweep", "grade_advice"]
     stage: str = "grade"
     skill_id: str | None = None
     goal: str = ""
     scorecard: dict | None = None
     sweep_space: dict | None = None
+    # grade_advice grounding — the figure's statistical method ({skill_id, mode}); a description, not a
+    # verdict, so the honesty rule holds (the server owns the per-skill knowledge in ai.grade).
+    stats: dict | None = None
 
 
 @router.post("/ai/explain")
@@ -230,6 +236,8 @@ def explain(req: ExplainRequest):
         data["scorecard"] = req.scorecard
     if req.sweep_space:
         data["sweep_space"] = req.sweep_space
+    if req.stats:
+        data["stats"] = req.stats
     # skill_id rides in `data` so the operator gateway can key propose_sweep recordings on it
     # and the live gateway can ground its prose; `_deterministic_explain` ignores it, so the
     # source-labelling comparison below is unaffected.

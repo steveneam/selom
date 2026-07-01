@@ -129,12 +129,15 @@ export interface GapBacklogEntry {
 
 /** `POST /ai/explain` request — informational, never a mutation. */
 export interface ExplainRequest {
-  request: "explain_score" | "propose_sweep";
+  request: "explain_score" | "propose_sweep" | "grade_advice";
   stage?: string;
   skill_id?: string | null;
   goal?: string;
   scorecard?: Record<string, unknown> | null;
   sweep_space?: Record<string, unknown> | null;
+  /** `grade_advice` grounding — the figure's statistical method ({ skill_id, mode }). A description,
+   *  not a verdict; the server (ai.grade) owns the per-skill test knowledge. */
+  stats?: Record<string, unknown> | null;
 }
 
 /**

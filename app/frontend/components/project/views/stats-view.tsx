@@ -4,6 +4,8 @@ import * as React from "react";
 import { Paintbrush, Table2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PaneBoundary } from "@/components/ui/error-boundary";
+import { AskAi } from "@/components/ai/ask-ai";
+import { explain } from "@/lib/ai/api";
 import { StatsPanel, type StatsLabeling } from "../stats-panel";
 import { EmptyState } from "./empty-state";
 import { getSkill } from "@/lib/catalog/seed";
@@ -27,6 +29,27 @@ export function StatsView({
   onOpenFigure: (f: Figure) => void;
   onRunSkill: () => void;
 }) {
+  // Grade advisory (Layer A Phase 3): the Statistics stage is advisory-only (spine invariant #4).
+  // Ground the explain on the figure's actual method — its skill + the deg `mode` param — so the
+  // advice names the real test the runner used (DETECTED == EXPLAINED). Deterministic-primary: the
+  // gateway-off answer is a grounded card (ai.grade), never a black box.
+  const skillId = activeFigure?.skillId;
+  const runtimeSkillId = skillId?.replace(/^selom\./, "");
+  const mode = activeFigure?.provenance?.params?.mode;
+  const askGradeAdvice = React.useCallback(
+    async (goal: string) => {
+      if (!runtimeSkillId) return null;
+      return explain({
+        request: "grade_advice",
+        stage: "grade",
+        skill_id: runtimeSkillId,
+        goal,
+        stats: { skill_id: runtimeSkillId, ...(mode != null ? { mode: String(mode) } : {}) },
+      });
+    },
+    [runtimeSkillId, mode],
+  );
+
   if (!(activeFigure && table)) {
     return (
       <EmptyState
@@ -57,6 +80,15 @@ export function StatsView({
       <PaneBoundary label="stats" title="This table couldn't be shown" resetKeys={[activeFigure.id]}>
         <StatsPanel table={table} defaultOpen labeling={labeling} />
       </PaneBoundary>
+      {/* Advisory-only (propose-never-auto): explain which test this figure uses + what it assumes. */}
+      <AskAi
+        stage="grade"
+        mode="advisory"
+        label="Ask about this statistic"
+        placeholder="e.g. which test is this, and what does it assume?"
+        context={{ skillId, params: activeFigure.provenance?.params }}
+        onExplain={askGradeAdvice}
+      />
     </div>
   );
 }
