@@ -2,39 +2,16 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Lock, Paintbrush, Redo2, RefreshCw, RotateCcw, SlidersHorizontal, Sparkles, Table2, Trash2, Undo2 } from "lucide-react";
+import { Sparkles, Trash2 } from "lucide-react";
 import { DataPanel, type AnalyzeArgs } from "./data-panel";
 import { DataCheckPanel } from "./data-check";
-import { FigureDataPanel } from "./figure-data-panel";
-import { PaneBoundary } from "@/components/ui/error-boundary";
-import { Dropzone } from "./dropzone";
-import { WorkbenchPanel } from "./workbench-panel";
-import { PublishConfidence } from "./publish-confidence";
-import { StaleBadge } from "./stale-badge";
-import { StatsPanel, type StatsLabeling } from "./stats-panel";
-import { VersionBar } from "./version-bar";
 import { CompareView } from "./compare-view";
 import { Workrail, type FigureNode, type Lineage, type RailView } from "./workrail";
-import { Pipeline, type StageKey, type StageState } from "@/components/pipeline";
-import { EditorWorkspace } from "@/components/figure/editor-workspace";
-import { FigureCanvas } from "@/components/figure/figure-canvas";
-import { ExportMenu } from "@/components/figure/export-menu";
-import { StylePicker } from "@/components/figure/style-picker";
+import type { StageKey, StageState } from "@/components/pipeline";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { useFigureStore } from "@/hooks/use-figure-store";
 import { getSkill } from "@/lib/catalog/seed";
-import {
-  applyStagedMarks,
-  hideDotLabels,
-  parseManualMarks,
-  readSeededMarks,
-  serializeManualMarks,
-  setManualMark,
-  type MarkRole,
-} from "@/lib/erg/marks";
 import { deriveFigureModel } from "@/lib/figure/figure-model";
-import { applyStagedThresholds, readThresholds, type VolcanoThresholds } from "@/lib/volcano/thresholds";
 import {
   labelableGenes,
   labeledGenes,
@@ -42,55 +19,33 @@ import {
   toggleLabelOps,
   type GeneLabelPoint,
 } from "@/lib/volcano/labels";
+import type { StatsLabeling } from "./stats-panel";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 import { projectStore, select, useProjects } from "@/lib/projects/store";
 import { useWorkspace, workspaceStore, wselect } from "@/lib/workspace/store";
-import type { Dataset, Figure } from "@/lib/projects/types";
+import type { Figure } from "@/lib/projects/types";
 import { figureStaleness } from "@/lib/lineage/staleness";
 import { figureTable } from "@/lib/lineage/figure-table";
 import { versionFamily } from "@/lib/lineage/versions";
 import { familyColorMap } from "@/lib/lineage/family";
-import { readStyleStamp } from "@/lib/figure/figure-spec";
-import type { SkillParams } from "@/lib/skills/api";
-import { recommendParams, runtimeSkillId, stageableRecommendations } from "@/lib/skills/api";
 import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
 import { pushUndo } from "@/lib/workspace/undo";
 import { useWorkspaceView } from "./hooks/use-workspace-view";
 import { useFigureCrud } from "./hooks/use-figure-crud";
 import { useFigureRun } from "./hooks/use-figure-run";
-import { AiPanel } from "@/components/ai/ai-panel";
-import { AiProposalRow } from "@/components/ai/ai-proposal-row";
-import { AskAi } from "@/components/ai/ask-ai";
-import { applyAcceptedProposals } from "@/lib/ai/proposals";
+import { useFigureDataStaging } from "./hooks/use-figure-data-staging";
 import { useAiHelpers } from "./hooks/use-ai-helpers";
+import { AiPanel } from "@/components/ai/ai-panel";
+import { EmptyState } from "./views/empty-state";
+import { ProjectOverview } from "./views/project-overview";
+import { FigureView } from "./views/figure-view";
+import { FigureDataView } from "./views/figure-data-view";
+import { SkillView, type Preselect } from "./views/skill-view";
+import { StatsView } from "./views/stats-view";
 
 /** Map a command-palette intent's tab onto the workrail's view model (Pillar 1, S2.3). */
 function viewFromTab(tab: WorkspaceTab): RailView {
   return tab === "overview" ? "home" : tab === "workbench" ? "skill" : tab;
-}
-
-/** Coerce a staged param value (number | numeric string | undefined) to a number, else the fallback. */
-function numOr(v: unknown, fallback: number): number {
-  const n = typeof v === "number" ? v : typeof v === "string" ? parseFloat(v) : NaN;
-  return Number.isFinite(n) ? n : fallback;
-}
-
-/** Resolve a catalog entry from a namespaced ("selom.erg_traces") OR bare ("erg_traces") id. */
-function resolveSkill(skillId: string) {
-  return getSkill(skillId) ?? getSkill(`selom.${skillId}`);
-}
-
-/** Display name for the editor's Skill pane (catalog name, falling back to the id). */
-function skillDisplayName(skillId: string): string {
-  return resolveSkill(skillId)?.name ?? skillId;
-}
-
-/** Compact origin/version line for the editor's Skill pane ("proprietary · v0.1.0"). */
-function skillBadge(skillId: string): string | undefined {
-  const sk = resolveSkill(skillId);
-  if (!sk) return undefined;
-  const origin = sk.license === "proprietary" ? "proprietary" : sk.source;
-  return `${origin} · v${sk.version}`;
 }
 
 export function ProjectWorkspace({ projectId }: { projectId: string }) {
@@ -121,7 +76,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // A skill the command palette / Gene Sets surface asked to pre-select in the
   // Workbench, with optional param prefills. The nonce makes a repeat request (same
   // skill, again) a fresh prop for the panel.
-  const [preselect, setPreselect] = React.useState<{ id: string; n: number; params?: Record<string, string | number | boolean> } | null>(null);
+  const [preselect, setPreselect] = React.useState<Preselect | null>(null);
   const [proposal, setProposal] = React.useState<IntakeProposal | null>(null);
   const [datasetId, setDatasetId] = React.useState<string | undefined>(undefined);
   const [lastFile, setLastFile] = React.useState<File | null>(null);
@@ -138,77 +93,34 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // The dataset the user is re-uploading bytes for (C5): the next file dropped in the Data tab
   // REFILLS this existing dataset instead of spawning a duplicate. Set from the lost-bytes banner.
   const [reattachId, setReattachId] = React.useState<string | null>(null);
-  // Active journal style for the current figure (journal-styles v1) — DERIVED from the
-  // spec's stamp (layout.meta.selomStyle), not held separately, so undo/redo and "New
-  // figure" rewind the picker label for free. Runs come out in the Selom default.
-  const activeStyle = readStyleStamp(figure.spec);
   // When the export popover is open, the page dims+blurs behind it but the figure
   // artboard stays crisp (it's the subject of the export) — see EditorWorkspace `elevated`.
   const [exportOpen, setExportOpen] = React.useState(false);
   // AI panel (S5) — the right-dock with the Activity feed + the capability-gap backlog.
   const [aiPanelOpen, setAiPanelOpen] = React.useState(false);
-  // Live "show a/b labels" toggle for the Figure-data preview (figure-data-capabilities §6). Labels
-  // are cosmetic on already-drawn dots, so hiding them is an INSTANT client-side restyle.
-  const [markLabelsShown, setMarkLabelsShown] = React.useState(true);
-  // The Figure-data inputs are STAGED here (lifted from the panel) so a dot drag and the numeric Marks
-  // editor write to the same params, the preview reflects them live, and ONE explicit re-run applies
-  // them. Reset from the open figure's own params when the figure changes (effect below).
-  const [fdParams, setFdParams] = React.useState<SkillParams>({});
+  // The open figure (owns the AI-proposal queue + the staged figure-data base) and its source dataset.
+  const activeFigure = activeFigureId ? figures.find((f) => f.id === activeFigureId) : undefined;
+  const activeDataset = activeFigure?.datasetId ? datasets.find((d) => d.id === activeFigure.datasetId) : undefined;
+  // Figure-data staging (§3C decomposition) — the STAGED inputs (a dot drag + the numeric Marks/Threshold
+  // editors all write one `fdParams`), the live preview, the a/b-label toggle, and the deterministic
+  // Auto-tune, lifted into a cohesive hook. Behaviour is this root's verbatim; the scope-reset happens
+  // DURING render (derive-don't-sync) so a figure switch never flashes the prior figure's staged marks.
+  const {
+    fdParams,
+    setFdParams,
+    fdBaseParams,
+    fdScope,
+    fdDirty,
+    previewSpec,
+    markLabelsShown,
+    setMarkLabelsShown,
+    onMarkMove,
+    onThresholdChange,
+    autoTune,
+  } = useFigureDataStaging({ activeFigure, activeFigureId, activeDataset, figure });
   // Publish-confidence bundle for the open figure (B4): methods-text + repro record +
   // guardrails. Derived from the persisted record (Pillar 1) so it survives reload —
   // no longer transient React state.
-  const activeFigure = activeFigureId ? figures.find((f) => f.id === activeFigureId) : undefined;
-  const fdBaseParams = (activeFigure?.provenance?.params ?? {}) as SkillParams;
-  // The staged Figure-data inputs are scoped to the (dataset · skill · figure) the open figure was
-  // produced by — not just its figure id (inventory §5.4 / gate Spine 3). Switching skill/dataset, or
-  // opening another figure, must restart from THAT figure's own params; a stale fc from skill A must
-  // never carry into a skill-B run, and a failed re-run must not strand another skill's staged value.
-  // Derive-don't-sync: reset the staged state DURING render when the scope key changes (React's
-  // "store information from previous renders" pattern) instead of in an effect — the old effect lagged
-  // a paint (a one-frame flash of the prior staged marks/thresholds on the new figure) and keyed only
-  // on the figure id. The label toggle re-derives from the same base params.
-  const fdScope = `${activeFigure?.datasetId ?? "_"}:${activeFigure?.skillId ?? "_"}:${activeFigureId ?? "_"}`;
-  const [fdScopeKey, setFdScopeKey] = React.useState(fdScope);
-  if (fdScopeKey !== fdScope) {
-    setFdScopeKey(fdScope);
-    // Seed from the figure's base params, then re-hydrate any ACCEPTED AI proposals' staged values
-    // (S5) so an accepted-but-not-yet-re-run suggestion survives a reload coherently — the banner's
-    // "staged" row, the counter, and the ✨ control marker stay in agreement.
-    setFdParams(applyAcceptedProposals({ ...fdBaseParams }, activeFigure?.aiProposals ?? []));
-    setMarkLabelsShown(fdBaseParams.mark_labels === undefined ? true : String(fdBaseParams.mark_labels) === "true");
-  }
-  // Are there staged input changes pending a re-run? (drag / time edit / dots toggle / any input.)
-  const fdDirty = React.useMemo(() => {
-    const keys = new Set([...Object.keys(fdBaseParams), ...Object.keys(fdParams)]);
-    return [...keys].some((k) => fdParams[k] !== fdBaseParams[k]);
-  }, [fdParams, fdBaseParams]);
-  // The preview reflects the staged marks (dots move live) + the label toggle + staged volcano
-  // thresholds (points re-colour live) — all pure + instant, no re-run.
-  const previewSpec = React.useMemo(() => {
-    let base = figure.spec ?? activeFigure?.spec;
-    if (!base) return base;
-    const manual = parseManualMarks(fdParams.manual_marks);
-    if (Object.keys(manual).length) base = applyStagedMarks(base, manual);
-    if (!markLabelsShown) base = hideDotLabels(base);
-    // Volcano: live re-bucket to the staged FC/p cuts. Idempotent, so applying the figure's own
-    // thresholds is a no-op — only re-bucket when a staged value actually differs.
-    if (deriveFigureModel(base).capabilities.thresholds) {
-      const t = readThresholds(base);
-      if (t) {
-        const fc = numOr(fdParams.fc_threshold, t.fc);
-        const fdr = numOr(fdParams.fdr_threshold, t.fdr);
-        if (fc !== t.fc || fdr !== t.fdr) base = applyStagedThresholds(base, { fc, fdr }).spec;
-      }
-    }
-    return base;
-  }, [
-    figure.spec,
-    activeFigure?.spec,
-    fdParams.manual_marks,
-    fdParams.fc_threshold,
-    fdParams.fdr_threshold,
-    markLabelsShown,
-  ]);
   const bundle = activeFigure
     ? {
         provenance: activeFigure.provenance,
@@ -222,7 +134,6 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // trigger-set. The only "live" factor we can compute in the dogfood mock is the
   // dataset's current data version; params (a re-run uses the figure's own), skill
   // version, and env aren't separately tracked here, so they're left unknown (skipped).
-  const activeDataset = activeFigure?.datasetId ? datasets.find((d) => d.id === activeFigure.datasetId) : undefined;
   const staleness = activeFigure
     ? figureStaleness(activeFigure, { sha256: activeDataset?.currentSha256 })
     : { stale: false, reasons: [] };
@@ -327,7 +238,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     }
     consume();
     return subscribeIntent(consume);
-  }, [projectId]);
+  }, [projectId, setView]);
 
   // Undo / redo while editing a figure (not on a frozen, read-only one).
   React.useEffect(() => {
@@ -354,25 +265,6 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     const id = setTimeout(() => projectStore.updateFigureSpec(activeFigureId, spec), 350);
     return () => clearTimeout(id);
   }, [figure.spec, activeFigureId, frozen]);
-
-  // Drag an ERG landmark dot on the canvas (erg-manual-marks R5) → STAGE the new time into the shared
-  // figure-data params (same place the numeric Marks editor writes). The dot moves live (the preview
-  // applies the staged marks); the amplitude re-measures server-side on the next explicit re-run — so
-  // you can drag freely without a re-run per drop. The pending-changes banner prompts the re-run.
-  const onMarkMove = React.useCallback((segment: string, role: MarkRole, tMs: number) => {
-    setFdParams((p) => ({
-      ...p,
-      marks: true,
-      manual_marks: serializeManualMarks(setManualMark(parseManualMarks(p.manual_marks), segment, role, tMs)),
-    }));
-  }, []);
-
-  // Drag a volcano FC/p-value threshold line (generalization-spec §E) → STAGE the new cut into the
-  // shared figure-data params (same place the numeric Threshold editor writes). The points re-colour
-  // live (the preview re-buckets); the DE table + labels recompute on the next explicit re-run.
-  const onThresholdChange = React.useCallback((t: VolcanoThresholds) => {
-    setFdParams((p) => ({ ...p, fc_threshold: t.fc, fdr_threshold: t.fdr }));
-  }, []);
 
   // Click a plotted point on a volcano (generalization-spec §H) → toggle its gene label: an INSTANT,
   // undoable annotation committed to the figure store (no re-run, unlike a threshold edit). The
@@ -432,7 +324,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     setActiveFigureId(fork.id);
     if (fork.spec) figure.init(fork.spec);
     setView("figure");
-  }, [activeFigure, figure]);
+  }, [activeFigure, figure, setActiveFigureId, setView]);
 
   // Dev helper: `?demo=<skillId>` (or any truthy `?demo`) auto-runs a skill so you
   // land on a live editable figure in ONE step — for fast manual checks and the
@@ -700,147 +592,33 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">
           {view === "figure" ? (
-            figure.spec ? (
-              <div className="flex h-full flex-col gap-3">
-                {/* flex-wrap so a long toolbar wraps within the content column at narrow widths rather
-                    than forcing a single overflowing row. (The AI panel now overlays rather than
-                    reserving width, so nothing is pushed — this is just graceful narrow-width wrapping.) */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {frozen ? (
-                    <>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-stage-figure">
-                        <Lock className="size-3.5" /> Frozen — read-only
-                      </span>
-                      <Button size="sm" variant="outline" className="ml-1 h-7" onClick={editCopy}>
-                        Edit a copy
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button variant="ghost" size="icon" disabled={!figure.canUndo} onClick={figure.undo} aria-label="Undo">
-                        <Undo2 />
-                      </Button>
-                      <Button variant="ghost" size="icon" disabled={!figure.canRedo} onClick={figure.redo} aria-label="Redo">
-                        <Redo2 />
-                      </Button>
-                      <span className="ml-2 text-xs text-muted-foreground">Editing live — every change is a JSON-Patch.</span>
-                    </>
-                  )}
-                  {staleness.stale && activeFigure && (
-                    <div className="ml-2 flex items-center gap-2">
-                      <StaleBadge result={staleness} />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7"
-                        data-testid="rerun-figure"
-                        onClick={() => rerunFigure(activeFigure)}
-                        disabled={!canRerun || running != null}
-                        title={canRerun ? "Re-run with the current data → a new version" : "Re-attach the dataset to re-run"}
-                      >
-                        <RefreshCw /> {running === activeFigure.skillId ? "Re-running…" : "Re-run"}
-                      </Button>
-                    </div>
-                  )}
-                  {/* flex-wrap + justify-end so this right-aligned action group wraps within the
-                      (narrow, rail-shrunk) content column instead of overflowing one 624px row under
-                      the AI panel — the outer toolbar's flex-wrap can't break inside a single child. */}
-                  <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
-                    {mockMode && activeDataset && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground"
-                        data-testid="simulate-data-change"
-                        onClick={() => projectStore.markDatasetUpdated(activeDataset.id)}
-                        title="Dev (mock only): mark this figure's dataset as changed, to demo staleness"
-                      >
-                        Simulate data change
-                      </Button>
-                    )}
-                    {!frozen && (
-                      <StylePicker
-                        store={figure}
-                        skillId={bundle?.provenance?.skill?.id}
-                        value={activeStyle.id}
-                      />
-                    )}
-                    {activeFigure?.skillId && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setView("figuredata")}
-                        title="Tune the inputs behind this figure and re-run"
-                      >
-                        <SlidersHorizontal /> Figure data
-                      </Button>
-                    )}
-                    <ExportMenu
-                      spec={figure.spec}
-                      filename={`selom-${bundle?.provenance?.skill?.id ?? "figure"}`}
-                      activeStyleLabel={activeStyle.label}
-                      onOpenChange={setExportOpen}
-                    />
-                    <Button variant="ghost" size="sm" onClick={() => { figure.reset(); setActiveFigureId(null); setView("skill"); }}>
-                      New figure
-                    </Button>
-                  </div>
-                </div>
-                {activeFigure && (
-                  <VersionBar
-                    figure={activeFigure}
-                    familyCount={activeFamily.length}
-                    running={running != null}
-                    skillId={activeFigure.skillId}
-                    baseParams={activeFigure.provenance?.params ?? {}}
-                    onSweep={runSweep}
-                    onCompare={() => openCompare(activeFamily.map((f) => f.id))}
-                    onToggleFreeze={toggleFreeze}
-                  />
-                )}
-                {/* Figure-forward (§3.7): the data-check routing + data-fit verdict relocate to the
-                    Figure-data stage (reachable from the toolbar / rail) so the artboard is the hero. */}
-                <PublishConfidence
-                  provenance={bundle?.provenance}
-                  methods={bundle?.methods}
-                  legend={bundle?.legend}
-                  guardrails={bundle?.guardrails}
-                />
-                <div className="flex min-h-[520px] flex-1 overflow-hidden rounded-xl border border-border bg-background">
-                  <EditorWorkspace
-                    store={figure}
-                    elevated={exportOpen}
-                    readOnly={frozen}
-                    onEditCopy={editCopy}
-                    onMarkMove={onMarkMove}
-                    onToggleLabel={onToggleLabel}
-                    skill={
-                      activeFigure?.skillId
-                        ? {
-                            skillName: skillDisplayName(activeFigure.skillId),
-                            badge: skillBadge(activeFigure.skillId),
-                            onOpenFigureData: () => setView("figuredata"),
-                          }
-                        : undefined
-                    }
-                  />
-                </div>
-              </div>
-            ) : activeFigure && !activeFigure.spec ? (
-              <EmptyState
-                title="Figure spec not stored"
-                body={`“${activeFigure.title}” was created before figures were saved durably, so its editable spec isn’t available. Re-run the skill to produce a fresh, editable version.`}
-                action="Run a skill"
-                onAction={() => setView("skill")}
-              />
-            ) : (
-              <EmptyState
-                title="No figure yet"
-                body="Run a skill and the editable figure appears here."
-                action="Run a skill"
-                onAction={() => setView("skill")}
-              />
-            )
+            <FigureView
+              figure={figure}
+              activeFigure={activeFigure}
+              activeDataset={activeDataset}
+              frozen={frozen}
+              staleness={staleness}
+              canRerun={canRerun}
+              running={running}
+              mockMode={mockMode}
+              exportOpen={exportOpen}
+              setExportOpen={setExportOpen}
+              activeFamily={activeFamily}
+              onEditCopy={editCopy}
+              onRerunFigure={rerunFigure}
+              onSweep={runSweep}
+              onOpenCompare={openCompare}
+              onToggleFreeze={toggleFreeze}
+              onMarkMove={onMarkMove}
+              onToggleLabel={onToggleLabel}
+              onOpenFigureData={() => setView("figuredata")}
+              onNewFigure={() => {
+                figure.reset();
+                setActiveFigureId(null);
+                setView("skill");
+              }}
+              onRunSkill={() => setView("skill")}
+            />
           ) : view === "compare" ? (
             compareFamily.length >= 2 ? (
               <CompareView
@@ -859,238 +637,36 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
               />
             )
           ) : view === "figuredata" ? (
-            activeFigure?.skillId ? (
-              // Figure-data is figure-forward: the inputs sit beside a LIVE preview of the same
-              // figure the styling box edits (shared `figure` store), so tuning a param + re-run
-              // updates the graph in place — no switching to the artboard to see the change.
-              <div className="flex min-h-0 flex-1 flex-col gap-3">
-                {/* Pending-changes prompt: any re-run input (dot drag, a/b time, dots toggle, an
-                    analysis input) stages here; the figure only updates when you re-run. */}
-                {(fdDirty || aiProposals.length > 0) && (
-                  <div className="space-y-2.5 rounded-lg border border-stage-figuredata/45 bg-[color-mix(in_oklab,var(--stage-figuredata)_12%,var(--card))] px-3.5 py-2.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-xs leading-relaxed text-foreground">
-                        <span className="font-semibold text-stage-figuredata">Pending changes</span>
-                        {aiCounter.total > 0 ? (
-                          <>
-                            {" · "}
-                            <span className="tabular-nums">{aiCounter.total} pending</span>
-                            {aiCounter.you > 0 && <span className="tabular-nums"> · {aiCounter.you} you</span>}
-                            {aiCounter.ai > 0 && (
-                              <span className="inline-flex items-center gap-0.5 align-baseline text-stage-ai">
-                                {" · "}
-                                <Sparkles className="size-3" aria-hidden />
-                                <span className="tabular-nums">{aiCounter.ai}</span> AI
-                              </span>
-                            )}
-                            {" — re-run to apply them to the measured values, the statistics table, and any downstream figures."}
-                          </>
-                        ) : (
-                          " — review the AI suggestions below, then accept the ones to keep."
-                        )}
-                      </span>
-                      <div className="flex shrink-0 items-center gap-2">
-                        {aiCounter.total > 0 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={running != null}
-                            onClick={resetFdToBase}
-                            title="Discard changes — back to this figure's current values"
-                          >
-                            <RotateCcw /> Reset
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          disabled={running != null || aiCounter.total === 0}
-                          onClick={rerunPending}
-                        >
-                          <RefreshCw /> {running != null ? "Re-running…" : "Re-run → new version"}
-                        </Button>
-                      </div>
-                    </div>
-                    {aiProposals.length > 0 && (
-                      <ul className="space-y-1.5 border-t border-stage-figuredata/25 pt-2.5">
-                        {aiProposals.map((p) => (
-                          <AiProposalRow
-                            key={p.id}
-                            proposal={p}
-                            onAccept={acceptAiProposal}
-                            onDismiss={dismissAiProposal}
-                            onRevert={revertAiProposal}
-                            disabled={running != null}
-                          />
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
-                <div className="flex min-h-0 flex-1 gap-4">
-                <div className="flex min-h-[520px] flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background">
-                  <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                      Live preview {running != null && <span className="text-primary">· re-running…</span>}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openFigure(activeFigure)}
-                      title="Open this figure in the editor to style it"
-                    >
-                      <Paintbrush /> Style this figure
-                    </Button>
-                  </div>
-                  {figure.spec ?? activeFigure.spec ? (
-                    <div className="relative flex min-h-0 flex-1 items-start justify-center overflow-auto p-6">
-                      <div
-                        className="relative flex rounded-xl border border-border bg-artboard p-3 shadow-2xl ring-1 ring-black/5"
-                        style={{ width: "100%", maxWidth: "56rem", height: "min(70vh, 680px)" }}
-                      >
-                        <div className="min-h-0 min-w-0 flex-1">
-                          {/* Show the modebar so the live preview always has Zoom / Pan / Autoscale /
-                              Reset-axes buttons — scroll-zoom (enabled for ERG) needs a reset to undo it.
-                              onMarkMove makes the a/b dots draggable here too (not just in the styler).
-                              previewSpec hides the dot labels client-side when the toggle is off.
-                              Isolated (Task B1): a staged-preview projection that throws shows a fallback
-                              rather than unmounting the Figure-data stage. */}
-                          <PaneBoundary
-                            label="preview"
-                            title="This preview couldn't be drawn"
-                            resetKeys={[activeFigure.datasetId, activeFigure.skillId, activeFigure.id, previewSpec]}
-                          >
-                            <FigureCanvas
-                              spec={(previewSpec ?? figure.spec ?? activeFigure.spec)!}
-                              displayModeBar
-                              onMarkMove={onMarkMove}
-                              onThresholdChange={onThresholdChange}
-                            />
-                          </PaneBoundary>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid flex-1 place-items-center p-6 text-center text-xs text-muted-foreground">
-                      Re-run to generate this figure’s preview.
-                    </div>
-                  )}
-                </div>
-                <div className="w-[360px] shrink-0 space-y-3 overflow-y-auto pr-1">
-                  {/* AI Helpers (S5): a single-shot "Ask AI to tune these inputs" composer — its
-                      proposals land in the pending-changes banner above. Degrades clean (the gateway
-                      is off by default → an empty plan → a quiet note, the editor unaffected). */}
-                  <AskAi
-                    stage="analyze"
-                    mode="staged"
-                    label="Ask AI to tune these inputs"
-                    placeholder="e.g. tighten the clusters"
-                    context={{
-                      skillId: activeFigure.skillId,
-                      params: fdParams,
-                      figureSpec: figure.spec ?? activeFigure.spec,
-                    }}
-                    onStaged={addAiProposals}
-                    // The DETERMINISTIC one-click default (Layer A Auto-tune, docs/auto-tune/spec.md):
-                    // fetch the engine's best-practice params for this skill + data, stage the diff into
-                    // the SAME pending queue as human-authored changes (no ✨, no gateway) — one re-run
-                    // above commits them. Design params stay ingest's job, so they never appear here.
-                    onAutoTune={async () => {
-                      if (!activeFigure.skillId) {
-                        return { ok: false, note: "No skill to tune yet — run a skill first." };
-                      }
-                      const recs = await recommendParams(runtimeSkillId(activeFigure.skillId), {
-                        data_columns: activeDataset?.dataFit?.columns ?? null,
-                        data_kind: activeDataset?.routing?.kind ?? null,
-                        data_n_numeric_cols: activeDataset?.dataFit?.n_numeric_cols ?? null,
-                        design: activeDataset?.design ?? null,
-                      });
-                      // Diff against the committed base (fdBaseParams) AND leave any input the user has
-                      // already hand-staged untouched — so the note matches the visible amber cue and
-                      // Auto-tune never silently overwrites an in-progress edit.
-                      const { changes, applied, skipped } = stageableRecommendations(
-                        recs.recs, fdParams, fdBaseParams,
-                      );
-                      const skipMsg = skipped.length
-                        ? ` Left your ${skipped.length} edited input${skipped.length === 1 ? "" : "s"} (${skipped.join(", ")}) as-is.`
-                        : "";
-                      if (applied.length === 0) {
-                        return { ok: true, note: `Already at the best-practice settings — nothing to change.${skipMsg}` };
-                      }
-                      setFdParams((prev) => ({ ...prev, ...changes }));
-                      // The reviewable, no-black-box diff: each changed input as OLD→NEW + why (spec §What / R9).
-                      const diff = applied.map((a) => `${a.key} ${a.from}→${a.to} (${a.why})`).join(" · ");
-                      return {
-                        ok: true,
-                        note: `Set ${applied.length} best-practice input${applied.length === 1 ? "" : "s"}: ${diff}.${skipMsg} Review the changed inputs below, then re-run.`,
-                      };
-                    }}
-                    autoTuneLabel="Auto-tune inputs"
-                    pendingActive={fdDirty}
-                    scopeKey={fdScope}
-                    disabled={running != null}
-                  />
-                  {/* Isolated (Task B1): the Figure-data inputs are bespoke per skill — if a control
-                      throws on an unexpected param/spec shape, the inputs pane fails alone, not the
-                      whole stage. resetKeys clear a stuck boundary on a dataset/skill/figure switch.
-                      Task B4: key={fdScope} (dataset:skill:figure) REMOUNTS the bespoke inputs on any
-                      such switch, so no staged control state from another skill can survive it. */}
-                  <PaneBoundary
-                    label="figure-data"
-                    title="These inputs couldn't be shown"
-                    resetKeys={[activeFigure.datasetId, activeFigure.skillId, activeFigure.id]}
-                  >
-                  <FigureDataPanel
-                    key={fdScope}
-                    skillId={activeFigure.skillId}
-                    skillName={getSkill(activeFigure.skillId)?.name ?? activeFigure.skillId}
-                    baseParams={activeFigure.provenance?.params ?? {}}
-                    params={fdParams}
-                    onParamsChange={setFdParams}
-                    running={running != null}
-                    dataCheck={activeFigure.dataCheck}
-                    dataFit={activeFigure.dataFit}
-                    seededMarks={readSeededMarks(figure.spec ?? activeFigure.spec)}
-                    canEditMarks={deriveFigureModel(figure.spec ?? activeFigure.spec).capabilities.landmarkMarks}
-                    canEditThresholds={deriveFigureModel(figure.spec ?? activeFigure.spec).capabilities.thresholds}
-                    figureSpec={figure.spec ?? activeFigure.spec}
-                    specSeed={
-                      // C5: seed the Inputs from THIS figure's own provenance param_spec (stamped at
-                      // run) so re-opening it shows the controls with no describe round-trip, and an
-                      // offline already-run figure stays tunable. Older figures (no param_spec) fetch.
-                      activeFigure.provenance?.skill?.param_spec
-                        ? { version: activeFigure.provenance.skill.version, spec: activeFigure.provenance.skill.param_spec }
-                        : null
-                    }
-                    markLabelsShown={markLabelsShown}
-                    onMarkLabelsShownChange={setMarkLabelsShown}
-                    proposals={aiProposals}
-                    onRevertProposal={revertAiProposal}
-                    onReset={resetFdToBase}
-                    // Route the panel's own Re-run through rerunPending too (NOT the plain
-                    // rerunFigureWithParams) so it takes the /ai/apply path when proposals are
-                    // accepted — otherwise the two identical "Re-run" buttons diverge and this one
-                    // silently drops AI provenance + orphans the queue. rerunPending reads fdParams
-                    // (the shared staged source the panel also edits) so the param arg is redundant.
-                    onRerun={rerunPending}
-                    onPickSkill={pickSuggestedSkill}
-                    onPickManually={() => setView("skill")}
-                  />
-                  </PaneBoundary>
-                </div>
-                </div>
-              </div>
-            ) : (
-              <EmptyState
-                title="No figure selected"
-                body="Open a figure to tune the inputs behind it and re-run."
-                action="Run a skill"
-                onAction={() => setView("skill")}
-              />
-            )
+            <FigureDataView
+              activeFigure={activeFigure}
+              figure={figure}
+              fdParams={fdParams}
+              setFdParams={setFdParams}
+              fdDirty={fdDirty}
+              fdScope={fdScope}
+              previewSpec={previewSpec}
+              markLabelsShown={markLabelsShown}
+              setMarkLabelsShown={setMarkLabelsShown}
+              onMarkMove={onMarkMove}
+              onThresholdChange={onThresholdChange}
+              autoTune={autoTune}
+              aiProposals={aiProposals}
+              aiCounter={aiCounter}
+              running={running}
+              resetFdToBase={resetFdToBase}
+              rerunPending={rerunPending}
+              acceptAiProposal={acceptAiProposal}
+              dismissAiProposal={dismissAiProposal}
+              revertAiProposal={revertAiProposal}
+              addAiProposals={addAiProposals}
+              onOpenFigure={openFigure}
+              onPickSkill={pickSuggestedSkill}
+              onRunSkill={() => setView("skill")}
+            />
           ) : (
             <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
               {view === "home" && (
-                <Overview
+                <ProjectOverview
                   datasets={datasets}
                   installs={installs}
                   figures={figures}
@@ -1116,78 +692,26 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
               )}
 
               {view === "skill" && (
-                <WorkbenchPanel
+                <SkillView
                   installs={installs}
                   proposal={proposal}
-                  route={
-                    workbenchDataset
-                      ? { routing: workbenchDataset.routing ?? null, dataFit: workbenchDataset.dataFit ?? null }
-                      : null
-                  }
-                  modality={workbenchDataset?.modality ?? null}
+                  workbenchDataset={workbenchDataset}
                   running={running}
                   onRun={runFlow}
                   preselect={preselect}
-                  routeComposer={
-                    <AskAi
-                      stage="route"
-                      mode="select"
-                      label="Ask AI which analysis"
-                      placeholder="e.g. which test for two groups?"
-                      hint="Pre-selects a skill below to confirm and run."
-                      // Data-aware (Slice 2): the active dataset's columns/kind ride along so the
-                      // gateway scores its suggested skill against the real data (the route-stage
-                      // select_skill compat gate). The engine kind lives on the persisted routing.
-                      context={{
-                        skillId: null,
-                        params: {},
-                        dataColumns: workbenchDataset?.dataFit?.columns ?? null,
-                        dataKind: workbenchDataset?.routing?.kind ?? null,
-                        dataNumericCols: workbenchDataset?.dataFit?.n_numeric_cols ?? null,
-                      }}
-                      onSelect={(skillId) => {
-                        const catalogId = `selom.${skillId}`;
-                        const skill = getSkill(catalogId);
-                        if (!skill) return null;
-                        workspaceStore.installSkill(catalogId);
-                        setPreselect((p) => ({ id: catalogId, n: (p?.n ?? 0) + 1 }));
-                        return skill.name;
-                      }}
-                    />
-                  }
+                  setPreselect={setPreselect}
                 />
               )}
 
-              {view === "stats" &&
-                (activeFigure && activeStatsTable ? (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight text-foreground">
-                          <Table2 className="size-4 text-stage-publish" />
-                          {activeStatsTable.title ?? "Statistics"}
-                        </h2>
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                          from <span className="text-foreground">{activeFigure.title}</span> ·{" "}
-                          {getSkill(activeFigure.skillId ?? "")?.name ?? "skill"}
-                        </p>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => openFigure(activeFigure)}>
-                        <Paintbrush /> Open figure
-                      </Button>
-                    </div>
-                    <PaneBoundary label="stats" title="This table couldn't be shown" resetKeys={[activeFigure.id]}>
-                      <StatsPanel table={activeStatsTable} defaultOpen labeling={statsLabeling} />
-                    </PaneBoundary>
-                  </div>
-                ) : (
-                  <EmptyState
-                    title="No statistics selected"
-                    body="Pick a Statistics node in the rail, or run a skill that computes a table (DEG, enrichment, markers)."
-                    action="Run a skill"
-                    onAction={() => setView("skill")}
-                  />
-                ))}
+              {view === "stats" && (
+                <StatsView
+                  activeFigure={activeFigure}
+                  table={activeStatsTable}
+                  labeling={statsLabeling}
+                  onOpenFigure={openFigure}
+                  onRunSkill={() => setView("skill")}
+                />
+              )}
             </div>
           )}
         </main>
@@ -1201,147 +725,6 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         proposals={aiProposals}
         aiCount={aiProposals.length}
       />
-    </div>
-  );
-}
-
-/** The project home — the pipeline tracker (or drop-to-start when empty) + figures. */
-function Overview({
-  datasets,
-  installs,
-  figures,
-  activeFigure,
-  stageStates,
-  onDrop,
-  onStage,
-  onRunSkill,
-  onOpenFigure,
-}: {
-  datasets: Dataset[];
-  installs: { id: string }[];
-  figures: Figure[];
-  activeFigure: Figure | undefined;
-  stageStates: Partial<Record<StageKey, StageState>>;
-  onDrop: (file: File) => void;
-  onStage: (key: StageKey) => void;
-  onRunSkill: () => void;
-  onOpenFigure: (f: Figure) => void;
-}) {
-  return (
-    <>
-      <Card className="p-6 lg:p-8">
-        {datasets.length === 0 ? (
-          <>
-            <div className="text-center">
-              <h2 className="text-xl font-semibold tracking-tight text-foreground">Let&apos;s make your first figure</h2>
-              <p className="mx-auto mt-1.5 max-w-md text-sm text-muted-foreground">
-                Drop a dataset to get started — Selom detects the type, cleans it, and walks you through the rest.
-              </p>
-            </div>
-            <Dropzone
-              onFile={onDrop}
-              accept=".h5ad,.csv,.tsv,.mzML,.iwxdata"
-              title="Drop your data here"
-              hint="or click to browse — this is step one"
-              formats=".h5ad · .csv · .tsv · .mzML"
-              className="mx-auto mt-6 max-w-2xl"
-            />
-            <p className="mt-8 text-center text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80">
-              What happens next
-            </p>
-            <Pipeline variant="progress" states={stageStates} onStageClick={onStage} className="mt-4" />
-          </>
-        ) : (
-          <>
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold tracking-tight text-foreground">Project pipeline</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {figures.length > 0
-                    ? "Keep editing, or publish with the methods text and provenance attached."
-                    : "Next: run a skill to make your first figure."}
-                </p>
-              </div>
-              <Button
-                size="sm"
-                variant={figures.length > 0 ? "outline" : "default"}
-                onClick={() => {
-                  if (figures.length > 0) onOpenFigure(activeFigure ?? figures[figures.length - 1]);
-                  else onRunSkill();
-                }}
-              >
-                {figures.length > 0 ? "Open figure" : "Run a skill"}
-                <ArrowRight />
-              </Button>
-            </div>
-            <Pipeline variant="progress" states={stageStates} onStageClick={onStage} className="mt-10" />
-          </>
-        )}
-      </Card>
-
-      {/* Counts — a quiet strip, not a hero-metric grid. */}
-      <Card className="mt-5 grid grid-cols-3 divide-x divide-border p-0">
-        <OverviewStat label="Datasets" value={datasets.length} />
-        <OverviewStat label="Installed skills" value={installs.length} />
-        <OverviewStat label="Figures" value={figures.length} />
-      </Card>
-
-      {figures.length > 0 && (
-        <div className="mt-8">
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Figures in this project
-          </h3>
-          <Card className="divide-y divide-border p-0">
-            {figures.slice(0, 6).map((f) => (
-              <button
-                key={f.id}
-                onClick={() => onOpenFigure(f)}
-                className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-accent/40"
-              >
-                <Paintbrush className="size-4 shrink-0 text-primary" />
-                <span className="truncate text-sm text-foreground">{f.title}</span>
-                <span className="tabular ml-auto text-[11px] text-muted-foreground">
-                  {getSkill(f.skillId ?? "")?.name ?? "figure"}
-                </span>
-              </button>
-            ))}
-          </Card>
-        </div>
-      )}
-    </>
-  );
-}
-
-function EmptyState({
-  title,
-  body,
-  action,
-  onAction,
-}: {
-  title: string;
-  body: string;
-  action: string;
-  onAction: () => void;
-}) {
-  return (
-    <Card className="grid h-full min-h-[320px] place-items-center p-10 text-center">
-      <div className="max-w-sm space-y-2">
-        <Sparkles className="mx-auto size-6 text-muted-foreground" />
-        <p className="text-sm font-medium text-foreground">{title}</p>
-        <p className="text-xs text-muted-foreground">{body}</p>
-        <Button variant="outline" size="sm" onClick={onAction}>
-          {action}
-        </Button>
-      </div>
-    </Card>
-  );
-}
-
-function OverviewStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="px-5 py-4">
-      <p className="tabular text-2xl font-semibold leading-none text-foreground">{value}</p>
-      <p className="mt-1.5 text-sm text-muted-foreground">{label}</p>
     </div>
   );
 }
