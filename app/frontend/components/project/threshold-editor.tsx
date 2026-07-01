@@ -5,6 +5,7 @@ import { SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/ui/cn";
 import { changedRingClass } from "@/lib/ui/changed-ring";
+import { AiMarker } from "@/components/ai/ai-marker";
 import {
   bucketCounts,
   clampThresholds,
@@ -72,6 +73,9 @@ export function ThresholdEditor({
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           <SlidersHorizontal className="size-3.5" /> Thresholds
+          {/* WCAG 1.4.1: an AI-changed threshold is marked by the ✨ glyph + its label, not the fuchsia
+              ring alone (param-grid parity). Inert (no revert) — the whole editor rings by author. */}
+          {changedAuthor === "ai" && <AiMarker state="staged" size="xs" />}
         </p>
         <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground/80">
           Set the fold-change and p-value cuts — points re-colour{" "}

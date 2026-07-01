@@ -92,11 +92,26 @@ _SKILL_CARDS: dict[str, dict] = {
 }
 
 # Map the deg runner's mode aliases (run_real.run's dispatch) → our card keys, so DETECTED == EXPLAINED.
+# "auto" (and an absent mode) is deliberately NOT mapped: the runner resolves it from the DATA at run
+# time (an .h5ad → scRNA Wilcoxon, else bulk pyDESeq2), which grade.py can't see from the figure alone.
+# An unresolved mode gets the generic deg card below, never a confidently-wrong specific one.
 _DEG_MODE_ALIASES: dict[str, str] = {
     "pseudobulk": "pseudobulk", "pseudo-bulk": "pseudobulk", "pseudo_bulk": "pseudobulk",
     "timecourse": "timecourse", "time-course": "timecourse", "time_course": "timecourse",
     "scrna": "scrna", "sc": "scrna", "single-cell": "scrna",
-    "bulk": "bulk", "auto": "bulk",
+    "bulk": "bulk",
+}
+
+# The honest fallback when a deg figure's mode is unresolved (auto / absent / unknown): describe deg's
+# mode-dependent tests without claiming one, so an scRNA run is never labelled bulk pyDESeq2.
+_DEG_GENERIC: dict = {
+    "test": (
+        "a mode-dependent DE test — bulk/pseudobulk use a pyDESeq2 negative-binomial Wald test, "
+        "scRNA uses a per-cell Wilcoxon rank-sum, and a time-course fits a continuous-time trend"
+    ),
+    "correction": "Benjamini-Hochberg FDR",
+    "assumes": ["this figure's deg mode wasn't pinned (it ran in auto), so the exact test depends on the data"],
+    "switch": "pick a deg mode (bulk / pseudobulk / scrna / timecourse) to get the precise test and its assumptions",
 }
 
 
@@ -110,8 +125,9 @@ def grade_card(stats: dict | None) -> str | None:
     if not skill_id:
         return None
     if skill_id == "deg":
-        mode = str(stats.get("mode") or "bulk").strip().lower()
-        card = _DEG_MODE_CARDS[_DEG_MODE_ALIASES.get(mode, "bulk")]
+        mode = str(stats.get("mode") or "").strip().lower()
+        key = _DEG_MODE_ALIASES.get(mode)          # None for auto / absent / unknown → the generic card
+        card = _DEG_MODE_CARDS[key] if key else _DEG_GENERIC
     else:
         card = _SKILL_CARDS.get(skill_id)
     if card is None:

@@ -156,6 +156,21 @@ export function AskAi({
   // The Auto-tune outcome is kept SEPARATE from the AI chat note so a deterministic result never
   // renders inside the ✨ AI surface (it is not AI output) — it shows in the neutral block below.
   const [tuneNote, setTuneNote] = React.useState<string | null>(null);
+  const [copied, setCopied] = React.useState(false);
+
+  async function copyResult() {
+    if (!result) return;
+    // Same honesty invariant as the methods/legend draft: prefix [AI-generated] ONLY when the gateway
+    // actually produced the text (source==="ai") — a grounded deterministic card copies clean.
+    const marker = result.source === "ai" ? "[AI-generated]\n" : "";
+    try {
+      await navigator.clipboard.writeText(marker + result.text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard blocked (e.g. insecure context) — no-op */
+    }
+  }
 
   async function autoTune() {
     if (!onAutoTune || tuning || busy) return;
@@ -381,8 +396,18 @@ export function AskAi({
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               {mode === "draft" ? "Draft" : "Advisory"}
             </span>
-            {/* ✨ AI only when the gateway actually produced it; a grounded deterministic card is labelled so. */}
-            <ExplainSourceBadge source={result.source} />
+            <div className="flex items-center gap-2">
+              {/* ✨ AI only when the gateway actually produced it; a grounded deterministic card is labelled so. */}
+              <ExplainSourceBadge source={result.source} />
+              {/* Copy the advisory text (fe-review MED) — carries the [AI-generated] marker only when source=ai. */}
+              <button
+                type="button"
+                onClick={() => void copyResult()}
+                className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
           </div>
           <p className="whitespace-pre-wrap text-xs leading-relaxed text-foreground/85">{result.text}</p>
         </div>

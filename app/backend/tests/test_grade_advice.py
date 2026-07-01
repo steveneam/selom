@@ -33,9 +33,25 @@ def test_grade_card_deg_modes_differ():
     assert tc != pb != sc
 
 
-def test_grade_card_deg_defaults_to_bulk_and_tolerates_prefix():
-    # No mode → bulk; a `selom.`-prefixed id is tolerated (the FE may pass either form).
-    assert grade_card({"skill_id": "deg"}) == grade_card({"skill_id": "selom.deg", "mode": "bulk"})
+def test_grade_card_deg_unresolved_mode_is_generic_not_bulk():
+    # auto / absent mode is resolved from the DATA at run time (an .h5ad → scRNA Wilcoxon, else bulk),
+    # which grade.py can't see from the figure — so it must give the generic deg card, NEVER commit to
+    # bulk pyDESeq2 (that mislabels an scRNA deg). The `selom.` prefix is tolerated (either FE form).
+    generic = grade_card({"skill_id": "deg"})
+    assert generic == grade_card({"skill_id": "deg", "mode": "auto"})
+    assert generic == grade_card({"skill_id": "selom.deg"})
+    # The generic card names the modes without committing to one; the pinned bulk card is specific.
+    assert "auto" in generic and "Wilcoxon" in generic
+    assert generic != grade_card({"skill_id": "deg", "mode": "bulk"})
+
+
+def test_deg_mode_aliases_all_resolve_to_a_real_card():
+    # Catalog-subset guard: every alias target must be a real _DEG_MODE_CARDS key (a typo would KeyError),
+    # and "auto" is intentionally unmapped (it falls through to the generic card, not a specific one).
+    from ai.grade import _DEG_MODE_ALIASES, _DEG_MODE_CARDS
+
+    assert set(_DEG_MODE_ALIASES.values()) <= set(_DEG_MODE_CARDS)
+    assert "auto" not in _DEG_MODE_ALIASES
 
 
 def test_grade_card_other_stat_skills_mapped():
