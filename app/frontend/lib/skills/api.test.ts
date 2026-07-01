@@ -148,6 +148,31 @@ describe("stageableRecommendations", () => {
     const { applied } = stageableRecommendations([rec("top_n", 15, 15)], {}, { top_n: "15" });
     expect(applied).toEqual([]);
   });
+
+  it("does NOT clobber a committed bulk deg contrast with the static defaults (the deg-clobber fix)", () => {
+    // Regression: a set bulk-RNA-seq contrast. The backend emits reference/treatment/mode/method as
+    // raw param_spec defaults (scaled=false ⇔ value===default) — those diff against the committed
+    // values but must NOT wipe the design or downgrade pyDESeq2→Wilcoxon. Clean no-op.
+    const recs = [
+      rec("reference", "", ""),
+      rec("treatment", "", ""),
+      rec("mode", "auto", "auto"),
+      rec("method", "wilcoxon", "wilcoxon"),
+    ];
+    const base = { reference: "CE4_4_iRPE", treatment: "CE4_5_iRPE", mode: "bulk", method: "pydeseq2" };
+    const { changes, applied, skipped } = stageableRecommendations(recs, {}, base);
+    expect(changes).toEqual({});
+    expect(applied).toEqual([]);
+    expect(skipped).toEqual([]); // a correctly-configured figure isn't "your edits left as-is" noise
+  });
+
+  it("still fills a genuinely empty/unset input from a static default (the OR-clause)", () => {
+    // The gate blocks a static default only from OVERWRITING a committed value — it must still FILL an
+    // empty one. A param whose committed value is "" gets its non-empty default.
+    const { changes, applied } = stageableRecommendations([rec("layer", "X", "X")], {}, { layer: "" });
+    expect(changes).toEqual({ layer: "X" });
+    expect(applied).toEqual([{ key: "layer", from: "", to: "X", why: "skill default" }]);
+  });
 });
 
 describe("recommendParams", () => {

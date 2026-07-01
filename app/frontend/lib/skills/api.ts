@@ -199,6 +199,13 @@ export interface RecChange {
  *   - it never silently overwrites a hand-edited staged value — a user-touched key that the rec would
  *     have changed is reported in `skipped` ("left your edits as-is"), never clobbered (fixes the
  *     silent-overwrite breach);
+ *   - a **raw static default** (`scaled===false` ⇔ `value===default`, per `engine/recommend.py`) may
+ *     only FILL an empty/unset input — it must NEVER overwrite a committed non-default value. This is
+ *     the deg-clobber fix (`docs/auto-tune/followups.md` NEXT): on a correctly-set bulk `deg` contrast
+ *     the `reference`/`treatment`/`method` static defaults (`""`, `""`, `wilcoxon`) diffed against the
+ *     committed values and would have wiped the design + downgraded pyDESeq2→Wilcoxon. A **curated
+ *     best-practice move** (`scaled===true`, e.g. `n_hvg→2000`) always applies, since it's a genuine
+ *     recommendation, not a default leaking through;
  *   - every APPLIED change genuinely differs from the figure base, so it shows the amber pending cue
  *     and the count in the note matches what's visibly staged (fixes the note-vs-visible mismatch).
  * String-compared (controls stringify their values; the proposal path compares the same way).
@@ -212,7 +219,8 @@ export function stageableRecommendations(
   const applied: RecChange[] = [];
   const skipped: string[] = [];
   for (const rec of recs) {
-    const baseVal = base[rec.key] ?? rec.default;   // what the run uses when this input is untouched
+    const committed = base[rec.key];                // the figure's committed value (undefined = unset)
+    const baseVal = committed ?? rec.default;       // what the run uses when this input is untouched
     const cur = staged[rec.key] ?? baseVal;         // the current effective (staged) value
     if (String(cur) !== String(baseVal)) {
       // The user has already staged a change to this key — don't overwrite it. Report it only if the
@@ -220,10 +228,13 @@ export function stageableRecommendations(
       if (String(rec.value) !== String(cur)) skipped.push(rec.key);
       continue;
     }
-    if (String(rec.value) !== String(baseVal)) {
-      changes[rec.key] = rec.value;
-      applied.push({ key: rec.key, from: baseVal, to: rec.value, why: rec.why });
-    }
+    if (String(rec.value) === String(baseVal)) continue; // rec already matches the run's value — no-op
+    // A static default (scaled=false) must not overwrite a committed non-default value — it may only
+    // fill an empty/unset input. A curated move (scaled=true) always applies. (deg-clobber fix.)
+    const committedIsSet = committed !== undefined && committed !== null && String(committed) !== "";
+    if (!rec.scaled && committedIsSet) continue;
+    changes[rec.key] = rec.value;
+    applied.push({ key: rec.key, from: baseVal, to: rec.value, why: rec.why });
   }
   return { changes, applied, skipped };
 }

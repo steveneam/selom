@@ -6,12 +6,17 @@
 > items are the intentionally-deferred phases + the D4-deferred richer surface — captured so none are
 > lost, not owed on Phase 1.
 
-## NEXT (ranked first) — Auto-tune clobbers the design contrast + downgrades the method on a bulk `deg` figure
+## ✅ FIXED (2026-07-01) — Auto-tune clobbered the design contrast + downgraded the method on a bulk `deg` figure
 
-> Found in the project-workspace-refactor browser smoke (2026-07-01, real backend, a real `deg` figure).
-> **Owner-approved to scope + fix next session.** This is a *correctness* issue (a "best-practice" button
-> proposing a scientifically-wrong method + wiping the experimental design), ranked above the cosmetic D4
-> items below. NOT a "look up better numbers" gap — the numbers are already right; the *policy* is wrong.
+> Found in the project-workspace-refactor browser smoke (2026-07-01, real backend, a real `deg` figure);
+> **fixed the same day** in `lib/skills/api.ts` `stageableRecommendations` (+2 unit tests, +1 empty-fill
+> lock). Real-engine confirmed: `recommend_params("deg")` emits every design/method param as
+> `scaled=False` (value≡default) → the gate below skips them on a committed contrast → clean no-op;
+> `umap_scrna` `n_hvg` stays `scaled=True` → still fills. This was a *correctness* issue (a "best-practice"
+> button proposing a scientifically-wrong method + wiping the experimental design), ranked above the
+> cosmetic D4 items below. NOT a "look up better numbers" gap — the numbers are already right; the *policy*
+> was wrong. **The fix is a one-rule FE staging policy; the backend was left as-is (its curated layer is
+> already correctly scoped).**
 
 **Symptom.** On a bulk-RNA-seq `deg` figure whose contrast is set (`reference=CE4_4_iRPE`,
 `treatment=CE4_5_iRPE`, `method=pydeseq2`, `mode=bulk`), clicking **Auto-tune inputs** proposes:
@@ -28,12 +33,13 @@ those raw defaults against the figure's *committed, design-correct* values → s
 scope boundary leaks through the FE staging. (The shipped UMAP verify missed it because that figure's
 non-`n_hvg` params already equalled their defaults, so nothing else diffed.)
 
-**Fix (one policy rule, FE `stageableRecommendations`).** Stage a rec as a change **only when it's a
-curated move (`scaled===true`) OR the figure's current value for that key is empty/unset** — a raw static
-default (`scaled=false`) must never *overwrite* a committed non-default. `ParamRec.scaled` already carries
-exactly this distinction (curated best-practice move vs. static baseline). Result: Auto-tune on a
+**Fix (one policy rule, FE `stageableRecommendations`) — SHIPPED.** Stage a rec as a change **only when
+it's a curated move (`scaled===true`) OR the figure's current value for that key is empty/unset** — a raw
+static default (`scaled=false`) must never *overwrite* a committed non-default. `ParamRec.scaled` already
+carries exactly this distinction (curated best-practice move vs. static baseline). Result: Auto-tune on a
 well-configured `deg` figure becomes a clean no-op → *"Already at the best-practice settings"*, while it
-still fires `n_hvg→2000` on a UMAP figure that needs it and still fills genuinely-empty inputs.
+still fires `n_hvg→2000` on a UMAP figure that needs it and still fills genuinely-empty inputs. Landed as
+the gate `if (!rec.scaled && committedIsSet) continue;` after the equality/user-edit checks.
 
 **Test.** `stageableRecommendations` unit: (a) deg recs (all `scaled=false`) + a base with
 `reference/treatment/method` set → `applied=[]` (no clobber); (b) a `scaled` `n_hvg` rec + a base with
