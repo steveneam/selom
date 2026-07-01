@@ -221,6 +221,7 @@ export function FigureView({
         methods={bundle?.methods}
         legend={bundle?.legend}
         guardrails={bundle?.guardrails}
+        skillId={activeFigure?.skillId ?? bundle?.provenance?.skill?.id}
       />
       <div className="flex min-h-[520px] flex-1 overflow-hidden rounded-xl border border-border bg-background">
         <EditorWorkspace

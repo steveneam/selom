@@ -129,7 +129,7 @@ export interface GapBacklogEntry {
 
 /** `POST /ai/explain` request — informational, never a mutation. */
 export interface ExplainRequest {
-  request: "explain_score" | "propose_sweep" | "grade_advice";
+  request: "explain_score" | "propose_sweep" | "grade_advice" | "draft_methods";
   stage?: string;
   skill_id?: string | null;
   goal?: string;
@@ -138,6 +138,10 @@ export interface ExplainRequest {
   /** `grade_advice` grounding — the figure's statistical method ({ skill_id, mode }). A description,
    *  not a verdict; the server (ai.grade) owns the per-skill test knowledge. */
   stats?: Record<string, unknown> | null;
+  /** `draft_methods` grounding — the figure's deterministic methods prose to polish. The server
+   *  returns it VERBATIM with the gateway off (so a no-op polish is labelled `deterministic`, never a
+   *  false ✨); the live gateway rewrites it to `goal` while preserving every number and citation. */
+  base_text?: string | null;
 }
 
 /**

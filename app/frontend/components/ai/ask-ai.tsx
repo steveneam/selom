@@ -12,8 +12,11 @@ import type { AiProposal, ExplainResponse, HelperTurn } from "@/lib/ai/types";
 import type { FigureSpec } from "@/lib/figure/figure-spec";
 import type { SkillParams } from "@/lib/skills/api";
 
-/** Stages in the engine spine that Layer A (AI Assist) owns. */
-export type AiStage = "route" | "ingest" | "analyze" | "grade" | "output";
+/** Stages in the engine spine that Layer A (AI Assist) owns. `methods` is the publish-stage
+ *  methods-draft entry point (pillar-2 may later split a formal Methods & Legend stage; the
+ *  `draft` composer moves there unchanged). It is a label only — `draft` mode delegates the wire
+ *  call to the caller's `onExplain`, so no stage string crosses the `/ai/propose` boundary. */
+export type AiStage = "route" | "ingest" | "analyze" | "grade" | "output" | "methods";
 
 /**
  * Apply-discipline per stage (the spine of every AI entry point).
@@ -69,8 +72,10 @@ export function AskAi({
   onSelect,
   onIngest,
   onExplain,
+  onDraftResult,
   onAutoTune,
   autoTuneLabel,
+  autoTuneHint,
   pendingActive,
   scopeKey,
 }: {
@@ -112,6 +117,14 @@ export function AskAi({
    */
   onExplain?: (goal: string) => Promise<ExplainResponse | null>;
   /**
+   * Callback for mode="draft" ONLY — lifts the explain result out of the composer into the caller's
+   * own EDITABLE field (the Methods textarea, `docs/methods-draft/spec.md` option A). When provided,
+   * `draft` mode calls this with the returned text + source INSTEAD of rendering AskAi's read-only
+   * result block (the caller owns display + edit + the ✨ source badge). Absent → `draft` falls back
+   * to the same read-only render as `advisory`, so an un-lifted draft still shows something.
+   */
+  onDraftResult?: (text: string, source: ExplainResponse["source"]) => void;
+  /**
    * Optional one-click "Auto-tune" — the DETERMINISTIC best-practice default for this stage
    * (docs/auto-tune/spec.md). When provided, a neutral (non-✨) button renders ABOVE the AI chat
    * ("the one-click default flows into chat"); the handler applies/stages the engine's recommendation
@@ -121,6 +134,10 @@ export function AskAi({
   onAutoTune?: () => Promise<AutoTuneOutcome>;
   /** Auto-tune button label (e.g. "Auto-tune", "Draft methods"). Defaults to "Auto-tune". */
   autoTuneLabel?: string;
+  /** The neutral hint under the Auto-tune button BEFORE a click (overrides the analyze-flavoured
+   *  "Best-practice defaults … then re-run" default — e.g. methods drafting has no re-run). Once the
+   *  handler runs, its outcome note replaces this. Only meaningful with `onAutoTune`. */
+  autoTuneHint?: string;
   /** Whether staged changes are currently pending (the caller's dirty flag). When it goes true→false
    *  (a Reset or a committed Re-run) the Auto-tune outcome note is cleared so it can't keep asserting
    *  pending changes exist. Only meaningful with `onAutoTune`. */
@@ -279,17 +296,27 @@ export function AskAi({
         setBusy(false);
       }
     } else if (mode === "advisory" || mode === "draft") {
-      // Informational path: call the caller's explain resolver and render the returned text + source
-      // badge. Deterministic-primary — gateway off still returns a grounded card (source="deterministic").
+      // Informational path: call the caller's explain resolver. Deterministic-primary — gateway off
+      // still returns a grounded card (source="deterministic"). For mode="draft" with `onDraftResult`,
+      // LIFT the text into the caller's editable field (the Methods textarea); otherwise render it in
+      // the read-only result block (advisory, and un-lifted draft).
       setBusy(true);
       setNote(null);
       try {
         const r = (await onExplain?.(g)) ?? null;
         if (r) {
-          setResult(r);
+          if (mode === "draft" && onDraftResult) {
+            onDraftResult(r.text, r.source);
+          } else {
+            setResult(r);
+          }
           setGoal("");
         } else {
-          setNote("Nothing to explain here yet — run a skill that produces a statistic first.");
+          setNote(
+            mode === "draft"
+              ? "Nothing to draft — this figure has no generated methods text yet."
+              : "Nothing to explain here yet — run a skill that produces a statistic first.",
+          );
         }
       } catch (e) {
         setNote(e instanceof Error ? e.message : "Couldn't reach the AI helper.");
@@ -389,7 +416,7 @@ export function AskAi({
           aria-live="polite"
           className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground"
         >
-          {tuneNote ?? "Best-practice defaults — no AI. Review the changed inputs below, then re-run."}
+          {tuneNote ?? autoTuneHint ?? "Best-practice defaults — no AI. Review the changed inputs below, then re-run."}
         </p>
       </div>
       {aiChat}

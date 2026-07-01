@@ -205,9 +205,14 @@ class ExplainRequest(BaseModel):
     ``grade_advice``   — statistics advisory for a figure: which test / correction it
                          uses and what it assumes, grounded in the ``stats`` method
                          descriptor (skill_id + mode). Advisory only, never a mutation.
+    ``draft_methods``  — polish a figure's DETERMINISTIC methods paragraph (``base_text``,
+                         from ``companions.methods``) to the user's goal, preserving every
+                         number / threshold / citation. The deterministic fallback IS
+                         ``base_text`` verbatim, so gateway-off returns the honest draft
+                         (``source="deterministic"``, no ✨) and a no-op polish stays so.
     """
 
-    request: Literal["explain_score", "propose_sweep", "grade_advice"]
+    request: Literal["explain_score", "propose_sweep", "grade_advice", "draft_methods"]
     stage: str = "grade"
     skill_id: str | None = None
     goal: str = ""
@@ -216,6 +221,10 @@ class ExplainRequest(BaseModel):
     # grade_advice grounding — the figure's statistical method ({skill_id, mode}); a description, not a
     # verdict, so the honesty rule holds (the server owns the per-skill knowledge in ai.grade).
     stats: dict | None = None
+    # draft_methods grounding — the figure's deterministic methods prose to polish. It is BOTH the
+    # thing the live model rewrites AND the deterministic fallback (returned verbatim), so an unchanged
+    # polish is honestly labelled `deterministic`. A description, not a verdict — no honesty risk.
+    base_text: str | None = None
 
 
 @router.post("/ai/explain")
@@ -238,6 +247,11 @@ def explain(req: ExplainRequest):
         data["sweep_space"] = req.sweep_space
     if req.stats:
         data["stats"] = req.stats
+    # draft_methods: the deterministic methods prose to polish. It is ALSO the deterministic fallback
+    # (`_deterministic_explain` returns it verbatim), so the source-labelling comparison below stays
+    # honest — a no-op polish reads `deterministic`, a real polish reads `ai`.
+    if req.base_text is not None:
+        data["base_text"] = req.base_text
     # skill_id rides in `data` so the operator gateway can key propose_sweep recordings on it
     # and the live gateway can ground its prose; `_deterministic_explain` ignores it, so the
     # source-labelling comparison below is unaffected.

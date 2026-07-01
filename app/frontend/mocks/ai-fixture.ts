@@ -194,8 +194,14 @@ export function mockExplain(
     scorecard?: Record<string, unknown>;
     sweep_space?: Record<string, unknown>;
     stats?: Record<string, unknown>;
+    base_text?: string;
   },
 ): string {
+  if (req === "draft_methods") {
+    // The deterministic draft IS the run's own methods prose, returned verbatim (source stays
+    // "deterministic", no ✨) — mirrors `_deterministic_explain`'s draft_methods branch.
+    return data.base_text ?? "";
+  }
   if (req === "explain_score") {
     const sc = data.scorecard ?? {};
     const score = sc.score ?? "n/a";

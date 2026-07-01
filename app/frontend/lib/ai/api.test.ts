@@ -177,6 +177,22 @@ describe("explain", () => {
     expect(out.text).toContain("pyDESeq2");
   });
 
+  it("threads draft_methods + the deterministic base_text and returns the polished draft (Phase 4)", async () => {
+    let sentBody: Record<string, unknown> = {};
+    vi.stubGlobal("fetch", (_url: string, init: RequestInit) => {
+      sentBody = JSON.parse(String(init.body));
+      return Promise.resolve(
+        jsonRes(200, { request: "draft_methods", text: "Polished methods prose.", source: "ai" }),
+      );
+    });
+    const base = "Differential expression was assessed with PyDESeq2. Analysis was performed using Selom.";
+    const out = await explain({ request: "draft_methods", skill_id: "deg", goal: "tighten it", base_text: base });
+    expect(sentBody.request).toBe("draft_methods");
+    expect(sentBody.base_text).toBe(base); // the deterministic prose the server polishes / falls back to
+    expect(out.source).toBe("ai");
+    expect(out.text).toContain("Polished");
+  });
+
   it("throws a friendly message on a non-OK response", async () => {
     vi.stubGlobal("fetch", () => Promise.resolve(jsonRes(500, {})));
     await expect(explain({ request: "explain_score" })).rejects.toThrow(/explanation/i);

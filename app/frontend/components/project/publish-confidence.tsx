@@ -1,8 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, BadgeCheck, Captions, Check, ChevronDown, Copy, FileText, FlaskConical, Info, ShieldCheck } from "lucide-react";
+import { AlertTriangle, BadgeCheck, Captions, Check, ChevronDown, Copy, FileText, FlaskConical, Info, RotateCcw, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AskAi } from "@/components/ai/ask-ai";
+import { ExplainSourceBadge } from "@/components/ai/explain-source-badge";
+import { explain } from "@/lib/ai/api";
+import type { ExplainResponse } from "@/lib/ai/types";
 import type { FigureLegend, SkillGuardrail, SkillMethods, SkillProvenance } from "@/lib/skills/api";
 
 /**
@@ -19,11 +23,15 @@ export function PublishConfidence({
   methods,
   legend,
   guardrails = [],
+  skillId,
 }: {
   provenance?: SkillProvenance;
   methods?: SkillMethods;
   legend?: FigureLegend;
   guardrails?: SkillGuardrail[];
+  /** The figure's skill id — grounds the Phase 4 "Draft methods" polish (operator keying + live
+   *  grounding). Optional so an older caller / a run without it still renders the deterministic text. */
+  skillId?: string;
 }) {
   const [open, setOpen] = React.useState(false);
   if (!provenance && !methods && !legend && guardrails.length === 0) return null;
@@ -59,7 +67,7 @@ export function PublishConfidence({
           {guardrails.length > 0 && <Guardrails items={guardrails} />}
           {(methods || legend) && (
             <div className="grid gap-4 lg:grid-cols-2">
-              {methods && <Methods methods={methods} />}
+              {methods && <Methods methods={methods} skillId={skillId} />}
               {legend && <Legend legend={legend} />}
             </div>
           )}
@@ -100,20 +108,74 @@ function Guardrails({ items }: { items: SkillGuardrail[] }) {
   );
 }
 
-function Methods({ methods }: { methods: SkillMethods }) {
+function Methods({ methods, skillId }: { methods: SkillMethods; skillId?: string }) {
   const [copied, setCopied] = React.useState(false);
+  // Phase 4 — the in-place, session-only editable draft (docs/methods-draft/spec.md option A). `draft`
+  // is null until the user seeds ("Draft methods") or polishes it; the deterministic `methods.text`
+  // stays the canonical base + fallback and is never mutated by drafting. `draftSource` drives the ✨
+  // badge + the [AI-generated] copy marker — it is "ai" only when the gateway actually rewrote the text.
+  const [draft, setDraft] = React.useState<string | null>(null);
+  const [draftSource, setDraftSource] = React.useState<ExplainResponse["source"] | null>(null);
+  const [draftCopied, setDraftCopied] = React.useState(false);
+
+  const runtimeSkillId = skillId?.replace(/^selom\./, "");
+  // The paste-ready references block, appended to either Copy (the citation list stays deterministic).
+  const refsBlock = methods.citations.length
+    ? "\n\nReferences:\n" + methods.citations.map((c, i) => `${i + 1}. ${c}`).join("\n")
+    : "";
 
   async function copy() {
-    const refs = methods.citations.length
-      ? "\n\nReferences:\n" + methods.citations.map((c, i) => `${i + 1}. ${c}`).join("\n")
-      : "";
     try {
-      await navigator.clipboard.writeText(methods.text + refs);
+      await navigator.clipboard.writeText(methods.text + refsBlock);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
       /* clipboard blocked (e.g. insecure context) — no-op */
     }
+  }
+
+  // The DETERMINISTIC "Draft methods" seed (the Auto-tune slot): draft := methods.text verbatim, no
+  // gateway, no ✨. It flows into the editable textarea below for hand-editing or AI polishing.
+  const seedDraft = React.useCallback(async () => {
+    setDraft(methods.text);
+    setDraftSource("deterministic");
+    return {
+      ok: true,
+      note: "Seeded an editable draft from the generated methods — polish it with AI below, or edit it yourself, then Copy.",
+    };
+  }, [methods.text]);
+
+  // The AI polish: ground on the CURRENT draft (or the generated text) as base_text so a second polish
+  // refines the first. Gateway-off returns base_text verbatim (source="deterministic", no false ✨).
+  const polishDraft = React.useCallback(
+    async (goal: string) =>
+      explain({
+        request: "draft_methods",
+        stage: "methods",
+        skill_id: runtimeSkillId,
+        goal,
+        base_text: draft ?? methods.text,
+      }),
+    [draft, methods.text, runtimeSkillId],
+  );
+
+  async function copyDraft() {
+    if (draft === null) return;
+    // Prefix [AI-generated] only when the last shown draft was AI (honesty invariant #7); a
+    // deterministic seed / a reset copies verbatim. Same references block as the canonical Copy.
+    const marker = draftSource === "ai" ? "[AI-generated]\n" : "";
+    try {
+      await navigator.clipboard.writeText(marker + draft + refsBlock);
+      setDraftCopied(true);
+      setTimeout(() => setDraftCopied(false), 1500);
+    } catch {
+      /* clipboard blocked (e.g. insecure context) — no-op */
+    }
+  }
+
+  function resetDraft() {
+    setDraft(methods.text);
+    setDraftSource("deterministic");
   }
 
   return (
@@ -138,6 +200,60 @@ function Methods({ methods }: { methods: SkillMethods }) {
             </li>
           ))}
         </ol>
+      )}
+
+      {/* Phase 4 — one-click deterministic seed ("Draft methods") + optional AI polish, into an
+          editable, session-only draft (the deterministic text above stays canonical). */}
+      <div className="mt-3">
+        <AskAi
+          stage="methods"
+          mode="draft"
+          label="Polish the methods text"
+          placeholder="e.g. tighten this and match a journal's methods tone"
+          context={{ skillId }}
+          onExplain={polishDraft}
+          onDraftResult={(text, source) => {
+            setDraft(text);
+            setDraftSource(source);
+          }}
+          onAutoTune={seedDraft}
+          autoTuneLabel="Draft methods"
+          autoTuneHint="Seeds an editable draft from the generated methods — no AI. Polish it with AI below, or edit it yourself."
+        />
+      </div>
+
+      {draft !== null && (
+        <div className="mt-3 rounded-lg border border-border bg-background/50 p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Editable draft
+            </span>
+            {/* ✨ AI only when the gateway rewrote it; a seeded / reset draft reads "Grounded summary". */}
+            <ExplainSourceBadge source={draftSource ?? "deterministic"} />
+          </div>
+          <textarea
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+            }}
+            aria-label="Editable methods draft"
+            className="min-h-[8rem] w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm leading-relaxed text-foreground/90 outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={copyDraft}>
+              {draftCopied ? <Check className="text-primary" /> : <Copy />}
+              {draftCopied ? "Copied" : "Copy"}
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={resetDraft}>
+              <RotateCcw /> Reset to generated
+            </Button>
+            {draftSource === "ai" && (
+              <span className="ml-auto text-[10px] leading-snug text-muted-foreground">
+                Copies with an [AI-generated] marker
+              </span>
+            )}
+          </div>
+        </div>
       )}
     </section>
   );

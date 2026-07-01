@@ -1,5 +1,5 @@
 {
-  "_comment": "Claude-authored operator-gateway recordings — the canned demo engine (SELOM_AI_GATEWAY=operator). `explanations` are grounded facts keyed by request_type:key — explain_score by scorecard.paper_id (reproducibility/tier/confidence/findings), grade_advice by skill_id:mode (the figure's statistical test + assumptions, from ai.grade). `plans` are goal-keyed ActionPlans replayed by propose() — the ingest design refiner's zero-credit demo (a scripted goal; the mapper never applies a proposed level absent from the detected design, so an illustrative payload is safe). No fabricated values, ≤120 words, mirrors the live gateway. Spec: docs/ai-gateway-wiring/spec.md + docs/ai-cross-stage-entry-points/build-spec.md. propose_sweep is intentionally left to the deterministic ranker (rank_sweep_space).",
+  "_comment": "Claude-authored operator-gateway recordings — the canned demo engine (SELOM_AI_GATEWAY=operator). `explanations` are grounded facts keyed by request_type:key — explain_score by scorecard.paper_id (reproducibility/tier/confidence/findings), grade_advice by skill_id:mode (the figure's statistical test + assumptions, from ai.grade), draft_methods by skill_id (a polished version of that skill's deterministic methods prose, preserving every number/test/citation). `plans` are goal-keyed ActionPlans replayed by propose() — the ingest design refiner's zero-credit demo (a scripted goal; the mapper never applies a proposed level absent from the detected design, so an illustrative payload is safe). No fabricated values, ≤120 words, mirrors the live gateway. Spec: docs/ai-gateway-wiring/spec.md + docs/ai-cross-stage-entry-points/build-spec.md + docs/methods-draft/spec.md. propose_sweep is intentionally left to the deterministic ranker (rank_sweep_space).",
   "explanations": [
     {
       "request_type": "explain_score",
@@ -20,6 +20,11 @@
       "request_type": "grade_advice",
       "key": "deg:bulk",
       "text": "This DEG figure uses pyDESeq2 — a negative-binomial GLM with a Wald test on the condition coefficient — and reports Benjamini-Hochberg adjusted p-values (padj). It assumes you fed it raw integer counts (not normalized or logged), with at least two independent biological replicates per group; three or more is safer. Trust the padj column, not the raw p, when picking significant genes. If your replicates span batches, add the batch as a covariate so the contrast isn't confounded; with a large or complex design, limma-voom fits faster with similar results."
+    },
+    {
+      "request_type": "draft_methods",
+      "key": "deg",
+      "text": "Differential expression was quantified with PyDESeq2, a Python reimplementation of DESeq2: raw counts were modelled with a negative-binomial generalized linear model and the condition coefficient tested with the Wald test, while single-cell inputs were ranked per group with the Wilcoxon rank-sum test (Scanpy). P-values were corrected for multiple testing by the Benjamini-Hochberg procedure, and the top-ranked genes are reported for the specified contrast. Analysis was performed using Selom."
     }
   ],
   "plans": [
