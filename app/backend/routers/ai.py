@@ -210,9 +210,13 @@ class ExplainRequest(BaseModel):
                          number / threshold / citation. The deterministic fallback IS
                          ``base_text`` verbatim, so gateway-off returns the honest draft
                          (``source="deterministic"``, no ✨) and a no-op polish stays so.
+    ``draft_legend``   — the same polish over a figure's deterministic LEGEND/caption
+                         (``companions.legends``); identical honesty lever (fallback = ``base_text``).
     """
 
-    request: Literal["explain_score", "propose_sweep", "grade_advice", "draft_methods"]
+    request: Literal[
+        "explain_score", "propose_sweep", "grade_advice", "draft_methods", "draft_legend"
+    ]
     stage: str = "grade"
     skill_id: str | None = None
     goal: str = ""

@@ -197,9 +197,9 @@ export function mockExplain(
     base_text?: string;
   },
 ): string {
-  if (req === "draft_methods") {
-    // The deterministic draft IS the run's own methods prose, returned verbatim (source stays
-    // "deterministic", no ✨) — mirrors `_deterministic_explain`'s draft_methods branch.
+  if (req === "draft_methods" || req === "draft_legend") {
+    // The deterministic draft IS the run's own methods/legend prose, returned verbatim (source stays
+    // "deterministic", no ✨) — mirrors `_deterministic_explain`'s draft branch.
     return data.base_text ?? "";
   }
   if (req === "explain_score") {

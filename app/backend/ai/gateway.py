@@ -144,8 +144,8 @@ def _deterministic_explain(request_type: str, data: dict, goal: str) -> str:
             "parameters. Check that your data meets the test's assumptions (replicates, independence, "
             "input scale) before trusting the p-values, and switch tests if it doesn't."
         )
-    if request_type == "draft_methods":
-        # The deterministic draft IS the run's own methods prose, returned VERBATIM. This is the
+    if request_type in ("draft_methods", "draft_legend"):
+        # The deterministic draft IS the run's own methods/legend prose, returned VERBATIM. This is the
         # honesty lever (docs/methods-draft/spec.md): gateway-off returns the deterministic draft
         # (`source="deterministic"`, no ✨), and it is the fallback the live gateway's polish is
         # compared against — a no-op polish stays `deterministic`, never a false ✨.
@@ -217,6 +217,15 @@ def build_explain_prompt(request_type: str, data: dict, goal: str) -> str:
             "nothing and drop nothing factual. If the goal is empty or you cannot improve it, return "
             "base_text unchanged.",
         ]
+    elif request_type == "draft_legend":
+        lines += [
+            "The data carries base_text: a figure's deterministic, publication-ready LEGEND (caption).",
+            "POLISH base_text to the user's goal (tighten wording, match a journal's caption style) and "
+            "return ONLY the rewritten caption prose — no preamble, no 'Figure N.' number, no "
+            "commentary. PRESERVE every number, threshold, group/contrast name, and quantity EXACTLY; "
+            "invent nothing and drop nothing factual. If the goal is empty or you cannot improve it, "
+            "return base_text unchanged.",
+        ]
     lines.append(f"Data (JSON): {json.dumps(data, indent=2)}")
     return "\n".join(lines)
 
@@ -244,9 +253,9 @@ def _operator_input_key(request_type: str, data: dict) -> str | None:
             return None
         # deg's advice differs by mode → key includes it so one recording per (skill, mode) is possible.
         return f"{key}:{st['mode']}" if st.get("mode") else str(key)
-    if request_type == "draft_methods":
+    if request_type in ("draft_methods", "draft_legend"):
         # Key on the figure's skill (the endpoint threads `skill_id` into `data`, as the other requests
-        # do) so one recording lights up each skill's polished methods demo. `None` → deterministic.
+        # do) so one recording lights up each skill's polished methods/legend demo. `None` → deterministic.
         key = data.get("skill_id")
         return str(key).split(".")[-1] if key else None
     return None

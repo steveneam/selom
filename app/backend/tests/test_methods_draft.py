@@ -138,3 +138,42 @@ def test_explain_endpoint_draft_methods_never_records_a_gap():
 
     explain(ExplainRequest(request="draft_methods", skill_id="deg", base_text=_BASE))
     assert g.list_gaps() == []
+
+
+# --- draft_legend — the symmetric sibling over a figure's caption ------------------------------------
+
+_LEGEND = "Volcano plot of differential expression; genes with |log2FC| >= 3 and FDR <= 0.05 highlighted."
+
+
+def test_deterministic_explain_draft_legend_returns_base_text_verbatim():
+    # Same honesty lever as draft_methods: the deterministic legend draft is base_text unchanged.
+    assert _deterministic_explain("draft_legend", {"base_text": _LEGEND}, "tighten") == _LEGEND
+    assert _deterministic_explain("draft_legend", {}, "polish") == ""
+
+
+def test_build_explain_prompt_draft_legend_grounds_on_caption():
+    prompt = build_explain_prompt("draft_legend", {"base_text": _LEGEND}, "match a journal caption")
+    assert "LEGEND" in prompt and "POLISH" in prompt and "PRESERVE" in prompt
+    assert _LEGEND in prompt
+
+
+def test_operator_input_key_draft_legend_keys_on_skill():
+    assert _operator_input_key("draft_legend", {"skill_id": "selom.volcano"}) == "volcano"
+    assert _operator_input_key("draft_legend", {}) is None
+
+
+def test_operator_recording_replays_draft_legend_volcano():
+    # The bundled recordings carry a draft_legend:volcano entry (the zero-credit demo).
+    gw = OperatorActionGateway.from_recordings()
+    text = gw.explain("draft_legend", {"skill_id": "volcano", "base_text": _LEGEND}, "polish it")
+    assert "Volcano plot" in text
+    assert text != _LEGEND  # differs from base_text → endpoint labels source="ai" honestly
+
+
+def test_explain_endpoint_draft_legend_deterministic_source_gateway_off():
+    from routers.ai import ExplainRequest, explain
+
+    resp = explain(ExplainRequest(request="draft_legend", skill_id="volcano", base_text=_LEGEND))
+    assert resp["request"] == "draft_legend"
+    assert resp["source"] == "deterministic"
+    assert resp["text"] == _LEGEND

@@ -129,7 +129,7 @@ export interface GapBacklogEntry {
 
 /** `POST /ai/explain` request — informational, never a mutation. */
 export interface ExplainRequest {
-  request: "explain_score" | "propose_sweep" | "grade_advice" | "draft_methods";
+  request: "explain_score" | "propose_sweep" | "grade_advice" | "draft_methods" | "draft_legend";
   stage?: string;
   skill_id?: string | null;
   goal?: string;

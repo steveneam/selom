@@ -25,6 +25,11 @@
       "request_type": "draft_methods",
       "key": "deg",
       "text": "Differential expression was quantified with PyDESeq2, a Python reimplementation of DESeq2: raw counts were modelled with a negative-binomial generalized linear model and the condition coefficient tested with the Wald test, while single-cell inputs were ranked per group with the Wilcoxon rank-sum test (Scanpy). P-values were corrected for multiple testing by the Benjamini-Hochberg procedure, and the top-ranked genes are reported for the specified contrast. Analysis was performed using Selom."
+    },
+    {
+      "request_type": "draft_legend",
+      "key": "volcano",
+      "text": "Volcano plot of differential expression, plotting -log10 adjusted p-value against log2 fold change. Genes passing the fold-change and false-discovery-rate thresholds are highlighted, with the most significant genes labelled; up- and down-regulated genes are coloured separately."
     }
   ],
   "plans": [
