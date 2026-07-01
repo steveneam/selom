@@ -197,8 +197,12 @@ export const handlers = [
       skill_id?: string | null;
       goal?: string;
       params?: Record<string, unknown>;
+      stage?: string;
+      data_columns?: string[];
     };
-    return HttpResponse.json(mockHelperTurn(body.skill_id ?? null, body.goal ?? "", body.params ?? {}));
+    return HttpResponse.json(
+      mockHelperTurn(body.skill_id ?? null, body.goal ?? "", body.params ?? {}, body.stage, body.data_columns),
+    );
   }),
   http.post("/api/ai/apply", async ({ request }) => {
     const fd = await request.formData();

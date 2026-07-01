@@ -8,6 +8,7 @@
  */
 
 import type { SkillParams } from "@/lib/skills/api";
+import type { DesignHints, DesignPatch } from "@/lib/intake/design";
 import type { AiActionDelta, AiActionType, AiProposal, CapabilityGap, HelperTurn } from "./types";
 
 /**
@@ -47,6 +48,70 @@ export function selectedSkillFromTurn(turn: HelperTurn): SelectedSkillResult {
   // No successful selection — surface a no_fitting_skill gap if the gateway recorded one.
   const noFitGap = turn.gaps.find((g) => g.unmet === "no_fitting_skill");
   return { skillId: null, gap: noFitGap };
+}
+
+/**
+ * The ingest AI refiner's output (Layer A 2b): the design PATCH that pre-fills the questionnaire + the
+ * approved-action DELTA that attributes the eventual run through the chokepoint (✨) + the rationale.
+ */
+export interface IngestDesignProposal {
+  patch: DesignPatch;
+  action: AiActionDelta;
+  rationale: string;
+}
+
+/**
+ * Map an ingest-stage {@link HelperTurn} into a design PATCH (to pre-fill the editable questionnaire)
+ * + the `set_design` action DELTA (for /ai/apply attribution). Bridges the action payload
+ * `{condition, control, treatment}` → the questionnaire's `{groupKey, reference, treatment}`.
+ *
+ * Honesty invariant (spine): NEVER carries a level absent from the DETECTED design — an out-of-set
+ * `control`/`treatment` is dropped (a coherent-but-unfulfillable intent → a gap, not an invented
+ * level). `groupKey` is set only when the AI named a REAL candidate column (scRNA obs); bulk's key is
+ * the header sentinel the AI can't name, so the single detected candidate is left as-is. Returns null
+ * when there's no staged `set_design` action, or nothing usable survived the level check.
+ */
+export function designFromIngestActions(
+  turn: HelperTurn,
+  hints: DesignHints | null,
+): IngestDesignProposal | null {
+  const action = turn.plan.actions.find((a) => a.type === "set_design");
+  if (!action) return null;
+  // It must have actually STAGED (not been gated / rejected by the spine).
+  const wasStaged = turn.results.some((r) => r.action_id === action.id && r.status === "staged");
+  if (!wasStaged) return null;
+  const payload = action.payload as { condition?: string; control?: string; treatment?: string };
+
+  // The candidate whose levels we validate against: the one the AI's `condition` names (a real scRNA
+  // obs candidate), else the best / only detected candidate (bulk's header-inferred pseudo-column).
+  const named = payload.condition
+    ? hints?.group_candidates.find((c) => c.key === payload.condition)
+    : undefined;
+  const cand =
+    named ?? hints?.group_candidates.find((c) => c.key === hints.best_group) ?? hints?.group_candidates[0];
+  const levelNames = new Set((cand?.levels ?? []).map((l) => l.name));
+
+  const patch: DesignPatch = {};
+  if (named) patch.groupKey = named.key; // only a real candidate column; bulk's sentinel is left as-is
+  if (payload.control && levelNames.has(payload.control)) patch.reference = payload.control;
+  if (payload.treatment && levelNames.has(payload.treatment)) patch.treatment = payload.treatment;
+
+  // Nothing usable survived the honesty check → the refiner honestly proposed no change.
+  if (patch.groupKey === undefined && patch.reference === undefined && patch.treatment === undefined) {
+    return null;
+  }
+
+  const tag = turn.provenance_actions.find((a) => a.action_id === action.id);
+  return {
+    patch,
+    action: {
+      action_id: action.id,
+      type: "set_design",
+      target: action.target || "design",
+      prompt: tag?.prompt ?? turn.goal,
+    },
+    rationale: action.rationale || turn.plan.notes || "",
+  };
 }
 
 /** Figure-data controls stringify their values; the AI proposes typed. Compare as strings. */

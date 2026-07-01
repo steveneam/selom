@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getSkill } from "@/lib/catalog/seed";
+import { AskAi } from "@/components/ai/ask-ai";
 import { questionsFor, type IntakeAnswers } from "@/lib/intake/mock";
 import {
   candidateFor,
@@ -20,7 +21,9 @@ import {
   type DesignChoice,
   type DesignHints,
 } from "@/lib/intake/design";
+import { designFromIngestActions, type IngestDesignProposal } from "@/lib/ai/proposals";
 import type { DataRouting } from "@/lib/skills/api";
+import type { AiActionDelta, HelperTurn } from "@/lib/ai/types";
 import type { Modality } from "@/lib/projects/types";
 
 /**
@@ -35,13 +38,20 @@ export function IntakeQuestionnaire({
   modality,
   design,
   routing,
+  dataColumns,
   onSubmit,
   onSkip,
 }: {
   modality: Modality;
   design?: DesignHints | null;
   routing?: DataRouting | null;
-  onSubmit: (answers: IntakeAnswers, choice: DesignChoice | null) => void;
+  /** The dataset's column names — forwarded to the ingest AI refiner so it can map messy sample
+   *  names → conditions. Absent → the refiner still runs, with less context. */
+  dataColumns?: string[] | null;
+  /** On confirm: the answers, the confirmed design, and — when the design came from the AI refiner and
+   *  was CONFIRMED UNCHANGED — the `set_design` action delta that attributes the run through the
+   *  chokepoint (✨). Absent/empty aiActions → a plain human-attributed run. */
+  onSubmit: (answers: IntakeAnswers, choice: DesignChoice | null, aiActions?: AiActionDelta[]) => void;
   onSkip: () => void;
 }) {
   const needsDesign = !!design?.needs_design;
@@ -55,6 +65,9 @@ export function IntakeQuestionnaire({
   // scRNA: the biological-replicate column (followups #6). Seeded from detection; the user can pick the
   // right one when it wasn't detected (else pseudobulk counts cells as replicates, inflating n).
   const [sampleCol, setSampleCol] = React.useState<string>(initial?.sampleCol ?? "");
+  // The ingest AI refiner's last proposal (2b): its patch pre-filled the design; kept so a CONFIRMED-
+  // UNCHANGED design attributes the run through the chokepoint (✨). Cleared on any dataset change.
+  const [aiProposal, setAiProposal] = React.useState<IngestDesignProposal | null>(null);
 
   // Re-seed the contrast when the dataset's design changes (new file / re-inspect / reload
   // re-attach). React-documented "adjust state when a prop changes" — a render-time reset keyed on
@@ -66,6 +79,28 @@ export function IntakeQuestionnaire({
     setReference(initial?.reference ?? "");
     setTreatment(initial?.treatment ?? "");
     setSampleCol(initial?.sampleCol ?? "");
+    setAiProposal(null); // a new dataset's design isn't the prior AI proposal
+  }
+
+  // The ingest AI refiner (2b): map the proposal turn → a design patch (honesty-checked against the
+  // detected levels), PRE-FILL the editable contrast, and return a short note. Never applies silently;
+  // the user confirms/edits below. Returns null → ask-ai shows its honest "nothing usable" fallback.
+  function applyIngestProposal(turn: HelperTurn): string | null {
+    const proposed = designFromIngestActions(turn, design ?? null);
+    if (!proposed) {
+      setAiProposal(null);
+      return null;
+    }
+    const { patch } = proposed;
+    if (patch.groupKey && patch.groupKey !== groupKey) pickGroup(patch.groupKey);
+    if (patch.reference) setReference(patch.reference);
+    if (patch.treatment) setTreatment(patch.treatment);
+    setAiProposal(proposed);
+    const bits = [
+      patch.reference && `control ${patch.reference}`,
+      patch.treatment && `treatment ${patch.treatment}`,
+    ].filter(Boolean);
+    return `✨ Proposed ${bits.join(" · ") || "a design"} — review below, then Confirm & run.`;
   }
 
   const candidate = candidateFor(design, groupKey);
@@ -118,7 +153,18 @@ export function IntakeQuestionnaire({
             sampleCol: sampleCol || null,
           }
         : null;
-    onSubmit(answers, choice);
+    // AI attribution (2b): carry the refiner's set_design action ONLY when its proposal was CONFIRMED
+    // UNCHANGED — every AI-proposed field still equals the confirmed value. If the user edited any of
+    // it, the run is human-attributed (no ✨). Mirrors approvedActions' "staged still equals proposed"
+    // honesty check; the server stamps the trusted actor via the chokepoint.
+    const p = aiProposal?.patch;
+    const aiUnchanged =
+      !!p &&
+      (p.groupKey === undefined || p.groupKey === groupKey) &&
+      (p.reference === undefined || p.reference === reference) &&
+      (p.treatment === undefined || p.treatment === treatment);
+    const aiActions = aiUnchanged && choice ? [aiProposal!.action] : [];
+    onSubmit(answers, choice, aiActions);
   }
 
   function setAnswer(id: string, v: string) {
@@ -293,6 +339,18 @@ export function IntakeQuestionnaire({
               )}
             </div>
           )}
+
+          {/* Layer A 2b — the AI refiner: reads messy free-text sample names → a control/treatment
+              contrast, PRE-FILLING the selects above (never silently). The deterministic detection
+              already ran; this is the L4 assist for the cases it couldn't parse. */}
+          <AskAi
+            stage="ingest"
+            mode="staged"
+            label="Ask AI to read your sample names"
+            placeholder="e.g. these are WT vs knockout — set the contrast"
+            context={{ dataColumns: dataColumns ?? null }}
+            onIngest={applyIngestProposal}
+          />
         </div>
       )}
 

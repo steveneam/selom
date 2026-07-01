@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/ui/cn";
 import { proposeActions } from "@/lib/ai/api";
 import { proposalsFromTurn, selectedSkillFromTurn } from "@/lib/ai/proposals";
-import type { AiProposal } from "@/lib/ai/types";
+import type { AiProposal, HelperTurn } from "@/lib/ai/types";
 import type { FigureSpec } from "@/lib/figure/figure-spec";
 import type { SkillParams } from "@/lib/skills/api";
 
@@ -66,6 +66,7 @@ export function AskAi({
   hint,
   onStaged,
   onSelect,
+  onIngest,
   onAutoTune,
   autoTuneLabel,
   pendingActive,
@@ -91,6 +92,15 @@ export function AskAi({
    * `null` when the slug cannot be found in the catalog (unresolved → honest note shown).
    */
   onSelect?: (skillId: string) => string | null;
+  /**
+   * Callback for stage="ingest" — receives the raw proposal turn. The caller (the intake
+   * questionnaire, which holds the detected design hints) maps it via `designFromIngestActions`,
+   * applies the patch to the editable design, and returns a short note to show (e.g. "Proposed WT
+   * vs KO — review below"), or `null` when nothing usable was proposed (an honest fallback note is
+   * then shown). The mapping lives with the caller because it needs the detected levels for the
+   * never-invent-a-level honesty check.
+   */
+  onIngest?: (turn: HelperTurn) => string | null;
   /**
    * Optional one-click "Auto-tune" — the DETERMINISTIC best-practice default for this stage
    * (docs/auto-tune/spec.md). When provided, a neutral (non-✨) button renders ABOVE the AI chat
@@ -152,7 +162,36 @@ export function AskAi({
     const g = goal.trim();
     if (!g || busy) return;
 
-    if (mode === "staged") {
+    if (stage === "ingest") {
+      // Ingest is STAGED, but maps to a design PATCH (not figure-data params): fetch the proposal and
+      // let the caller (the questionnaire, which holds the detected design) map + apply it + describe it.
+      setBusy(true);
+      setNote(null);
+      try {
+        const turn = await proposeActions({
+          stage,
+          skill_id: context.skillId,
+          params: context.params,
+          goal: g,
+          // The detected column names help the gateway map messy sample names → conditions.
+          data_columns: context.dataColumns ?? undefined,
+        });
+        const applied = onIngest?.(turn) ?? null;
+        if (applied) {
+          setNote(applied);
+          setGoal("");
+        } else {
+          setNote(
+            turn.plan.notes ||
+              "No design suggestion — the AI gateway is off or couldn't map your names to the detected conditions. Your form is unaffected.",
+          );
+        }
+      } catch (e) {
+        setNote(e instanceof Error ? e.message : "Couldn't reach the AI helper.");
+      } finally {
+        setBusy(false);
+      }
+    } else if (mode === "staged") {
       setBusy(true);
       setNote(null);
       try {

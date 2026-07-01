@@ -47,6 +47,19 @@ export interface DesignHints {
 /** The bulk sentinel: condition labels inferred from the sample column names (no real column). */
 export const COLUMN_NAMES_KEY = "__column_names__";
 
+/**
+ * A partial design the ingest AI refiner (Layer A 2b) proposes, to PRE-FILL the editable
+ * questionnaire — never applied silently; the user confirms/edits it. Only fields the AI actually
+ * proposed AND that survive the honesty check are set: `reference`/`treatment` must be levels PRESENT
+ * in the detected design (an absent level is dropped — a coherent-but-unfulfillable intent becomes a
+ * gap, never an invented level); `groupKey` is set only when the AI named a real candidate column.
+ */
+export interface DesignPatch {
+  groupKey?: string;
+  reference?: string;
+  treatment?: string;
+}
+
 /** The user's confirmed design (the confirm-card output) — staged into the run. */
 export interface DesignChoice {
   /** The chosen group factor: an obs/sheet column, or `__column_names__` for bulk headers. */

@@ -1,5 +1,5 @@
 {
-  "_comment": "Claude-authored operator-gateway recordings — the canned demo engine for the public showcase papers (SELOM_AI_GATEWAY=operator). Grounded ONLY in each paper's real scorecard (reproducibility/tier/confidence/findings); no fabricated values, ≤120 words, mirrors the live gateway's explain style. Keyed by request_type:scorecard.paper_id. Spec: docs/ai-gateway-wiring/spec.md. propose_sweep is intentionally left to the deterministic ranker (rank_sweep_space).",
+  "_comment": "Claude-authored operator-gateway recordings — the canned demo engine (SELOM_AI_GATEWAY=operator). `explanations` are grounded ONLY in each paper's real scorecard (reproducibility/tier/confidence/findings), keyed by request_type:scorecard.paper_id. `plans` are goal-keyed ActionPlans replayed by propose() — the ingest design refiner's zero-credit demo (a scripted goal; the mapper never applies a proposed level absent from the detected design, so an illustrative payload is safe). No fabricated values, ≤120 words, mirrors the live gateway. Spec: docs/ai-gateway-wiring/spec.md + docs/ai-cross-stage-entry-points/build-spec.md. propose_sweep is intentionally left to the deterministic ranker (rank_sweep_space).",
   "explanations": [
     {
       "request_type": "explain_score",
@@ -17,5 +17,18 @@
       "text": "Reproducibility 96/100 earns the top 'verified' tier at full Selom confidence (100/100). All 5 in-scope panels scored, 9 panel comparisons reproduced, and there are no paper-irreproducible or discrepant findings — Selom recovered the published figures from the data essentially exactly. 1 panel is out-of-scope, a non-gradable figure type. This is the cleanest of the showcase reproductions: the small gap from 100 reflects minor numeric rounding rather than any structural disagreement. No action is needed to trust these panels — they are a faithful, end-to-end reproduction of the paper's results."
     }
   ],
-  "plans": []
+  "plans": [
+    {
+      "goal": "Read my sample names and set up the contrast",
+      "actions": [
+        {
+          "type": "set_design",
+          "target": "design",
+          "payload": { "condition": "genotype", "control": "WT", "treatment": "KO" },
+          "rationale": "Two genotype groups read from the sample column names; 'WT' matches a control keyword, so it references against 'KO' (logFC = KO vs WT)."
+        }
+      ],
+      "notes": "Proposed a WT-vs-KO contrast from the sample column names — confirm or edit it below, then re-run."
+    }
+  ]
 }

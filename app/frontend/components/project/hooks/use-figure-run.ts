@@ -140,7 +140,16 @@ export function useFigureRun({
       }
       setRunning(step.skillId);
       try {
-        const res = await runSkill(runtimeSkillId(step.skillId), file, step.params, designFile, opts);
+        // Layer A 2b: an AI-refined design (confirmed unchanged) carries the set_design delta on the
+        // step → route THIS fresh run through /ai/apply so the figure gets provenance.actions[] (✨),
+        // exactly like a figure-data AI re-run. Deterministic result is identical (same _execute_skill_run
+        // + posted params); the chokepoint stamps the trusted actor. Else the plain human run.
+        const res = step.aiActions?.length
+          ? await applyAiActions(runtimeSkillId(step.skillId), file, step.params, step.aiActions, {
+              override: opts.override,
+              design: designFile,
+            })
+          : await runSkill(runtimeSkillId(step.skillId), file, step.params, designFile, opts);
         const name = getSkill(step.skillId)?.name ?? step.skillId;
         // Persist the figure durably — full spec + the provenance bundle (the staleness
         // trigger-set, stamped with the dataset's current version). Both were transient

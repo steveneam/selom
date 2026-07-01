@@ -12,6 +12,7 @@ import {
   applyAcceptedProposals,
   approvedActions,
   authorOf,
+  designFromIngestActions,
   dismissProposal,
   pendingCounter,
   proposalsFromTurn,
@@ -19,6 +20,7 @@ import {
   unacceptProposal,
 } from "./proposals";
 import { getSkill } from "@/lib/catalog/seed";
+import type { DesignHints } from "@/lib/intake/design";
 import type { AiProposal, CapabilityGap, HelperTurn } from "./types";
 
 function proposal(over: Partial<AiProposal> = {}): AiProposal {
@@ -171,6 +173,98 @@ describe("applyAcceptedProposals", () => {
     const out = applyAcceptedProposals(base, [proposal({ status: "proposed" })]);
     expect(out).toEqual(base);
     expect(out).not.toBe(base);
+  });
+});
+
+describe("designFromIngestActions (2b — the ingest AI refiner mapper)", () => {
+  function ingestTurn(
+    payload: Record<string, unknown>,
+    status: "staged" | "rejected" = "staged",
+  ): HelperTurn {
+    const aid = "d1";
+    return {
+      goal: "read my sample names",
+      plan: {
+        goal: "read my sample names", notes: "two groups",
+        actions: [{ id: aid, type: "set_design", target: "design", payload, rationale: "two groups from names" }],
+      },
+      results: [
+        { action_id: aid, type: "set_design", target: "design", tier: "recompute", status,
+          effect: payload, errors: [], gap: null },
+      ],
+      staged_params: {},
+      figure_spec: null,
+      gaps: [],
+      provenance_actions: [
+        { action_id: aid, actor: "ai", type: "set_design", target: "design",
+          prompt: "read my sample names", model: "m", approved_by: "", approved_at: "" },
+      ],
+    };
+  }
+
+  const bulkHints: DesignHints = {
+    needs_design: true, source: "column_names", modality: "bulk_counts",
+    best_group: "__column_names__", sample_col: null, note: "",
+    group_candidates: [
+      {
+        key: "__column_names__", label: "sample columns", n_levels: 2, reference_guess: "Control",
+        levels: [
+          { name: "Control", n_replicates: 3, replicate_unit: "samples" },
+          { name: "PDE6B", n_replicates: 3, replicate_unit: "samples" },
+        ],
+      },
+    ],
+  };
+
+  it("maps set_design {control,treatment} → a patch + the set_design delta (control → reference)", () => {
+    const out = designFromIngestActions(
+      ingestTurn({ condition: "genotype", control: "Control", treatment: "PDE6B" }), bulkHints);
+    expect(out).not.toBeNull();
+    expect(out!.patch).toEqual({ reference: "Control", treatment: "PDE6B" }); // no groupKey (bulk sentinel)
+    expect(out!.action).toEqual({ action_id: "d1", type: "set_design", target: "design", prompt: "read my sample names" });
+  });
+
+  it("NEVER invents a level absent from the detected design — drops out-of-set control/treatment → null", () => {
+    // AI proposes WT/KO but the data has Control/PDE6B → nothing usable survives → honest null.
+    expect(designFromIngestActions(ingestTurn({ control: "WT", treatment: "KO" }), bulkHints)).toBeNull();
+  });
+
+  it("keeps the in-set side and drops the absent side (partial honesty)", () => {
+    const out = designFromIngestActions(ingestTurn({ control: "Control", treatment: "KO" }), bulkHints);
+    expect(out!.patch).toEqual({ reference: "Control" }); // treatment KO dropped (absent from levels)
+  });
+
+  it("returns null when the set_design action was NOT staged (gated / rejected)", () => {
+    expect(
+      designFromIngestActions(ingestTurn({ control: "Control", treatment: "PDE6B" }, "rejected"), bulkHints),
+    ).toBeNull();
+  });
+
+  it("returns null when there is no set_design action in the turn", () => {
+    const turn: HelperTurn = {
+      goal: "g", plan: { goal: "g", notes: "", actions: [] }, results: [],
+      staged_params: {}, figure_spec: null, gaps: [], provenance_actions: [],
+    };
+    expect(designFromIngestActions(turn, bulkHints)).toBeNull();
+  });
+
+  it("sets groupKey only when the AI names a REAL candidate column (scRNA obs)", () => {
+    const scHints: DesignHints = {
+      needs_design: true, source: "obs", modality: "sc_counts", best_group: "condition",
+      sample_col: "sample", note: "",
+      group_candidates: [
+        {
+          key: "condition", label: "condition", n_levels: 2, reference_guess: "Ctrl",
+          levels: [
+            { name: "Ctrl", n_replicates: 2, replicate_unit: "samples" },
+            { name: "Mut", n_replicates: 2, replicate_unit: "samples" },
+          ],
+        },
+      ],
+    };
+    const out = designFromIngestActions(
+      ingestTurn({ condition: "condition", control: "Ctrl", treatment: "Mut" }), scHints);
+    expect(out!.patch).toEqual({ groupKey: "condition", reference: "Ctrl", treatment: "Mut" });
   });
 });
 

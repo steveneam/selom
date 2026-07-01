@@ -257,6 +257,33 @@ def test_recordings_file_is_well_formed():
         assert ("explain_score", slug) in keys
 
 
+def test_recordings_plans_validate_and_replay_by_goal():
+    # The ingest design-refiner demo: from_recordings now loads plans[] (was silently ignored),
+    # every recorded plan validates as an ActionPlan, and propose() replays it by goal.
+    from ai.models import ActionContext, ActionPlan
+
+    doc = json.loads(_RECORDINGS.read_text(encoding="utf-8"))
+    plans = doc.get("plans", [])
+    assert plans, "expected at least one recorded propose plan"
+    for entry in plans:
+        plan = ActionPlan.model_validate(entry)
+        assert plan.goal and plan.actions
+
+    gw = OperatorActionGateway.from_recordings(str(_RECORDINGS))
+    goal = "Read my sample names and set up the contrast"
+    replayed = gw.propose(ActionContext(stage="ingest"), goal)
+    assert replayed.goal == goal
+    assert any(a.type == "set_design" for a in replayed.actions)
+
+
+def test_operator_unknown_goal_returns_empty_plan():
+    from ai.models import ActionContext
+
+    gw = OperatorActionGateway.from_recordings(str(_RECORDINGS))
+    plan = gw.propose(ActionContext(stage="ingest"), "a goal with no recording")
+    assert plan.actions == []
+
+
 @pytest.mark.parametrize("slug", ["rpgrip1", "jev", "hani"])
 def test_operator_lights_up_showcase_paper(slug):
     gw = OperatorActionGateway.from_recordings(str(_RECORDINGS))

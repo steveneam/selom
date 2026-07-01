@@ -1,4 +1,5 @@
 import type { Guardrail, Modality, QcReport } from "@/lib/projects/types";
+import type { AiActionDelta } from "@/lib/ai/types";
 
 /**
  * Deterministic mock of the guided-intake backend (docs/command-center/design.md
@@ -24,6 +25,10 @@ export interface ProposedStep {
   params: Record<string, string | number | boolean>;
   /** 0–1 model confidence; rendered, never hidden. */
   confidence: number;
+  /** Layer A 2b: the approved AI action delta for THIS step's run — present only when the ingest AI
+   *  refiner proposed the design AND the user confirmed it unchanged. Its presence routes the run
+   *  through /ai/apply (✨ attribution via the chokepoint) instead of a plain runSkill. */
+  aiActions?: AiActionDelta[];
 }
 
 export interface IntakeProposal {

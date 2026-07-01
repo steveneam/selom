@@ -305,10 +305,12 @@ class OperatorActionGateway:
 
             {"explanations": [{"request_type": "explain_score", "key": "rpgrip1",
                                "text": "…"}],
-             "plans": []}
+             "plans": [{"goal": "…", "actions": [{"type": "set_design", "target": "design",
+                                                  "payload": {"condition": "…"}}]}]}
 
         Explanations are keyed ``request_type:key`` where ``key`` is the per-INPUT id
-        (see :func:`_operator_input_key`); ``plans`` is reserved (goal-keyed) and empty today.
+        (see :func:`_operator_input_key`); ``plans`` are goal-keyed :class:`ActionPlan`s replayed
+        by :meth:`propose` (the canned demo for a scripted goal, e.g. the ingest design refiner).
         """
         gw = cls()
         resolved = path or str(Path(__file__).resolve().parent / "recordings" / "explain.json")
@@ -325,6 +327,16 @@ class OperatorActionGateway:
             rt, key, text = entry.get("request_type"), entry.get("key"), entry.get("text")
             if rt and key and text:
                 gw._explanations[f"{rt}:{key}"] = text
+        # Propose plans (goal-keyed). A malformed plan must never break startup — skip it
+        # (degrade-clean), the same policy the explanations loop follows.
+        for entry in doc.get("plans") or []:
+            if not isinstance(entry, dict):
+                continue
+            try:
+                plan = ActionPlan.model_validate(entry)
+            except Exception:  # noqa: BLE001 — a bad recording degrades to no plan, never a crash
+                continue
+            gw._plans[plan.goal] = plan
         return gw
 
     def record(self, goal: str, plan: ActionPlan) -> None:

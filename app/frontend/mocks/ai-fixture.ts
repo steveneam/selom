@@ -21,7 +21,17 @@ import type { GapBacklogEntry, HelperTurn } from "@/lib/ai/types";
 // merging two rows). Stays consistent WITHIN a turn (the plan/result/provenance all share it).
 let _mockSeq = 0;
 
-export function mockHelperTurn(skillId: string | null, goal: string, params: Record<string, unknown>): HelperTurn {
+export function mockHelperTurn(
+  skillId: string | null,
+  goal: string,
+  params: Record<string, unknown>,
+  stage?: string,
+  dataColumns?: string[],
+): HelperTurn {
+  // Ingest (2b): the refiner reads sample names → a contrast. Derive two labels from data_columns by
+  // stripping the trailing replicate suffix (loosely mirroring the engine) — self-consistent with the
+  // /data/inspect design fixture (both strip the same columns), so the mapper's level check passes.
+  if (stage === "ingest") return mockIngestTurn(goal, dataColumns ?? []);
   const aid = `mock-a${++_mockSeq}`;
   const isUmap = (skillId ?? "").includes("umap");
   const target = isUmap || "n_neighbors" in params ? "n_neighbors" : Object.keys(params)[0] ?? "resolution";
@@ -64,6 +74,43 @@ export function mockHelperTurn(skillId: string | null, goal: string, params: Rec
         approved_by: "",
         approved_at: "",
       },
+    ],
+  };
+}
+
+/** The ingest-stage mock turn (2b): one staged `set_design` action proposing a 2-group contrast read
+ *  from the sample column names. Wire-only (dev:mock) — the real mapping needs the live gateway. */
+function mockIngestTurn(goal: string, columns: string[]): HelperTurn {
+  const aid = `mock-a${++_mockSeq}`;
+  const labels = [...new Set(columns.map((c) => c.replace(/[_\-\s]*\d+$/, "")).filter(Boolean))];
+  const control = labels[0] ?? "Control";
+  const treatment = labels.find((l) => l !== control) ?? "Treatment";
+  const payload = { condition: "condition", control, treatment };
+  return {
+    goal,
+    plan: {
+      goal,
+      notes: "Mock ingest proposal (dev:mock, wire-only). The live gateway needs SELOM_AI_GATEWAY.",
+      actions: [
+        {
+          id: aid,
+          type: "set_design",
+          target: "design",
+          payload,
+          rationale: `Read two groups from the sample names: ${treatment} vs ${control}.`,
+        },
+      ],
+    },
+    results: [
+      { action_id: aid, type: "set_design", target: "design", tier: "recompute", status: "staged",
+        effect: payload, errors: [], gap: null },
+    ],
+    staged_params: payload,
+    figure_spec: null,
+    gaps: [],
+    provenance_actions: [
+      { action_id: aid, actor: "ai", type: "set_design", target: "design", prompt: goal,
+        model: "mock-model", approved_by: "", approved_at: "" },
     ],
   };
 }

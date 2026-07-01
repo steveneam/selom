@@ -19,19 +19,28 @@ import { detectModality, proposeForModality, type IntakeAnswers, type IntakeProp
 import { combineData, inspectData, modalityFromKind, qcFromInspect, type DataTypeOverride } from "@/lib/intake/inspect";
 import { designRunParams, type DesignChoice } from "@/lib/intake/design";
 import { projectStore } from "@/lib/projects/store";
+import type { AiActionDelta } from "@/lib/ai/types";
 import type { Dataset } from "@/lib/projects/types";
 
 /** Inject the confirmed experimental design (the questionnaire's confirm-card) into the proposal's
  *  DE step — the `deg` runner reads these params directly (reference/treatment/condition_col/…) and
  *  records them in provenance, so a gateway-off re-run reproduces. No design → the proposal is
- *  unchanged (an already-computed DE table / unsupervised run needs none). build-spec §3b. */
-function withDesign(proposal: IntakeProposal | null, choice: DesignChoice | null): IntakeProposal | null {
+ *  unchanged (an already-computed DE table / unsupervised run needs none). build-spec §3b.
+ *  `aiActions` (2b): when the design came from the AI refiner and was confirmed unchanged, attach the
+ *  set_design delta to the DE step so runFlow routes it through /ai/apply (✨ attribution). */
+function withDesign(
+  proposal: IntakeProposal | null,
+  choice: DesignChoice | null,
+  aiActions?: AiActionDelta[],
+): IntakeProposal | null {
   if (!proposal || !choice) return proposal;
   const dp = designRunParams(choice);
   return {
     ...proposal,
     steps: proposal.steps.map((s) =>
-      s.skillId === "selom.deg" ? { ...s, params: { ...s.params, ...dp } } : s,
+      s.skillId === "selom.deg"
+        ? { ...s, params: { ...s.params, ...dp }, ...(aiActions?.length ? { aiActions } : {}) }
+        : s,
     ),
   };
 }
@@ -393,11 +402,12 @@ export function DataPanel({
               modality={active.dataset.modality}
               design={active.dataset.design}
               routing={active.dataset.routing}
-              onSubmit={(answers: IntakeAnswers, choice: DesignChoice | null) =>
+              dataColumns={active.dataset.dataFit?.columns}
+              onSubmit={(answers: IntakeAnswers, choice: DesignChoice | null, aiActions?: AiActionDelta[]) =>
                 onAnalyze({
                   datasetId: active.dataset.id,
                   file: active.file,
-                  proposal: withDesign(proposeForModality(active.dataset.modality, answers), choice),
+                  proposal: withDesign(proposeForModality(active.dataset.modality, answers), choice, aiActions),
                   designFile,
                 })
               }
