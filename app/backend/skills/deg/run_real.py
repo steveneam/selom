@@ -458,12 +458,64 @@ def _bar(names, scores, title, jsonable, subtitle=None) -> dict:
     return jsonable(spec)
 
 
-# Map common timepoint labels to a numeric axis: "P14"/"day7"/"6h" -> 14/7/6.
+# The time-course floors, exported so the intake questionnaire imports the SAME numbers (a detected
+# time-course the runner would reject just trades a categorical fallback for a run error). Detecting a
+# trend needs >=3 ordered timepoints spanned by >=4 samples.
+MIN_TIMECOURSE_SAMPLES = 4
+MIN_TIMECOURSE_LEVELS = 3
+
+# Physical time units → a common base (seconds). Only a label that carries a recognized unit — a
+# trailing suffix ("3d", "90min") or a leading unit prefix ("day3", "wk2") — is scaled; an index
+# prefix (t0, P14) or a bare number is unitless. Used ONLY to order a MIXED-unit set; a single-unit
+# design keeps its face values.
+_TIME_UNIT_SECONDS: dict[str, float] = {
+    "s": 1.0, "sec": 1.0, "secs": 1.0,
+    "min": 60.0, "mins": 60.0,
+    "h": 3600.0, "hr": 3600.0, "hrs": 3600.0, "hour": 3600.0, "hours": 3600.0,
+    "d": 86400.0, "day": 86400.0, "days": 86400.0,
+    "w": 604800.0, "wk": 604800.0, "week": 604800.0, "weeks": 604800.0,
+    "mo": 2_592_000.0, "month": 2_592_000.0, "months": 2_592_000.0,
+}
+_TIME_UNIT_LABEL_RE = re.compile(
+    r"(?i)^\s*(?:(?P<prefix>[a-z]+)[\s_-]?)?(?P<num>-?\d+(?:\.\d+)?)[\s_-]?(?P<suffix>[a-z]+)?\s*$"
+)
+
+
+# Map common timepoint labels to a numeric axis: "P14"/"day7"/"6h" -> 14/7/6 (FACE value — the number
+# in the label's own unit). Mixed units are reconciled by numeric_time_axis, not here.
 def _numeric_time(value) -> float:
     m = re.search(r"-?\d+(?:\.\d+)?", str(value))
     if not m:
         raise ValueError(f"could not read a number from timepoint '{value}'")
     return float(m.group())
+
+
+def _time_unit_seconds(value) -> float | None:
+    """Seconds-per-unit for the physical time unit a timepoint label carries (a trailing suffix or a
+    leading unit prefix), or None for a unitless index (t0/P14) or a bare number. Shared with the
+    intake questionnaire so both classify units identically (no shadow copy)."""
+    m = _TIME_UNIT_LABEL_RE.match(str(value))
+    if not m:
+        return None
+    for tok in (m.group("suffix"), m.group("prefix")):
+        secs = _TIME_UNIT_SECONDS.get((tok or "").lower())
+        if secs is not None:
+            return secs
+    return None
+
+
+def numeric_time_axis(labels) -> list[float]:
+    """Map an ordered set of timepoint labels to a numeric axis. A single-unit (or unitless) design
+    keeps each label's FACE value (day0/day3/day7 -> 0/3/7, in its own unit — matching the paper's
+    axis, so nothing regresses). A MIXED-unit design (24h + 3d) is normalized to its smallest present
+    unit so it orders correctly (24h, 3d -> 24, 72) instead of silently mis-ordering by face value
+    (24, 3). Shared by the runner and the intake questionnaire so DETECTED == CONSUMED."""
+    vals = [str(x) for x in labels]
+    units = {u for x in vals if (u := _time_unit_seconds(x)) is not None}
+    if len(units) <= 1:
+        return [_numeric_time(x) for x in vals]
+    base = min(units)
+    return [_numeric_time(x) * ((_time_unit_seconds(x) or base) / base) for x in vals]
 
 
 def _timecourse(data_path: str, params: dict) -> dict:
@@ -498,17 +550,22 @@ def _timecourse(data_path: str, params: dict) -> dict:
         if group_col not in design.columns:
             raise ValueError(f"group_col '{group_col}' not in design columns {list(design.columns)}")
         samples = [s for s in samples if str(design[group_col].get(str(s))) == group_val]
-    if len(samples) < 4:
+    if len(samples) < MIN_TIMECOURSE_SAMPLES:
         raise ValueError(
-            f"time-course needs >=4 samples spanning the timepoints; matched {len(samples)} "
-            f"(check the design join / group filter)"
+            f"time-course needs >={MIN_TIMECOURSE_SAMPLES} samples spanning the timepoints; "
+            f"matched {len(samples)} (check the design join / group filter)"
         )
 
     sub = counts[samples].copy()
     sub = sub[sub.sum(axis=1) >= int(params.get("min_count", 10))]
-    times = np.array([_numeric_time(design[time_col].get(str(s))) for s in samples], dtype=float)
-    if len(set(times.tolist())) < 3:
-        raise ValueError(f"time-course needs >=3 distinct timepoints, found {sorted(set(times.tolist()))}")
+    # numeric_time_axis reconciles mixed units (24h + 3d -> 24, 72) so the trend axis can't be silently
+    # mis-ordered by face value; a single-unit sheet keeps its face values (no change).
+    times = np.array(numeric_time_axis([design[time_col].get(str(s)) for s in samples]), dtype=float)
+    if len(set(times.tolist())) < MIN_TIMECOURSE_LEVELS:
+        raise ValueError(
+            f"time-course needs >={MIN_TIMECOURSE_LEVELS} distinct timepoints, "
+            f"found {sorted(set(times.tolist()))}"
+        )
 
     # Optional covariate to adjust for a known confounder (e.g. genotype): the trend is
     # then tested net of it (design ~covariate + time), keeping the test honest.

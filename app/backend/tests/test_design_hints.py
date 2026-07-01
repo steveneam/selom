@@ -76,9 +76,11 @@ def test_reuses_the_deg_runner_label_constants():
     # The design detector must consume the SAME label logic the deg run consumes (detection == run).
     # These symbols are the contract; a rename/move in skills.deg.run_real must fail LOUDLY here, not
     # silently degrade the questionnaire to a stale copy (the shadow-copy fallback was removed).
-    from engine.questionnaire import _obs_aliases, _rep_regex
+    from engine.questionnaire import _obs_aliases, _rep_regex, _timecourse_floors
     from skills.deg.run_real import (
         DEFAULT_REP_REGEX,
+        MIN_TIMECOURSE_LEVELS,
+        MIN_TIMECOURSE_SAMPLES,
         _CONDITION_FALLBACKS,
         _SAMPLE_FALLBACKS,
     )
@@ -87,6 +89,8 @@ def test_reuses_the_deg_runner_label_constants():
     cond, sample = _obs_aliases()
     assert cond == _CONDITION_FALLBACKS
     assert sample == _SAMPLE_FALLBACKS
+    # The time-course floors are the runner's own constants (no duplicated literals to drift).
+    assert _timecourse_floors() == (MIN_TIMECOURSE_SAMPLES, MIN_TIMECOURSE_LEVELS)
 
 
 def test_bulk_single_condition_needs_no_design():
@@ -153,6 +157,37 @@ def test_bulk_timecourse_detected_and_time_sorted():
     assert rows == {
         "t0_1": 0.0, "t0_2": 0.0, "t24_1": 24.0, "t24_2": 24.0, "t120_1": 120.0, "t120_2": 120.0,
     }
+
+
+def test_bulk_timecourse_mixed_units_order_correctly():
+    # The mixed-unit trap (gauntlet finding): labels 24h/48h/3d parse by FACE value to {24,48,3},
+    # silently ordering 3d (=72h) as the baseline. numeric_time_axis normalizes to the smallest unit
+    # (hours) so the order is 24h < 48h < 3d and 24h is the baseline. The level `time` carries the
+    # normalized axis value (3d -> 72), so the synthesized sheet + the FE display are order-correct.
+    df = pd.DataFrame({
+        "gene": [f"g{i}" for i in range(4)],
+        "24h_1": range(4), "24h_2": range(4), "48h_1": range(4), "3d_1": range(4),
+    })
+    hints = suggest_design_hints(DataBundle(payload=df, kind=BULK_COUNTS))
+    cand = hints.group_candidates[0]
+    assert cand.kind == "time_course"
+    assert [lv.name for lv in cand.levels] == ["24h", "48h", "3d"]      # NOT 3d, 24h, 48h
+    assert cand.reference_guess == "24h"                                # baseline = earliest, not 3d
+    assert [lv.time for lv in cand.levels] == [24.0, 48.0, 72.0]        # 3d normalized to 72 hours
+    assert {r.sample: r.time for r in cand.time_rows}["3d_1"] == 72.0
+
+
+def test_bulk_timecourse_single_unit_keeps_face_values():
+    # A single-unit design keeps its face values in its own unit (no forced hour normalization) — so a
+    # day-based course stays day0/day3/day7 -> 0/3/7, matching the paper's axis (nothing regresses).
+    df = pd.DataFrame({
+        "gene": [f"g{i}" for i in range(4)],
+        "day0_1": range(4), "day0_2": range(4), "day3_1": range(4), "day7_1": range(4),
+    })
+    hints = suggest_design_hints(DataBundle(payload=df, kind=BULK_COUNTS))
+    cand = hints.group_candidates[0]
+    assert cand.kind == "time_course"
+    assert [lv.time for lv in cand.levels] == [0.0, 3.0, 7.0]           # face values, not 0/72/168
 
 
 def test_bulk_timecourse_times_equal_the_deg_runner_parser():

@@ -19,6 +19,7 @@ from skills.deg.run_real import (
     _labels_from_design_or_names,
     _numeric_time,
     _timecourse,
+    numeric_time_axis,
     tmm_size_factors,
 )
 
@@ -68,6 +69,20 @@ def test_numeric_time(value, expected):
 def test_numeric_time_no_number():
     with pytest.raises(ValueError):
         _numeric_time("baseline")
+
+
+def test_numeric_time_axis_single_unit_is_face_value():
+    # One unit (or unitless) → each label keeps its face value in its own unit; nothing is rescaled.
+    assert numeric_time_axis(["0h", "24h", "48h"]) == [0.0, 24.0, 48.0]
+    assert numeric_time_axis(["day0", "day3", "day7"]) == [0.0, 3.0, 7.0]
+    assert numeric_time_axis(["t0", "t24", "t120"]) == [0.0, 24.0, 120.0]
+
+
+def test_numeric_time_axis_mixed_units_normalize_to_smallest():
+    # Mixed hours + days: face value (24,48,3) mis-orders 3d first; normalize to hours → 24,48,72.
+    assert numeric_time_axis(["24h", "48h", "3d"]) == [24.0, 48.0, 72.0]
+    # Days + weeks normalize to days (the smallest present unit): 3d, 1wk, 2wk → 3, 7, 14.
+    assert numeric_time_axis(["3d", "1wk", "2wk"]) == [3.0, 7.0, 14.0]
 
 
 # --- bulk contrast-selection error contracts (raise before any DE engine) -------

@@ -16,6 +16,9 @@ export interface LevelHint {
   n_replicates: number;
   /** "samples" (biological replicates) | "cells" (scRNA with no sample column found). */
   replicate_unit: string;
+  /** time_course only: this level's numeric timepoint (the axis value driving order + the Wald trend).
+   *  The confirm-card shows it and lets the user correct a misparse; null/absent for a categorical level. */
+  time?: number | null;
 }
 
 /** One synthesized design-sheet row for a time-course run: a sample column → its numeric timepoint.

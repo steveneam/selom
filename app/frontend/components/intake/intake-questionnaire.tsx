@@ -14,12 +14,16 @@ import {
 } from "@/components/ui/select";
 import { getSkill } from "@/lib/catalog/seed";
 import { AskAi } from "@/components/ai/ask-ai";
+import { AiMarker } from "@/components/ai/ai-marker";
+import { cn } from "@/lib/ui/cn";
 import { questionsFor, type IntakeAnswers } from "@/lib/intake/mock";
 import {
   candidateFor,
   defaultDesignChoice,
   type DesignChoice,
   type DesignHints,
+  type LevelHint,
+  type TimeRow,
 } from "@/lib/intake/design";
 import { designFromIngestActions, type IngestDesignProposal } from "@/lib/ai/proposals";
 import type { DataRouting } from "@/lib/skills/api";
@@ -74,6 +78,12 @@ export function IntakeQuestionnaire({
   // The ingest AI refiner's last proposal (2b): its patch pre-filled the design; kept so a CONFIRMED-
   // UNCHANGED design attributes the run through the chokepoint (✨). Cleared on any dataset change.
   const [aiProposal, setAiProposal] = React.useState<IngestDesignProposal | null>(null);
+  // Override a WRONG time-course detection back to a 2-group contrast (fe-review HIGH): the engine may
+  // read ordered-looking labels as a time-course when the user actually wants to compare groups.
+  const [treatAsCategorical, setTreatAsCategorical] = React.useState(false);
+  // Per-timepoint numeric-time corrections (fe-review HIGH): the value the user typed to fix a misparse
+  // (e.g. a label the engine mis-scaled). Keyed by level name; drives the order + the synthesized sheet.
+  const [timeEdits, setTimeEdits] = React.useState<Record<string, string>>({});
 
   // Re-seed the contrast when the dataset's design changes (new file / re-inspect / reload
   // re-attach). React-documented "adjust state when a prop changes" — a render-time reset keyed on
@@ -86,6 +96,8 @@ export function IntakeQuestionnaire({
     setTreatment(initial?.treatment ?? "");
     setSampleCol(initial?.sampleCol ?? "");
     setAiProposal(null); // a new dataset's design isn't the prior AI proposal
+    setTreatAsCategorical(false);
+    setTimeEdits({});
   }
 
   // The ingest AI refiner (2b): map the proposal turn → a design patch (honesty-checked against the
@@ -110,11 +122,38 @@ export function IntakeQuestionnaire({
   }
 
   const candidate = candidateFor(design, groupKey);
-  const levels = candidate?.levels ?? [];
+  // Memoized so it's a stable dependency for the timepoint-ordering useMemo below (candidate is a stable
+  // element reference off the `design` prop, so this only changes when the chosen group changes).
+  const levels = React.useMemo(() => candidate?.levels ?? [], [candidate]);
   // A time-course design (ordered timepoints) renders a timeline + runs the deg time-course mode — no
   // control/treatment contrast, so the contrast selects, the ≥2-replicate warning, and the messy-name
-  // AI refiner (which maps names → a contrast) don't apply.
-  const isTimeCourse = candidate?.kind === "time_course";
+  // AI refiner (which maps names → a contrast) don't apply. The user can OVERRIDE the detection back to
+  // a 2-group contrast (fe-review HIGH) — then it's treated categorically like any other design.
+  const detectedTimeCourse = candidate?.kind === "time_course";
+  const isTimeCourse = detectedTimeCourse && !treatAsCategorical;
+
+  // The effective numeric time of a timepoint level = the user's correction if valid, else the engine's
+  // detected value (fe-review HIGH: a misparsed timepoint can be fixed, and the order follows the number).
+  const effTime = React.useCallback(
+    (lv: LevelHint): number => {
+      const raw = timeEdits[lv.name];
+      const n = raw !== undefined && raw.trim() !== "" ? Number(raw) : NaN;
+      return Number.isFinite(n) ? n : lv.time ?? 0;
+    },
+    [timeEdits],
+  );
+  // Timepoints re-sorted by their effective time — so a corrected value reorders the timeline + baseline.
+  const orderedTimeLevels = React.useMemo(
+    () => (isTimeCourse ? [...levels].sort((a, b) => effTime(a) - effTime(b)) : levels),
+    [isTimeCourse, levels, effTime],
+  );
+  // Valid only when no two timepoints collapsed onto the same value (the runner needs distinct times).
+  const timeCourseValid =
+    !isTimeCourse ||
+    (() => {
+      const ts = levels.map(effTime);
+      return ts.every(Number.isFinite) && new Set(ts).size === ts.length;
+    })();
 
   // Switch the group factor → re-default the contrast to that candidate's control guess + next level.
   function pickGroup(key: string) {
@@ -126,18 +165,23 @@ export function IntakeQuestionnaire({
     setTreatment(names.find((n) => n !== ref) ?? names[1] ?? "");
   }
 
-  // "Reset to detected" (followups #7): restore the engine's prefill after any contrast/sample edit.
+  // "Reset to detected" (followups #7): restore the engine's prefill after any contrast/sample/design
+  // edit — incl. a time-course override or a corrected timepoint.
   const designEdited =
     !!initial &&
     (groupKey !== initial.groupKey ||
       reference !== initial.reference ||
       treatment !== initial.treatment ||
-      (sampleCol || "") !== (initial.sampleCol || ""));
+      (sampleCol || "") !== (initial.sampleCol || "") ||
+      treatAsCategorical ||
+      Object.keys(timeEdits).length > 0);
   function resetToDetected() {
     setGroupKey(initial?.groupKey ?? "");
     setReference(initial?.reference ?? "");
     setTreatment(initial?.treatment ?? "");
     setSampleCol(initial?.sampleCol ?? "");
+    setTreatAsCategorical(false);
+    setTimeEdits({});
   }
 
   const analysisName = React.useMemo(() => {
@@ -146,13 +190,30 @@ export function IntakeQuestionnaire({
     return getSkill(`selom.${sid}`)?.name ?? getSkill(sid)?.name ?? sid;
   }, [routing]);
 
+  // Per-field AI attribution (fe-review MED): the ✨ shows on a contrast field that STILL holds the
+  // value the ingest refiner proposed (editing it away drops the marker) — mirrors submit()'s honesty
+  // check, so what's marked ✨ is exactly what routes through the chokepoint as AI-attributed.
+  const refFromAi = aiProposal?.patch.reference !== undefined && aiProposal?.patch.reference === reference;
+  const treatFromAi = aiProposal?.patch.treatment !== undefined && aiProposal?.patch.treatment === treatment;
+
   const refReps = levels.find((l) => l.name === reference)?.n_replicates;
   const treatReps = levels.find((l) => l.name === treatment)?.n_replicates;
   const lowReps = needsDesign && !isTimeCourse && ((refReps ?? 0) < 2 || (treatReps ?? 0) < 2);
   const designValid =
-    !needsDesign || isTimeCourse || (!!reference && !!treatment && reference !== treatment);
+    !needsDesign ||
+    (isTimeCourse
+      ? timeCourseValid
+      : !!reference && !!treatment && reference !== treatment);
 
   function submit() {
+    // A time-course run carries the (possibly corrected) per-sample times: remap each level's detected
+    // time → its effective time, then rewrite the sheet rows by that map so a fixed misparse reproduces.
+    let timeRows: TimeRow[] = candidate?.time_rows ?? [];
+    if (isTimeCourse && candidate) {
+      const remap = new Map<number, number>();
+      for (const lv of levels) if (lv.time != null) remap.set(lv.time, effTime(lv));
+      timeRows = (candidate.time_rows ?? []).map((r) => ({ ...r, time: remap.get(r.time) ?? r.time }));
+    }
     const choice: DesignChoice | null =
       needsDesign && candidate && designValid
         ? {
@@ -163,7 +224,7 @@ export function IntakeQuestionnaire({
             treatment,
             levels: levels.map((l) => l.name),
             sampleCol: sampleCol || null,
-            ...(isTimeCourse ? { timeRows: candidate.time_rows ?? [] } : {}),
+            ...(isTimeCourse ? { timeRows } : {}),
           }
         : null;
     // AI attribution (2b): carry the refiner's set_design action ONLY when its proposal was CONFIRMED
@@ -255,35 +316,86 @@ export function IntakeQuestionnaire({
             </p>
           )}
 
+          {/* Override a wrong time-course detection (fe-review HIGH). Shown whenever the engine read a
+              time-course, so the user can flip it to a 2-group contrast — or back. */}
+          {detectedTimeCourse && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] text-muted-foreground">These conditions are:</span>
+              <div
+                className="inline-flex rounded-lg border border-border p-0.5"
+                role="group"
+                aria-label="Design type"
+              >
+                <button
+                  type="button"
+                  aria-pressed={isTimeCourse}
+                  onClick={() => setTreatAsCategorical(false)}
+                  className={cn(
+                    "rounded-md px-2 py-1 text-[11px] transition-colors",
+                    isTimeCourse
+                      ? "bg-primary/15 font-medium text-primary"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Ordered timepoints
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={treatAsCategorical}
+                  onClick={() => setTreatAsCategorical(true)}
+                  className={cn(
+                    "rounded-md px-2 py-1 text-[11px] transition-colors",
+                    treatAsCategorical
+                      ? "bg-primary/15 font-medium text-primary"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Groups to compare
+                </button>
+              </div>
+              <span className="text-[11px] text-muted-foreground/70">
+                {isTimeCourse ? "— tests a trend across time" : "— runs a 2-group contrast instead"}
+              </span>
+            </div>
+          )}
+
           {isTimeCourse ? (
             /* Time-course (2c): an ordered timeline, not a 2-group contrast — the run tests a trend
-               across time (deg time-course mode), with the earliest timepoint as the baseline. */
+               across time (deg time-course mode), with the earliest timepoint as the baseline. Each
+               timepoint's numeric value is EDITABLE (fe-review HIGH): correct a misparse and the order
+               + baseline follow the number. */
             <div className="space-y-2">
               <p className="text-[11px] text-muted-foreground">
-                Ordered timepoints — genes are tested for a trend across time (baseline = earliest).
+                Ordered timepoints — genes are tested for a trend across time (baseline = earliest). Edit a
+                value to fix a misparse; the order updates.
               </p>
               <ol className="flex flex-wrap items-center gap-1.5" aria-label="Timepoints in order">
-                {levels.map((lv, i) => (
+                {orderedTimeLevels.map((lv, i) => (
                   <React.Fragment key={lv.name}>
                     {i > 0 && (
                       <span aria-hidden className="text-muted-foreground/50">
                         →
                       </span>
                     )}
-                    <li className="flex items-center gap-1.5 rounded-lg border border-border bg-card/60 px-2.5 py-1.5">
-                      <span className="text-sm font-medium text-foreground">{lv.name}</span>
-                      {i === 0 && (
-                        <span className="rounded border border-primary/40 px-1 py-px text-[9px] uppercase tracking-wide text-primary">
-                          baseline
-                        </span>
-                      )}
-                      <span className="tabular text-[11px] text-muted-foreground">
-                        {lv.n_replicates} {lv.replicate_unit}
-                      </span>
+                    <li>
+                      <TimepointChip
+                        name={lv.name}
+                        time={effTime(lv)}
+                        reps={lv.n_replicates}
+                        unit={lv.replicate_unit}
+                        isBaseline={i === 0}
+                        onCommit={(n) => setTimeEdits((m) => ({ ...m, [lv.name]: String(n) }))}
+                      />
                     </li>
                   </React.Fragment>
                 ))}
               </ol>
+              {!timeCourseValid && (
+                <p className="inline-flex items-center gap-1.5 text-[11px] text-warn">
+                  <TriangleAlert className="size-3.5" />
+                  Two timepoints share the same value — give each a distinct time.
+                </p>
+              )}
             </div>
           ) : (
             <>
@@ -327,7 +439,10 @@ export function IntakeQuestionnaire({
           {/* The contrast direction — logFC is treatment vs reference. */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="design-ref">Control / reference</Label>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="design-ref">Control / reference</Label>
+                {refFromAi && <AiMarker state="staged" size="xs" />}
+              </div>
               <Select value={reference} onValueChange={setReference}>
                 <SelectTrigger id="design-ref" aria-label="Control / reference">
                   <SelectValue placeholder="Select…" />
@@ -342,7 +457,10 @@ export function IntakeQuestionnaire({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="design-treat">Treatment / comparison</Label>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="design-treat">Treatment / comparison</Label>
+                {treatFromAi && <AiMarker state="staged" size="xs" />}
+              </div>
               <Select value={treatment} onValueChange={setTreatment}>
                 <SelectTrigger id="design-treat" aria-label="Treatment / comparison">
                   <SelectValue placeholder="Select…" />
@@ -497,5 +615,61 @@ export function IntakeQuestionnaire({
         </div>
       </details>
     </div>
+  );
+}
+
+/** One editable timepoint chip in the ordered timeline. The number is the axis value the deg time-course
+ *  runner consumes — editing it corrects a misparse (fe-review HIGH). A free-typed draft commits on
+ *  blur/Enter (so the timeline doesn't re-sort mid-keystroke) and re-syncs when the effective value
+ *  changes externally (a reorder / reset) — the adjust-state-during-render pattern, no effect needed. */
+function TimepointChip({
+  name,
+  time,
+  reps,
+  unit,
+  isBaseline,
+  onCommit,
+}: {
+  name: string;
+  time: number;
+  reps: number;
+  unit: string;
+  isBaseline: boolean;
+  onCommit: (n: number) => void;
+}) {
+  const [draft, setDraft] = React.useState(String(time));
+  const [seed, setSeed] = React.useState(time);
+  if (seed !== time) {
+    setSeed(time);
+    setDraft(String(time));
+  }
+  const commit = () => {
+    const n = Number(draft);
+    if (Number.isFinite(n) && n !== time) onCommit(n);
+    else setDraft(String(time));
+  };
+  return (
+    <span className="flex items-center gap-1.5 rounded-lg border border-border bg-card/60 px-2.5 py-1.5">
+      <span className="text-sm font-medium text-foreground">{name}</span>
+      {isBaseline && (
+        <span className="rounded border border-primary/40 px-1 py-px text-[9px] uppercase tracking-wide text-primary">
+          baseline
+        </span>
+      )}
+      <input
+        value={draft}
+        inputMode="decimal"
+        aria-label={`${name} timepoint value`}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        className="tabular h-6 w-14 rounded border border-input bg-background/60 px-1.5 text-center text-xs text-foreground outline-none focus-visible:border-ring/60 focus-visible:ring-1 focus-visible:ring-ring/30"
+      />
+      <span className="tabular text-[11px] text-muted-foreground">
+        {reps} {unit}
+      </span>
+    </span>
   );
 }

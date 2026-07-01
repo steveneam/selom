@@ -44,11 +44,6 @@ _MAX_LEVELS = 12
 # A sample/replicate column can carry more levels than a condition (one per biological replicate), but
 # not the thousands of a per-cell barcode — bound the FE sample-col picker's candidate list.
 _MAX_SAMPLE_LEVELS = 100
-# Time-course floors — mirror the deg `_timecourse` runner exactly (DETECTED == CONSUMED): it needs
-# >=3 distinct timepoints spanned by >=4 samples, else it raises. Detecting a time-course the runner
-# would reject just trades a categorical fallback for a run error, so gate on the same numbers.
-_MIN_TIMECOURSE_LEVELS = 3
-_MIN_TIMECOURSE_SAMPLES = 4
 
 # An ordered-timepoint label: a number carrying a recognizable time affix — a leading prefix
 # (t0 · day3 · p14 · week2) OR a trailing unit (24h · 3d · 2wk). A BARE number (no affix: "1"/"2"/"3")
@@ -71,6 +66,8 @@ class LevelHint(BaseModel):
     name: str
     n_replicates: int = 0       # bulk: sample columns at this level · scRNA: distinct sample ids (else cells)
     replicate_unit: str = "samples"   # "samples" (biological replicates) | "cells" (no sample col found)
+    time: float | None = None   # time_course only: this level's numeric timepoint (the axis value the FE
+    #   shows + lets the user correct); None for a categorical level.
 
 
 class TimeRow(BaseModel):
@@ -314,19 +311,25 @@ def _timecourse_candidate(labels: dict[str, str], levels: list[tuple[str, int]])
     sorted by NUMERIC time (not alphabetically), and ``time_rows`` carries one row per sample column for
     the synthesized design sheet. Returns None on any miss → the caller keeps the categorical candidate
     (E4: no worse than today)."""
-    if len(labels) < _MIN_TIMECOURSE_SAMPLES:      # the runner needs >=4 samples spanning the timepoints
+    from skills.deg.run_real import numeric_time_axis
+
+    min_samples, min_levels = _timecourse_floors()
+    if len(labels) < min_samples:                  # the runner needs >=4 samples spanning the timepoints
         return None
-    times: dict[str, float] = {}
-    for name, _ in levels:
-        t = _timepoint_numeric(name)
-        if t is None:                              # a non-time label → not a uniform time axis
-            return None
-        times[name] = t
-    if len({round(t, 6) for t in times.values()}) < _MIN_TIMECOURSE_LEVELS:
+    distinct = [name for name, _ in levels]
+    # Gate first: EVERY distinct label must be an ordered timepoint (a time affix + a parseable number);
+    # a bare index is deliberately not a timepoint (see `_timepoint_numeric`).
+    if any(_timepoint_numeric(name) is None for name in distinct):
         return None
-    ordered = sorted(levels, key=lambda nc: times[nc[0]])
-    level_hints = [LevelHint(name=name, n_replicates=n, replicate_unit="samples") for name, n in ordered]
-    time_rows = [TimeRow(sample=col, time=times[label]) for col, label in labels.items()]
+    # Then the numeric axis: single-unit → face values; MIXED units (24h + 3d) → normalized to the
+    # smallest unit so the order is correct — via the runner's shared parser (no shadow copy).
+    axis = dict(zip(distinct, numeric_time_axis(distinct)))
+    if len({round(t, 6) for t in axis.values()}) < min_levels:
+        return None
+    ordered = sorted(levels, key=lambda nc: axis[nc[0]])
+    level_hints = [LevelHint(name=name, n_replicates=n, replicate_unit="samples", time=axis[name])
+                   for name, n in ordered]
+    time_rows = [TimeRow(sample=col, time=axis[label]) for col, label in labels.items()]
     return GroupCandidate(
         key=_COLUMN_NAMES_KEY, label="timepoints", kind="time_course",
         levels=level_hints, n_levels=len(level_hints),
@@ -361,6 +364,15 @@ def _obs_aliases() -> tuple[tuple[str, ...], tuple[str, ...]]:
     from skills.deg.run_real import _CONDITION_FALLBACKS, _SAMPLE_FALLBACKS
 
     return _CONDITION_FALLBACKS, _SAMPLE_FALLBACKS
+
+
+def _timecourse_floors() -> tuple[int, int]:
+    """The deg runner's time-course floors ``(min samples, min distinct timepoints)``, imported
+    DIRECTLY (no shadow copy) so a detected time-course is exactly one the runner would accept — see
+    :func:`_rep_regex` for why there is no local fallback."""
+    from skills.deg.run_real import MIN_TIMECOURSE_LEVELS, MIN_TIMECOURSE_SAMPLES
+
+    return MIN_TIMECOURSE_SAMPLES, MIN_TIMECOURSE_LEVELS
 
 
 def _is_dataframe(obj: Any) -> bool:
