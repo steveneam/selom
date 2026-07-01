@@ -48,3 +48,37 @@ def test_picks_symbol_and_gene_name_variants():
 def test_no_gene_column_returns_none():
     # Nothing gene-like -> None, so the runner falls back to the frame index.
     assert _pick(_cols("foo", "log2fc", "fdr"), _GENE_COLS) is None
+
+
+# --- gene labels are ONE draggable representation (unify-on-superior-framework) ---------------
+# Ratchet: every volcano gene label — auto top-N AND gene-set highlight — must be a
+# layout.annotation (individually draggable/deletable in the editor), never a frozen `text` trace.
+# This guard fails loudly if a future change reintroduces a static label trace.
+from skills.volcano.run import _assemble  # noqa: E402
+
+
+def test_topn_labels_are_annotations_not_a_text_trace():
+    up = ([2.0], [5.0], [["A", 0.001]])
+    spec = _assemble(up, ([], [], []), ([], [], []), labels=[(2.0, 5.0, "A")], fc_t=1.0, y_cut=1.3, title="t")
+    annos = spec["layout"].get("annotations", [])
+    assert [a["text"] for a in annos] == ["A"]
+    # no static text-label trace survives
+    assert not any(t.get("mode") == "text" or t.get("name") == "labels" for t in spec["data"])
+    # smart-connector + grabbable/deletable annotation
+    a = annos[0]
+    assert a["showarrow"] is True and a["captureevents"] is True
+
+
+def test_highlight_keeps_markers_but_labels_are_annotations():
+    hl = [(1.5, 4.0, "B")]
+    spec = _assemble(([], [], []), ([], [], []), ([], [], []), labels=[], fc_t=1.0, y_cut=1.3, title="t", highlight=hl)
+    # amber markers stay a trace; its label moved to annotations (no markers+text)
+    hi = [t for t in spec["data"] if t.get("name") == "highlighted"]
+    assert hi and hi[0]["mode"] == "markers"
+    assert [a["text"] for a in spec["layout"]["annotations"]] == ["B"]
+
+
+def test_no_labels_omits_annotations_key():
+    # A label-less figure (the stub) stays byte-identical to its golden — no empty annotations key.
+    spec = _assemble(([], [], []), ([], [], []), ([], [], []), labels=[], fc_t=1.0, y_cut=1.3, title="t")
+    assert "annotations" not in spec["layout"]

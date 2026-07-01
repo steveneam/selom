@@ -27,6 +27,7 @@ import {
 import { installPerfHook, recordRenderMs } from "@/lib/figure/perf";
 import { payloadWarnings } from "@/lib/figure/payload";
 import { relayoutToOps, restyleToOps } from "@/lib/figure/plotly-edits";
+import { remove } from "@/lib/figure/patch";
 import { wireMarkDrag, type Crosshair } from "./mark-drag";
 import { wireThresholdDrag } from "./threshold-drag";
 import { wireColorbarDrag } from "./colorbar-drag";
@@ -242,7 +243,12 @@ export function FigureCanvas({
   // Stable gesture handlers, created once. Each Plotly canvas gesture becomes ONE
   // undoable JSON-Patch edit (Plotly fires once on drag-release → one history entry).
   const handlersRef = useRef<
-    { relayout: (e: unknown) => void; restyle: (e: unknown) => void; click: (e: unknown) => void }
+    {
+      relayout: (e: unknown) => void;
+      restyle: (e: unknown) => void;
+      click: (e: unknown) => void;
+      clickAnnotation: (e: unknown) => void;
+    }
     | undefined
   >(undefined);
   if (!handlersRef.current) {
@@ -281,6 +287,15 @@ export function FigureCanvas({
         const ci = (point as { curveNumber?: number } | undefined)?.curveNumber;
         if (typeof ci === "number") liveRef.current.onSelectTrace?.(ci);
       },
+      // Click a gene label to DELETE it cleanly — the whole annotation (text + its smart connector)
+      // goes in one undoable op, so nothing is left dangling. Fires only because the label sets
+      // captureevents:true. Gated to a geneLabels figure with a store (the styler/editor), non-overlay.
+      clickAnnotation: (e: unknown) => {
+        const { store: st, overlay: ov, geneLabels: gl } = liveRef.current;
+        if (!st || ov || !gl) return;
+        const idx = (e as { index?: number } | undefined)?.index;
+        if (typeof idx === "number" && idx >= 0) st.commit([remove(`/layout/annotations/${idx}`)]);
+      },
     };
   }
 
@@ -304,9 +319,11 @@ export function FigureCanvas({
     el.removeListener?.("plotly_relayout", h.relayout);
     el.removeListener?.("plotly_restyle", h.restyle);
     el.removeListener?.("plotly_click", h.click);
+    el.removeListener?.("plotly_clickannotation", h.clickAnnotation);
     el.on("plotly_relayout", h.relayout);
     el.on("plotly_restyle", h.restyle);
     el.on("plotly_click", h.click);
+    el.on("plotly_clickannotation", h.clickAnnotation);
 
     // (Re)wire dot-dragging — capability-gated (spec §3): only on a figure that DECLARES editable
     // landmark marks (ERG trace / flicker-waveform), never on a UMAP scatter or any figure without
@@ -381,6 +398,7 @@ export function FigureCanvas({
       el.removeListener?.("plotly_relayout", h.relayout);
       el.removeListener?.("plotly_restyle", h.restyle);
       el.removeListener?.("plotly_click", h.click);
+      el.removeListener?.("plotly_clickannotation", h.clickAnnotation);
     }
     dragDisposeRef.current?.();
     thresholdDisposeRef.current?.();
@@ -420,7 +438,11 @@ export function FigureCanvas({
             legendText: true,
             annotationPosition: true,
             annotationTail: true,
-            annotationText: true,
+            // Gene labels are identified by their `text` (= the gene symbol) — the toggle/carry model
+            // and click-to-delete all key off it. Editing the text in place would break that identity
+            // AND an empty-cleared text left a dangling arrow (the "line trace"). Reposition/drag yes,
+            // rename no; delete is a clean click-to-remove (plotly_clickannotation).
+            annotationText: false,
             titleText: true,
             axisTitleText: !hasSecondaryAxes,
             colorbarPosition: true,

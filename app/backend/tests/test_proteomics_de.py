@@ -62,10 +62,8 @@ def test_proteomics_de_recovers_planted_de():
 
     # Labels are the significant genes (top_n=40 covers all 30 planted DE, no nulls).
     labels = {}
-    for tr in fig["data"]:
-        if tr.get("mode") == "text":
-            for x, name in zip(tr["x"], tr["text"]):
-                labels[str(name)] = float(x)
+    for a in fig["layout"].get("annotations", []):  # gene labels are annotations now (one draggable set)
+        labels[str(a["text"])] = float(a["x"])
 
     assert set(labels) == set(UP) | set(DOWN), "labelled set should be exactly the planted DE"
     assert all(labels[u] > 0 for u in UP), "up proteins (higher in A) must have positive log2FC"
@@ -151,9 +149,8 @@ def test_moderated_mode_runs_via_skill():
         os.unlink(path)
 
     labels = set()
-    for tr in fig["data"]:
-        if tr.get("mode") == "text":
-            labels |= {str(t) for t in tr["text"]}
+    for a in fig["layout"].get("annotations", []):  # gene labels are annotations now (one draggable set)
+        labels.add(str(a["text"]))
     assert set(UP) | set(DOWN) <= labels, "moderated mode should still recover the planted DE"
 
 
@@ -213,7 +210,6 @@ def test_mindet_mode_runs_via_skill():
         os.unlink(path)
 
     labels = set()
-    for tr in fig["data"]:
-        if tr.get("mode") == "text":
-            labels |= {str(t) for t in tr["text"]}
+    for a in fig["layout"].get("annotations", []):  # gene labels are annotations now (one draggable set)
+        labels.add(str(a["text"]))
     assert set(UP) | set(DOWN) <= labels, "mindet mode should still recover the planted DE"

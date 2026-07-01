@@ -100,7 +100,10 @@ def test_volcano_assemble_adds_highlight_layer_only_when_given():
     hl = _assemble(([1.0], [3.0]), ([-1.0], [3.0]), ([0.0], [0.5]), [], 1.0, 1.3, "t",
                    highlight=[(1.0, 3.0, "RHO")])
     hl_traces = [tr for tr in hl["data"] if tr.get("name") == "highlighted"]
-    assert len(hl_traces) == 1 and hl_traces[0]["text"] == ["RHO"]
+    # amber dots stay a trace; the member's LABEL is a layout annotation (the one draggable/deletable
+    # gene-label representation), not baked into a markers+text trace.
+    assert len(hl_traces) == 1 and hl_traces[0]["mode"] == "markers"
+    assert [a["text"] for a in hl["layout"].get("annotations", [])] == ["RHO"]
 
 
 def test_volcano_panel_parsing_is_separator_tolerant():

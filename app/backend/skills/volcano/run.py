@@ -56,6 +56,23 @@ def _stub_figure(params: dict) -> dict:
     return spec
 
 
+def _label_annotation(x, y, gene, color="#0f172a", border="rgba(148,163,184,0.5)") -> dict:
+    """One gene-label annotation — the SINGLE gene-label representation, shared byte-for-byte with
+    the FE (``lib/volcano/labels.ts`` ``labelAnnotation``). Every volcano gene label — auto top-N,
+    gene-set highlight, and the editor's click-to-label — is THIS shape, so all of them are one
+    uniform, individually draggable/deletable set (not a frozen ``text`` trace). ``showarrow`` +
+    ``ax``/``ay`` is the "smart connector": a short leader that moves and deletes WITH the label and
+    never dangles. ``captureevents`` lets the canvas grab it (drag) and remove it (click-to-delete)."""
+    return {
+        "x": x, "y": y, "text": gene,
+        "showarrow": True, "arrowhead": 0, "arrowsize": 1, "arrowwidth": 1,
+        "arrowcolor": "#94a3b8", "ax": 0, "ay": -18,
+        "font": {"size": 10, "color": color},
+        "bgcolor": "rgba(255,255,255,0.72)", "bordercolor": border, "borderpad": 1,
+        "captureevents": True,
+    }
+
+
 def _assemble(up, down, ns, labels, fc_t, y_cut, title, highlight=None) -> dict:
     """Build the volcano spec from up/down/ns ``(x, y, customdata)`` triples + optional
     label/highlight points.
@@ -65,6 +82,11 @@ def _assemble(up, down, ns, labels, fc_t, y_cut, title, highlight=None) -> dict:
     clicked point and the Statistics-table toggle can locate a gene's coordinates. ``highlight`` is
     an optional list of ``(x, y, gene)`` for a gene-set panel applied from the "Gene Sets" surface —
     drawn on top in amber, with each member labelled. Left ``None`` it adds nothing.
+
+    Gene labels (top-N + highlight) are emitted as ``layout.annotations`` — the ONE representation
+    the editor also writes (unify-on-superior-framework): so a user can drag or delete ANY label,
+    auto or hand-added, identically. The highlight still draws its amber MARKERS as a trace; only its
+    text moves to annotations.
     """
     # Per-point customdata ([gene, padj]) is optional: the volcano passes ``(x, y, customdata)``
     # triples, but ``proteomics_de`` reuses this assembler with bare ``(x, y)`` pairs — so a bucket
@@ -87,21 +109,17 @@ def _assemble(up, down, ns, labels, fc_t, y_cut, title, highlight=None) -> dict:
         if tr.get("customdata") is None:
             tr.pop("customdata", None)
             tr.pop("hovertemplate", None)
-    if labels:
-        data.append({
-            "type": "scatter", "mode": "text", "name": "labels", "showlegend": False,
-            "x": [p[0] for p in labels], "y": [p[1] for p in labels],
-            "text": [p[2] for p in labels], "textposition": "top center",
-            "textfont": {"size": 10},
-        })
+    # Gene labels → layout.annotations (the ONE draggable/deletable representation), NOT a static
+    # `text` trace. Top-N in slate, highlight members in amber; the highlight also keeps its marker dots.
+    annotations = [_label_annotation(p[0], p[1], p[2]) for p in labels] if labels else []
     if highlight:
         data.append({
-            "type": "scatter", "mode": "markers+text", "name": "highlighted",
+            "type": "scatter", "mode": "markers", "name": "highlighted", "showlegend": False,
             "x": [p[0] for p in highlight], "y": [p[1] for p in highlight],
-            "text": [p[2] for p in highlight], "textposition": "top center",
-            "textfont": {"size": 10, "color": HL},
             "marker": {"color": HL, "size": 9, "line": {"color": "#ffffff", "width": 1.2}},
         })
+        annotations += [_label_annotation(p[0], p[1], p[2], color=HL, border="rgba(245,158,11,0.5)")
+                        for p in highlight]
     shapes = [
         {"type": "line", "x0": fc_t, "x1": fc_t, "yref": "paper", "y0": 0, "y1": 1,
          "line": {"color": NS, "width": 1, "dash": "dash"}},
@@ -110,12 +128,14 @@ def _assemble(up, down, ns, labels, fc_t, y_cut, title, highlight=None) -> dict:
         {"type": "line", "xref": "paper", "x0": 0, "x1": 1, "y0": y_cut, "y1": y_cut,
          "line": {"color": NS, "width": 1, "dash": "dash"}},
     ]
-    return {
-        "data": data,
-        "layout": {
-            "title": {"text": title},
-            "xaxis": {"title": {"text": "log2 fold-change"}},
-            "yaxis": {"title": {"text": "-log10 adjusted p"}},
-            "shapes": shapes,
-        },
+    layout = {
+        "title": {"text": title},
+        "xaxis": {"title": {"text": "log2 fold-change"}},
+        "yaxis": {"title": {"text": "-log10 adjusted p"}},
+        "shapes": shapes,
     }
+    # Omit an empty annotations key so a label-less figure (the stub / proteomics without top-N)
+    # stays byte-identical to its golden.
+    if annotations:
+        layout["annotations"] = annotations
+    return {"data": data, "layout": layout}

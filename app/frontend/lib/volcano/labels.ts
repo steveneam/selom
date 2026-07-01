@@ -87,7 +87,14 @@ export function isLabeled(spec: FigureSpec | null | undefined, gene: string): bo
   return readAnnotations(spec).some((a) => a?.text === gene);
 }
 
-/** Build the gene-label annotation: a small text tag with a short leader arrow to the point. */
+/**
+ * Build the gene-label annotation — the ONE gene-label representation, byte-identical to the backend
+ * (`skills/volcano/run.py` `_label_annotation`), so auto top-N, gene-set highlight, and click-added
+ * labels are one uniform draggable/deletable set. `showarrow` + `ax`/`ay` is the "smart connector":
+ * a short leader that moves and deletes WITH the label (never dangles). `captureevents: true` lets the
+ * canvas GRAB it (drag to reposition) and REMOVE it (click-to-delete via plotly_clickannotation) —
+ * with it off the label was pointer-transparent (couldn't be grabbed) and delete left the arrow behind.
+ */
 function labelAnnotation(p: GeneLabelPoint): Record<string, unknown> {
   return {
     x: p.x,
@@ -104,7 +111,7 @@ function labelAnnotation(p: GeneLabelPoint): Record<string, unknown> {
     bgcolor: "rgba(255,255,255,0.72)",
     bordercolor: "rgba(148,163,184,0.5)",
     borderpad: 1,
-    captureevents: false,
+    captureevents: true,
   };
 }
 
