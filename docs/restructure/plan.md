@@ -37,7 +37,7 @@ Status: `TODO` · `WIP` (≤1 at a time) · `DONE — <sha>` · `BLOCKED — <wh
 | Order | ID | Task | Pri | Status | Home / pointer |
 |---|---|---|---|---|---|
 | 1 | **WS1.1** | `_stub_figure()` prod guard (no fabricated figures off-dev) | P0 | DONE — 1be60a5 | CURRENT NEXT#2 · RISKS #11 |
-| 2 | **WS1.2** | Methods-text ↔ param_spec accuracy guard | P1 | TODO | pillars P4 · NEW test |
+| 2 | **WS1.2** | Methods-text ↔ param_spec accuracy guard | P1 | DONE — <sha> | pillars P4 · NEW test |
 | 3 | **WS2.1** | Close upload→run→save loop (own-data run = Library artifact) | P1 | TODO | CURRENT DEFERRED 7c-(b) · pillars P4 · RISKS #8 |
 | 4 | **WS2.2** | Intake "correct the detection" affordances | P1 | TODO | intake-questionnaire/followups.md #2,3,4,7,8 |
 | 5 | **WS2.3** | Surface the data-fit verdict on own-data | P1 | TODO | data-aware-routing/followups.md #1–4 |
@@ -102,7 +102,7 @@ promise. Home: CURRENT NEXT#2; add a RISKS.md #11 next to the #8 upload landmine
 - **Scope guard:** do NOT delete the stubs (they're legit for dev/demo/tests) — only guard
   and label them. No new skill work.
 
-### WS1.2 — Methods-text ↔ param_spec accuracy guard · P1 · Status: TODO
+### WS1.2 — Methods-text ↔ param_spec accuracy guard · P1 · Status: DONE — <sha>
 `companions/methods.py` (40+ template builders) can interpolate a param name that no longer
 exists in a skill's `param_spec` → confidently wrong methods prose. Home: pillars P4.
 - **Definition of Done:** a test asserts every param token a methods/legend template
@@ -286,6 +286,7 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 
 | Date | Session | Task(s) | Result / sha |
 |---|---|---|---|
+| 2026-07-02 | RESTRUCTURE-02 | WS1.2 | Methods/legend ↔ `param_spec` accuracy guard: `tests/test_methods_param_spec_guard.py` statically reads every param token each `companions/methods.py` + `companions/legends.py` template pulls off its resolved-params dict (direct `p[...]`/`p.get(...)` **and** through same-module helpers that receive the dict — `_erg_adaptation(p)`, legends' `_contrast(p)`) and asserts each ∈ the live `param_spec`; a `test_extractor_is_not_vacuous` pins the reader so the guard can't pass hollow. 64 template cases + 1 meta, all green; templates untouched (Scope guard). Verify passed: renamed `volcano.top_n`→`n_top` in `skill.json` → 2 cases fail; revert → 65 green. Completes WS1 (honesty). `<sha>` |
 | 2026-07-02 | RESTRUCTURE-01 | WS1.1 | Stub-engine honesty guard: prod boot guard (`config.is_production` refuses a stub-resolving engine off-dev, fail-loud at startup) + resolved `engine_policy` in provenance + FE "example data — not your results" banner + `test_engine_policy_guard` (reachability + drift). RISKS #11 added. Verified live: real DE CSV→`real`, stub→`stub`, prod+stub refuses boot. `1be60a5` · then reworded Working Agreement #3 (self-ref sha → a follow-up `docs(handoff)` stamp commit — owner-directed). |
 | 2026-07-02 | RESTRUCTURE-PLAN | (planning) | Audit + this tracker written; CURRENT NEXT re-ranked to point here. |
 
