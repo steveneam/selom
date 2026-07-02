@@ -42,7 +42,7 @@
 | AWS-MAT-1..5 | 2026-06-28 | (git) | S3 object-store seam · jobs→SQL · tenant schema · Clerk auth · step-6 prep |
 | older | — | (git / `archive/`) | `git log` · `agent_handoff/archive/` |
 
-## ▸ LIVE · RESTRUCTURE-02 · 2026-07-02 16:20 +10:00 · **WS1.2 committed + stamped + pushed; WS1 boundary reviews DEFERRED (owner directive)** · Claude (FE+BE, solo mode), Fable 5
+## ▸ LIVE · RESTRUCTURE-02 · 2026-07-02 15:47 +10:00 · **WS1.2 committed + stamped + pushed; WS1 boundary reviews DEFERRED (owner directive)** · Claude (FE+BE, solo mode), Fable 5
 
 - **What happened:** did **WS1.2** — the methods/legend ↔ `param_spec` accuracy guard (a test-only add; templates untouched). WS1.2 makes the **WS1 (honesty)** workstream code-complete. The WS1 boundary reviews (review-gauntlet + fe-review + the WS1.1-owed StubEngineBanner G2) were **not run this session — owner directed "don't run the gauntlet or fe-review this session."** They are **OWED before WS1 is fully closed** — see NEXT#R. Full narrative = the SESSIONS row + the commit body.
 - **Shipped (`8c7f09b`):** BE `tests/test_methods_param_spec_guard.py` (new) — AST reader (`_referenced_keys` follows same-module helper calls that receive the params dict) + 64 parametrized template cases + `test_extractor_is_not_vacuous`. Tracker WS1.2→DONE + Progress log.
