@@ -30,6 +30,10 @@ export function fromApiDataset(r: Record<string, unknown>): Dataset {
     id: r.id as string, projectId: r.project_id as string, filename: (r.filename as string) || "data",
     label: (r.label as string) || undefined, modality: (r.modality as Modality) || "unknown",
     currentSha256: (r.current_sha256 as string) || undefined,
+    // Server-derived "has stored bytes" (WS2.1): a `ready` row with an upload/parsed key came through
+    // the real intake flow → runs use run-from-dataset_id. A metadata-only `addDataset` row is `ready`
+    // with NO key → false. Recomputed on every reconcile, so it stays correct across reload.
+    uploaded: r.status === "ready" && Boolean(r.upload_s3_key || r.parquet_s3_key),
     qc: (r.qc as Dataset["qc"]) || undefined, createdAt: ms(r.created_at),
   };
 }

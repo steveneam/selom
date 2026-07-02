@@ -12,6 +12,7 @@ import type { FigureStore } from "@/hooks/use-figure-store";
 import {
   DataCheckError,
   runSkill,
+  runSkillByDataset,
   runtimeSkillId,
   type DataCheck,
   type SkillParams,
@@ -133,10 +134,17 @@ export function useFigureRun({
       // so produced figures have a dataset to compute staleness against.
       const dsId = datasetId ?? datasets[0]?.id;
       const dataset = dsId ? datasets.find((d) => d.id === dsId) : undefined;
-      const file = resolveRunFile(dataset);
-      if (!file) {
-        setNeedData({ datasetId: dsId });   // re-opened dataset, real backend → prompt re-upload
-        return;
+      // WS2.1 — close the upload→run→save loop: an uploaded dataset (bytes in the store) runs from its
+      // dataset_id, so no multipart re-upload and no re-upload prompt after reload. AI actions + a
+      // design sheet can't ride run-from-dataset_id → those stay on the multipart path.
+      const useDataset = !step.aiActions?.length && !designFile && !!dataset?.uploaded;
+      let file: File | null = null;
+      if (!useDataset) {
+        file = resolveRunFile(dataset);
+        if (!file) {
+          setNeedData({ datasetId: dsId });   // re-opened dataset, real backend → prompt re-upload
+          return;
+        }
       }
       setRunning(step.skillId);
       try {
@@ -144,12 +152,14 @@ export function useFigureRun({
         // step → route THIS fresh run through /ai/apply so the figure gets provenance.actions[] (✨),
         // exactly like a figure-data AI re-run. Deterministic result is identical (same _execute_skill_run
         // + posted params); the chokepoint stamps the trusted actor. Else the plain human run.
-        const res = step.aiActions?.length
-          ? await applyAiActions(runtimeSkillId(step.skillId), file, step.params, step.aiActions, {
+        const res = useDataset
+          ? await runSkillByDataset(runtimeSkillId(step.skillId), dataset!.id, step.params, opts)
+          : step.aiActions?.length
+          ? await applyAiActions(runtimeSkillId(step.skillId), file!, step.params, step.aiActions, {
               override: opts.override,
               design: designFile,
             })
-          : await runSkill(runtimeSkillId(step.skillId), file, step.params, designFile, opts);
+          : await runSkill(runtimeSkillId(step.skillId), file!, step.params, designFile, opts);
         const name = getSkill(step.skillId)?.name ?? step.skillId;
         // Persist the figure durably — full spec + the provenance bundle (the staleness
         // trigger-set, stamped with the dataset's current version). Both were transient
@@ -192,17 +202,24 @@ export function useFigureRun({
       setError(null);
       setNeedData(null);
       const dataset = fig.datasetId ? datasets.find((d) => d.id === fig.datasetId) : undefined;
-      const file = resolveRunFile(dataset);
-      if (!file) {
-        setNeedData({ datasetId: fig.datasetId });
-        return;
+      // WS2.1: re-run an uploaded dataset from its dataset_id (no re-upload prompt after reload).
+      const useDataset = !designFile && !!dataset?.uploaded;
+      let file: File | null = null;
+      if (!useDataset) {
+        file = resolveRunFile(dataset);
+        if (!file) {
+          setNeedData({ datasetId: fig.datasetId });
+          return;
+        }
       }
       // Persist hand-picked gene labels across the re-run, but only when re-running the figure that's
       // actually open in the editor (else figure.spec is a different figure's labels).
       const carryPrev = fig.id === activeFigureId ? captureCarryLabels() : [];
       setRunning(fig.skillId);
       try {
-        const res = await runSkill(runtimeSkillId(fig.skillId), file, fig.provenance.params, designFile);
+        const res = useDataset
+          ? await runSkillByDataset(runtimeSkillId(fig.skillId), dataset!.id, fig.provenance.params)
+          : await runSkill(runtimeSkillId(fig.skillId), file!, fig.provenance.params, designFile);
         const nextSpec = carryPrev.length ? carryLabels(res.figure, carryPrev) : res.figure;
         const saved = projectStore.addFigure(projectId, {
           title: fig.title,
@@ -240,10 +257,15 @@ export function useFigureRun({
       setError(null);
       setNeedData(null);
       const dataset = origin.datasetId ? datasets.find((d) => d.id === origin.datasetId) : undefined;
-      const file = resolveRunFile(dataset);
-      if (!file) {
-        setNeedData({ datasetId: origin.datasetId });
-        return;
+      // WS2.1: sweep an uploaded dataset from its dataset_id (no re-upload for the N runs).
+      const useDataset = !designFile && !!dataset?.uploaded;
+      let file: File | null = null;
+      if (!useDataset) {
+        file = resolveRunFile(dataset);
+        if (!file) {
+          setNeedData({ datasetId: origin.datasetId });
+          return;
+        }
       }
       setRunning(origin.skillId);
       // The non-swept params hold at the figure's recorded config; the backend fills any
@@ -253,7 +275,9 @@ export function useFigureRun({
       try {
         for (const value of values) {
           const params = { ...base, [param]: value };
-          const res = await runSkill(runtimeSkillId(origin.skillId), file, params, designFile);
+          const res = useDataset
+            ? await runSkillByDataset(runtimeSkillId(origin.skillId), dataset!.id, params)
+            : await runSkill(runtimeSkillId(origin.skillId), file!, params, designFile);
           saved.push(
             projectStore.addFigure(projectId, {
               title: origin.title,
@@ -301,17 +325,24 @@ export function useFigureRun({
       setBlocked(null);
       setNeedData(null);
       const dataset = origin.datasetId ? datasets.find((d) => d.id === origin.datasetId) : undefined;
-      const file = resolveRunFile(dataset);
-      if (!file) {
-        setNeedData({ datasetId: origin.datasetId });
-        return;
+      // WS2.1: re-run (edited inputs) an uploaded dataset from its dataset_id (no re-upload).
+      const useDataset = !designFile && !!dataset?.uploaded;
+      let file: File | null = null;
+      if (!useDataset) {
+        file = resolveRunFile(dataset);
+        if (!file) {
+          setNeedData({ datasetId: origin.datasetId });
+          return;
+        }
       }
       // Persist hand-picked gene labels across the re-run (origin is the open figure → figure.spec is
       // its spec): the fresh backend spec has none, so re-anchor them onto it (generalization-spec §H).
       const carryPrev = captureCarryLabels();
       setRunning(origin.skillId);
       try {
-        const res = await runSkill(runtimeSkillId(origin.skillId), file, params, designFile);
+        const res = useDataset
+          ? await runSkillByDataset(runtimeSkillId(origin.skillId), dataset!.id, params)
+          : await runSkill(runtimeSkillId(origin.skillId), file!, params, designFile);
         const nextSpec = carryPrev.length ? carryLabels(res.figure, carryPrev) : res.figure;
         const saved = projectStore.addFigure(projectId, {
           title: origin.title,

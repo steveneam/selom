@@ -18,6 +18,7 @@ import { datasetDisplayName } from "@/lib/lineage/family";
 import { detectModality, proposeForModality, proposeFromQc, type IntakeAnswers, type IntakeProposal } from "@/lib/intake/mock";
 import { combineData, inspectData, modalityFromKind, qcFromInspect, type DataTypeOverride } from "@/lib/intake/inspect";
 import { designRunParams, timeCourseDesignFile, type DesignChoice } from "@/lib/intake/design";
+import { uploadDataset } from "@/lib/uploads/api";
 import { projectStore } from "@/lib/projects/store";
 import type { AiActionDelta } from "@/lib/ai/types";
 import type { Dataset } from "@/lib/projects/types";
@@ -91,9 +92,14 @@ export function DataPanel({
   const [disabledSteps, setDisabledSteps] = React.useState<Set<string>>(new Set());
   // The live engine inspect is in flight for the active dataset (drop or data-type override).
   const [inspecting, setInspecting] = React.useState(false);
+  // The real byte-upload handshake (WS2.1) is in flight for a freshly dropped file.
+  const [uploading, setUploading] = React.useState(false);
   // Multi-file combine (C6) is in flight; or its error.
   const [combining, setCombining] = React.useState(false);
   const [combineError, setCombineError] = React.useState<string | null>(null);
+  // dev:mock has no upload/run-dataset handlers → skip the byte-upload handshake (WS2.1) and keep the
+  // metadata-only + multipart mock path. Real backend (the verify target) runs the full loop.
+  const mockMode = process.env.NEXT_PUBLIC_API_MOCKING === "enabled";
 
   React.useEffect(() => {
     setDisabledSteps(new Set());
@@ -134,7 +140,7 @@ export function DataPanel({
     [],
   );
 
-  function ingest(file: File) {
+  async function ingest(file: File) {
     // C5 re-attach: when the lost-bytes banner sent us here, the next file REFILLS the existing
     // dataset (same record + a fresh sha) instead of spawning a duplicate, and the bytes go up so
     // the figure can re-run this session.
@@ -149,7 +155,18 @@ export function DataPanel({
       return;
     }
     const modality = detectModality(file.name);
-    const dataset = projectStore.addDataset(projectId, file.name, modality);
+    // WS2.1 — close the upload→run→save loop: put the BYTES in the object store so the run goes from
+    // the dataset_id (no re-upload) and the dataset survives reload re-runnable. Fail-soft: a failed
+    // upload (or dev:mock, which has no upload handlers) degrades to the metadata-only dataset + this
+    // session's multipart run — the proven flow is never broken.
+    let dataset: Dataset | null = null;
+    if (!mockMode) {
+      setUploading(true);
+      dataset = await uploadDataset(projectId, file);
+      setUploading(false);
+      if (dataset) dataset = projectStore.addUploadedDataset(dataset);
+    }
+    if (!dataset) dataset = projectStore.addDataset(projectId, file.name, modality);
     setActive({ dataset, file, real: true });
     setDisabledSteps(new Set());
     setOverride(undefined);
@@ -161,7 +178,7 @@ export function DataPanel({
   // through to the normal ingest path. Fail-soft: a backend error surfaces a note, no dataset made.
   function combineFiles(files: File[]) {
     if (files.length <= 1) {
-      if (files[0]) ingest(files[0]);
+      if (files[0]) void ingest(files[0]);
       return;
     }
     setCombineError(null);
@@ -217,7 +234,7 @@ export function DataPanel({
   React.useEffect(() => {
     if (!incomingFile || ingestedRef.current === incomingFile) return;
     ingestedRef.current = incomingFile;
-    ingest(incomingFile);
+    void ingest(incomingFile);
     onIncomingConsumed?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incomingFile]);
@@ -238,7 +255,7 @@ export function DataPanel({
             hold several datasets, so an add-affordance always lives here. */}
         {datasets.length === 0 ? (
           <Dropzone
-            onFile={ingest}
+            onFile={(f) => void ingest(f)}
             onFiles={combineFiles}
             multiple
             accept=".h5ad,.csv,.tsv,.txt,.mzML,.iwxdata"
@@ -248,7 +265,7 @@ export function DataPanel({
           />
         ) : (
           <Dropzone
-            onFile={ingest}
+            onFile={(f) => void ingest(f)}
             onFiles={combineFiles}
             multiple
             accept=".h5ad,.csv,.tsv,.txt,.mzML,.iwxdata"
@@ -257,6 +274,11 @@ export function DataPanel({
             icon={Plus}
             variant="secondary"
           />
+        )}
+        {uploading && (
+          <p className="text-xs text-muted-foreground" role="status">
+            Uploading your data…
+          </p>
         )}
         {combining && (
           <p className="text-xs text-muted-foreground" role="status">

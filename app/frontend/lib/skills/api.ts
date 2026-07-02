@@ -310,6 +310,29 @@ export async function runSkill(
 }
 
 /**
+ * Run a skill from an ALREADY-UPLOADED dataset (WS2.1 / 7c §5): the bytes live in the object store, so
+ * this POSTs the `dataset_id` (no multipart re-upload) and gets back the SAME `{ figure, provenance,
+ * methods, … }` bundle as {@link runSkill} — both route through the backend's one `_execute_skill_run`,
+ * so the response shape AND the typed-error surface (422 QC block, 400 data-contract) are identical
+ * (shared {@link parseSkillRunResponse}). `skillId` is the bare runtime slug (call {@link runtimeSkillId}
+ * first). NOTE: run-from-dataset_id carries NO design sheet — a run that needs one stays on the
+ * multipart {@link runSkill} path.
+ */
+export async function runSkillByDataset(
+  skillId: string,
+  datasetId: string,
+  params: SkillParams = {},
+  opts: { override?: boolean } = {},
+): Promise<SkillRunResponse> {
+  const res = await fetch(`/api/skills/${encodeURIComponent(skillId)}/run-dataset`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dataset_id: datasetId, params, override: opts.override ?? false }),
+  });
+  return parseSkillRunResponse(res);
+}
+
+/**
  * Parse a skill-run HTTP response into a {@link SkillRunResponse} (or throw a friendly,
  * typed error). Shared by {@link runSkill} (POST /skills/{id}/run) and the AI gateway's
  * apply path (POST /ai/apply) — both route through the SAME `_execute_skill_run` body,

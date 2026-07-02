@@ -13,6 +13,7 @@ vi.mock("@/lib/api/client", () => {
 
 import { api } from "@/lib/api/client";
 import { mergeDatasets, mergeFigures, projectStore } from "./store";
+import { fromApiDataset } from "./sync";
 import type { Dataset, Figure } from "./types";
 
 const flush = () => new Promise<void>((r) => setTimeout(r, 0));
@@ -93,6 +94,30 @@ describe("addDataset — the real path never fabricates qc (A2 ratchet: the pbmc
     expect(d.qc).toBeUndefined();
     // The snapshot agrees — no fabricated dims persisted to the store/mirror either.
     expect(projectStore.getSnapshot().datasets.find((x) => x.id === d.id)?.qc).toBeUndefined();
+  });
+});
+
+describe("addUploadedDataset + fromApiDataset.uploaded — the WS2.1 upload→run→save loop", () => {
+  it("addUploadedDataset inserts the server-authoritative row WITHOUT a POST (intake already persisted it)", async () => {
+    (api.post as ReturnType<typeof vi.fn>).mockClear();
+    const d: Dataset = {
+      id: "srv_up_ds", projectId: "demo-pbmc", filename: "counts.csv",
+      modality: "bulk RNA-seq", uploaded: true, currentSha256: "abc", createdAt: 1,
+    };
+    const ret = projectStore.addUploadedDataset(d);
+    expect(ret).toBe(d);
+    expect(projectStore.getSnapshot().datasets.some((x) => x.id === "srv_up_ds")).toBe(true);
+    await flush();
+    // The metadata-only twin (addDataset) POSTs /datasets; the upload flow must NOT — the row exists.
+    expect(api.post).not.toHaveBeenCalledWith("/datasets", expect.objectContaining({ id: "srv_up_ds" }));
+  });
+
+  it("flags a ready row WITH stored bytes as uploaded; a metadata-only / pending row is not", () => {
+    const map = (r: Record<string, unknown>) => fromApiDataset({ id: "x", project_id: "p", filename: "f", ...r });
+    expect(map({ status: "ready", upload_s3_key: "uploads/x" }).uploaded).toBe(true);
+    expect(map({ status: "ready", parquet_s3_key: "data/x.csv" }).uploaded).toBe(true);
+    expect(map({ status: "ready" }).uploaded).toBe(false); // metadata-only (addDataset) → multipart
+    expect(map({ status: "pending_upload", upload_s3_key: "uploads/x" }).uploaded).toBe(false); // not confirmed
   });
 });
 

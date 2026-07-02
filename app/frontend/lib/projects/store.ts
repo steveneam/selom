@@ -293,6 +293,15 @@ export const projectStore = {
     });
     return d;
   },
+  /** Insert a dataset created by the REAL upload flow (WS2.1) — its bytes already live in the object
+   *  store, so runs use run-from-dataset_id (no re-upload) and it survives reload. Unlike `addDataset`
+   *  (the metadata-only twin) it does NOT enqueue `POST /datasets`: `/uploads/intake` already persisted
+   *  the server row, and it is server-authoritative (7c §2.2 — id/currentSha256/uploaded come from the
+   *  store). `d` is the already-mapped {@link Dataset} from `uploadDataset` (via `fromApiDataset`). */
+  addUploadedDataset(d: Dataset): Dataset {
+    setState({ ...state, datasets: [...state.datasets, d] });
+    return d;
+  },
   /** Apply the live engine inspect result to a dataset (real modality + cleaning/QC report, plus the
    *  Slice-2 data-aware route: suggested pipeline + per-skill data-fit + table shape). Persisting
    *  routing/dataFit here is what makes the "Recommended for your data" chips survive reload. */

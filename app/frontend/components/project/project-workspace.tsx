@@ -138,9 +138,13 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     ? figureStaleness(activeFigure, { sha256: activeDataset?.currentSha256 })
     : { stale: false, reasons: [] };
   const mockMode = process.env.NEXT_PUBLIC_API_MOCKING === "enabled";
-  // Re-run needs the dataset bytes: present this session (lastFile) or fabricated in
-  // mock mode; with neither (e.g. after reload against a real backend) it's disabled.
-  const canRerun = !!activeFigure?.skillId && !!activeFigure?.provenance && (lastFile != null || mockMode);
+  // Re-run needs the dataset bytes: an UPLOADED dataset runs from its dataset_id (WS2.1 — no
+  // re-upload, so re-run works after reload), else this session's real bytes (lastFile), else
+  // fabricated in mock mode. With none (a re-opened metadata-only dataset) it's disabled.
+  const canRerun =
+    !!activeFigure?.skillId &&
+    !!activeFigure?.provenance &&
+    (lastFile != null || mockMode || !!activeDataset?.uploaded);
   // The skill-run engine (§3C): a fresh run + the three re-run flavours + their shared run
   // state. It persists durable figure records and navigates by writing the routing setters.
   const { running, error, blocked, needData, setBlocked, setNeedData, runFlow, rerunFigure, runSweep, rerunFigureWithParams, rerunFigureWithAi } =

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  * which provides `fetch`/`FormData`/`File`; we stub `fetch` to assert the wire contract.
  */
 
-import { DataCheckError, recommendParams, runSkill, stageableRecommendations, type ParamRec } from "./api";
+import { DataCheckError, recommendParams, runSkill, runSkillByDataset, stageableRecommendations, type ParamRec } from "./api";
 
 function jsonRes(status: number, body: unknown): Response {
   return {
@@ -197,5 +197,43 @@ describe("recommendParams", () => {
   it("throws on a 404 (unknown skill)", async () => {
     vi.stubGlobal("fetch", () => Promise.resolve(jsonRes(404, {})));
     await expect(recommendParams("nope")).rejects.toThrow(/404/);
+  });
+});
+
+describe("runSkillByDataset — run-from-dataset_id (WS2.1)", () => {
+  it("POSTs { dataset_id, params, override } as JSON and returns the parsed figure", async () => {
+    const calls: Array<[string, { method: string; body: string }]> = [];
+    vi.stubGlobal("fetch", (url: string, init: { method: string; body: string }) => {
+      calls.push([url, init]);
+      return Promise.resolve(jsonRes(200, { figure: FIGURE, provenance: { skill: { id: "volcano" } } }));
+    });
+
+    const out = await runSkillByDataset("volcano", "srv_ds_1", { fc_threshold: 1 }, { override: true });
+
+    expect(out.figure).toEqual(FIGURE);
+    expect(calls[0][0]).toBe("/api/skills/volcano/run-dataset");
+    expect(calls[0][1].method).toBe("POST");
+    expect(JSON.parse(calls[0][1].body)).toEqual({
+      dataset_id: "srv_ds_1",
+      params: { fc_threshold: 1 },
+      override: true,
+    });
+  });
+
+  it("defaults override to false and shares the typed 422 QC-block error surface", async () => {
+    const detail = {
+      error: "data_check_failed",
+      message: "This data has a blocking problem for analysis.",
+      kind: "bulk_counts",
+      qc: { ran: true, ok: false, blocked: true, flags: [], stats: {} },
+      routing: null,
+    };
+    let sentBody = "";
+    vi.stubGlobal("fetch", (_url: string, init: { body: string }) => {
+      sentBody = init.body;
+      return Promise.resolve(jsonRes(422, { detail }));
+    });
+    await expect(runSkillByDataset("deg", "srv_ds_1")).rejects.toBeInstanceOf(DataCheckError);
+    expect(JSON.parse(sentBody).override).toBe(false);
   });
 });

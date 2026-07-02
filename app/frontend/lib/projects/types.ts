@@ -91,6 +91,12 @@ export interface Dataset {
    * with no real bytes, it's a stable real-looking stand-in the client maintains.)
    */
   currentSha256?: string;
+  /** True when this dataset's BYTES live in the object store (uploaded via the real intake flow —
+   *  WS2.1), so a run uses run-from-dataset_id (no multipart re-upload) and it — plus any figure it
+   *  produces — is re-runnable after reload with no re-upload prompt. False/undefined for a
+   *  metadata-only dataset (`addDataset`) or a demo seed. Server-derived (status=ready + a stored key,
+   *  see `fromApiDataset`), so it self-heals across a reconcile — not a fragile client-only flag. */
+  uploaded?: boolean;
   /** Present ONLY once a real qc verdict exists (seed demo data, or a completed `/data/inspect`
    *  success) — a real dataset added via `addDataset` starts `undefined`. Never a fabricated
    *  stand-in: an in-flight or failed inspect is tracked separately via `inspectState`, so the UI
