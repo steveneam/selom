@@ -55,7 +55,7 @@
 - **Gates green:** FE `tsc --noEmit` clean · eslint **0** on touched files · vitest **487 passed** (49 files; +5 `notAFitSkills`, incl. the complement-of-chips case). BE **untouched** (#3 is FE-only).
 - **Env note:** started a BE on :8010 for the live verify, **killed it** (eamos :8000 untouched). BE run via the uv-3.12 PY + `PYTHONPATH="D:/selom/app/backend/.venv/Lib/site-packages;."`. Probe scripts in the session scratchpad (never committed). No FE dev server started (HTTP-level verify, no browser MCP this env).
 - **Owner key (unchanged):** `AI_GATEWAY_API_KEY` in the gitignored repo-root `.env`; `SELOM_AI_GATEWAY` defaults `null`; `=gateway` live Vercel, `=operator` zero-credit canned.
-- **Model note:** owner set the default model to **Fable 5** via `/model` this session (saved to `.claude/settings.json`). CLAUDE.md's Notes still document an Opus-4.8 pin ("superseded the prior Fable 5 default") — now stale; update it when convenient.
+- **Model note:** owner briefly toggled the model to Fable 5 via `/model` mid-session, then **kept Opus 4.8** — the CLAUDE.md Opus-4.8 pin stands, no doc change needed.
 
 ## ▸ NEXT — (re-ranked 2026-07-02 00:16; **Layer A BUILD COMPLETE** — Phase 4 `cbbf803` + legend `e6fb26b` + Phase 5 `3dfd712` + export-fix `452a7b0` shipped, on top of 2c `6a7afa1` / Phase 3 `7da105b`; plan of record = `docs/ai-cross-stage-entry-points/build-spec.md`)
 
