@@ -13,7 +13,7 @@ import { skillColor, skillIcon } from "@/lib/catalog/modality";
 import { isFieldDisabled, visibleParamFields } from "@/lib/catalog/params";
 import { useSkillParams } from "@/lib/catalog/use-skill-params";
 import { getSkill } from "@/lib/catalog/seed";
-import { isDataAwareRecommendation, recommendedSkills } from "@/lib/catalog/quick-apply";
+import { isDataAwareRecommendation, notAFitSkills, recommendedSkills } from "@/lib/catalog/quick-apply";
 import type { DataRouting, SkillParams } from "@/lib/skills/api";
 import type { DataFitSummary } from "@/lib/intake/inspect";
 import type { Modality } from "@/lib/projects/types";
@@ -111,6 +111,10 @@ export function WorkbenchPanel({
   // inspect route drove the chips. The modality-mock fallback (demo/sample, or a real dataset whose
   // inspect failed) gets an honest, non-per-dataset heading instead.
   const dataAware = isDataAwareRecommendation(route ?? null);
+  // Slice-3 followups #3: the analyses the engine routed but the data is a certain mismatch for —
+  // surfaced as a muted, struck "not a fit — <reason>" trace (with the engine's reason VISIBLE, not
+  // tooltip-only) so an expected-but-dropped skill isn't invisible. Empty for the demo/sample mock.
+  const notAFit = notAFitSkills(route ?? null);
   // Surface WHY each chip is recommended (Slice 2): the per-skill data-fit verdict for an inspected
   // dataset, looked up by the (normalized) skill id. Drives a tooltip so the data-fit ranking + the
   // fit reason aren't invisible. Undefined for the demo/sample mock path (no inspected fit).
@@ -174,6 +178,36 @@ export function WorkbenchPanel({
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Not a fit for your data (followups #3) — analyses the engine routed but the data is a
+            certain mismatch for, kept visible (with the reason) instead of silently dropped, so an
+            expected-but-missing skill is traceable. Non-interactive (they can't run on this data). */}
+        {notAFit.length > 0 && (
+          <div>
+            <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+              Not a fit for your data
+            </p>
+            <ul className="space-y-1">
+              {notAFit.map(({ skill, reason, confidenceLabel }) => {
+                const Icon = skillIcon(skill);
+                return (
+                  <li key={skill.id} className="flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                    <span aria-hidden className="mt-px shrink-0 opacity-50 [&_svg]:size-3.5">
+                      <Icon />
+                    </span>
+                    <span>
+                      <span className="font-medium text-muted-foreground/90 line-through decoration-muted-foreground/40">
+                        {skill.name}
+                      </span>
+                      {" — "}
+                      {reason || confidenceLabel}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         )}
 

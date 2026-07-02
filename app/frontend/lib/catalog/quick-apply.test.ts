@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { dedupById, isDataAwareRecommendation, recommendedSkills } from "./quick-apply";
+import { dedupById, isDataAwareRecommendation, notAFitSkills, recommendedSkills } from "./quick-apply";
 import type { DataFitSummary } from "@/lib/intake/inspect";
 import type { DataFit } from "@/lib/reproduction/data-fit";
 import type { DataRouting } from "@/lib/skills/api";
@@ -98,6 +98,43 @@ describe("isDataAwareRecommendation — A3 fix: never label the modality-mock fa
   it("is false for a real dataset whose inspect failed (routing null) — no route, no fabricated per-dataset label", () => {
     expect(isDataAwareRecommendation(null)).toBe(false);
     expect(isDataAwareRecommendation({ routing: null, dataFit: null })).toBe(false);
+  });
+});
+
+describe("notAFitSkills — the dropped 'not a fit' trace (followups #3)", () => {
+  const badFit = (skill_id: string, reason: string): DataFit => ({
+    ...fit(skill_id, false), reason, confidence: "not_a_fit", confidence_label: "Not a fit",
+  });
+
+  it("returns the certain-mismatch skills, resolved to the catalog, with the engine's reason", () => {
+    const n = notAFitSkills(route(["deg", "volcano"], [badFit("volcano", "needs a raw count matrix")]));
+    expect(n.map((x) => x.skill.id)).toEqual(["selom.volcano"]);
+    expect(n[0].reason).toBe("needs a raw count matrix");
+    expect(n[0].confidenceLabel).toBe("Not a fit");
+  });
+
+  it("excludes fits that are compatible (true) or unknown (null) — only certain mismatches show", () => {
+    const n = notAFitSkills(route(["deg", "volcano"], [fit("deg", true), fit("volcano", null)]));
+    expect(n).toEqual([]);
+  });
+
+  it("is empty for the modality-mock path (no route / no dataFit — no per-dataset fitness to judge)", () => {
+    expect(notAFitSkills(null)).toEqual([]);
+    expect(notAFitSkills({ routing: routingWith(["deg"]), dataFit: null })).toEqual([]);
+  });
+
+  it("drops a mismatch whose slug isn't in the catalog (no broken row) + dedups by id", () => {
+    const n = notAFitSkills(
+      route(["volcano", "volcano", "not_a_real_skill"],
+        [badFit("volcano", "x"), badFit("not_a_real_skill", "y")]),
+    );
+    expect(n.map((x) => x.skill.id)).toEqual(["selom.volcano"]);
+  });
+
+  it("is the complement of the recommended chips — a dropped skill appears here, not there", () => {
+    const r = route(["deg", "volcano"], [badFit("volcano", "needs raw counts")]);
+    expect(recommendedSkills(r, null).map((s) => s.id)).toEqual(["selom.deg"]);
+    expect(notAFitSkills(r).map((x) => x.skill.id)).toEqual(["selom.volcano"]);
   });
 });
 

@@ -40,7 +40,7 @@ Status: `TODO` · `WIP` (≤1 at a time) · `DONE — <sha>` · `BLOCKED — <wh
 | 2 | **WS1.2** | Methods-text ↔ param_spec accuracy guard | P1 | DONE — 8c7f09b | pillars P4 · NEW test |
 | 3 | **WS2.1** | Close upload→run→save loop (own-data run = Library artifact) | P1 | DONE — 9c9c382 | CURRENT DEFERRED 7c-(b) · pillars P4 · RISKS #8 |
 | 4 | **WS2.2** | Intake "correct the detection" affordances | P1 | DONE — f51e0c2 | intake-questionnaire/followups.md #2,3,4,7,8 |
-| 5 | **WS2.3** | Surface the data-fit verdict on own-data | P1 | TODO | data-aware-routing/followups.md #1–4 |
+| 5 | **WS2.3** | Surface the data-fit verdict on own-data | P1 | DONE — <sha> | data-aware-routing/followups.md #1–4 |
 | 6 | **WS2.4** | Ingest robustness for messy real inputs | P1 | TODO | pillars P3c + P1d |
 | 7 | **WS2.5** | QC coverage vs deliberately-broken real data | P1 | TODO | pillars P1c (extension) |
 | 8 | **WS2.6** | Unify the run-path error taxonomy | P2 | TODO | pillars P1/P4 · NEW |
@@ -162,18 +162,28 @@ column with one candidate), **#7** (reset to detected), **#8** (skill/prompt whe
 - **Scope guard (honored):** surfacing only — **no code change** (affordances already present). The AI
   L4 refiner (followups #1) was not rebuilt; no rename/merge map (design-sheet is the repro path).
 
-### WS2.3 — Surface the data-fit verdict on own-data · P1 · Status: TODO
-`DataFitSummary` is computed + persisted but never shown on own-data intake. Home + items:
-`docs/data-aware-routing/followups.md` **#1** (fit verdict on intake — reuse
-`components/reproduction/data-fit-panel.tsx`), **#2** (dataset-card fit band), **#3**
-("hidden: not a fit — <reason>" trace), **#4** (route-composer "why rejected" + a
-"checked against your data" affirmation).
-- **Definition of Done:** an inspected dataset shows its fit verdict + band on the own-data
-  surface; a dropped-as-not-a-fit skill is traceable, not invisible.
-- **Verify:** browser, a real inspected dataset — verdict + band render; a non-fitting skill
-  shows the muted reason.
-- **Scope guard:** reuse the existing verdict component; no new scoring logic (the verdict is
-  server-computed already).
+### WS2.3 — Surface the data-fit verdict on own-data · P1 · Status: DONE — <sha>
+Home + items: `docs/data-aware-routing/followups.md` **#1** (fit verdict on intake), **#2**
+(dataset-card fit band), **#3** ("not a fit — <reason>" trace), **#4** (route-composer "why
+rejected" + a "checked against your data" affirmation). **#1/#2 shipped pre-tracker in `99bd6e4`**
+(`data-panel.tsx` renders `DataFitVerdict` + a dataset-card `ConfidenceChip` off the persisted
+`dataFit`) — the doc's "Deferred" list was stale (the same phantom-TODO pattern as WS2.2
+[[verify-todo-not-already-shipped]]). **#3 built this session:** `quick-apply.notAFitSkills` surfaces
+the routed-but-`compatible===false` analyses (previously dropped silently), and `workbench-panel.tsx`
+renders a muted, struck "Not a fit for your data — <reason>" list with the engine's reason **visible**
+(not tooltip-only). **#4 is OUT of this DoD** (a distinct AI route-composer surface needing a backend
+gap-threading change) — deferred, tracked in "Open items" below.
+- **Definition of Done:** an inspected dataset shows its fit verdict + band on the own-data surface
+  (#1/#2); a dropped-as-not-a-fit skill is traceable, not invisible (#3). **Met.**
+- **Verify (PASSED — real data + live `/data/inspect` on :8010):** #1/#2 render off the persisted
+  `dataFit` (present in `data-panel.tsx`); **#3** — real bulk counts `rpgr_irpe_rawcounts.csv` route
+  `[deg, volcano, enrichment]` → `deg` is a chip, **volcano + enrichment `compatible=false`** ("missing
+  a fold-change / significance column") → the not-a-fit trace shows both with their reasons; the real
+  eyg28 DE table routes only to fitting skills (nothing dropped — correct). Gates: FE tsc clean +
+  eslint 0 + vitest **487** (+5 `notAFitSkills` cases, incl. the complement-of-chips test); BE
+  untouched.
+- **Scope guard (honored):** reused the existing verdict component + the server-computed `dataFit`;
+  no new scoring logic; #3 is FE-only (no backend change). #4's backend gap-threading kept out.
 
 ### WS2.4 — Ingest robustness for messy real inputs · P1 · Status: TODO
 The layered classifier degrades honestly, but the "we're not sure → here are options" path
@@ -303,6 +313,10 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 - **P6 parking lot** (BAM, command-center C/B, Supabase/arq/Kaleido [superseded by AWS], …)
   → `docs/on-hold/README.md`, untouched.
 - **skill-gaps backlog** → a dogfooding feedback engine, not a task.
+- **Route-composer transparency** (data-aware-routing followups **#4**) — the AI `select_skill`
+  rejection shows a generic "no fitting skill" note; thread the specific incompatibility reason
+  through the gap + add a "checked against your data" success signal. A distinct AI route-composer
+  surface (BE gap-threading + `ask-ai.tsx`), deferred out of WS2.3 → `docs/data-aware-routing/followups.md`.
 
 ---
 
@@ -310,6 +324,7 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 
 | Date | Session | Task(s) | Result / sha |
 |---|---|---|---|
+| 2026-07-02 | RESTRUCTURE-05 | WS2.3 | **#1/#2 were shipped pre-tracker (`99bd6e4`); built #3; #4 deferred.** Same phantom-TODO check as WS2.2 [[verify-todo-not-already-shipped]]: `data-panel.tsx` already renders `DataFitVerdict` (own-data fit verdict, #1) + a dataset-card `ConfidenceChip` off the persisted `dataFit` (#2) — the followups "Deferred" list was stale. **#3 (the genuinely-open item) built:** `recommendedFromRoute` silently dropped `compatible===false` skills; added `quick-apply.notAFitSkills` (returns the routed-but-mismatched analyses resolved to catalog skills + reason + band) and a muted, struck **"Not a fit for your data — <reason>"** list in `workbench-panel.tsx` with the engine's reason **visible** (not tooltip-only), non-interactive (they can't run). **Verified live on :8010 `/data/inspect` with REAL data** [[verify-on-real-data-not-mock]]: `rpgr_irpe_rawcounts.csv` (bulk counts) routes `[deg, volcano, enrichment]` → `deg` compatible (chip), **volcano + enrichment `compatible=false`** ("missing a fold-change column, a significance (p/padj) column") → the not-a-fit trace shows both with their reasons; the eyg28 DE table routes only to fitting skills (`volcano/enrichment/gsea`, nothing dropped — correct). **#4 (route-composer "why rejected" + "checked against your data") kept deferred** — a distinct AI route-composer surface needing a backend gap-threading change, not the own-data verdict surface + outside WS2.3's DoD; captured in data-aware-routing/followups.md + "Open items". Files: `lib/catalog/quick-apply.ts` (+`notAFitSkills`/`NotAFit`), `components/project/workbench-panel.tsx` (the trace), `lib/catalog/quick-apply.test.ts` (+5). Gates: FE tsc clean · eslint 0 · vitest **487** (+5); BE untouched. `<sha>` |
 | 2026-07-02 | RESTRUCTURE-04 | WS2.2 | **Verified + closed (no re-build) — the affordances shipped pre-tracker.** Reading `intake-questionnaire.tsx` showed all five WS2.2 items (#2 excluded-level badge · #3 prefill reason · #4 single-source column · #7 reset-to-detected · #8 routing-null copy) already implemented, each tagged with its followups number; `git blame` placed them in `6b84834` (07-01 21:33) / `3743878` (07-02 01:21) / `79db701` (07-02 02:14) — **all before this tracker (`e9edf44`, 07-02 12:51)**. The audit had inherited the stale "Deferred #1–#8" list in `followups.md` (never updated after those commits) and minted WS2.2 as a phantom `TODO`. Confirmed the wire both sides (`engine/questionnaire.py` always sets `note`, sets `reference_guess`/`group_candidates`/`sample_col_candidates`; `lib/intake/design.ts` mirrors them). **Verified live on :8010 `/data/inspect` with REAL data** [[verify-on-real-data-not-mock]]: real bulk `rpgr_irpe_rawcounts.csv` (2-cond → #3 note, #4 single-candidate, #8 routes to deg) + `+ rpgr_irpe_design.csv` (→ `source=design_sheet`, `reference_guess='Control'` → the #3 control-guess line) + `EYG_29…St7…rawCounts.csv` (**6 conditions → #2 badge fires**); real scRNA **assembled from Hani GSE201356 10x** (the GEO deposit has no per-cell obs design — it's in the GSM filenames — so built a faithful 2000-cell AnnData: obs `line`=3 iPSC lines → **#2 fires**, obs `sample_id`=4 GSM samples → **#6** sample-col picker with real replicate counts). `jev/retina_fadl.h5ad` correctly returns `needs_design=False` (only `n_genes`/`leiden`, no condition col). #7 is pure FE state; #8's null branch is the FE else (routing resolved on all real data). Reconciled `followups.md` (Deferred #2/#3/#4/#6/#7/#8 → **Shipped**, root-cause doc fix; #1/#5 kept deferred). **No code changed.** Gates: BE `test_design_hints` **25/25** + FE tsc clean + intake vitest **53/53** + eslint 0. Working Agreement #4 updated per owner directive (reviews deferred to the VERY END, after all tasks — not per-workstream). `f51e0c2` |
 | 2026-07-02 | RESTRUCTURE-03 | WS2.1 | Closed the upload→run→save loop (FE-only; the BE intake/confirm/parse/run-dataset endpoints were already built + tested in 7c). New `lib/uploads/api.ts` `uploadDataset` drives the real handshake (`/uploads/intake` → local PUT of the bytes → `/uploads/{id}/confirm` → `/uploads/{id}/parse`) and returns a server-authoritative `Dataset` with `uploaded:true`; `fromApiDataset` derives `uploaded` from `status=ready` + a stored upload/parsed key (self-heals across reconcile). `data-panel.ingest` runs it on a fresh single-file drop (gated `!mockMode`, with an "Uploading…" cue), inserting via a new `projectStore.addUploadedDataset` (no `/datasets` re-POST — intake already persisted the row). `runSkillByDataset` POSTs `/skills/{id}/run-dataset`; `use-figure-run` routes the fresh run + all 3 re-run flavours through it whenever the dataset is `uploaded` AND the run has no design sheet / AI actions (run-dataset carries neither → those stay multipart); `canRerun` gains `activeDataset.uploaded` so re-run works after reload. Fail-soft everywhere (upload failure / dev:mock → metadata-only dataset + multipart). Gates: FE tsc clean · eslint 0 err (1 pre-existing set-state-in-effect warning, untouched) · vitest **482** (+ uploads happy/fail-soft, runSkillByDataset wire+422, addUploadedDataset no-POST, `uploaded` mapping); BE untouched (no BE change). **Verified LIVE on real eyg28 DE CSV** (RPGRIP1_cpdHet d210, TMM-K0; :8010 SQLite + LocalObjectStore + dev auth): intake → PUT 2.4 MB → confirm(ready) → parse(real sha) → **run-dataset produced a 16,760-gene volcano with NO multipart** → saved figure → a fresh `GET /figures` (=reload) still returns it with its spec → dataset row → `uploaded=true`. (HTTP-level e2e drove the exact FE wire path — no browser MCP in this env, as at WS1.1; the in-browser click-through is the one lighter item owed to the WS2 boundary review.) `9c9c382` |
 | 2026-07-02 | RESTRUCTURE-02 | WS1.2 | Methods/legend ↔ `param_spec` accuracy guard: `tests/test_methods_param_spec_guard.py` statically reads every param token each `companions/methods.py` + `companions/legends.py` template pulls off its resolved-params dict (direct `p[...]`/`p.get(...)` **and** through same-module helpers that receive the dict — `_erg_adaptation(p)`, legends' `_contrast(p)`) and asserts each ∈ the live `param_spec`; a `test_extractor_is_not_vacuous` pins the reader so the guard can't pass hollow. 64 template cases + 1 meta, all green; templates untouched (Scope guard). Verify passed: renamed `volcano.top_n`→`n_top` in `skill.json` → 2 cases fail; revert → 65 green. Makes WS1 (honesty) **code-complete**; the WS1 boundary reviews (gauntlet + fe-review + WS1.1-owed StubEngineBanner G2) were **deferred this session by owner directive** — owed before WS1 is fully closed (CURRENT NEXT#R). `8c7f09b` |
@@ -318,9 +333,9 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 
 ---
 
-## Next-session prompt (tailored — RESTRUCTURE-05 · WS2.3; supersedes the generic template below until stamped done)
+## Next-session prompt (tailored — RESTRUCTURE-06 · WS2.4; supersedes the generic template below until stamped done)
 
-Paste this to start the next session; re-stamp the header line with the real clock. When WS2.3 is
+Paste this to start the next session; re-stamp the header line with the real clock. When WS2.4 is
 `DONE`, rewrite this block for the next top-`TODO` (like the CURRENT.md LIVE pointer).
 
 ```
@@ -329,27 +344,29 @@ Paste this to start the next session; re-stamp the header line with the real clo
 
 Read first: docs/restructure/plan.md (the tracker) → Status board + Progress log + the
 Working Agreement. Confirm git: `git fetch && git status` — origin/main should be in sync at the
-RESTRUCTURE-04 stamp commit.
+RESTRUCTURE-05 stamp commit.
 
-State: WS1 (honesty) CODE-COMPLETE — WS1.1 (1be60a5) + WS1.2 (8c7f09b). WS2.1 (9c9c382) DONE —
-upload→run→save loop closed + verified live. WS2.2 DONE — the five "correct the detection"
-affordances (#2/#3/#4/#7/#8) had shipped pre-tracker (6b84834/3743878/79db701); RESTRUCTURE-04
-verified them live on real bulk (rpgr/eyg29) + real scRNA (assembled from Hani 10x) and reconciled
-the stale followups.md (no code change). **Reviews are now deferred to the VERY END** (owner
-directive, Working Agreement #4): one review-gauntlet + fe-review pass over the whole restructure
-diff AFTER all tasks are DONE — carries the owed WS1 boundary (NEXT#R: gauntlet + fe-review + the
-WS1.1 StubEngineBanner G2) + WS2.1's in-browser click-through. Do NOT run them per-workstream.
+State: WS1 CODE-COMPLETE (1be60a5 + 8c7f09b). WS2.1 (9c9c382) DONE. WS2.2 DONE — the five
+"correct the detection" affordances had shipped pre-tracker; verified live + reconciled, no code
+change. WS2.3 DONE — #1/#2 (fit verdict + dataset-card band) shipped pre-tracker (99bd6e4); built
+#3 (the "Not a fit — <reason>" trace in workbench-panel via quick-apply.notAFitSkills), verified
+live on real bulk counts; #4 (route-composer transparency) deferred to "Open items". **NOTE the
+recurring pattern:** WS2.2 + WS2.3 were both largely already-shipped — the followups docs the tracker
+points at had stale "Deferred" lists. **Before building any WS TODO, read + git-blame the target
+first** [[verify-todo-not-already-shipped]]; if it's already there, verify-live + reconcile-doc +
+stamp, don't re-build. **Reviews deferred to the VERY END** (Working Agreement #4): one
+review-gauntlet + fe-review pass over the whole restructure diff after ALL tasks are DONE (carries the
+owed WS1 boundary NEXT#R + WS2.1's in-browser click-through). Do NOT run them per-workstream.
 
-Do: proceed to the top TODO by Order — WS2.3 (Surface the data-fit verdict on own-data; Order 5,
-P1). DataFitSummary is computed + persisted on inspect but never SHOWN on own-data intake. Home +
-items: docs/data-aware-routing/followups.md #1 (fit verdict on intake — reuse
-components/reproduction/data-fit-panel.tsx), #2 (dataset-card fit band), #3 ("hidden: not a fit —
-<reason>" trace for a dropped skill), #4 (route-composer "why rejected" + a "checked against your
-data" affirmation). The verdict is server-computed already (/data/inspect `data_fit`, on the wire +
-persisted as Dataset.dataFit) — this is SURFACING, not new scoring. Scope guard: reuse the existing
-verdict component; no new scoring logic. DONE only when an inspected dataset shows its fit verdict +
-band on the own-data surface and a dropped-as-not-a-fit skill is traceable (not invisible), verified
-in-browser (or HTTP-level if no browser MCP) on a live backend with a real inspected dataset.
+Do: proceed to the top TODO by Order — WS2.4 (Ingest robustness for messy real inputs; Order 6, P1).
+Home: pillars P3c + P1d. First git-blame engine/ingest.py + engine/cleaning.py to see what already
+exists (encoding/delimiter/orientation handling may be partly there — verify before building). DoD:
+UNKNOWN/GENERIC_TABLE routes to an honest "here are options" surface; encoding/delimiter sniffing +
+a wrong-orientation hint exist; a genuinely unloadable file fails with a clear reason, never a crash
+(no 500). Verify: feed 3–4 deliberately messy REAL files (malformed CSV / odd Excel / wrong
+orientation / bad encoding) → each yields options or an honest error, never a 500. Scope guard: no
+new modalities; no auto-fetch/accession work (parked). Detection + honest options only. This is a BE
+task (engine + maybe a small FE surface for the options) — run the BE fast pytest + ruff gate.
 
 Rules (the anti-half-done contract):
 - Stay on the board. New work surfaced mid-task → add a WSx.y row FIRST, don't expand scope.
@@ -369,11 +386,12 @@ Rules (the anti-half-done contract):
 Env / landmines (unchanged): :8000 = eamos, NEVER kill → BE on :8010 (`uvicorn main:app --port
 8010`, no --reload; the uv-3.12 PY at C:\Users\seamegdool\AppData\Roaming\uv\python\
 cpython-3.12.13-windows-x86_64-none\python.exe + PYTHONPATH="D:/selom/app/backend/.venv/Lib/
-site-packages;." run from app/backend, NOT `uv run` — EDR; set PYTHONIOENCODING=utf-8 for the
-note's → char; ruff may hit WinError-5 first spawn, retry once). FE = `npx next dev --webpack`.
-Snapshot localStorage before any live-store verify; the untracked scratch dev.db holds prior verify
-projects (harmless). git user.email stays 282747725+steveneam@users.noreply.github.com. Kill every
-dev server you start before ending. Proceed to WS2.3.
+site-packages;." run from app/backend, NOT `uv run` — EDR; set PYTHONIOENCODING=utf-8 for non-ASCII
+in probe output; ruff may hit WinError-5 first spawn, retry once). Messy real inputs to try live:
+alpk1 .xlsx counts (`D:/selom-data/alpk1/mouse_P14P30P90/*.xlsx`), dorgau `*.csv.gz`, hani 10x
+triplets. FE = `npx next dev --webpack`. git user.email stays
+282747725+steveneam@users.noreply.github.com. Kill every dev server you start before ending. Proceed
+to WS2.4.
 ```
 
 ## Resume prompt (persistent — the generic template; the tailored block above supersedes it until stamped done)

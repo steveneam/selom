@@ -17,6 +17,7 @@
 import { getSkill } from "@/lib/catalog/seed";
 import { proposeForModality, type IntakeProposal } from "@/lib/intake/mock";
 import type { DataFitSummary } from "@/lib/intake/inspect";
+import type { ConfidenceBand } from "@/lib/reproduction/data-fit";
 import type { Modality } from "@/lib/projects/types";
 import type { DataRouting } from "@/lib/skills/api";
 
@@ -104,4 +105,37 @@ export function isDataAwareRecommendation(
   route: { routing: DataRouting | null; dataFit: DataFitSummary | null } | null,
 ): boolean {
   return !!route?.routing;
+}
+
+/** One analysis the engine routed but the data is a CERTAIN mismatch for — surfaced (not hidden) so
+ *  an expected-but-dropped skill is traceable, with the engine's reason (followups #3). */
+export interface NotAFit {
+  skill: CatalogSkill;
+  reason: string;
+  confidence: ConfidenceBand;
+  confidenceLabel: string;
+}
+
+/**
+ * The skills `recommendedSkills` DROPPED because the data is a certain mismatch (`compatible === false`)
+ * — the complement of the recommended chips, resolved to verified catalog skills so a muted "not a fit
+ * for your data — <reason>" trace can render instead of silently vanishing (followups #3). Only for an
+ * INSPECTED dataset (real `dataFit`): the modality-mock fallback has no per-dataset fitness to judge,
+ * so it returns []. Deduped by skill id, capped at four.
+ */
+export function notAFitSkills(
+  route: { routing: DataRouting | null; dataFit: DataFitSummary | null } | null,
+): NotAFit[] {
+  if (!route?.routing || !route.dataFit) return [];
+  const seen = new Set<string>();
+  const out: NotAFit[] = [];
+  for (const f of route.dataFit.fits) {
+    if (f.compatible !== false) continue; // keep only certain mismatches (null = uncertain, still shown as a chip)
+    const skill = getSkill(toCatalogId(f.skill_id));
+    if (!skill || skill.tier !== "verified" || seen.has(skill.id)) continue;
+    seen.add(skill.id);
+    out.push({ skill, reason: f.reason, confidence: f.confidence, confidenceLabel: f.confidence_label });
+    if (out.length >= 4) break;
+  }
+  return out;
 }
