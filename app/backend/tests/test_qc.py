@@ -79,6 +79,22 @@ def test_empty_table_blocks():
     assert "empty" in _codes(rep)
 
 
+def test_wide_bulk_matrix_warns_maybe_transposed():
+    # 3 rows (samples) x 20 numeric columns (genes): a count matrix is genes x samples (tall),
+    # so far more numeric columns than rows means the table was probably dropped transposed.
+    df = pd.DataFrame(RNG.integers(0, 100, size=(3, 20)), columns=[f"g{j}" for j in range(20)])
+    rep = run_qc(DataBundle(payload=df, kind=BULK_COUNTS))
+    assert "maybe_transposed" in _codes(rep)
+    assert rep.ok is False        # a warn drops ok
+    assert rep.blocked is False   # but does not hard-block — the user can override
+
+
+def test_tall_bulk_matrix_no_transpose_warning():
+    df = pd.DataFrame(RNG.integers(0, 400, size=(50, 6)), columns=[f"s{j}" for j in range(6)])
+    rep = run_qc(DataBundle(payload=df, kind=BULK_COUNTS))
+    assert "maybe_transposed" not in _codes(rep)
+
+
 def test_anndata_clean_counts_ok():
     ad = pytest.importorskip("anndata")
     X = RNG.poisson(1.0, size=(40, 8)).astype("float32")

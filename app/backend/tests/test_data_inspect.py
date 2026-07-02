@@ -154,3 +154,55 @@ def test_inspect_unrecognized_type_400():
     )
     assert r.status_code == 400
     assert "no ingest loader" in r.json()["detail"]
+
+
+# --- messy-real-input robustness (WS2.4): a stranger's odd/broken file never 500s -----------------
+
+def test_inspect_semicolon_csv_parses_into_columns():
+    csv = b"gene;s0;s1;s2;s3\n" + b"".join(
+        f"g{i};{i};{i + 1};{i + 2};{i + 3}\n".encode() for i in range(20))
+    r = client.post("/data/inspect", files={"matrix": ("counts_eu.csv", csv, "text/csv")})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["kind"] == "bulk_counts"            # sniffed ';' -> real columns, not one blob
+    assert body["data_fit"]["n_numeric_cols"] == 4
+
+
+def test_inspect_latin1_encoding_no_500():
+    # A cp1252 byte (µ = 0xB5) in the header must not crash the UTF-8 default read.
+    csv = "gene,ctrl,\xb5M_dose\n".encode("cp1252") + b"".join(
+        f"g{i},{i},{i + 1}\n".encode() for i in range(15))
+    r = client.post("/data/inspect", files={"matrix": ("dose.csv", csv, "text/csv")})
+    assert r.status_code == 200
+
+
+def test_inspect_wide_matrix_flags_maybe_transposed():
+    # 3 rows x 20 gene columns declared as counts -> a wrong-orientation hint, not a crash.
+    csv = b"sample," + b",".join(f"g{j}".encode() for j in range(20)) + b"\n"
+    csv += b"".join(
+        (f"s{i}," + ",".join(str((i + j) % 50) for j in range(20)) + "\n").encode()
+        for i in range(3))
+    r = client.post("/data/inspect?hint=bulk_counts", files={"matrix": ("wide.csv", csv, "text/csv")})
+    assert r.status_code == 200
+    body = r.json()
+    assert any(f["code"] == "maybe_transposed" for f in body["qc"]["flags"])
+
+
+def test_inspect_ragged_csv_400_not_500():
+    csv = b"a,b,c\n1,2,3\n4,5,6\n7,8,9,10,11\n"   # inconsistent row widths -> ParserError
+    r = client.post("/data/inspect", files={"matrix": ("ragged.csv", csv, "text/csv")})
+    assert r.status_code == 400
+
+
+def test_inspect_corrupt_xlsx_400_not_500():
+    r = client.post(
+        "/data/inspect",
+        files={"matrix": ("broken.xlsx", b"definitely not a real workbook",
+                          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    assert r.status_code == 400
+
+
+def test_inspect_empty_csv_400():
+    r = client.post("/data/inspect", files={"matrix": ("empty.csv", b"   \n", "text/csv")})
+    assert r.status_code == 400

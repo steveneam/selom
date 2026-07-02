@@ -86,6 +86,60 @@ def test_ingest_unrecognized_raises(tmp_path):
         ingest(p)
 
 
+# --- messy-real-input robustness (WS2.4): encoding / delimiter sniffing + honest parse errors ------
+
+def test_ingest_semicolon_csv_parses_into_columns(tmp_path):
+    """A European semicolon-delimited .csv parses into columns, not one blob."""
+    p = tmp_path / "eu.csv"
+    p.write_bytes(b"gene;s0;s1;s2\n" + b"".join(
+        f"g{i};{i};{i + 1};{i + 2}\n".encode() for i in range(15)))
+    db = ingest(p)
+    assert db.payload.shape[1] == 4   # sniffed ';' -> 4 columns, not a single blob
+    assert db.kind == BULK_COUNTS
+
+
+def test_ingest_latin1_encoding_loads(tmp_path):
+    """A cp1252/latin-1 byte in the header (µ = 0xB5) must not crash the default UTF-8 read."""
+    p = tmp_path / "dose.csv"
+    p.write_bytes("gene,ctrl,\xb5M_dose\n".encode("cp1252") + b"".join(
+        f"g{i},{i},{i + 1}\n".encode() for i in range(12)))
+    db = ingest(p)                    # must not raise UnicodeDecodeError
+    assert "gene" in [str(c) for c in db.payload.columns]
+
+
+def test_ingest_utf8_bom_first_header_clean(tmp_path):
+    """A UTF-8 BOM is stripped (utf-8-sig) so the first column name isn't mangled with ﻿."""
+    p = tmp_path / "bom.csv"
+    p.write_bytes(b"\xef\xbb\xbfgene,s0,s1\n" + b"".join(
+        f"g{i},{i},{i + 1}\n".encode() for i in range(12)))
+    db = ingest(p)
+    assert list(db.payload.columns)[0] == "gene"
+
+
+def test_ingest_empty_csv_raises(tmp_path):
+    p = tmp_path / "empty.csv"
+    p.write_bytes(b"   \n")
+    with pytest.raises(ValueError, match="empty"):
+        ingest(p)
+
+
+def test_ingest_ragged_csv_raises_valueerror(tmp_path):
+    """Rows with more fields than the header are a genuine parse failure -> an honest ValueError
+    (which the router turns into a 400), never a raw ParserError bubbling up as a 500."""
+    p = tmp_path / "ragged.csv"
+    p.write_bytes(b"a,b,c\n1,2,3\n4,5,6\n7,8,9,10,11\n")   # inconsistent row widths -> ParserError
+    with pytest.raises(ValueError):
+        ingest(p)
+
+
+def test_ingest_corrupt_xlsx_raises_valueerror(tmp_path):
+    """A file wearing .xlsx that isn't a real workbook fails with a clear ValueError, not a 500."""
+    p = tmp_path / "broken.xlsx"
+    p.write_bytes(b"definitely not a zip-based spreadsheet")
+    with pytest.raises(ValueError):
+        ingest(p)
+
+
 # --- ingest_many (C6 multi-file combine) ------------------------------------------------
 
 def _erg_csv(path, condition, sample_ids):

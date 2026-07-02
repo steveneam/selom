@@ -34,6 +34,21 @@ def _flag(severity: str, code: str, message: str, fix: str = "") -> QCFlag:
     return QCFlag(severity=severity, code=code, message=message, fix=fix)
 
 
+def _orientation_flag(n_rows: int, n_numeric_cols: int, feature_noun: str) -> QCFlag | None:
+    """A count/intensity matrix is ``features × samples`` (tall): many feature rows, a handful of
+    sample columns. Far more numeric columns than rows is a strong, low-false-positive sign the table
+    was dropped transposed — a genes×samples matrix never has more sample columns than gene rows. A
+    ``warn`` (not a hard block): running DE on a transposed matrix produces garbage, but the user can
+    override if their wide shape is intentional."""
+    if n_numeric_cols > n_rows and n_numeric_cols >= 12:
+        return _flag(QC_WARN, "maybe_transposed",
+                     f"{n_numeric_cols} numeric columns but only {n_rows} rows — the table may be "
+                     f"transposed (samples as rows, {feature_noun} as columns).",
+                     f"Analyses expect {feature_noun} as rows and samples as columns; "
+                     f"transpose it if that's the case.")
+    return None
+
+
 def run_qc(bundle: Any) -> QCReport:
     """Inspect a ``DataBundle`` → a ``QCReport``. Pure: returns the report; the caller assigns
     ``bundle.qc = run_qc(bundle)``. ``ok`` is True only when no ``warn``/``block`` flag fired."""
@@ -88,8 +103,14 @@ def _qc_frame(df: Any, kind: str) -> tuple[dict, list[QCFlag]]:
             flags.append(_flag(QC_WARN, "too_few_samples",
                                "Only one sample column — most analyses need ≥2 per group.",
                                "Add the other samples / a design with replicates."))
+        orient = _orientation_flag(n_rows, num.shape[1], "genes")
+        if orient is not None:
+            flags.append(orient)
 
     elif kind == PROTEOMICS:
+        orient = _orientation_flag(n_rows, num.shape[1], "proteins")
+        if orient is not None:
+            flags.append(orient)
         n_all_missing = int(np.isnan(arr).all(axis=1).sum())
         if n_all_missing:
             flags.append(_flag(QC_WARN, "all_missing_rows",

@@ -41,9 +41,10 @@ Status: `TODO` · `WIP` (≤1 at a time) · `DONE — <sha>` · `BLOCKED — <wh
 | 3 | **WS2.1** | Close upload→run→save loop (own-data run = Library artifact) | P1 | DONE — 9c9c382 | CURRENT DEFERRED 7c-(b) · pillars P4 · RISKS #8 |
 | 4 | **WS2.2** | Intake "correct the detection" affordances | P1 | DONE — f51e0c2 | intake-questionnaire/followups.md #2,3,4,7,8 |
 | 5 | **WS2.3** | Surface the data-fit verdict on own-data | P1 | DONE — 50c3bde | data-aware-routing/followups.md #1–4 |
-| 6 | **WS2.4** | Ingest robustness for messy real inputs | P1 | TODO | pillars P3c + P1d |
+| 6 | **WS2.4** | Ingest robustness for messy real inputs | P1 | DONE — <sha> | pillars P3c + P1d |
 | 7 | **WS2.5** | QC coverage vs deliberately-broken real data | P1 | TODO | pillars P1c (extension) |
 | 8 | **WS2.6** | Unify the run-path error taxonomy | P2 | TODO | pillars P1/P4 · NEW |
+| 8b | **WS2.7** | Gzip-wrapped table support (`.csv.gz`/`.tsv.gz`) | P2 | TODO | NEW (WS2.4 follow-up) |
 | 9 | **WS3.1** | Converge the two ingest/classify paths (shared primitive) | P2 | TODO | CURRENT NEXT#6 + NEXT#1 |
 | 10 | **WS3.2** | Column-override logic → one resolver | P2 | TODO | NEXT#1 (concrete) |
 | 11 | **WS3.3** | Param validation → drop the redundant gate | P2 | TODO | NEXT#1 (concrete) |
@@ -185,17 +186,36 @@ gap-threading change) — deferred, tracked in "Open items" below.
 - **Scope guard (honored):** reused the existing verdict component + the server-computed `dataFit`;
   no new scoring logic; #3 is FE-only (no backend change). #4's backend gap-threading kept out.
 
-### WS2.4 — Ingest robustness for messy real inputs · P1 · Status: TODO
-The layered classifier degrades honestly, but the "we're not sure → here are options" path
-(pillars P3c) is unfinished and real strangers bring malformed CSV / odd Excel / wrong
-orientation. Home: pillars P3c + P1d.
-- **Definition of Done:** UNKNOWN/GENERIC_TABLE routes to an honest "here are options"
-  surface; encoding/delimiter sniffing + a wrong-orientation hint exist; a genuinely
-  unloadable file fails with a clear reason, never a crash.
-- **Verify:** feed 3–4 deliberately messy real files → each yields options or an honest
-  error, never a 500.
-- **Scope guard:** no new modalities; no auto-fetch/accession work (parked). Detection +
-  honest options only.
+### WS2.4 — Ingest robustness for messy real inputs · P1 · Status: DONE — <sha>
+The layered classifier degrades honestly, but a real stranger's CSV crashed or collapsed to one
+column on an odd encoding/delimiter, and a corrupt file 500'd (the router caught only `ValueError`,
+while a `UnicodeDecodeError`/`ParserError`/`BadZipFile` bubbled up as a crash). The "here are options"
+surface for `UNKNOWN`/`GENERIC_TABLE` already existed (`route.py` → pca/corr_heatmap + an honest note;
+QC `unclassified`); the robustness gap was the load path. Home: pillars P3c + P1d.
+**Done (BE-only, `engine/ingest.py` + `engine/qc.py`):** `_load_csv` now sniffs the **encoding**
+(utf-8-sig ± BOM → cp1252 → latin-1 backstop) and the **delimiter** (`csv.Sniffer` over comma/tab/
+semicolon/pipe, header-max-fields fallback), so a European semicolon export or a cp1252 file loads
+into real columns instead of crashing/blobbing; an empty file is an honest `ValueError`. `ingest`
+wraps `loader.load` so any parse failure becomes an actionable `ValueError` (`_load_failure_message`
+per loader → the router's existing `except ValueError` returns a 400) — never a 500. QC gains a
+`maybe_transposed` **wrong-orientation** warn for count/intensity matrices (numeric cols > rows and
+≥ 12 → "samples as rows, genes as columns"), fired for bulk + proteomics.
+- **Definition of Done:** UNKNOWN/GENERIC_TABLE routes to an honest "here are options" surface;
+  encoding/delimiter sniffing + a wrong-orientation hint exist; a genuinely unloadable file fails
+  with a clear reason, never a crash. **Met.**
+- **Verify (PASSED — real data + live `/data/inspect` on :8010):** six messy files, **zero 500s**.
+  A **semicolon**-delimited real rpgr counts CSV → 200 `bulk_counts`, 6 numeric cols (was a 1-column
+  blob); a **cp1252 + µ-header** real counts → 200 `bulk_counts` (was a `UnicodeDecodeError` 500); a
+  **transposed** real counts (6 rows × 60 gene cols) → 200 with `qc.maybe_transposed` (fires on the
+  natural no-hint path too); a **real alpk1 `.xlsx`** gene list → 200 `generic_table` + the honest
+  options note (pca/corr_heatmap, "pick a skill manually"); a **corrupt `.xlsx`** → **400** "couldn't
+  open … as an Excel file … (BadZipFile)"; a real **`.csv.gz`** → **400** honest "no ingest loader".
+  Gates: BE fast **1190/1** + ruff clean; FE untouched. (Unit tests: `test_ingest.py` +6,
+  `test_qc.py` +2, `test_data_inspect.py` +6.)
+- **Scope guard (honored):** no new modalities; no auto-fetch/accession. Detection + honest options
+  only. **Gzip support** (`.csv.gz`/`.tsv.gz`, common for GEO count matrices) surfaced mid-task — a
+  new work item, so it went to a new row (**WS2.7**), not silent scope creep; today it is an honest
+  400, never a crash, which satisfies this DoD.
 
 ### WS2.5 — QC coverage vs deliberately-broken real data · P1 · Status: TODO
 QC flags (pillars P1c) were built against curated data. Extend to messy inputs. Home:
@@ -213,6 +233,17 @@ A stranger needs one honest, actionable surface. Home: pillars P1/P4.
   all three layers map onto, with fix-hints, mirroring the QC-flag shape.
 - **Verify:** each error class surfaces one consistent, actionable message in the UI.
 - **Scope guard:** taxonomy + mapping only; no behavior change to successful runs.
+
+### WS2.7 — Gzip-wrapped table support · P2 · Status: TODO
+A `.csv.gz`/`.tsv.gz` (the near-universal shape of a GEO count matrix — e.g. dorgau
+`GSM…_counts.csv.gz`) currently returns an honest 400 "no ingest loader" (never a crash), but a real
+stranger downloading from GEO hits a wall. Surfaced during WS2.4; captured here rather than expanding
+that task. Home: `engine/ingest.py` registry.
+- **Definition of Done:** a gzipped delimited table (`.csv.gz`/`.tsv.gz`/`.txt.gz`) ingests as its
+  decompressed table (reusing the WS2.4 encoding/delimiter sniffing), classified as its real modality.
+- **Verify:** the real dorgau `*.csv.gz` → 200 with its true kind + routing, on live `/data/inspect`.
+- **Scope guard:** gzip only (no zip/tar bundles, no auto-fetch); reuse `_load_csv`'s sniffing — don't
+  fork a second CSV reader.
 
 ## WS3 — Dedup / parallel-representation (executes CURRENT NEXT#1; case-by-case)
 
@@ -324,6 +355,7 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 
 | Date | Session | Task(s) | Result / sha |
 |---|---|---|---|
+| 2026-07-02 | RESTRUCTURE-06 | WS2.4 | **Genuinely unbuilt (not a phantom-TODO like WS2.2/2.3) — real robustness work shipped.** BE-only: `_load_csv` now sniffs **encoding** (utf-8-sig ± BOM → cp1252 → latin-1 backstop) + **delimiter** (`csv.Sniffer` over `,\t;|`, header-max-fields fallback) so a semicolon/cp1252 real export loads into columns instead of crashing/blobbing; empty file → honest `ValueError`. `ingest` wraps `loader.load` → any parse failure becomes an actionable `ValueError` (`_load_failure_message` per loader) so the router returns **400, never a 500**. QC gains a `maybe_transposed` wrong-orientation warn (numeric cols > rows and ≥ 12) for bulk + proteomics. **Verified live on :8010 `/data/inspect` with REAL data** [[verify-on-real-data-not-mock]] — 6 messy files, **0 × 500**: semicolon real rpgr counts → 200 `bulk_counts` (6 cols, was a blob); cp1252 + µ header → 200 (was a `UnicodeDecodeError` 500); transposed real counts → 200 + `maybe_transposed` (fires on the no-hint path too); real alpk1 `.xlsx` gene list → 200 `generic_table` + honest options note; corrupt `.xlsx` → 400 friendly "…(BadZipFile)"; real `.csv.gz` → 400 honest "no ingest loader". The `UNKNOWN`/`GENERIC_TABLE` options surface already existed (`route.py` pca/corr_heatmap + note; QC `unclassified`) — the gap was the load path. Gzip support surfaced mid-task → captured as **WS2.7** (a new row, not scope creep; honest 400 today satisfies the DoD). Files: `engine/ingest.py`, `engine/qc.py`, `tests/test_ingest.py` (+6), `tests/test_qc.py` (+2), `tests/test_data_inspect.py` (+6). Gates: BE fast **1190/1** + ruff clean; FE untouched. `<sha>` |
 | 2026-07-02 | RESTRUCTURE-05 | WS2.3 | **#1/#2 were shipped pre-tracker (`99bd6e4`); built #3; #4 deferred.** Same phantom-TODO check as WS2.2 [[verify-todo-not-already-shipped]]: `data-panel.tsx` already renders `DataFitVerdict` (own-data fit verdict, #1) + a dataset-card `ConfidenceChip` off the persisted `dataFit` (#2) — the followups "Deferred" list was stale. **#3 (the genuinely-open item) built:** `recommendedFromRoute` silently dropped `compatible===false` skills; added `quick-apply.notAFitSkills` (returns the routed-but-mismatched analyses resolved to catalog skills + reason + band) and a muted, struck **"Not a fit for your data — <reason>"** list in `workbench-panel.tsx` with the engine's reason **visible** (not tooltip-only), non-interactive (they can't run). **Verified live on :8010 `/data/inspect` with REAL data** [[verify-on-real-data-not-mock]]: `rpgr_irpe_rawcounts.csv` (bulk counts) routes `[deg, volcano, enrichment]` → `deg` compatible (chip), **volcano + enrichment `compatible=false`** ("missing a fold-change column, a significance (p/padj) column") → the not-a-fit trace shows both with their reasons; the eyg28 DE table routes only to fitting skills (`volcano/enrichment/gsea`, nothing dropped — correct). **#4 (route-composer "why rejected" + "checked against your data") kept deferred** — a distinct AI route-composer surface needing a backend gap-threading change, not the own-data verdict surface + outside WS2.3's DoD; captured in data-aware-routing/followups.md + "Open items". Files: `lib/catalog/quick-apply.ts` (+`notAFitSkills`/`NotAFit`), `components/project/workbench-panel.tsx` (the trace), `lib/catalog/quick-apply.test.ts` (+5). Gates: FE tsc clean · eslint 0 · vitest **487** (+5); BE untouched. `50c3bde` |
 | 2026-07-02 | RESTRUCTURE-04 | WS2.2 | **Verified + closed (no re-build) — the affordances shipped pre-tracker.** Reading `intake-questionnaire.tsx` showed all five WS2.2 items (#2 excluded-level badge · #3 prefill reason · #4 single-source column · #7 reset-to-detected · #8 routing-null copy) already implemented, each tagged with its followups number; `git blame` placed them in `6b84834` (07-01 21:33) / `3743878` (07-02 01:21) / `79db701` (07-02 02:14) — **all before this tracker (`e9edf44`, 07-02 12:51)**. The audit had inherited the stale "Deferred #1–#8" list in `followups.md` (never updated after those commits) and minted WS2.2 as a phantom `TODO`. Confirmed the wire both sides (`engine/questionnaire.py` always sets `note`, sets `reference_guess`/`group_candidates`/`sample_col_candidates`; `lib/intake/design.ts` mirrors them). **Verified live on :8010 `/data/inspect` with REAL data** [[verify-on-real-data-not-mock]]: real bulk `rpgr_irpe_rawcounts.csv` (2-cond → #3 note, #4 single-candidate, #8 routes to deg) + `+ rpgr_irpe_design.csv` (→ `source=design_sheet`, `reference_guess='Control'` → the #3 control-guess line) + `EYG_29…St7…rawCounts.csv` (**6 conditions → #2 badge fires**); real scRNA **assembled from Hani GSE201356 10x** (the GEO deposit has no per-cell obs design — it's in the GSM filenames — so built a faithful 2000-cell AnnData: obs `line`=3 iPSC lines → **#2 fires**, obs `sample_id`=4 GSM samples → **#6** sample-col picker with real replicate counts). `jev/retina_fadl.h5ad` correctly returns `needs_design=False` (only `n_genes`/`leiden`, no condition col). #7 is pure FE state; #8's null branch is the FE else (routing resolved on all real data). Reconciled `followups.md` (Deferred #2/#3/#4/#6/#7/#8 → **Shipped**, root-cause doc fix; #1/#5 kept deferred). **No code changed.** Gates: BE `test_design_hints` **25/25** + FE tsc clean + intake vitest **53/53** + eslint 0. Working Agreement #4 updated per owner directive (reviews deferred to the VERY END, after all tasks — not per-workstream). `f51e0c2` |
 | 2026-07-02 | RESTRUCTURE-03 | WS2.1 | Closed the upload→run→save loop (FE-only; the BE intake/confirm/parse/run-dataset endpoints were already built + tested in 7c). New `lib/uploads/api.ts` `uploadDataset` drives the real handshake (`/uploads/intake` → local PUT of the bytes → `/uploads/{id}/confirm` → `/uploads/{id}/parse`) and returns a server-authoritative `Dataset` with `uploaded:true`; `fromApiDataset` derives `uploaded` from `status=ready` + a stored upload/parsed key (self-heals across reconcile). `data-panel.ingest` runs it on a fresh single-file drop (gated `!mockMode`, with an "Uploading…" cue), inserting via a new `projectStore.addUploadedDataset` (no `/datasets` re-POST — intake already persisted the row). `runSkillByDataset` POSTs `/skills/{id}/run-dataset`; `use-figure-run` routes the fresh run + all 3 re-run flavours through it whenever the dataset is `uploaded` AND the run has no design sheet / AI actions (run-dataset carries neither → those stay multipart); `canRerun` gains `activeDataset.uploaded` so re-run works after reload. Fail-soft everywhere (upload failure / dev:mock → metadata-only dataset + multipart). Gates: FE tsc clean · eslint 0 err (1 pre-existing set-state-in-effect warning, untouched) · vitest **482** (+ uploads happy/fail-soft, runSkillByDataset wire+422, addUploadedDataset no-POST, `uploaded` mapping); BE untouched (no BE change). **Verified LIVE on real eyg28 DE CSV** (RPGRIP1_cpdHet d210, TMM-K0; :8010 SQLite + LocalObjectStore + dev auth): intake → PUT 2.4 MB → confirm(ready) → parse(real sha) → **run-dataset produced a 16,760-gene volcano with NO multipart** → saved figure → a fresh `GET /figures` (=reload) still returns it with its spec → dataset row → `uploaded=true`. (HTTP-level e2e drove the exact FE wire path — no browser MCP in this env, as at WS1.1; the in-browser click-through is the one lighter item owed to the WS2 boundary review.) `9c9c382` |
@@ -333,40 +365,39 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 
 ---
 
-## Next-session prompt (tailored — RESTRUCTURE-06 · WS2.4; supersedes the generic template below until stamped done)
+## Next-session prompt (tailored — RESTRUCTURE-07 · WS2.5; supersedes the generic template below until stamped done)
 
-Paste this to start the next session; re-stamp the header line with the real clock. When WS2.4 is
+Paste this to start the next session; re-stamp the header line with the real clock. When WS2.5 is
 `DONE`, rewrite this block for the next top-`TODO` (like the CURRENT.md LIVE pointer).
 
 ```
-# Selom — Restructure · 2026-07-02 17:38 +10:00 · Claude (FE+BE, solo mode)
+# Selom — Restructure · 2026-07-02 HH:MM +10:00 · Claude (FE+BE, solo mode)
 (re-stamp this line with the real clock at session start)
 
 Read first: docs/restructure/plan.md (the tracker) → Status board + Progress log + the
 Working Agreement. Confirm git: `git fetch && git status` — origin/main should be in sync at the
-RESTRUCTURE-05 stamp commit.
+RESTRUCTURE-06 stamp commit.
 
-State: WS1 CODE-COMPLETE (1be60a5 + 8c7f09b). WS2.1 (9c9c382) DONE. WS2.2 DONE — the five
-"correct the detection" affordances had shipped pre-tracker; verified live + reconciled, no code
-change. WS2.3 DONE — #1/#2 (fit verdict + dataset-card band) shipped pre-tracker (99bd6e4); built
-#3 (the "Not a fit — <reason>" trace in workbench-panel via quick-apply.notAFitSkills), verified
-live on real bulk counts; #4 (route-composer transparency) deferred to "Open items". **NOTE the
-recurring pattern:** WS2.2 + WS2.3 were both largely already-shipped — the followups docs the tracker
-points at had stale "Deferred" lists. **Before building any WS TODO, read + git-blame the target
-first** [[verify-todo-not-already-shipped]]; if it's already there, verify-live + reconcile-doc +
-stamp, don't re-build. **Reviews deferred to the VERY END** (Working Agreement #4): one
-review-gauntlet + fe-review pass over the whole restructure diff after ALL tasks are DONE (carries the
-owed WS1 boundary NEXT#R + WS2.1's in-browser click-through). Do NOT run them per-workstream.
+State: WS1 CODE-COMPLETE (1be60a5 + 8c7f09b). WS2.1 (9c9c382), WS2.2 (f51e0c2), WS2.3 (50c3bde),
+WS2.4 (<sha>) DONE. WS2.4 shipped real robustness (BE-only): CSV encoding+delimiter sniffing in
+`engine/ingest.py::_load_csv`, an `ingest` error-wrap so a parse failure → 400 not 500, and a
+`maybe_transposed` QC warn in `engine/qc.py` (bulk+proteomics). New follow-up **WS2.7** (gzip
+`.csv.gz`/`.tsv.gz`) captured from mid-task. **NOTE the recurring pattern:** WS2.2 + WS2.3 were both
+already-shipped (stale "Deferred" docs); WS2.4 was genuinely unbuilt. **Before building any WS TODO,
+read + git-blame the target first** [[verify-todo-not-already-shipped]]; if already there, verify-live
++ reconcile-doc + stamp, don't re-build. **Reviews deferred to the VERY END** (Working Agreement #4):
+one review-gauntlet + fe-review pass over the whole restructure diff after ALL tasks are DONE (carries
+the owed WS1 boundary NEXT#R + WS2.1's in-browser click-through). Do NOT run them per-workstream.
 
-Do: proceed to the top TODO by Order — WS2.4 (Ingest robustness for messy real inputs; Order 6, P1).
-Home: pillars P3c + P1d. First git-blame engine/ingest.py + engine/cleaning.py to see what already
-exists (encoding/delimiter/orientation handling may be partly there — verify before building). DoD:
-UNKNOWN/GENERIC_TABLE routes to an honest "here are options" surface; encoding/delimiter sniffing +
-a wrong-orientation hint exist; a genuinely unloadable file fails with a clear reason, never a crash
-(no 500). Verify: feed 3–4 deliberately messy REAL files (malformed CSV / odd Excel / wrong
-orientation / bad encoding) → each yields options or an honest error, never a 500. Scope guard: no
-new modalities; no auto-fetch/accession work (parked). Detection + honest options only. This is a BE
-task (engine + maybe a small FE surface for the options) — run the BE fast pytest + ruff gate.
+Do: proceed to the top TODO by Order — WS2.5 (QC coverage vs deliberately-broken real data; Order 7,
+P1). Home: pillars P1c extension. **First read `engine/qc.py` — several flags already exist**
+(non_integer_counts, negative_counts, all_zero_features, too_few_samples, proteomics all_missing_rows/
+high_missingness, DE pvalue_out_of_range/nan_pvalues, empty, and the WS2.4 `maybe_transposed`); WS2.5
+is verify-coverage-on-broken-REAL-data + fill the gaps. DoD: all-NaN column, single-sample,
+non-integer "counts", all-zero features, and wrong-orientation each produce the right block/warn flag
+with a fix hint. Verify: a broken-fixture matrix (build from a REAL dataset) hits each flag; a clean
+one stays `ok`. Scope guard: extend the existing `engine/qc.py` rule set; do NOT change the
+block-vs-override policy (D-e5 stands). BE task — run the BE fast pytest + ruff gate.
 
 Rules (the anti-half-done contract):
 - Stay on the board. New work surfaced mid-task → add a WSx.y row FIRST, don't expand scope.
@@ -387,11 +418,11 @@ Env / landmines (unchanged): :8000 = eamos, NEVER kill → BE on :8010 (`uvicorn
 8010`, no --reload; the uv-3.12 PY at C:\Users\seamegdool\AppData\Roaming\uv\python\
 cpython-3.12.13-windows-x86_64-none\python.exe + PYTHONPATH="D:/selom/app/backend/.venv/Lib/
 site-packages;." run from app/backend, NOT `uv run` — EDR; set PYTHONIOENCODING=utf-8 for non-ASCII
-in probe output; ruff may hit WinError-5 first spawn, retry once). Messy real inputs to try live:
-alpk1 .xlsx counts (`D:/selom-data/alpk1/mouse_P14P30P90/*.xlsx`), dorgau `*.csv.gz`, hani 10x
-triplets. FE = `npx next dev --webpack`. git user.email stays
-282747725+steveneam@users.noreply.github.com. Kill every dev server you start before ending. Proceed
-to WS2.4.
+in probe output; ruff may hit WinError-5 first spawn, retry once). Broken-fixture inputs for WS2.5:
+build from a REAL base (e.g. `D:/selom-data/rpgr/rpgr_irpe_rawcounts.csv`) — inject an all-NaN column,
+a single-sample slice, non-integer "counts", all-zero rows, a transpose. FE = `npx next dev
+--webpack`. git user.email stays 282747725+steveneam@users.noreply.github.com. Kill every dev server
+you start before ending. Proceed to WS2.5.
 ```
 
 ## Resume prompt (persistent — the generic template; the tailored block above supersedes it until stamped done)

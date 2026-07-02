@@ -60,12 +60,57 @@ def _load_xlsx(path: Path, *, sheet: str | int | None = None, **_: Any) -> Any:
     return pd.read_excel(path, sheet_name=0 if sheet is None else sheet)
 
 
+# Encodings tried in order when reading a delimited text file. utf-8-sig transparently handles both
+# BOM-less UTF-8 and a UTF-8 BOM (so a leading BOM never mangles the first column name); cp1252 is the
+# common Windows/Excel export; latin-1 always decodes (every byte maps to a code point) so it is the
+# guaranteed backstop — a real stranger's CSV never crashes on an odd encoding. First codec that
+# decodes the whole file wins ([[layered-deterministic-extraction]]: content-first, honest fallback).
+_CSV_ENCODINGS = ("utf-8-sig", "cp1252", "latin-1")
+
+
+def _resolve_encoding(raw: bytes) -> str:
+    for enc in _CSV_ENCODINGS:
+        try:
+            raw.decode(enc)
+            return enc
+        except UnicodeDecodeError:
+            continue
+    return "latin-1"  # unreachable (latin-1 decodes any byte) — explicit for the reader
+
+
+def _sniff_delimiter(sample: str) -> str:
+    """Best guess of a delimited-text separator among comma/tab/semicolon/pipe. Uses ``csv.Sniffer``,
+    falling back to the candidate that splits the header into the most fields (default comma) — so a
+    European semicolon export or a pipe-delimited file parses into columns, not one blob."""
+    import csv
+
+    try:
+        return csv.Sniffer().sniff(sample, delimiters=",\t;|").delimiter
+    except csv.Error:  # no clear/uniform delimiter (e.g. a genuinely single-column file)
+        header = next((ln for ln in sample.splitlines() if ln.strip()), "")
+        counts = {d: header.count(d) for d in (",", "\t", ";", "|")}
+        best = max(counts, key=counts.get)
+        return best if counts[best] else ","
+
+
 def _load_csv(path: Path, *, sep: str | None = None, **_: Any) -> Any:
+    """Read a delimited text file (.csv/.tsv/.txt) robustly: sniff the encoding (UTF-8 ± BOM / cp1252 /
+    latin-1) and — unless the caller pins ``sep`` or the suffix is ``.tsv`` — the delimiter, so a messy
+    real export loads instead of crashing on a non-UTF-8 byte or collapsing to one column. An empty
+    file is an honest ``ValueError``; a genuine parse failure propagates for :func:`ingest` to turn
+    into a clear, actionable message (never a 500)."""
+    import io
+
     import pandas as pd
 
-    if sep is None and path.suffix.lower() == ".tsv":
-        sep = "\t"
-    return pd.read_csv(path, sep=sep) if sep else pd.read_csv(path)
+    raw = path.read_bytes()
+    if not raw.strip():
+        raise ValueError(f"{path.name!r} is empty — no data to read.")
+    enc = _resolve_encoding(raw)
+    if sep is None:
+        sep = ("\t" if path.suffix.lower() == ".tsv"
+               else _sniff_delimiter(raw[:65536].decode(enc, errors="replace")))
+    return pd.read_csv(io.BytesIO(raw), sep=sep, encoding=enc)
 
 
 def _load_iwxdata(path: Path, **_: Any) -> Any:
@@ -134,6 +179,25 @@ def _pick_loader(path: Path) -> _Loader | None:
     return next((ld for ld in REGISTRY if ld.recognize(path)), None)
 
 
+def _load_failure_message(loader: _Loader, path: Path, exc: Exception) -> str:
+    """Turn a loader's opaque parse exception into a clear, actionable reason for the user. A
+    genuinely unloadable file (corrupt / wrong format / ragged rows) is an honest 400 — never a 500
+    with a stack trace. Names the failure type without leaking the traceback."""
+    name = path.name
+    kind = type(exc).__name__
+    by_loader = {
+        "csv": (f"couldn't parse {name!r} as a table — check the delimiter, the header row, and that "
+                f"every row has the same number of columns ({kind})."),
+        "xlsx": (f"couldn't open {name!r} as an Excel file — it may be corrupt or not a real "
+                 f".xlsx/.xls ({kind})."),
+        "h5ad": f"couldn't open {name!r} as an AnnData/.h5ad file — it may be corrupt ({kind}).",
+        "10x_mtx": f"couldn't read {name!r} as a 10x-mtx directory ({kind}).",
+        "iwxdata": f"couldn't decode {name!r} as a native iWorx ERG export ({kind}).",
+        "diagnosys_erg": f"couldn't decode {name!r} as a Diagnosys ERG export ({kind}).",
+    }
+    return by_loader.get(loader.name, f"couldn't read {name!r} ({kind}: {exc}).")
+
+
 def _source_ref(path: Path, *, sheet: str | int | None = None) -> SourceRef:
     sr = SourceRef(filename=path.name, sheet=str(sheet) if sheet is not None else "")
     if path.is_file():
@@ -157,15 +221,22 @@ def ingest(
 ) -> DataBundle:
     """Read ``src`` into a classified ``DataBundle``. ``hint`` forces the modality;
     ``sheet`` selects an xlsx sheet; ``sep`` overrides the CSV delimiter. Raises ``ValueError``
-    for an unrecognized input type (an unloadable file is an honest error, distinct from an
-    unknown *modality* of a loadable one, which is ``Kind.UNKNOWN``)."""
+    for an unrecognized input type **and** for a recognized-but-unloadable file (a corrupt Excel,
+    ragged CSV, undecodable bytes) — both are honest, actionable errors the caller turns into a 400,
+    never a 500. An *unloadable file* is distinct from an unknown *modality* of a loadable one, which
+    classifies to ``Kind.UNKNOWN`` and still ingests."""
     path = Path(src)
     loader = _pick_loader(path)
     if loader is None:
         raise ValueError(
             f"no ingest loader for {path.name!r}; supported: .h5ad, 10x-mtx dir, .xlsx/.xls, .csv/.tsv"
         )
-    payload = loader.load(path, sheet=sheet, sep=sep)
+    try:
+        payload = loader.load(path, sheet=sheet, sep=sep)
+    except ValueError:
+        raise  # already an honest, actionable message (empty file, iWorx/Diagnosys decode, …)
+    except Exception as exc:  # noqa: BLE001 — a parse failure is an honest 400 for the user, never a 500
+        raise ValueError(_load_failure_message(loader, path, exc)) from exc
     source = _source_ref(path, sheet=sheet)  # provenance keys on the ORIGINAL file (the .iwxdata)
     # The runner handle (E4): a path-based skill runs from here. For a directly-readable file it IS
     # the source; for a decoded binary format (materialize) we write the decoded table to a temp CSV
