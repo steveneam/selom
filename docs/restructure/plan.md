@@ -64,14 +64,21 @@ Status: `TODO` · `WIP` (≤1 at a time) · `DONE — <sha>` · `BLOCKED — <wh
 ## Working agreement (the anti-half-done / anti-creep rules)
 
 1. **One task = one commit** (named paths, no `git add -A`; no AI sign-off
-   [[selom-authorship-no-ai-signoff]]). A task is `DONE` only when its **Definition of
-   Done** is met **and** its **Verify** passed on real data + a live backend
+   [[selom-authorship-no-ai-signoff]]) — **plus** at most one tiny follow-up *handoff-stamp*
+   commit that fills the self-referential sha (see #3). A task is `DONE` only when its
+   **Definition of Done** is met **and** its **Verify** passed on real data + a live backend
    [[verify-on-real-data-not-mock]] — not when the code merely compiles.
 2. **Stay on the board.** Do only tasks listed here. If new work surfaces mid-task, **add
    a new `WSx.y` row first** (capture), then decide — never silently expand a task's scope.
    Each task's **Scope guard** names what is explicitly *out*.
-3. **Update in the same commit** you finish: flip the task's Status to `DONE — <sha>`,
-   append one line to the Progress log, and refresh the `CURRENT.md` LIVE pointer.
+3. **Cross the task off with the work; stamp the sha in a follow-up.** Your finishing commit
+   flips the task's Status to `DONE — <sha>` (leave `<sha>` a literal placeholder), appends the
+   Progress-log line, and refreshes the `CURRENT.md` LIVE pointer — **alongside the code**, so
+   the board is never left un-updated. Then replace `<sha>` with the pushed commit's hash in ONE
+   tiny follow-up commit — `docs(handoff): stamp <WSx.y> DONE (<sha>)`. A commit **cannot** carry
+   its own hash, and an amended hash never reaches `origin`, so the stamp is what makes every
+   `<sha>` actually resolve on the remote (matches this repo's `docs(handoff): record …`
+   convention). Push both.
 4. **Reviews at the milestone, not per task** [[review-cadence-phase-not-task]] — run
    `review-gauntlet` (+ `fe-review` if FE) when a workstream (WS1 / WS2 / WS3) completes,
    not on each 1–2-task session.
@@ -279,7 +286,7 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 
 | Date | Session | Task(s) | Result / sha |
 |---|---|---|---|
-| 2026-07-02 | RESTRUCTURE-01 | WS1.1 | Stub-engine honesty guard: prod boot guard (`config.is_production` refuses a stub-resolving engine off-dev, fail-loud at startup) + resolved `engine_policy` in provenance + FE "example data — not your results" banner + `test_engine_policy_guard` (reachability + drift). RISKS #11 added. Verified live: real DE CSV→`real`, stub→`stub`, prod+stub refuses boot. `1be60a5` |
+| 2026-07-02 | RESTRUCTURE-01 | WS1.1 | Stub-engine honesty guard: prod boot guard (`config.is_production` refuses a stub-resolving engine off-dev, fail-loud at startup) + resolved `engine_policy` in provenance + FE "example data — not your results" banner + `test_engine_policy_guard` (reachability + drift). RISKS #11 added. Verified live: real DE CSV→`real`, stub→`stub`, prod+stub refuses boot. `1be60a5` · then reworded Working Agreement #3 (self-ref sha → a follow-up `docs(handoff)` stamp commit — owner-directed). |
 | 2026-07-02 | RESTRUCTURE-PLAN | (planning) | Audit + this tracker written; CURRENT NEXT re-ranked to point here. |
 
 ---
@@ -299,9 +306,11 @@ Selom Playbook (spec only if the task says so → build → VERIFY on real data 
 Rules (the anti-half-done contract):
 - Stay on the board. New work surfaced mid-task → add a WSx.y row FIRST, don't expand scope.
 - Honor each task's Definition of Done + Verify + Scope guard. DONE only when Verify passes.
-- One task = one commit (named paths, no AI sign-off). Owner pushes.
-- On finishing: flip the task Status to `DONE — <sha>`, append a Progress-log line, refresh
-  the CURRENT.md LIVE pointer.
+- One task = one commit (named paths, no AI sign-off) + one tiny follow-up handoff-stamp commit
+  for the sha. Owner pushes (unless the session prompt authorizes you to).
+- On finishing: flip Status to `DONE — <sha>` (literal placeholder), append a Progress-log line,
+  refresh the CURRENT.md LIVE pointer — with the code. A commit can't name its own resolvable
+  hash, so fill `<sha>` in a follow-up `docs(handoff): stamp <WSx.y> DONE (<sha>)`. Push both.
 - Reviews (gauntlet/fe-review) at a WORKSTREAM boundary, not per task.
 - Foundation before deploy: no WS6 until every WS1+WS2 task is DONE.
 
