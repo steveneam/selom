@@ -302,7 +302,68 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 
 ---
 
-## Resume prompt (persistent — paste to start a restructure session)
+## Next-session prompt (tailored — RESTRUCTURE-04 · WS2.2; supersedes the generic template below until stamped done)
+
+Paste this to start the next session; re-stamp the header line with the real clock. When WS2.2 is
+`DONE`, rewrite this block for the next top-`TODO` (like the CURRENT.md LIVE pointer).
+
+```
+# Selom — Restructure · 2026-07-02 16:15 +10:00 · Claude (FE+BE, solo mode)
+(re-stamp this line with the real clock at session start)
+
+Read first: docs/restructure/plan.md (the tracker) → Status board + Progress log + the
+Working Agreement. Confirm git: `git fetch && git status` — origin/main should be @ 438bd18,
+in sync.
+
+State: WS1 (honesty) CODE-COMPLETE — WS1.1 (1be60a5) + WS1.2 (8c7f09b). WS2.1 (9c9c382) DONE —
+the upload→run→save loop is closed + verified live on real eyg28 DE data (intake→PUT→confirm→
+parse→run-dataset volcano→saved figure→survives reload; dataset uploaded=true). Two reviews are
+OWED, both at their WORKSTREAM boundary (not per task):
+- WS1 boundary — see CURRENT NEXT#R (review-gauntlet over `e9edf44..HEAD` + fe-review; the WS1.1
+  StubEngineBanner G2 rendered-in-context is still owed).
+- WS2.1's in-browser click-through — no browser MCP this env; folds into the WS2-boundary
+  fe-review when WS2 completes (Working Agreement #4).
+
+Do (owner's call — pick one):
+- (A) Proceed to the top TODO by Order — WS2.2 (Intake "correct the detection" affordances;
+  Order 4, P1). Home + exact items: docs/intake-questionnaire/followups.md #2 (excluded-level
+  badge on >2-condition designs), #3 (surface WHY the design was prefilled — design.note /
+  reference_guess are already on the wire), #4 (show the source column with one candidate),
+  #7 (reset design edits to the detected prefill), #8 (show the resolved skill when routing is
+  null). (#1 override + #5/#6 sample-col/sheet already shipped.) Scope guard: surfacing + light
+  edit only; do NOT rebuild the AI L4 refiner (shipped); NO rename/merge map (design-sheet is
+  the repro path). DONE only when each of #2/#3/#4/#7/#8 has a working affordance on the confirm
+  card, verified in-browser on a live backend with real bulk + real scRNA obs.
+- (B) Close the WS1 boundary first (NEXT#R): review-gauntlet + fe-review over the WS1 diff + the
+  owed StubEngineBanner G2 (FE at a stub backend — API_PROXY_TARGET=http://127.0.0.1:8011 with
+  :8011 booted SELOM_SKILLS_ENGINE=stub, drop the real eyg28 DE CSV, run volcano, confirm the
+  amber "example data — not your results" banner renders above the artboard). Fix, declare WS1
+  fully closed.
+
+Rules (the anti-half-done contract):
+- Stay on the board. New work surfaced mid-task → add a WSx.y row FIRST, don't expand scope.
+- Honor each task's Definition of Done + Verify + Scope guard. DONE only when Verify passes on
+  REAL data + a LIVE backend [[verify-on-real-data-not-mock]]. Gates: BE fast pytest + ruff ·
+  FE tsc + eslint + vitest.
+- One task = one commit (named paths, no `git add -A`, no AI sign-off) + one tiny follow-up
+  handoff-stamp commit for the sha. You commit AND push (owner authorized).
+- On finishing: flip Status to `DONE — <sha>` (literal placeholder) + Progress-log line +
+  refresh CURRENT LIVE, all WITH the code; then `docs(handoff): stamp <WSx.y> DONE (<sha>)`.
+  Push both. Careful stamping the sha: the legend / Working-Agreement / this resume prompt keep
+  `<sha>` as literal placeholders — only the board row + section header + progress-log line get
+  the real hash (a blind sed -g clobbers the templates).
+- Foundation before deploy: no WS6 until every WS1 + WS2 task is DONE.
+
+Env / landmines (unchanged): :8000 = eamos, NEVER kill → BE on :8010 (`uvicorn main:app --port
+8010`, no --reload; the uv-3.12 PY + PYTHONPATH=".venv\Lib\site-packages;." run from app/backend,
+NOT `uv run` — EDR; ruff may hit WinError-5 first spawn, retry once). FE = `npx next dev
+--webpack`. Snapshot localStorage before any live-store verify; the untracked scratch dev.db
+holds a "WS2.1 upload-loop verify" project (harmless). git user.email stays
+282747725+steveneam@users.noreply.github.com. Kill every dev server you start before ending.
+Proceed to WS2.2.
+```
+
+## Resume prompt (persistent — the generic template; the tailored block above supersedes it until stamped done)
 
 ```
 # Selom — Restructure · <YYYY-MM-DD HH:MM +zzz> · Claude (FE+BE, solo mode)
