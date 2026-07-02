@@ -17,6 +17,12 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent  # D:/selom
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_REPO_ROOT / ".env", extra="ignore")
 
+    # Deployment posture. `dev` (default) is the offline inner loop; `prod` a real deployment
+    # serving real users. It is only an EXPLICIT marker — `is_production` also treats a live Clerk
+    # auth or an S3 object store as production, so the honesty guards still fire even if a deploy
+    # forgets to set this. The local dogfood (SQLite job store, local files, dev auth) is NOT prod.
+    environment: str = Field(default="dev", validation_alias="SELOM_ENV")  # dev | prod
+
     # Job queue backend: "inline" (run on-request, no infra) | "arq" (Redis worker).
     queue: str = Field(default="inline", validation_alias="SELOM_QUEUE")
     redis_url: str = Field(default="redis://localhost:6379", validation_alias="REDIS_URL")
@@ -176,6 +182,18 @@ class Settings(BaseSettings):
         default=None, validation_alias="SELOM_GAP_STORE_PATH"
     )
 
+    @property
+    def is_production(self) -> bool:
+        """A real deployment serving real users. True when explicitly `SELOM_ENV=prod`, OR when an
+        unambiguous prod backend is active — live Clerk auth (real users) or an S3 object store
+        (real cloud storage). Deliberately does NOT include `job_store=sql`: the local dogfood runs
+        the SQL job store on SQLite, and that must stay a dev environment (stubs allowed there)."""
+        return (
+            self.environment.strip().lower() == "prod"
+            or self.auth_mode.strip().lower() == "clerk"
+            or self.object_store.strip().lower() == "s3"
+        )
+
     @model_validator(mode="after")
     def _validate_backend_combos(self):
         """Fail fast at boot if a non-local backend is selected without its required setting,
@@ -188,6 +206,29 @@ class Settings(BaseSettings):
             problems.append("SELOM_JOB_STORE=sql requires SELOM_DATABASE_URL")
         if self.auth_mode.strip().lower() == "clerk" and not self.clerk_issuer.strip():
             problems.append("SELOM_AUTH_MODE=clerk requires SELOM_CLERK_ISSUER")
+        # WS1.1 — no fabricated figures off-dev (RISKS #11). In production the skills engine must
+        # NOT be able to resolve to the synthetic stub: a deploy missing the science extras (or one
+        # left on SELOM_SKILLS_ENGINE=stub) would serve fake science as HTTP 200 — a direct breach
+        # of the "no black box" promise. Fail LOUD at startup, not per-request. Dev is untouched
+        # (stubs are legit for the offline loop / golden tests / the canned demo).
+        if self.is_production:
+            from skills._engine import missing_engine_modules, resolve_engine_policy
+
+            missing = missing_engine_modules()
+            if resolve_engine_policy() == "stub":
+                why = (f"required science modules are not importable ({', '.join(missing)})"
+                       if missing else "SELOM_SKILLS_ENGINE=stub is set")
+                problems.append(
+                    "production must serve real analyses but the skills engine resolves to the "
+                    f"fabricated stub ({why}) — install the science extras and unset "
+                    "SELOM_SKILLS_ENGINE (or set it to 'real')")
+            elif missing:
+                # Engine forced 'real' but a dep is genuinely absent → every skill needing it 500s
+                # per-request. Surface it at boot too, so the deploy fails visibly instead of on the
+                # first user run.
+                problems.append(
+                    "production forces the real skills engine but these required modules are not "
+                    f"importable: {', '.join(missing)} — install the science extras")
         if problems:
             raise ValueError("Invalid Selom configuration — " + "; ".join(problems))
         return self

@@ -58,11 +58,18 @@ def _packages() -> dict[str, str]:
 
 
 def environment_snapshot() -> dict:
-    """Interpreter + platform + which engine policy is in effect + stack versions."""
+    """Interpreter + platform + which engine policy is in effect + stack versions.
+
+    ``engine_policy`` is the RESOLVED posture (``"real"`` | ``"stub"``), not the raw
+    ``SELOM_SKILLS_ENGINE`` setting: an ``auto`` run that fell back to a fabricated stub (a dep
+    missing) must say ``"stub"`` here, so the figure is honestly labelled and the FE can warn
+    "example data — not your results". See ``skills/_engine.resolve_engine_policy`` (WS1.1)."""
+    from skills._engine import resolve_engine_policy
+
     return {
         "python": platform.python_version(),
         "platform": platform.platform(),
-        "engine_policy": os.environ.get("SELOM_SKILLS_ENGINE", "auto").lower(),
+        "engine_policy": resolve_engine_policy(),
         "packages": _packages(),
     }
 

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { StaleBadge } from "../stale-badge";
 import { VersionBar } from "../version-bar";
 import { PublishConfidence } from "../publish-confidence";
+import { StubEngineBanner } from "../stub-engine-banner";
 import { EmptyState } from "./empty-state";
 import { EditorWorkspace } from "@/components/figure/editor-workspace";
 import { ExportMenu } from "@/components/figure/export-menu";
@@ -223,6 +224,9 @@ export function FigureView({
         guardrails={bundle?.guardrails}
         skillId={activeFigure?.skillId ?? bundle?.provenance?.skill?.id}
       />
+      {/* WS1.1 — a stub figure (backend without the science extras) is example data, not the
+          user's results; label it loudly, right above the artboard. */}
+      <StubEngineBanner provenance={bundle?.provenance} />
       <div className="flex min-h-[520px] flex-1 overflow-hidden rounded-xl border border-border bg-background">
         <EditorWorkspace
           store={figure}
