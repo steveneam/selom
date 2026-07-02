@@ -43,7 +43,7 @@ Status: `TODO` · `WIP` (≤1 at a time) · `DONE — <sha>` · `BLOCKED — <wh
 | 5 | **WS2.3** | Surface the data-fit verdict on own-data | P1 | DONE — 50c3bde | data-aware-routing/followups.md #1–4 |
 | 6 | **WS2.4** | Ingest robustness for messy real inputs | P1 | DONE — 4ee6ab9 | pillars P3c + P1d |
 | 7 | **WS2.5** | QC coverage vs deliberately-broken real data | P1 | DONE — 1be0a6b | pillars P1c (extension) |
-| 8 | **WS2.6** | Unify the run-path error taxonomy | P2 | TODO | pillars P1/P4 · NEW |
+| 8 | **WS2.6** | Unify the run-path error taxonomy | P2 | DONE — <sha> | pillars P1/P4 · NEW |
 | 8b | **WS2.7** | Gzip-wrapped table support (`.csv.gz`/`.tsv.gz`) | P2 | TODO | NEW (WS2.4 follow-up) |
 | 8c | **WS2.8** | Counts matrix with an empty/failed sample column demotes to `generic_table` | P2 | TODO | NEW (WS2.5 follow-up) |
 | 9 | **WS3.1** | Converge the two ingest/classify paths (shared primitive) | P2 | TODO | CURRENT NEXT#6 + NEXT#1 |
@@ -247,13 +247,38 @@ reads `ok`; promoting it to warn would wrongly flag every real matrix).
 - **Scope guard (honored):** extended the existing `engine/qc.py` rule set only; did NOT change the
   block-vs-override policy (D-e5 stands) — the new flag is a warn (override-able), never a hard block.
 
-### WS2.6 — Unify the run-path error taxonomy · P2 · Status: TODO
+### WS2.6 — Unify the run-path error taxonomy · P2 · Status: DONE — <sha>
 Three inconsistent error styles (engine `None` / router `HTTPException` / skill `ValueError`).
 A stranger needs one honest, actionable surface. Home: pillars P1/P4.
+**Done (BE + a thin FE surface):** new `routers/_errors.py` `RunError` (an `HTTPException` subclass) gives
+every run-path failure ONE envelope `detail = {error, category, message, fix, **context}`, mirroring
+the QC-flag shape (`engine/qc.py` QCFlag `severity/code/message/fix`). Three categories — `bad_input`
+(400/422) · `unsupported` (404/409) · `internal` (5xx/504) — with paired-default-status constructors +
+shared `unknown_skill()` / `param_out_of_range()` builders so a repeated shape has one home. Converted
+**24 raise sites** across the run path + the data front door: `_run.py` (7 — the runner `ValueError`
+was a **bare-string** 400 that fell through the FE's generic "try again" frame; now a `skill_run_failed`
+bad-input with the real cause + a fix), `skills.py` (10), `ai.py` (3), `data.py` (4 — the inspect/combine
+`ValueError→400`). Also mapped the `load_skill` `FileNotFoundError` at the shared `_execute_skill_run`
+chokepoint so an **unknown skill on the multipart `/run` path is a uniform 404** (was a 500; `/jobs`
++ `/run-dataset` already 404'd). `error`/`context` keys preserved verbatim (every `detail["error"]`
+test + the FE `data_check_failed` branch still resolve); `category`/`fix` are additive. FE
+`parseSkillRunResponse` surfaces the taxonomy `message` (already) + appends the `fix` when present and
+not already folded in. The 2 artifact-GET 404s in `data.py` (a separate lineage-retrieval feature) are
+left as-is — not run-path.
 - **Definition of Done:** a single error taxonomy (bad-input vs unsupported vs internal) that
-  all three layers map onto, with fix-hints, mirroring the QC-flag shape.
-- **Verify:** each error class surfaces one consistent, actionable message in the UI.
-- **Scope guard:** taxonomy + mapping only; no behavior change to successful runs.
+  all three layers map onto, with fix-hints, mirroring the QC-flag shape. **Met.**
+- **Verify (PASSED — real data + live backend on :8010):** a probe drove every class end-to-end and
+  each returned the SAME `{error, category, message, fix}` envelope — `param_out_of_range` (bad_input
+  400, real eyg28 DE) · `data_contract_failed` (bad_input 422, volcano on real rpgr counts, self-framed
+  message + fix="") · `skill_run_failed` (bad_input 400, erg skill on real counts → the real
+  "missing required columns […]" cause + an actionable fix) · `unknown_skill` (unsupported 404 on the
+  multipart `/run`, was a 500) · `invalid_hint` (bad_input 400, `/data/inspect`). Gates: BE fast
+  **1202/1** + ruff clean; FE tsc + eslint(0) + vitest **489**. Tests: new `test_run_error_taxonomy.py`
+  (envelope shape + all-three-categories + a `_run.py`-has-no-bare-HTTPException drift guard) + moved
+  4 bare-string `detail` assertions to `detail["message"]` (run_error_surface, ai_s2 ×3, data_inspect).
+- **Scope guard (honored):** taxonomy + mapping only — no behavior change to successful runs; QC rule
+  set untouched. The one error-path behavior change (unknown-skill `/run` 500→404) is a taxonomy
+  unification, not a success-path change.
 
 ### WS2.7 — Gzip-wrapped table support · P2 · Status: TODO
 A `.csv.gz`/`.tsv.gz` (the near-universal shape of a GEO count matrix — e.g. dorgau
@@ -391,6 +416,7 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 
 | Date | Session | Task(s) | Result / sha |
 |---|---|---|---|
+| 2026-07-02 | RESTRUCTURE-08 | WS2.6 | **Unified the run-path error taxonomy — genuine work (not a phantom-TODO).** New `routers/_errors.py` `RunError` (an `HTTPException` subclass) gives every run-path failure ONE envelope `detail = {error, category, message, fix, **context}`, mirroring the QC-flag shape (`engine/qc.py` QCFlag). Three categories — `bad_input` (400/422) · `unsupported` (404/409) · `internal` (5xx/504) — via paired-default-status constructors + shared `unknown_skill()`/`param_out_of_range()` builders (one home for a repeated shape). Converted **24 raise sites**: `_run.py` (7), `skills.py` (10), `ai.py` (3), `data.py` (4 inspect/combine `ValueError→400`); the **key fix** is the skill-runner `ValueError` — a **bare-string** 400 that fell through the FE's generic "Couldn't run… try again." frame (wrong for a data mismatch) — now `skill_run_failed` bad-input carrying the real cause + an actionable fix. Also mapped the `load_skill` `FileNotFoundError` at the shared `_execute_skill_run` chokepoint → an **unknown skill on the multipart `/run` path is a uniform 404** (was a 500; `/jobs`+`/run-dataset` already 404'd). `error`/`context` keys preserved verbatim so every `detail["error"]` test + the FE `data_check_failed` branch still resolve; `category`/`fix` additive. FE `parseSkillRunResponse` surfaces the taxonomy `message` + appends `fix` when present (self-framed gate messages set `fix=""` → no double). Left the 2 artifact-GET 404s in `data.py` (a separate lineage-retrieval feature) — not run-path. **Verified live on :8010 + REAL data** [[verify-on-real-data-not-mock]] — a probe drove all five classes: `param_out_of_range` (bad_input 400, real eyg28 DE), `data_contract_failed` (bad_input 422, volcano on real rpgr counts), `skill_run_failed` (bad_input 400, erg on real counts → the real "missing required columns […]" + fix), `unknown_skill` (unsupported 404 on multipart `/run`, was a 500), `invalid_hint` (bad_input 400, `/data/inspect`) — each returning the SAME `{error, category, message, fix}` envelope. Files: `routers/_errors.py` (new), `routers/{_run,skills,ai,data}.py`, `lib/skills/api.ts`, `tests/test_run_error_taxonomy.py` (new), `tests/{test_run_error_surface,test_ai_s2,test_data_inspect}.py`, `lib/skills/api.test.ts` (+2). Gates: BE fast **1202/1** + ruff clean; FE tsc + eslint(0) + vitest **489**. `<sha>` |
 | 2026-07-02 | RESTRUCTURE-07 | WS2.5 | **Genuinely a small code gap + a coverage fill (not a phantom-TODO).** Of the five DoD conditions, four QC rules already existed (`too_few_samples` warn · `non_integer_counts` block · `all_zero_features` info · `maybe_transposed` warn); the one true gap was an **all-NaN sample column** → added `_all_nan_column_flag` in `engine/qc.py` (a `all_nan_columns` **warn** that names the offending column + a fix hint), fired for `bulk_counts` + `proteomics` (columns = samples). Added unit coverage for the two existing-but-untested rules. Kept `all_zero_features` **info** on purpose — the real rpgr base fires it and still reads `ok`, so promoting it to warn would wrongly flag every real counts matrix (D-e5 policy untouched; the new flag is override-able, never a hard block). **Verified live on :8010 `/data/inspect` with REAL data** [[verify-on-real-data-not-mock]] — broken fixtures from `rpgr_irpe_rawcounts.csv` (2000 genes × 6 real samples): natural path → single-sample `too_few_samples`, all-zero rows `all_zero_features` (stays `ok`), transpose `maybe_transposed`, clean base `ok=true`; typed as counts (`hint=bulk_counts`, the "declared counts" scenario) → all-NaN column (real col `CE2_1_c1_iRPE_3`) `all_nan_columns` warn, ÷3 `non_integer_counts` **block**. **Finding captured as WS2.8 (not fixed — stay on the board):** on the natural path an all-NaN column pushes missingness past the >2% counts gate in `_classify_frame`, demoting the matrix to `generic_table` (loses counts routing + the empty-column warn); `non_integer`→`generic_table` is correct (fractional ≠ raw counts). Files: `engine/qc.py` (+`_all_nan_column_flag`, wired into bulk+proteomics), `tests/test_qc.py` (+4 → 15). Gates: BE fast **1194/1** + ruff clean; FE untouched. `1be0a6b` |
 | 2026-07-02 | RESTRUCTURE-06 | WS2.4 | **Genuinely unbuilt (not a phantom-TODO like WS2.2/2.3) — real robustness work shipped.** BE-only: `_load_csv` now sniffs **encoding** (utf-8-sig ± BOM → cp1252 → latin-1 backstop) + **delimiter** (`csv.Sniffer` over `,\t;|`, header-max-fields fallback) so a semicolon/cp1252 real export loads into columns instead of crashing/blobbing; empty file → honest `ValueError`. `ingest` wraps `loader.load` → any parse failure becomes an actionable `ValueError` (`_load_failure_message` per loader) so the router returns **400, never a 500**. QC gains a `maybe_transposed` wrong-orientation warn (numeric cols > rows and ≥ 12) for bulk + proteomics. **Verified live on :8010 `/data/inspect` with REAL data** [[verify-on-real-data-not-mock]] — 6 messy files, **0 × 500**: semicolon real rpgr counts → 200 `bulk_counts` (6 cols, was a blob); cp1252 + µ header → 200 (was a `UnicodeDecodeError` 500); transposed real counts → 200 + `maybe_transposed` (fires on the no-hint path too); real alpk1 `.xlsx` gene list → 200 `generic_table` + honest options note; corrupt `.xlsx` → 400 friendly "…(BadZipFile)"; real `.csv.gz` → 400 honest "no ingest loader". The `UNKNOWN`/`GENERIC_TABLE` options surface already existed (`route.py` pca/corr_heatmap + note; QC `unclassified`) — the gap was the load path. Gzip support surfaced mid-task → captured as **WS2.7** (a new row, not scope creep; honest 400 today satisfies the DoD). Files: `engine/ingest.py`, `engine/qc.py`, `tests/test_ingest.py` (+6), `tests/test_qc.py` (+2), `tests/test_data_inspect.py` (+6). Gates: BE fast **1190/1** + ruff clean; FE untouched. `4ee6ab9` |
 | 2026-07-02 | RESTRUCTURE-05 | WS2.3 | **#1/#2 were shipped pre-tracker (`99bd6e4`); built #3; #4 deferred.** Same phantom-TODO check as WS2.2 [[verify-todo-not-already-shipped]]: `data-panel.tsx` already renders `DataFitVerdict` (own-data fit verdict, #1) + a dataset-card `ConfidenceChip` off the persisted `dataFit` (#2) — the followups "Deferred" list was stale. **#3 (the genuinely-open item) built:** `recommendedFromRoute` silently dropped `compatible===false` skills; added `quick-apply.notAFitSkills` (returns the routed-but-mismatched analyses resolved to catalog skills + reason + band) and a muted, struck **"Not a fit for your data — <reason>"** list in `workbench-panel.tsx` with the engine's reason **visible** (not tooltip-only), non-interactive (they can't run). **Verified live on :8010 `/data/inspect` with REAL data** [[verify-on-real-data-not-mock]]: `rpgr_irpe_rawcounts.csv` (bulk counts) routes `[deg, volcano, enrichment]` → `deg` compatible (chip), **volcano + enrichment `compatible=false`** ("missing a fold-change column, a significance (p/padj) column") → the not-a-fit trace shows both with their reasons; the eyg28 DE table routes only to fitting skills (`volcano/enrichment/gsea`, nothing dropped — correct). **#4 (route-composer "why rejected" + "checked against your data") kept deferred** — a distinct AI route-composer surface needing a backend gap-threading change, not the own-data verdict surface + outside WS2.3's DoD; captured in data-aware-routing/followups.md + "Open items". Files: `lib/catalog/quick-apply.ts` (+`notAFitSkills`/`NotAFit`), `components/project/workbench-panel.tsx` (the trace), `lib/catalog/quick-apply.test.ts` (+5). Gates: FE tsc clean · eslint 0 · vitest **487** (+5); BE untouched. `50c3bde` |
@@ -402,9 +428,9 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 
 ---
 
-## Next-session prompt (tailored — RESTRUCTURE-08 · WS2.6; supersedes the generic template below until stamped done)
+## Next-session prompt (tailored — RESTRUCTURE-09 · WS2.7; supersedes the generic template below until stamped done)
 
-Paste this to start the next session; re-stamp the header line with the real clock. When WS2.6 is
+Paste this to start the next session; re-stamp the header line with the real clock. When WS2.7 is
 `DONE`, rewrite this block for the next top-`TODO` (like the CURRENT.md LIVE pointer).
 
 ```
@@ -413,30 +439,32 @@ Paste this to start the next session; re-stamp the header line with the real clo
 
 Read first: docs/restructure/plan.md (the tracker) → Status board + Progress log + the
 Working Agreement. Confirm git: `git fetch && git status` — origin/main should be in sync at the
-RESTRUCTURE-07 stamp commit (WS2.5 = the `all_nan_columns` QC flag).
+RESTRUCTURE-08 stamp commit (WS2.6 = the run-path error taxonomy, `routers/_errors.py`).
 
 State: WS1 CODE-COMPLETE (1be60a5 + 8c7f09b). WS2.1 (9c9c382), WS2.2 (f51e0c2), WS2.3 (50c3bde),
-WS2.4 (4ee6ab9), WS2.5 DONE. WS2.5 filled the one QC code gap (an all-NaN sample column →
-`all_nan_columns` warn in `engine/qc.py`, bulk+proteomics) + unit coverage for the two untested
-existing rules; `all_zero_features` stays **info** on purpose (a real counts matrix has all-zero
-genes). New follow-ups pending: **WS2.7** (gzip `.csv.gz`/`.tsv.gz`) + **WS2.8** (a counts matrix with
-an empty sample column demotes to `generic_table` past the >2% missingness gate in `_classify_frame`).
-**Recurring pattern:** WS2.2 + WS2.3 were already-shipped (stale "Deferred" docs); WS2.4 + WS2.5 were
-genuine. **Before building any WS TODO, read + git-blame the target first**
+WS2.4 (4ee6ab9), WS2.5 (1be0a6b), WS2.6 DONE. WS2.6 gave every run-path failure ONE envelope
+`detail = {error, category, message, fix, **context}` (new `routers/_errors.py` `RunError`, mirroring
+the QC-flag shape) — three categories bad_input/unsupported/internal, 24 raise sites converted; the key
+fix was the skill-runner `ValueError` (a bare-string 400 → `skill_run_failed` with the real cause + a
+fix) and unknown-skill on multipart `/run` (500 → uniform 404). Follow-ups still pending: **WS2.8** (a
+counts matrix with an empty sample column demotes to `generic_table` past the >2% missingness gate in
+`_classify_frame`). **Recurring pattern:** WS2.2 + WS2.3 were already-shipped (stale "Deferred" docs);
+WS2.4/2.5/2.6 were genuine. **Before building any WS TODO, read + git-blame the target first**
 [[verify-todo-not-already-shipped]]; if already there, verify-live + reconcile-doc + stamp, don't
 re-build. **Reviews deferred to the VERY END** (Working Agreement #4): one review-gauntlet + fe-review
 pass over the whole restructure diff after ALL tasks are DONE (carries the owed WS1 boundary NEXT#R +
 WS2.1's in-browser click-through). Do NOT run them per-workstream.
 
-Do: proceed to the top TODO by Order — WS2.6 (Unify the run-path error taxonomy; Order 8, P2). Home:
-pillars P1/P4. **First read the three error styles** — engine returns `None`, the router raises
-`HTTPException` (see `routers/_run.py` + `routers/data.py`'s `except ValueError → 400`), a skill
-raises `ValueError`. DoD: a single error taxonomy (bad-input vs unsupported vs internal) all three map
-onto, each with a fix-hint, **mirroring the QC-flag shape** (`{severity/code/message/fix}` — reuse that
-shape, don't invent a parallel one). Verify: each error class surfaces ONE consistent, actionable
-message in the UI (drive it end-to-end on the live backend). Scope guard: taxonomy + mapping only — NO
-behavior change to successful runs; do not touch the QC rule set. Likely touches BE + a thin FE surface
-— if it edits the FE run-error display, run the FE gates too.
+Do: proceed to the top TODO by Order — WS2.7 (Gzip-wrapped table support; Order 8b, P2). Home:
+`engine/ingest.py` registry. A `.csv.gz`/`.tsv.gz`/`.txt.gz` (the near-universal GEO count-matrix shape)
+today returns an honest 400 "no ingest loader" (WS2.4 made it never a crash) — but a real stranger
+downloading from GEO hits a wall. **First read + git-blame `engine/ingest.py`** (the loader registry +
+`_load_csv`'s WS2.4 encoding/delimiter sniffing) to confirm it's genuinely unbuilt. DoD: a gzipped
+delimited table ingests as its DECOMPRESSED table (transparently gunzip, then REUSE `_load_csv`'s
+sniffing — do NOT fork a second CSV reader), classified as its real modality. Verify: a real
+`*.csv.gz` → 200 with its true kind + routing on live `/data/inspect` (gzip the real rpgr counts to
+`rpgr_irpe_rawcounts.csv.gz` if no real GEO `.csv.gz` is on disk). Scope guard: gzip only — NO zip/tar
+bundles, NO auto-fetch. Likely BE-only (FE untouched).
 
 Rules (the anti-half-done contract):
 - Stay on the board. New work surfaced mid-task → add a WSx.y row FIRST, don't expand scope.
@@ -457,10 +485,10 @@ Env / landmines (unchanged): :8000 = eamos, NEVER kill → BE on :8010 (`uvicorn
 8010`, no --reload; the uv-3.12 PY at C:\Users\seamegdool\AppData\Roaming\uv\python\
 cpython-3.12.13-windows-x86_64-none\python.exe + PYTHONPATH="D:/selom/app/backend/.venv/Lib/
 site-packages;." run from app/backend, NOT `uv run` — EDR; set PYTHONIOENCODING=utf-8 for non-ASCII
-in probe output; ruff may hit WinError-5 first spawn, retry once). Real bases for run-path errors:
-`D:/selom-data/rpgr/rpgr_irpe_rawcounts.csv` (counts) + `D:/selom-data/eyg28` (DE table). FE = `npx
+in probe output; ruff may hit WinError-5 first spawn, retry once). Real base for the gzip verify:
+`D:/selom-data/rpgr/rpgr_irpe_rawcounts.csv` (gzip it to a `.csv.gz`). FE = `npx
 next dev --webpack`. git user.email stays 282747725+steveneam@users.noreply.github.com. Kill every dev
-server you start before ending. Proceed to WS2.6.
+server you start before ending. Proceed to WS2.7.
 ```
 
 ## Resume prompt (persistent — the generic template; the tailored block above supersedes it until stamped done)

@@ -409,7 +409,7 @@ def test_apply_endpoint_empty_ai_actions_is_400(tmp_path, monkeypatch):
         )
 
     assert response.status_code == 400
-    assert "non-empty" in response.json()["detail"]
+    assert "non-empty" in response.json()["detail"]["message"]  # WS2.6 taxonomy envelope
 
 
 # ---------------------------------------------------------------------------
@@ -581,7 +581,7 @@ def test_apply_endpoint_malformed_entry_missing_type_is_400(tmp_path, monkeypatc
         )
 
     assert response.status_code == 400
-    assert "malformed" in response.json()["detail"]
+    assert "malformed" in response.json()["detail"]["message"]  # WS2.6 taxonomy envelope
 
 
 def test_apply_endpoint_malformed_entry_missing_target_is_400(tmp_path, monkeypatch):
@@ -608,7 +608,7 @@ def test_apply_endpoint_malformed_entry_missing_target_is_400(tmp_path, monkeypa
         )
 
     assert response.status_code == 400
-    assert "malformed" in response.json()["detail"]
+    assert "malformed" in response.json()["detail"]["message"]  # WS2.6 taxonomy envelope
 
 
 def test_apply_endpoint_forged_actor_is_overwritten_not_rejected(tmp_path, monkeypatch):

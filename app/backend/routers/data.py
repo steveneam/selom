@@ -3,6 +3,7 @@ import pathlib
 
 from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
 
+from routers._errors import RunError
 from routers._run import _save_upload
 
 router = APIRouter()
@@ -22,7 +23,9 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
     from engine import compat, suggest_design_hints
 
     if hint is not None and hint not in ALL_KINDS:
-        raise HTTPException(status_code=400, detail=f"hint must be one of {ALL_KINDS}")
+        raise RunError.bad_input(
+            "invalid_hint", f"hint must be one of {ALL_KINDS}.",
+            fix="Drop the hint to auto-detect, or pass one of the listed modalities.")
     path = _save_upload(matrix)
     design_path = _save_upload(design) if design is not None else None
     try:
@@ -59,7 +62,13 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
         # An attached sample sheet (design_path) is the source of truth (auto-join, never hand-match).
         design_hints = suggest_design_hints(bundle, design_path=design_path)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # The engine raises ValueError for a file it can't read/parse (bad encoding, no loader, a
+        # corrupt workbook) — the real cause (str(e)) is the taxonomy's `message`; a bad-input 400,
+        # never a 500. Same envelope the run path uses (WS2.6).
+        raise RunError.bad_input(
+            "data_read_failed", str(e),
+            fix="Check the file opens as a table (delimiter / header / sheet), "
+                "or try a different export.") from e
     finally:
         pathlib.Path(path).unlink(missing_ok=True)
         if design_path is not None:
@@ -89,7 +98,9 @@ async def combine_data(files: list[UploadFile] = File(...), labels: str | None =
     from engine import ingest_many
 
     if not files:
-        raise HTTPException(status_code=400, detail="combine: no files")
+        raise RunError.bad_input(
+            "combine_no_files", "combine: no files.",
+            fix="Attach two or more single-condition files to merge.")
     label_list = labels.split(",") if labels else None
     paths = [_save_upload(f) for f in files]
     bundle = None
@@ -102,7 +113,11 @@ async def combine_data(files: list[UploadFile] = File(...), labels: str | None =
         # below deletes them), so the merged artifact's lineage can name "merged from {A, B, C}".
         parent_refs = [lineage.source_parent(p, f.filename or "") for p, f in zip(paths, files)]
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # A merge that can't reconcile the inputs (mismatched shapes, no common condition) — the
+        # real cause as `message`, a bad-input 400 in the shared envelope (WS2.6).
+        raise RunError.bad_input(
+            "combine_failed", str(e),
+            fix="Ensure each file is one condition with a shared column layout.") from e
     finally:
         for p in paths:
             pathlib.Path(p).unlink(missing_ok=True)

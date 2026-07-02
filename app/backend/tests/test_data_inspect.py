@@ -153,7 +153,7 @@ def test_inspect_unrecognized_type_400():
         files={"matrix": ("mystery.bin", b"\x00\x01\x02", "application/octet-stream")},
     )
     assert r.status_code == 400
-    assert "no ingest loader" in r.json()["detail"]
+    assert "no ingest loader" in r.json()["detail"]["message"]  # WS2.6 taxonomy envelope
 
 
 # --- messy-real-input robustness (WS2.4): a stranger's odd/broken file never 500s -----------------

@@ -21,7 +21,7 @@ import os
 from datetime import UTC, datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from pydantic import BaseModel
 
 from ai.gateway import ActionGateway, NullActionGateway, _deterministic_explain, rank_sweep_space
@@ -30,6 +30,7 @@ from ai.models import ActionContext
 from auth import AuthContext, require_user
 from companions import provenance
 from config import settings
+from routers._errors import RunError, unknown_skill
 from routers._run import _execute_skill_run, _save_upload, _stringify_params
 
 router = APIRouter()
@@ -337,7 +338,7 @@ async def apply_approved(
     from skills.registry import list_skill_ids
 
     if skill_id not in set(list_skill_ids()):
-        raise HTTPException(status_code=404, detail=f"unknown skill {skill_id!r}")
+        raise unknown_skill(skill_id)
 
     try:
         params_dict: dict = _json.loads(params)
@@ -350,19 +351,19 @@ async def apply_approved(
         actions_list = []
 
     if not actions_list:
-        raise HTTPException(
-            status_code=400,
-            detail="/ai/apply requires a non-empty ai_actions log (the approved action delta)",
-        )
+        raise RunError.bad_input(
+            "ai_actions_empty",
+            "/ai/apply requires a non-empty ai_actions log (the approved action delta).",
+            fix="Approve at least one AI proposal before applying.")
 
     # Validate the DELTA shape only (descriptive integrity) — actor/model/approved_* are NEVER
     # required nor trusted from the caller; the server stamps them below.
     for entry in actions_list:
         if not isinstance(entry, dict) or not entry.get("type") or "target" not in entry:
-            raise HTTPException(
-                status_code=400,
-                detail="malformed ai_actions entry: each must carry type and target",
-            )
+            raise RunError.bad_input(
+                "ai_actions_malformed",
+                "malformed ai_actions entry: each must carry type and target.",
+                fix="Send each approved action as {action_id, type, target, prompt}.")
 
     # Server-controlled provenance (NEXT#1, docs/provenance-chokepoint/spec.md): derive the trusted
     # attribution and route ONLY the stamped list to the run path — the raw `actions_list` (with any

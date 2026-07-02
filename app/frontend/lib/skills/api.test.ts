@@ -100,6 +100,33 @@ describe("runSkill — is-my-data-clean guardrail", () => {
     await expect(p).rejects.not.toThrow(/Couldn't run this skill/); // shown as-is, not wrapped
     await expect(p.catch((e) => e)).resolves.not.toBeInstanceOf(DataCheckError);
   });
+
+  it("appends the taxonomy `fix` hint to a run error's message (WS2.6 skill_run_failed)", async () => {
+    // The run-path taxonomy envelope (backend routers/_errors.py RunError) carries a `fix` — the
+    // actionable next step (the QCFlag `fix` peer). The runner ValueError used to be a bare-string
+    // 400 that fell through the generic "try again" frame; now it surfaces the real cause + the fix.
+    const detail = {
+      error: "skill_run_failed",
+      category: "bad_input",
+      message: "deg needs a condition column with ≥2 groups.",
+      fix: "Attach a design sheet, or add the missing samples.",
+    };
+    vi.stubGlobal("fetch", () => Promise.resolve(jsonRes(400, { detail })));
+    const p = runSkill("deg", new File(["x"], "counts.csv"));
+    await expect(p).rejects.toThrow(/needs a condition column/); // the real cause
+    await expect(p).rejects.toThrow(/Attach a design sheet/); // the fix hint appended
+    await expect(p).rejects.not.toThrow(/Couldn't run this skill/); // not the generic frame
+  });
+
+  it("does not double the fix when it's already folded into the message", async () => {
+    // A self-framed gate message (its next step is already in the sentence) sets fix="" — nothing to
+    // append; and even a redundant fix substring is not re-appended.
+    const message = "This data doesn't fit volcano. Swap in a matching file.";
+    const detail = { error: "data_contract_failed", category: "bad_input", message, fix: "Swap in a matching file." };
+    vi.stubGlobal("fetch", () => Promise.resolve(jsonRes(422, { detail })));
+    const err = (await runSkill("volcano", new File(["x"], "counts.csv")).catch((e) => e)) as Error;
+    expect(err.message).toBe(message); // fix already present → not appended twice
+  });
 });
 
 /**

@@ -6,13 +6,14 @@ import shutil
 import tempfile
 import uuid
 
-from fastapi import HTTPException, UploadFile
+from fastapi import UploadFile
 
 from companions import guardrails
 from companions import legends
 from companions import methods
 from companions import provenance
 from config import settings
+from routers._errors import RunError, param_out_of_range, unknown_skill
 from skills.contract import (
     load_skill,
     run_bundle_with_table,
@@ -134,16 +135,18 @@ async def _execute_skill_run(
     # ingest → gates (QC / D1 / D2) → run → response. `filename` is the dropped name (or the dataset
     # filename) used for provenance + the engine's derived sample labels. `override` is already popped
     # from params by the caller; `design_path` (multipart only) is cleaned up in the finally.
-    spec = load_skill(skill_id)
+    # An unknown skill id makes `load_skill` raise FileNotFoundError — map it to the taxonomy's
+    # `unsupported` 404 here, at the one chokepoint every run entry shares (multipart /run had no
+    # upfront guard and 500'd, while /jobs + /run-dataset 404'd — WS2.6 makes it uniform).
+    try:
+        spec = load_skill(skill_id)
+    except FileNotFoundError as exc:
+        raise unknown_skill(skill_id) from exc
     # C3: enforce the param_spec ranges/options at the API — an out-of-range knob (e.g.
     # fc_threshold=100 on a max:5 param) is a 400 the user can fix, not a crash inside the skill.
     range_errors = validate_param_ranges(spec, params)
     if range_errors:
-        raise HTTPException(status_code=400, detail={
-            "error": "param_out_of_range",
-            "message": "One or more parameters are outside their allowed range.",
-            "errors": range_errors,
-        })
+        raise param_out_of_range(range_errors)
     try:
         # Both products load through one ingest front door (engine-spine §6/§9): classify + QC, then
         # run from the same DataBundle. Fail-soft — an uninspectable upload yields no bundle and runs
@@ -160,16 +163,19 @@ async def _execute_skill_run(
             plan = plan_cleaning(bundle, profile=prof)
             routing = route_profile(bundle, prof.code)
         if qc is not None and qc.blocked and not override:
-            raise HTTPException(status_code=422, detail={
-                "error": "data_check_failed",
-                "message": "This data has a blocking problem for analysis. Review the flags, then "
-                           "re-run with override=true to analyze it anyway.",
-                "kind": bundle.kind,
-                "qc": qc.model_dump(),
-                "routing": routing.model_dump() if routing is not None else None,
-                "profile": prof.model_dump() if prof is not None else None,
-                "cleaning_plan": plan.model_dump() if plan is not None else None,
-            })
+            # The QC block message is self-framed (it names the escape hatch), and each QC flag
+            # carries its OWN `fix` — so the envelope `fix` stays empty; the actionable steps are
+            # the per-flag hints the FE already renders.
+            raise RunError.bad_input(
+                "data_check_failed",
+                "This data has a blocking problem for analysis. Review the flags, then "
+                "re-run with override=true to analyze it anyway.",
+                status_code=422,
+                kind=bundle.kind,
+                qc=qc.model_dump(),
+                routing=routing.model_dump() if routing is not None else None,
+                profile=prof.model_dump() if prof is not None else None,
+                cleaning_plan=plan.model_dump() if plan is not None else None)
         # D1 — declared data-contract gate (docs/architecture-consistency-gate/skill-input-contract.md):
         # before entering the runner, check the dropped data carries what THIS skill needs — the
         # column groups / modality the skill declares in engine.compat. A CERTAIN mismatch (missing
@@ -206,14 +212,13 @@ async def _execute_skill_run(
                 # clear 400 (not a silent no-op / a runner crash) — overridable like the QC/D1/D2 gates.
                 missing = {role: col for role, col in column_override.items() if col not in have}
                 if missing and not override:
-                    raise HTTPException(status_code=400, detail={
-                        "error": "column_override_missing",
-                        "message": "A column override points at a column this data doesn't have. "
-                                   "Map each role to an existing column, or re-run with override=true.",
-                        "skill_id": skill_id,
-                        "missing": missing,
-                        "available": fa.columns,
-                    })
+                    raise RunError.bad_input(
+                        "column_override_missing",
+                        "A column override points at a column this data doesn't have. "
+                        "Map each role to an existing column, or re-run with override=true.",
+                        skill_id=skill_id,
+                        missing=missing,
+                        available=fa.columns)
                 # Keep ONLY the entries that resolve to a real column — the EFFECTIVE override the
                 # runner actually uses. So provenance records exactly what fed the figure, and a
                 # faithful re-run (no override=true) resolves identically. Under override=true an
@@ -232,14 +237,16 @@ async def _execute_skill_run(
                 params.pop("_column_override", None)
             data_fit_obj = compat.fit(skill_id, fa, column_override=column_override)
             if data_fit_obj.gated and not override:
-                raise HTTPException(status_code=422, detail={
-                    "error": "data_contract_failed",
-                    "message": compat.contract_message(data_fit_obj),
-                    "skill_id": skill_id,
-                    "kind": bundle.kind,
-                    "data_fit": data_fit_obj.model_dump(),
-                    "routing": routing.model_dump() if routing is not None else None,
-                })
+                # `contract_message` is already a full, self-framed sentence with its own next step
+                # ("… Swap in a matching file."), so the envelope `fix` stays empty — surfaced as-is.
+                raise RunError.bad_input(
+                    "data_contract_failed",
+                    compat.contract_message(data_fit_obj),
+                    status_code=422,
+                    skill_id=skill_id,
+                    kind=bundle.kind,
+                    data_fit=data_fit_obj.model_dump(),
+                    routing=routing.model_dump() if routing is not None else None)
         # D2 — frame-validation at the skill seam (docs/architecture-consistency-gate/
         # frame-validation.md): once D1 confirms the required columns are PRESENT, check they carry
         # USABLE data — a present-but-empty / all-text fold-change column passes D1 yet becomes a
@@ -252,13 +259,13 @@ async def _execute_skill_run(
             frame_errs = frame_schema.check_skill_input(skill_id, bundle.payload,
                                                         override=column_override)
             if frame_errs:
-                raise HTTPException(status_code=400, detail={
-                    "error": "frame_validation_failed",
-                    "message": frame_schema.frame_validation_message(frame_errs, skill_id),
-                    "skill_id": skill_id,
-                    "stage": frame_schema.STAGE_SKILL_INPUT,
-                    "violations": [v.model_dump() for v in frame_errs],
-                })
+                # `frame_validation_message` names each defect + the next step — self-framed, fix="".
+                raise RunError.bad_input(
+                    "frame_validation_failed",
+                    frame_schema.frame_validation_message(frame_errs, skill_id),
+                    skill_id=skill_id,
+                    stage=frame_schema.STAGE_SKILL_INPUT,
+                    violations=[v.model_dump() for v in frame_errs])
         def _do_run():
             return (run_bundle_with_table(skill_id, bundle, params) if bundle is not None
                     else run_skill_with_table(skill_id, path, params))
@@ -275,14 +282,19 @@ async def _execute_skill_run(
                 figure, table = _do_run()
         except ValueError as e:
             # A runner raises ValueError for a DATA problem (missing columns, no groups, an empty
-            # result) — a 4xx the user can fix, NOT a 5xx outage. Surface the real cause so the FE
-            # shows "missing required columns […]" instead of "the service is unavailable".
-            raise HTTPException(status_code=400, detail=str(e))
+            # result) — a 4xx the user can fix, NOT a 5xx outage. Surface the real cause (str(e), a
+            # self-framed sentence) as the taxonomy's `message` so the FE shows "… required columns
+            # […]" instead of "the service is unavailable" — the same envelope as the pre-run gates.
+            raise RunError.bad_input(
+                "skill_run_failed", str(e),
+                fix="Check your data has the columns and groups this analysis needs, "
+                    "or pick a skill that fits it.")
         except asyncio.TimeoutError:
-            raise HTTPException(status_code=504, detail={
-                "error": "skill_timeout",
-                "message": f"'{skill_id}' exceeded the {timeout}s execution limit and was abandoned.",
-            })
+            raise RunError.internal(
+                "skill_timeout",
+                f"'{skill_id}' exceeded the {timeout}s execution limit and was abandoned.",
+                status_code=504,
+                fix="Try a smaller input or a lighter analysis.")
         # L3 table synthesis (docs/records/table-synthesis/spec.md §4 / §8 step 4): a tableless skill that
         # has a deterministic synthesizer gets a canonical Statistics table re-shaped from its OWN
         # figure (S1 read-not-recompute -> tagged synthesized:True, S3), so the FE Statistics node

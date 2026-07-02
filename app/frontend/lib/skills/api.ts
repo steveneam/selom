@@ -357,12 +357,19 @@ export async function parseSkillRunResponse(res: Response): Promise<SkillRunResp
       const blocked = readDataCheckBlock(body);
       if (blocked) throw blocked;
     }
-    // A typed gate's `detail.message` (D1 data_contract_failed, C3 param_out_of_range) is a full,
-    // self-framed sentence with its own next step — surface it AS-IS. Wrapping it in "Couldn't run …
-    // Please try again." reads wrong (a data mismatch isn't fixed by retrying) and doubles the period.
+    // Every run-path failure now arrives in ONE taxonomy envelope (backend routers/_errors.py
+    // RunError → detail `{error, category, message, fix}`, mirroring the QC-flag shape) — a typed
+    // gate (data_contract_failed, param_out_of_range), a runner data error (skill_run_failed, once a
+    // bare-string 400 that fell through to the generic frame), an unknown skill/dataset, a timeout.
+    // `message` is a full, self-framed sentence; surface it AS-IS (wrapping it in "Couldn't run …
+    // Please try again." reads wrong for a data mismatch). `fix` is the actionable next step (the
+    // QCFlag `fix` peer) — append it when present and not already folded into the message, so the
+    // user reads what to do, not just what broke.
     const d = body?.detail;
     if (d && typeof d === "object" && typeof (d as { message?: unknown }).message === "string") {
-      throw new Error((d as { message: string }).message);
+      const { message, fix } = d as { message: string; fix?: unknown };
+      const hint = typeof fix === "string" ? fix.trim() : "";
+      throw new Error(hint && !message.includes(hint) ? `${message} ${hint}` : message);
     }
     // Otherwise speak plainly and point at a next step. A bare string detail (a runner's terse
     // ValueError) rides inside the friendly frame; an opaque failure gets the generic text.

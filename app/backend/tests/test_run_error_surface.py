@@ -3,6 +3,12 @@
 A runner raises ``ValueError`` for a DATA problem (missing columns, no groups, an empty result).
 That must reach the user as a 4xx with the real message — NOT a generic 5xx "service unavailable".
 Real engine, so the skill actually validates its input.
+
+WS2.6: the runner ValueError now rides the unified run-path taxonomy envelope
+(``routers/_errors.py`` ``RunError`` → ``detail = {error:"skill_run_failed", category:"bad_input",
+message, fix}``) instead of a bare-string ``detail``. The contract this test guards is unchanged —
+the real cause reaches the user as a fixable 4xx — it just lives in ``detail["message"]`` now, next
+to a ``fix`` hint (mirroring the QC-flag shape).
 """
 
 import pytest
@@ -27,8 +33,11 @@ def test_missing_columns_surfaces_real_cause_as_400():
     )
     assert r.status_code == 400               # a data error, not a 500 outage
     detail = r.json()["detail"]
-    assert "required columns" in detail        # the real cause, surfaced verbatim
-    assert "b_wave_uv" in detail
+    assert detail["error"] == "skill_run_failed"      # the run-path taxonomy code (WS2.6)
+    assert detail["category"] == "bad_input"          # the user can fix it
+    assert "required columns" in detail["message"]    # the real cause, surfaced verbatim
+    assert "b_wave_uv" in detail["message"]
+    assert detail["fix"]                              # an actionable next step rides along
 
 
 def test_valid_erg_table_runs_through_the_run_endpoint():
