@@ -53,6 +53,44 @@ def test_negative_counts_block():
     assert "negative_counts" in _codes(rep)
 
 
+def test_single_sample_column_warns_too_few():
+    df = pd.DataFrame(RNG.integers(0, 400, size=(50, 1)), columns=["s0"])
+    rep = run_qc(DataBundle(payload=df, kind=BULK_COUNTS))
+    assert "too_few_samples" in _codes(rep)
+    assert rep.ok is False       # a warn drops ok
+    assert rep.blocked is False  # but does not hard-block
+
+
+def test_all_zero_features_info_stays_ok():
+    arr = RNG.integers(1, 400, size=(50, 6))
+    arr[:3, :] = 0  # 3 genes with zero counts in every sample
+    df = pd.DataFrame(arr, columns=[f"s{j}" for j in range(6)])
+    rep = run_qc(DataBundle(payload=df, kind=BULK_COUNTS))
+    assert "all_zero_features" in _codes(rep)
+    assert rep.ok is True        # all-zero genes are benign (dropped) — info, does not drop ok
+    assert rep.blocked is False
+
+
+def test_all_nan_column_warns():
+    arr = RNG.integers(0, 400, size=(50, 6)).astype("float64")
+    arr[:, 2] = np.nan  # a sample column with no data at all
+    df = pd.DataFrame(arr, columns=[f"s{j}" for j in range(6)])
+    rep = run_qc(DataBundle(payload=df, kind=BULK_COUNTS))
+    assert "all_nan_columns" in _codes(rep)
+    empty = next(f for f in rep.flags if f.code == "all_nan_columns")
+    assert "s2" in empty.message and empty.fix        # names the offending column + a fix hint
+    assert rep.ok is False       # a warn drops ok
+    assert rep.blocked is False
+
+
+def test_proteomics_all_nan_column_warns():
+    arr = RNG.normal(20.0, 2.0, size=(30, 6))
+    arr[:, 0] = np.nan  # a sample where nothing was detected
+    df = pd.DataFrame(arr, columns=[f"s{j}" for j in range(6)])
+    rep = run_qc(DataBundle(payload=df, kind=PROTEOMICS))
+    assert "all_nan_columns" in _codes(rep)
+
+
 def test_proteomics_all_missing_row_warns():
     arr = RNG.normal(20.0, 2.0, size=(30, 6))
     arr[0, :] = np.nan  # a never-detected protein

@@ -34,6 +34,21 @@ def _flag(severity: str, code: str, message: str, fix: str = "") -> QCFlag:
     return QCFlag(severity=severity, code=code, message=message, fix=fix)
 
 
+def _all_nan_column_flag(num: Any, arr: Any, np: Any) -> QCFlag | None:
+    """A column that is entirely NaN is a sample with no data at all — almost always a parse
+    artifact (a trailing delimiter's blank column) or a genuinely empty sample; either way it can't
+    contribute to any per-sample analysis. A ``warn`` (override-able), not a hard block."""
+    mask = np.isnan(arr).all(axis=0)
+    if not mask.any():
+        return None
+    cols = [str(c) for c in num.columns[mask]]
+    shown = ", ".join(cols[:3]) + (f" (+{len(cols) - 3} more)" if len(cols) > 3 else "")
+    return _flag(QC_WARN, "all_nan_columns",
+                 f"{len(cols)} column(s) are entirely empty (all values missing): {shown}.",
+                 "Drop the empty sample(s) or check the file parsed correctly "
+                 "(a trailing delimiter can add a blank column).")
+
+
 def _orientation_flag(n_rows: int, n_numeric_cols: int, feature_noun: str) -> QCFlag | None:
     """A count/intensity matrix is ``features × samples`` (tall): many feature rows, a handful of
     sample columns. Far more numeric columns than rows is a strong, low-false-positive sign the table
@@ -103,11 +118,17 @@ def _qc_frame(df: Any, kind: str) -> tuple[dict, list[QCFlag]]:
             flags.append(_flag(QC_WARN, "too_few_samples",
                                "Only one sample column — most analyses need ≥2 per group.",
                                "Add the other samples / a design with replicates."))
+        empty_col = _all_nan_column_flag(num, arr, np)
+        if empty_col is not None:
+            flags.append(empty_col)
         orient = _orientation_flag(n_rows, num.shape[1], "genes")
         if orient is not None:
             flags.append(orient)
 
     elif kind == PROTEOMICS:
+        empty_col = _all_nan_column_flag(num, arr, np)
+        if empty_col is not None:
+            flags.append(empty_col)
         orient = _orientation_flag(n_rows, num.shape[1], "proteins")
         if orient is not None:
             flags.append(orient)

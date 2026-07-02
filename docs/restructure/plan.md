@@ -42,9 +42,10 @@ Status: `TODO` · `WIP` (≤1 at a time) · `DONE — <sha>` · `BLOCKED — <wh
 | 4 | **WS2.2** | Intake "correct the detection" affordances | P1 | DONE — f51e0c2 | intake-questionnaire/followups.md #2,3,4,7,8 |
 | 5 | **WS2.3** | Surface the data-fit verdict on own-data | P1 | DONE — 50c3bde | data-aware-routing/followups.md #1–4 |
 | 6 | **WS2.4** | Ingest robustness for messy real inputs | P1 | DONE — 4ee6ab9 | pillars P3c + P1d |
-| 7 | **WS2.5** | QC coverage vs deliberately-broken real data | P1 | TODO | pillars P1c (extension) |
+| 7 | **WS2.5** | QC coverage vs deliberately-broken real data | P1 | DONE — <sha> | pillars P1c (extension) |
 | 8 | **WS2.6** | Unify the run-path error taxonomy | P2 | TODO | pillars P1/P4 · NEW |
 | 8b | **WS2.7** | Gzip-wrapped table support (`.csv.gz`/`.tsv.gz`) | P2 | TODO | NEW (WS2.4 follow-up) |
+| 8c | **WS2.8** | Counts matrix with an empty/failed sample column demotes to `generic_table` | P2 | TODO | NEW (WS2.5 follow-up) |
 | 9 | **WS3.1** | Converge the two ingest/classify paths (shared primitive) | P2 | TODO | CURRENT NEXT#6 + NEXT#1 |
 | 10 | **WS3.2** | Column-override logic → one resolver | P2 | TODO | NEXT#1 (concrete) |
 | 11 | **WS3.3** | Param validation → drop the redundant gate | P2 | TODO | NEXT#1 (concrete) |
@@ -217,14 +218,34 @@ per loader → the router's existing `except ValueError` returns a 400) — neve
   new work item, so it went to a new row (**WS2.7**), not silent scope creep; today it is an honest
   400, never a crash, which satisfies this DoD.
 
-### WS2.5 — QC coverage vs deliberately-broken real data · P1 · Status: TODO
+### WS2.5 — QC coverage vs deliberately-broken real data · P1 · Status: DONE — <sha>
 QC flags (pillars P1c) were built against curated data. Extend to messy inputs. Home:
 pillars P1c extension slice.
+**Done (BE-only, `engine/qc.py`):** of the five DoD conditions, four QC rules already existed
+(`too_few_samples`/`non_integer_counts`/`all_zero_features`/`maybe_transposed`) — the one true code
+gap was an **all-NaN sample column** (a sample with no data at all), so added `_all_nan_column_flag`
+→ a `all_nan_columns` **warn** (names the offending column + a fix hint), fired for `bulk_counts` +
+`proteomics` (the modalities whose columns are samples). Two existing-but-untested rules
+(`too_few_samples`, `all_zero_features`) got unit coverage. `all_zero_features` stays **info** by
+design (a real counts matrix naturally has all-zero genes — the clean rpgr base fires it and still
+reads `ok`; promoting it to warn would wrongly flag every real matrix).
 - **Definition of Done:** all-NaN column, single-sample, non-integer "counts", all-zero
-  features, and wrong-orientation each produce the right block/warn flag with a fix hint.
-- **Verify:** a broken-fixture matrix hits each flag; a clean one stays `ok`.
-- **Scope guard:** extend the existing `engine/qc.py` rule set; do NOT change the
-  block-vs-override policy (D-e5 stands).
+  features, and wrong-orientation each produce the right block/warn flag with a fix hint. **Met.**
+- **Verify (PASSED — real data + live `/data/inspect` on :8010):** broken fixtures built from the
+  **real** `rpgr_irpe_rawcounts.csv` (first 2000 genes × 6 real samples). On the natural (no-hint)
+  path: **single-sample** slice → `too_few_samples` warn; **all-zero** real gene rows →
+  `all_zero_features` info (stays `ok`); **transpose** → `maybe_transposed` warn; the **clean** base →
+  `ok=true`. When the file is typed as counts (`hint=bulk_counts`, the "declared counts" scenario each
+  flag is built for): **all-NaN column** (real col `CE2_1_c1_iRPE_3` blanked) → `all_nan_columns` warn;
+  **non-integer** (real counts ÷3) → `non_integer_counts` **block**. Gates: BE fast **1194/1** + ruff
+  clean; FE untouched. (Unit tests: `test_qc.py` +4 → 15.)
+- **Finding (captured, not fixed → WS2.8):** on the *natural* path an all-NaN sample column pushes
+  missingness to ~1/n_samples (>2% counts gate in `_classify_frame`) so the matrix demotes to
+  `generic_table` and loses both counts routing and the empty-column warn — a classify-robustness
+  edge, out of this QC-rule-set scope. (`non_integer` demoting to `generic_table` is *correct* —
+  fractional data with no counts signal isn't raw counts.)
+- **Scope guard (honored):** extended the existing `engine/qc.py` rule set only; did NOT change the
+  block-vs-override policy (D-e5 stands) — the new flag is a warn (override-able), never a hard block.
 
 ### WS2.6 — Unify the run-path error taxonomy · P2 · Status: TODO
 Three inconsistent error styles (engine `None` / router `HTTPException` / skill `ValueError`).
@@ -244,6 +265,21 @@ that task. Home: `engine/ingest.py` registry.
 - **Verify:** the real dorgau `*.csv.gz` → 200 with its true kind + routing, on live `/data/inspect`.
 - **Scope guard:** gzip only (no zip/tar bundles, no auto-fetch); reuse `_load_csv`'s sniffing — don't
   fork a second CSV reader.
+
+### WS2.8 — Counts matrix with an empty/failed sample column demotes to `generic_table` · P2 · Status: TODO
+Surfaced during WS2.5 live verify. `_classify_frame` gates `bulk_counts` on `integral and miss < 0.02`
+(`engine/databundle.py`); a real counts matrix with one empty/failed sample column has missingness
+≈ 1/n_samples (16.7 % for 6 samples), which fails that gate → the file demotes to `generic_table`.
+The stranger then loses the deg/volcano routing **and** the WS2.5 `all_nan_columns` empty-column warn
+(that flag lives in the counts QC branch, which never runs). A plausible real GEO shape (one dropped
+sample). Home: `engine/databundle.py` `_classify_frame` counts gate.
+- **Definition of Done:** an otherwise-integer counts matrix with a small number of all-NaN sample
+  columns still classifies as `bulk_counts`, so the `all_nan_columns` warn surfaces the empty sample —
+  without loosening the gate enough to misread a genuinely generic table as counts.
+- **Verify:** the real rpgr counts with one blanked sample column → `bulk_counts` + `all_nan_columns`
+  on the natural (no-hint) `/data/inspect` path; a genuinely-generic table stays `generic_table`.
+- **Scope guard:** the counts gate only; do NOT touch the metabolomics/proteomics/DE branches or the
+  QC rule set (WS2.5). `non_integer` → `generic_table` is correct and out of scope.
 
 ## WS3 — Dedup / parallel-representation (executes CURRENT NEXT#1; case-by-case)
 
@@ -355,6 +391,7 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 
 | Date | Session | Task(s) | Result / sha |
 |---|---|---|---|
+| 2026-07-02 | RESTRUCTURE-07 | WS2.5 | **Genuinely a small code gap + a coverage fill (not a phantom-TODO).** Of the five DoD conditions, four QC rules already existed (`too_few_samples` warn · `non_integer_counts` block · `all_zero_features` info · `maybe_transposed` warn); the one true gap was an **all-NaN sample column** → added `_all_nan_column_flag` in `engine/qc.py` (a `all_nan_columns` **warn** that names the offending column + a fix hint), fired for `bulk_counts` + `proteomics` (columns = samples). Added unit coverage for the two existing-but-untested rules. Kept `all_zero_features` **info** on purpose — the real rpgr base fires it and still reads `ok`, so promoting it to warn would wrongly flag every real counts matrix (D-e5 policy untouched; the new flag is override-able, never a hard block). **Verified live on :8010 `/data/inspect` with REAL data** [[verify-on-real-data-not-mock]] — broken fixtures from `rpgr_irpe_rawcounts.csv` (2000 genes × 6 real samples): natural path → single-sample `too_few_samples`, all-zero rows `all_zero_features` (stays `ok`), transpose `maybe_transposed`, clean base `ok=true`; typed as counts (`hint=bulk_counts`, the "declared counts" scenario) → all-NaN column (real col `CE2_1_c1_iRPE_3`) `all_nan_columns` warn, ÷3 `non_integer_counts` **block**. **Finding captured as WS2.8 (not fixed — stay on the board):** on the natural path an all-NaN column pushes missingness past the >2% counts gate in `_classify_frame`, demoting the matrix to `generic_table` (loses counts routing + the empty-column warn); `non_integer`→`generic_table` is correct (fractional ≠ raw counts). Files: `engine/qc.py` (+`_all_nan_column_flag`, wired into bulk+proteomics), `tests/test_qc.py` (+4 → 15). Gates: BE fast **1194/1** + ruff clean; FE untouched. `<sha>` |
 | 2026-07-02 | RESTRUCTURE-06 | WS2.4 | **Genuinely unbuilt (not a phantom-TODO like WS2.2/2.3) — real robustness work shipped.** BE-only: `_load_csv` now sniffs **encoding** (utf-8-sig ± BOM → cp1252 → latin-1 backstop) + **delimiter** (`csv.Sniffer` over `,\t;|`, header-max-fields fallback) so a semicolon/cp1252 real export loads into columns instead of crashing/blobbing; empty file → honest `ValueError`. `ingest` wraps `loader.load` → any parse failure becomes an actionable `ValueError` (`_load_failure_message` per loader) so the router returns **400, never a 500**. QC gains a `maybe_transposed` wrong-orientation warn (numeric cols > rows and ≥ 12) for bulk + proteomics. **Verified live on :8010 `/data/inspect` with REAL data** [[verify-on-real-data-not-mock]] — 6 messy files, **0 × 500**: semicolon real rpgr counts → 200 `bulk_counts` (6 cols, was a blob); cp1252 + µ header → 200 (was a `UnicodeDecodeError` 500); transposed real counts → 200 + `maybe_transposed` (fires on the no-hint path too); real alpk1 `.xlsx` gene list → 200 `generic_table` + honest options note; corrupt `.xlsx` → 400 friendly "…(BadZipFile)"; real `.csv.gz` → 400 honest "no ingest loader". The `UNKNOWN`/`GENERIC_TABLE` options surface already existed (`route.py` pca/corr_heatmap + note; QC `unclassified`) — the gap was the load path. Gzip support surfaced mid-task → captured as **WS2.7** (a new row, not scope creep; honest 400 today satisfies the DoD). Files: `engine/ingest.py`, `engine/qc.py`, `tests/test_ingest.py` (+6), `tests/test_qc.py` (+2), `tests/test_data_inspect.py` (+6). Gates: BE fast **1190/1** + ruff clean; FE untouched. `4ee6ab9` |
 | 2026-07-02 | RESTRUCTURE-05 | WS2.3 | **#1/#2 were shipped pre-tracker (`99bd6e4`); built #3; #4 deferred.** Same phantom-TODO check as WS2.2 [[verify-todo-not-already-shipped]]: `data-panel.tsx` already renders `DataFitVerdict` (own-data fit verdict, #1) + a dataset-card `ConfidenceChip` off the persisted `dataFit` (#2) — the followups "Deferred" list was stale. **#3 (the genuinely-open item) built:** `recommendedFromRoute` silently dropped `compatible===false` skills; added `quick-apply.notAFitSkills` (returns the routed-but-mismatched analyses resolved to catalog skills + reason + band) and a muted, struck **"Not a fit for your data — <reason>"** list in `workbench-panel.tsx` with the engine's reason **visible** (not tooltip-only), non-interactive (they can't run). **Verified live on :8010 `/data/inspect` with REAL data** [[verify-on-real-data-not-mock]]: `rpgr_irpe_rawcounts.csv` (bulk counts) routes `[deg, volcano, enrichment]` → `deg` compatible (chip), **volcano + enrichment `compatible=false`** ("missing a fold-change column, a significance (p/padj) column") → the not-a-fit trace shows both with their reasons; the eyg28 DE table routes only to fitting skills (`volcano/enrichment/gsea`, nothing dropped — correct). **#4 (route-composer "why rejected" + "checked against your data") kept deferred** — a distinct AI route-composer surface needing a backend gap-threading change, not the own-data verdict surface + outside WS2.3's DoD; captured in data-aware-routing/followups.md + "Open items". Files: `lib/catalog/quick-apply.ts` (+`notAFitSkills`/`NotAFit`), `components/project/workbench-panel.tsx` (the trace), `lib/catalog/quick-apply.test.ts` (+5). Gates: FE tsc clean · eslint 0 · vitest **487** (+5); BE untouched. `50c3bde` |
 | 2026-07-02 | RESTRUCTURE-04 | WS2.2 | **Verified + closed (no re-build) — the affordances shipped pre-tracker.** Reading `intake-questionnaire.tsx` showed all five WS2.2 items (#2 excluded-level badge · #3 prefill reason · #4 single-source column · #7 reset-to-detected · #8 routing-null copy) already implemented, each tagged with its followups number; `git blame` placed them in `6b84834` (07-01 21:33) / `3743878` (07-02 01:21) / `79db701` (07-02 02:14) — **all before this tracker (`e9edf44`, 07-02 12:51)**. The audit had inherited the stale "Deferred #1–#8" list in `followups.md` (never updated after those commits) and minted WS2.2 as a phantom `TODO`. Confirmed the wire both sides (`engine/questionnaire.py` always sets `note`, sets `reference_guess`/`group_candidates`/`sample_col_candidates`; `lib/intake/design.ts` mirrors them). **Verified live on :8010 `/data/inspect` with REAL data** [[verify-on-real-data-not-mock]]: real bulk `rpgr_irpe_rawcounts.csv` (2-cond → #3 note, #4 single-candidate, #8 routes to deg) + `+ rpgr_irpe_design.csv` (→ `source=design_sheet`, `reference_guess='Control'` → the #3 control-guess line) + `EYG_29…St7…rawCounts.csv` (**6 conditions → #2 badge fires**); real scRNA **assembled from Hani GSE201356 10x** (the GEO deposit has no per-cell obs design — it's in the GSM filenames — so built a faithful 2000-cell AnnData: obs `line`=3 iPSC lines → **#2 fires**, obs `sample_id`=4 GSM samples → **#6** sample-col picker with real replicate counts). `jev/retina_fadl.h5ad` correctly returns `needs_design=False` (only `n_genes`/`leiden`, no condition col). #7 is pure FE state; #8's null branch is the FE else (routing resolved on all real data). Reconciled `followups.md` (Deferred #2/#3/#4/#6/#7/#8 → **Shipped**, root-cause doc fix; #1/#5 kept deferred). **No code changed.** Gates: BE `test_design_hints` **25/25** + FE tsc clean + intake vitest **53/53** + eslint 0. Working Agreement #4 updated per owner directive (reviews deferred to the VERY END, after all tasks — not per-workstream). `f51e0c2` |
@@ -365,9 +402,9 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 
 ---
 
-## Next-session prompt (tailored — RESTRUCTURE-07 · WS2.5; supersedes the generic template below until stamped done)
+## Next-session prompt (tailored — RESTRUCTURE-08 · WS2.6; supersedes the generic template below until stamped done)
 
-Paste this to start the next session; re-stamp the header line with the real clock. When WS2.5 is
+Paste this to start the next session; re-stamp the header line with the real clock. When WS2.6 is
 `DONE`, rewrite this block for the next top-`TODO` (like the CURRENT.md LIVE pointer).
 
 ```
@@ -376,28 +413,30 @@ Paste this to start the next session; re-stamp the header line with the real clo
 
 Read first: docs/restructure/plan.md (the tracker) → Status board + Progress log + the
 Working Agreement. Confirm git: `git fetch && git status` — origin/main should be in sync at the
-RESTRUCTURE-06 stamp commit.
+RESTRUCTURE-07 stamp commit (WS2.5 = the `all_nan_columns` QC flag).
 
 State: WS1 CODE-COMPLETE (1be60a5 + 8c7f09b). WS2.1 (9c9c382), WS2.2 (f51e0c2), WS2.3 (50c3bde),
-WS2.4 (4ee6ab9) DONE. WS2.4 shipped real robustness (BE-only): CSV encoding+delimiter sniffing in
-`engine/ingest.py::_load_csv`, an `ingest` error-wrap so a parse failure → 400 not 500, and a
-`maybe_transposed` QC warn in `engine/qc.py` (bulk+proteomics). New follow-up **WS2.7** (gzip
-`.csv.gz`/`.tsv.gz`) captured from mid-task. **NOTE the recurring pattern:** WS2.2 + WS2.3 were both
-already-shipped (stale "Deferred" docs); WS2.4 was genuinely unbuilt. **Before building any WS TODO,
-read + git-blame the target first** [[verify-todo-not-already-shipped]]; if already there, verify-live
-+ reconcile-doc + stamp, don't re-build. **Reviews deferred to the VERY END** (Working Agreement #4):
-one review-gauntlet + fe-review pass over the whole restructure diff after ALL tasks are DONE (carries
-the owed WS1 boundary NEXT#R + WS2.1's in-browser click-through). Do NOT run them per-workstream.
+WS2.4 (4ee6ab9), WS2.5 DONE. WS2.5 filled the one QC code gap (an all-NaN sample column →
+`all_nan_columns` warn in `engine/qc.py`, bulk+proteomics) + unit coverage for the two untested
+existing rules; `all_zero_features` stays **info** on purpose (a real counts matrix has all-zero
+genes). New follow-ups pending: **WS2.7** (gzip `.csv.gz`/`.tsv.gz`) + **WS2.8** (a counts matrix with
+an empty sample column demotes to `generic_table` past the >2% missingness gate in `_classify_frame`).
+**Recurring pattern:** WS2.2 + WS2.3 were already-shipped (stale "Deferred" docs); WS2.4 + WS2.5 were
+genuine. **Before building any WS TODO, read + git-blame the target first**
+[[verify-todo-not-already-shipped]]; if already there, verify-live + reconcile-doc + stamp, don't
+re-build. **Reviews deferred to the VERY END** (Working Agreement #4): one review-gauntlet + fe-review
+pass over the whole restructure diff after ALL tasks are DONE (carries the owed WS1 boundary NEXT#R +
+WS2.1's in-browser click-through). Do NOT run them per-workstream.
 
-Do: proceed to the top TODO by Order — WS2.5 (QC coverage vs deliberately-broken real data; Order 7,
-P1). Home: pillars P1c extension. **First read `engine/qc.py` — several flags already exist**
-(non_integer_counts, negative_counts, all_zero_features, too_few_samples, proteomics all_missing_rows/
-high_missingness, DE pvalue_out_of_range/nan_pvalues, empty, and the WS2.4 `maybe_transposed`); WS2.5
-is verify-coverage-on-broken-REAL-data + fill the gaps. DoD: all-NaN column, single-sample,
-non-integer "counts", all-zero features, and wrong-orientation each produce the right block/warn flag
-with a fix hint. Verify: a broken-fixture matrix (build from a REAL dataset) hits each flag; a clean
-one stays `ok`. Scope guard: extend the existing `engine/qc.py` rule set; do NOT change the
-block-vs-override policy (D-e5 stands). BE task — run the BE fast pytest + ruff gate.
+Do: proceed to the top TODO by Order — WS2.6 (Unify the run-path error taxonomy; Order 8, P2). Home:
+pillars P1/P4. **First read the three error styles** — engine returns `None`, the router raises
+`HTTPException` (see `routers/_run.py` + `routers/data.py`'s `except ValueError → 400`), a skill
+raises `ValueError`. DoD: a single error taxonomy (bad-input vs unsupported vs internal) all three map
+onto, each with a fix-hint, **mirroring the QC-flag shape** (`{severity/code/message/fix}` — reuse that
+shape, don't invent a parallel one). Verify: each error class surfaces ONE consistent, actionable
+message in the UI (drive it end-to-end on the live backend). Scope guard: taxonomy + mapping only — NO
+behavior change to successful runs; do not touch the QC rule set. Likely touches BE + a thin FE surface
+— if it edits the FE run-error display, run the FE gates too.
 
 Rules (the anti-half-done contract):
 - Stay on the board. New work surfaced mid-task → add a WSx.y row FIRST, don't expand scope.
@@ -418,11 +457,10 @@ Env / landmines (unchanged): :8000 = eamos, NEVER kill → BE on :8010 (`uvicorn
 8010`, no --reload; the uv-3.12 PY at C:\Users\seamegdool\AppData\Roaming\uv\python\
 cpython-3.12.13-windows-x86_64-none\python.exe + PYTHONPATH="D:/selom/app/backend/.venv/Lib/
 site-packages;." run from app/backend, NOT `uv run` — EDR; set PYTHONIOENCODING=utf-8 for non-ASCII
-in probe output; ruff may hit WinError-5 first spawn, retry once). Broken-fixture inputs for WS2.5:
-build from a REAL base (e.g. `D:/selom-data/rpgr/rpgr_irpe_rawcounts.csv`) — inject an all-NaN column,
-a single-sample slice, non-integer "counts", all-zero rows, a transpose. FE = `npx next dev
---webpack`. git user.email stays 282747725+steveneam@users.noreply.github.com. Kill every dev server
-you start before ending. Proceed to WS2.5.
+in probe output; ruff may hit WinError-5 first spawn, retry once). Real bases for run-path errors:
+`D:/selom-data/rpgr/rpgr_irpe_rawcounts.csv` (counts) + `D:/selom-data/eyg28` (DE table). FE = `npx
+next dev --webpack`. git user.email stays 282747725+steveneam@users.noreply.github.com. Kill every dev
+server you start before ending. Proceed to WS2.6.
 ```
 
 ## Resume prompt (persistent — the generic template; the tailored block above supersedes it until stamped done)
