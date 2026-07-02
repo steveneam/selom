@@ -36,7 +36,7 @@ Status: `TODO` · `WIP` (≤1 at a time) · `DONE — <sha>` · `BLOCKED — <wh
 
 | Order | ID | Task | Pri | Status | Home / pointer |
 |---|---|---|---|---|---|
-| 1 | **WS1.1** | `_stub_figure()` prod guard (no fabricated figures off-dev) | P0 | DONE — <sha> | CURRENT NEXT#2 · RISKS #11 |
+| 1 | **WS1.1** | `_stub_figure()` prod guard (no fabricated figures off-dev) | P0 | DONE — 1be60a5 | CURRENT NEXT#2 · RISKS #11 |
 | 2 | **WS1.2** | Methods-text ↔ param_spec accuracy guard | P1 | TODO | pillars P4 · NEW test |
 | 3 | **WS2.1** | Close upload→run→save loop (own-data run = Library artifact) | P1 | TODO | CURRENT DEFERRED 7c-(b) · pillars P4 · RISKS #8 |
 | 4 | **WS2.2** | Intake "correct the detection" affordances | P1 | TODO | intake-questionnaire/followups.md #2,3,4,7,8 |
@@ -81,7 +81,7 @@ Status: `TODO` · `WIP` (≤1 at a time) · `DONE — <sha>` · `BLOCKED — <wh
 
 ## WS1 — Honesty foundation (gates deploy)
 
-### WS1.1 — `_stub_figure()` production guard · P0 · Status: DONE — <sha>
+### WS1.1 — `_stub_figure()` production guard · P0 · Status: DONE — 1be60a5
 All 31 skills fall back to a fabricated synthetic figure when `use_real_engine()` is
 false, served as HTTP 200 (only a faint "(stub)" title). A deploy missing the
 scverse/pydeseq2 extras would ship fake science — a direct breach of the "no black box"
@@ -279,7 +279,7 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 
 | Date | Session | Task(s) | Result / sha |
 |---|---|---|---|
-| 2026-07-02 | RESTRUCTURE-01 | WS1.1 | Stub-engine honesty guard: prod boot guard (`config.is_production` refuses a stub-resolving engine off-dev, fail-loud at startup) + resolved `engine_policy` in provenance + FE "example data — not your results" banner + `test_engine_policy_guard` (reachability + drift). RISKS #11 added. Verified live: real DE CSV→`real`, stub→`stub`, prod+stub refuses boot. `<sha>` |
+| 2026-07-02 | RESTRUCTURE-01 | WS1.1 | Stub-engine honesty guard: prod boot guard (`config.is_production` refuses a stub-resolving engine off-dev, fail-loud at startup) + resolved `engine_policy` in provenance + FE "example data — not your results" banner + `test_engine_policy_guard` (reachability + drift). RISKS #11 added. Verified live: real DE CSV→`real`, stub→`stub`, prod+stub refuses boot. `1be60a5` |
 | 2026-07-02 | RESTRUCTURE-PLAN | (planning) | Audit + this tracker written; CURRENT NEXT re-ranked to point here. |
 
 ---
