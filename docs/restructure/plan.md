@@ -39,7 +39,7 @@ Status: `TODO` · `WIP` (≤1 at a time) · `DONE — <sha>` · `BLOCKED — <wh
 | 1 | **WS1.1** | `_stub_figure()` prod guard (no fabricated figures off-dev) | P0 | DONE — 1be60a5 | CURRENT NEXT#2 · RISKS #11 |
 | 2 | **WS1.2** | Methods-text ↔ param_spec accuracy guard | P1 | DONE — 8c7f09b | pillars P4 · NEW test |
 | 3 | **WS2.1** | Close upload→run→save loop (own-data run = Library artifact) | P1 | DONE — 9c9c382 | CURRENT DEFERRED 7c-(b) · pillars P4 · RISKS #8 |
-| 4 | **WS2.2** | Intake "correct the detection" affordances | P1 | TODO | intake-questionnaire/followups.md #2,3,4,7,8 |
+| 4 | **WS2.2** | Intake "correct the detection" affordances | P1 | DONE — <sha> | intake-questionnaire/followups.md #2,3,4,7,8 |
 | 5 | **WS2.3** | Surface the data-fit verdict on own-data | P1 | TODO | data-aware-routing/followups.md #1–4 |
 | 6 | **WS2.4** | Ingest robustness for messy real inputs | P1 | TODO | pillars P3c + P1d |
 | 7 | **WS2.5** | QC coverage vs deliberately-broken real data | P1 | TODO | pillars P1c (extension) |
@@ -79,9 +79,15 @@ Status: `TODO` · `WIP` (≤1 at a time) · `DONE — <sha>` · `BLOCKED — <wh
    its own hash, and an amended hash never reaches `origin`, so the stamp is what makes every
    `<sha>` actually resolve on the remote (matches this repo's `docs(handoff): record …`
    convention). Push both.
-4. **Reviews at the milestone, not per task** [[review-cadence-phase-not-task]] — run
-   `review-gauntlet` (+ `fe-review` if FE) when a workstream (WS1 / WS2 / WS3) completes,
-   not on each 1–2-task session.
+4. **Reviews at the VERY END, not per workstream** (owner directive 2026-07-02, RESTRUCTURE-04;
+   supersedes the earlier per-workstream-boundary cadence) — run `review-gauntlet` (+ `fe-review` if
+   FE) **once, after ALL restructure tasks are DONE**, not at each WS1/WS2/WS3 boundary. Rationale: a
+   boundary review that finds something forces re-churn on a spot later tasks will touch again; one
+   final pass over the whole diff stays faithful to the plan and the no-distractions concept. Still
+   [[review-cadence-phase-not-task]] (never per small task) — just batched to the finish line. **Carry
+   the owed reviews to that final pass:** WS1 boundary (gauntlet + fe-review over the WS1 diff + the
+   WS1.1 `StubEngineBanner` G2 rendered-in-context, NEXT#R) and WS2.1's in-browser click-through fold
+   into the single end-of-restructure review.
 5. **Foundation before deploy** — do not start WS6 until every WS1 + WS2 task is `DONE`.
 
 ---
@@ -134,18 +140,27 @@ metadata-only dataset + multipart). Verified live on real eyg28 DE data (see Pro
 - **Scope guard:** reuse the built `run-dataset`/`jobs-dataset` endpoints; do NOT redesign
   the store or the upload contract. S3 wiring is WS6, not here (local PUT stand-in is fine).
 
-### WS2.2 — Intake "correct the detection" affordances · P1 · Status: TODO
-The deterministic skeleton computes/persists the design but can't always let the user *fix*
-it. Home + exact items: `docs/intake-questionnaire/followups.md` **#2** (excluded-level
-badge on >2-condition designs), **#3** (surface *why* the design was prefilled — the
-`design.note`/`reference_guess` are already on the wire), **#4** (show the source column with
-one candidate), **#7** (reset design edits to the detected prefill), **#8** (show the
-resolved skill when routing is null). (#1 override + #5/#6 sample-col/sheet already shipped.)
-- **Definition of Done:** each of #2/#3/#4/#7/#8 has a working affordance on the confirm card.
-- **Verify:** browser, real bulk + real scRNA obs — mis-grouping is correctable, exclusions
-  are visible, the prefill reason shows, routing-null shows the skill/prompt.
-- **Scope guard:** surfacing + light edit only; the AI L4 refiner (followups #1 primary) is
-  already shipped — do NOT rebuild it. No rename/merge map (design-sheet is the repro path).
+### WS2.2 — Intake "correct the detection" affordances · P1 · Status: DONE — <sha>
+**Already shipped pre-tracker; verified live + doc reconciled (no re-build).** The five affordances
+(#2/#3/#4/#7/#8) landed in the Layer A ingest build — `6b84834` (reproducible design-edit
+affordances) · `3743878` (honest inspect states) · `79db701` (reset/override) — all committed
+*before* this tracker (`e9edf44`) existed, so the audit inherited the stale "Deferred #1–#8" list in
+`docs/intake-questionnaire/followups.md` and minted WS2.2 as a phantom `TODO`. RESTRUCTURE-04
+verified each on a **live backend + real data** and reconciled `followups.md` (Deferred → Shipped;
+that stale doc was the root cause). Home + exact items: `followups.md` **#2** (excluded-level badge
+on >2-condition designs), **#3** (prefill reason — `design.note`/`reference_guess`), **#4** (source
+column with one candidate), **#7** (reset to detected), **#8** (skill/prompt when routing is null).
+(#6 sample-col also shipped; #1 rename/merge + #5 auto-thread-sheet remain deferred, out of scope.)
+- **Definition of Done:** each of #2/#3/#4/#7/#8 has a working affordance on the confirm card. **Met.**
+- **Verify (PASSED — real data + live `/data/inspect` on :8010):** **#2** fires on real bulk
+  `EYG_29…St7…rawCounts.csv` (6 conditions) **and** real scRNA assembled from Hani GSE201356 10x
+  (`line` = 3 iPSC lines); **#3** `note` on rpgr + `reference_guess='Control'` on rpgr + design sheet;
+  **#4** "Conditions from <label>" on rpgr/eyg29/Hani (all single-candidate); **#6** Hani → `sample_id`
+  detected + candidates `['sample_id','line']`; **#8** all four real datasets route to a skill (null
+  branch = FE else). #7 is pure FE state (Reset-to-detected on `designEdited`). Gates: BE
+  `test_design_hints` **25/25** + FE tsc clean + intake vitest **53/53** + eslint 0 (no code changed).
+- **Scope guard (honored):** surfacing only — **no code change** (affordances already present). The AI
+  L4 refiner (followups #1) was not rebuilt; no rename/merge map (design-sheet is the repro path).
 
 ### WS2.3 — Surface the data-fit verdict on own-data · P1 · Status: TODO
 `DataFitSummary` is computed + persisted but never shown on own-data intake. Home + items:
@@ -295,6 +310,7 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 
 | Date | Session | Task(s) | Result / sha |
 |---|---|---|---|
+| 2026-07-02 | RESTRUCTURE-04 | WS2.2 | **Verified + closed (no re-build) — the affordances shipped pre-tracker.** Reading `intake-questionnaire.tsx` showed all five WS2.2 items (#2 excluded-level badge · #3 prefill reason · #4 single-source column · #7 reset-to-detected · #8 routing-null copy) already implemented, each tagged with its followups number; `git blame` placed them in `6b84834` (07-01 21:33) / `3743878` (07-02 01:21) / `79db701` (07-02 02:14) — **all before this tracker (`e9edf44`, 07-02 12:51)**. The audit had inherited the stale "Deferred #1–#8" list in `followups.md` (never updated after those commits) and minted WS2.2 as a phantom `TODO`. Confirmed the wire both sides (`engine/questionnaire.py` always sets `note`, sets `reference_guess`/`group_candidates`/`sample_col_candidates`; `lib/intake/design.ts` mirrors them). **Verified live on :8010 `/data/inspect` with REAL data** [[verify-on-real-data-not-mock]]: real bulk `rpgr_irpe_rawcounts.csv` (2-cond → #3 note, #4 single-candidate, #8 routes to deg) + `+ rpgr_irpe_design.csv` (→ `source=design_sheet`, `reference_guess='Control'` → the #3 control-guess line) + `EYG_29…St7…rawCounts.csv` (**6 conditions → #2 badge fires**); real scRNA **assembled from Hani GSE201356 10x** (the GEO deposit has no per-cell obs design — it's in the GSM filenames — so built a faithful 2000-cell AnnData: obs `line`=3 iPSC lines → **#2 fires**, obs `sample_id`=4 GSM samples → **#6** sample-col picker with real replicate counts). `jev/retina_fadl.h5ad` correctly returns `needs_design=False` (only `n_genes`/`leiden`, no condition col). #7 is pure FE state; #8's null branch is the FE else (routing resolved on all real data). Reconciled `followups.md` (Deferred #2/#3/#4/#6/#7/#8 → **Shipped**, root-cause doc fix; #1/#5 kept deferred). **No code changed.** Gates: BE `test_design_hints` **25/25** + FE tsc clean + intake vitest **53/53** + eslint 0. Working Agreement #4 updated per owner directive (reviews deferred to the VERY END, after all tasks — not per-workstream). `<sha>` |
 | 2026-07-02 | RESTRUCTURE-03 | WS2.1 | Closed the upload→run→save loop (FE-only; the BE intake/confirm/parse/run-dataset endpoints were already built + tested in 7c). New `lib/uploads/api.ts` `uploadDataset` drives the real handshake (`/uploads/intake` → local PUT of the bytes → `/uploads/{id}/confirm` → `/uploads/{id}/parse`) and returns a server-authoritative `Dataset` with `uploaded:true`; `fromApiDataset` derives `uploaded` from `status=ready` + a stored upload/parsed key (self-heals across reconcile). `data-panel.ingest` runs it on a fresh single-file drop (gated `!mockMode`, with an "Uploading…" cue), inserting via a new `projectStore.addUploadedDataset` (no `/datasets` re-POST — intake already persisted the row). `runSkillByDataset` POSTs `/skills/{id}/run-dataset`; `use-figure-run` routes the fresh run + all 3 re-run flavours through it whenever the dataset is `uploaded` AND the run has no design sheet / AI actions (run-dataset carries neither → those stay multipart); `canRerun` gains `activeDataset.uploaded` so re-run works after reload. Fail-soft everywhere (upload failure / dev:mock → metadata-only dataset + multipart). Gates: FE tsc clean · eslint 0 err (1 pre-existing set-state-in-effect warning, untouched) · vitest **482** (+ uploads happy/fail-soft, runSkillByDataset wire+422, addUploadedDataset no-POST, `uploaded` mapping); BE untouched (no BE change). **Verified LIVE on real eyg28 DE CSV** (RPGRIP1_cpdHet d210, TMM-K0; :8010 SQLite + LocalObjectStore + dev auth): intake → PUT 2.4 MB → confirm(ready) → parse(real sha) → **run-dataset produced a 16,760-gene volcano with NO multipart** → saved figure → a fresh `GET /figures` (=reload) still returns it with its spec → dataset row → `uploaded=true`. (HTTP-level e2e drove the exact FE wire path — no browser MCP in this env, as at WS1.1; the in-browser click-through is the one lighter item owed to the WS2 boundary review.) `9c9c382` |
 | 2026-07-02 | RESTRUCTURE-02 | WS1.2 | Methods/legend ↔ `param_spec` accuracy guard: `tests/test_methods_param_spec_guard.py` statically reads every param token each `companions/methods.py` + `companions/legends.py` template pulls off its resolved-params dict (direct `p[...]`/`p.get(...)` **and** through same-module helpers that receive the dict — `_erg_adaptation(p)`, legends' `_contrast(p)`) and asserts each ∈ the live `param_spec`; a `test_extractor_is_not_vacuous` pins the reader so the guard can't pass hollow. 64 template cases + 1 meta, all green; templates untouched (Scope guard). Verify passed: renamed `volcano.top_n`→`n_top` in `skill.json` → 2 cases fail; revert → 65 green. Makes WS1 (honesty) **code-complete**; the WS1 boundary reviews (gauntlet + fe-review + WS1.1-owed StubEngineBanner G2) were **deferred this session by owner directive** — owed before WS1 is fully closed (CURRENT NEXT#R). `8c7f09b` |
 | 2026-07-02 | RESTRUCTURE-01 | WS1.1 | Stub-engine honesty guard: prod boot guard (`config.is_production` refuses a stub-resolving engine off-dev, fail-loud at startup) + resolved `engine_policy` in provenance + FE "example data — not your results" banner + `test_engine_policy_guard` (reachability + drift). RISKS #11 added. Verified live: real DE CSV→`real`, stub→`stub`, prod+stub refuses boot. `1be60a5` · then reworded Working Agreement #3 (self-ref sha → a follow-up `docs(handoff)` stamp commit — owner-directed). |
@@ -302,43 +318,38 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 
 ---
 
-## Next-session prompt (tailored — RESTRUCTURE-04 · WS2.2; supersedes the generic template below until stamped done)
+## Next-session prompt (tailored — RESTRUCTURE-05 · WS2.3; supersedes the generic template below until stamped done)
 
-Paste this to start the next session; re-stamp the header line with the real clock. When WS2.2 is
+Paste this to start the next session; re-stamp the header line with the real clock. When WS2.3 is
 `DONE`, rewrite this block for the next top-`TODO` (like the CURRENT.md LIVE pointer).
 
 ```
-# Selom — Restructure · 2026-07-02 16:15 +10:00 · Claude (FE+BE, solo mode)
+# Selom — Restructure · 2026-07-02 17:38 +10:00 · Claude (FE+BE, solo mode)
 (re-stamp this line with the real clock at session start)
 
 Read first: docs/restructure/plan.md (the tracker) → Status board + Progress log + the
-Working Agreement. Confirm git: `git fetch && git status` — origin/main should be @ 438bd18,
-in sync.
+Working Agreement. Confirm git: `git fetch && git status` — origin/main should be in sync at the
+RESTRUCTURE-04 stamp commit.
 
 State: WS1 (honesty) CODE-COMPLETE — WS1.1 (1be60a5) + WS1.2 (8c7f09b). WS2.1 (9c9c382) DONE —
-the upload→run→save loop is closed + verified live on real eyg28 DE data (intake→PUT→confirm→
-parse→run-dataset volcano→saved figure→survives reload; dataset uploaded=true). Two reviews are
-OWED, both at their WORKSTREAM boundary (not per task):
-- WS1 boundary — see CURRENT NEXT#R (review-gauntlet over `e9edf44..HEAD` + fe-review; the WS1.1
-  StubEngineBanner G2 rendered-in-context is still owed).
-- WS2.1's in-browser click-through — no browser MCP this env; folds into the WS2-boundary
-  fe-review when WS2 completes (Working Agreement #4).
+upload→run→save loop closed + verified live. WS2.2 DONE — the five "correct the detection"
+affordances (#2/#3/#4/#7/#8) had shipped pre-tracker (6b84834/3743878/79db701); RESTRUCTURE-04
+verified them live on real bulk (rpgr/eyg29) + real scRNA (assembled from Hani 10x) and reconciled
+the stale followups.md (no code change). **Reviews are now deferred to the VERY END** (owner
+directive, Working Agreement #4): one review-gauntlet + fe-review pass over the whole restructure
+diff AFTER all tasks are DONE — carries the owed WS1 boundary (NEXT#R: gauntlet + fe-review + the
+WS1.1 StubEngineBanner G2) + WS2.1's in-browser click-through. Do NOT run them per-workstream.
 
-Do (owner's call — pick one):
-- (A) Proceed to the top TODO by Order — WS2.2 (Intake "correct the detection" affordances;
-  Order 4, P1). Home + exact items: docs/intake-questionnaire/followups.md #2 (excluded-level
-  badge on >2-condition designs), #3 (surface WHY the design was prefilled — design.note /
-  reference_guess are already on the wire), #4 (show the source column with one candidate),
-  #7 (reset design edits to the detected prefill), #8 (show the resolved skill when routing is
-  null). (#1 override + #5/#6 sample-col/sheet already shipped.) Scope guard: surfacing + light
-  edit only; do NOT rebuild the AI L4 refiner (shipped); NO rename/merge map (design-sheet is
-  the repro path). DONE only when each of #2/#3/#4/#7/#8 has a working affordance on the confirm
-  card, verified in-browser on a live backend with real bulk + real scRNA obs.
-- (B) Close the WS1 boundary first (NEXT#R): review-gauntlet + fe-review over the WS1 diff + the
-  owed StubEngineBanner G2 (FE at a stub backend — API_PROXY_TARGET=http://127.0.0.1:8011 with
-  :8011 booted SELOM_SKILLS_ENGINE=stub, drop the real eyg28 DE CSV, run volcano, confirm the
-  amber "example data — not your results" banner renders above the artboard). Fix, declare WS1
-  fully closed.
+Do: proceed to the top TODO by Order — WS2.3 (Surface the data-fit verdict on own-data; Order 5,
+P1). DataFitSummary is computed + persisted on inspect but never SHOWN on own-data intake. Home +
+items: docs/data-aware-routing/followups.md #1 (fit verdict on intake — reuse
+components/reproduction/data-fit-panel.tsx), #2 (dataset-card fit band), #3 ("hidden: not a fit —
+<reason>" trace for a dropped skill), #4 (route-composer "why rejected" + a "checked against your
+data" affirmation). The verdict is server-computed already (/data/inspect `data_fit`, on the wire +
+persisted as Dataset.dataFit) — this is SURFACING, not new scoring. Scope guard: reuse the existing
+verdict component; no new scoring logic. DONE only when an inspected dataset shows its fit verdict +
+band on the own-data surface and a dropped-as-not-a-fit skill is traceable (not invisible), verified
+in-browser (or HTTP-level if no browser MCP) on a live backend with a real inspected dataset.
 
 Rules (the anti-half-done contract):
 - Stay on the board. New work surfaced mid-task → add a WSx.y row FIRST, don't expand scope.
@@ -352,15 +363,17 @@ Rules (the anti-half-done contract):
   Push both. Careful stamping the sha: the legend / Working-Agreement / this resume prompt keep
   `<sha>` as literal placeholders — only the board row + section header + progress-log line get
   the real hash (a blind sed -g clobbers the templates).
+- Reviews at the VERY END, not per workstream (Working Agreement #4, owner directive).
 - Foundation before deploy: no WS6 until every WS1 + WS2 task is DONE.
 
 Env / landmines (unchanged): :8000 = eamos, NEVER kill → BE on :8010 (`uvicorn main:app --port
-8010`, no --reload; the uv-3.12 PY + PYTHONPATH=".venv\Lib\site-packages;." run from app/backend,
-NOT `uv run` — EDR; ruff may hit WinError-5 first spawn, retry once). FE = `npx next dev
---webpack`. Snapshot localStorage before any live-store verify; the untracked scratch dev.db
-holds a "WS2.1 upload-loop verify" project (harmless). git user.email stays
-282747725+steveneam@users.noreply.github.com. Kill every dev server you start before ending.
-Proceed to WS2.2.
+8010`, no --reload; the uv-3.12 PY at C:\Users\seamegdool\AppData\Roaming\uv\python\
+cpython-3.12.13-windows-x86_64-none\python.exe + PYTHONPATH="D:/selom/app/backend/.venv/Lib/
+site-packages;." run from app/backend, NOT `uv run` — EDR; set PYTHONIOENCODING=utf-8 for the
+note's → char; ruff may hit WinError-5 first spawn, retry once). FE = `npx next dev --webpack`.
+Snapshot localStorage before any live-store verify; the untracked scratch dev.db holds prior verify
+projects (harmless). git user.email stays 282747725+steveneam@users.noreply.github.com. Kill every
+dev server you start before ending. Proceed to WS2.3.
 ```
 
 ## Resume prompt (persistent — the generic template; the tailored block above supersedes it until stamped done)
