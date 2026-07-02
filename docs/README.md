@@ -11,6 +11,7 @@ the docs convention in `docs/repo-structure/plan.md` §1.3).
 | `repo-structure/plan.md` | spec | Repo structure conventions + cleanup/refactor plan |
 | `aws-materialization/` | spec | Active deploy work — plan, spec, integrations, 7c FE-state migration |
 | `pillars/plan.md` | spec | Master engine-spine map (P1–P5) — the current backlog |
+| `restructure/plan.md` | spec | **Architecture-audit tracker (2026-07-02)** — live task board (WS1–WS6) for the Product-A-first arch/process hardening; points into pillars + the followups |
 | `architecture-consistency-gate/` | spec | Review gate — bespoke panes on one consistent spine |
 | `engine-spine/spec.md` | spec | Shared engine spine |
 | `reproduction-engine/` | spec | Repro SOP, spec, schemas, skill-table-contract (living reference) |

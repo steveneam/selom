@@ -7,6 +7,9 @@
 >
 > Keystone first move (owner-picked): the engine-structure spec — `docs/engine-spine/spec.md`.
 > Parked sidetracks: `docs/on-hold/README.md` (cataloged, never deleted).
+> **Active hardening tracker (2026-07-02 audit):** `docs/restructure/plan.md` — the
+> Product-A-first architecture/process hardening slices (WS1–WS6) map onto these pillars
+> and are the task-of-record for that initiative.
 > Companions: `docs/reproduction-engine/live-reproduction-spec.md` (P5),
 > `docs/records/table-synthesis/spec.md` (P2/L3), [[layered-deterministic-extraction]],
 > [[selom-figure-repro-mission]], [[compound-capability-each-task]].
@@ -130,6 +133,27 @@ roadmap entries it fulfils.
 **Goal:** capture every off-thesis sidetrack so nothing is lost, and **stop working it** until the
 spine is solid. Registry: `docs/on-hold/README.md` (pointer + why-parked + recover-from + which
 pillar it would rejoin). Nothing deleted, nothing moved out of its existing home.
+
+### Architecture-audit slices (2026-07-02) — tracked in `docs/restructure/plan.md`
+
+The audit added these slices to the master backlog; detail + acceptance bars live in the
+restructure tracker (WS ids in parens). Ordered Product-A-first per the owner.
+
+- **Honesty (gates deploy):** `_stub_figure()` prod guard — no fabricated figures off-dev
+  (WS1.1) · methods-text ↔ `param_spec` accuracy guard (WS1.2) · unify the run-path error
+  taxonomy (WS2.6).
+- **P1 (ingest & clean):** QC coverage vs deliberately-broken real data — extends 1c (WS2.5) ·
+  messy-input ingest robustness — extends 1d (WS2.4) · converge the two ingest/classify paths
+  onto a shared primitive — extends 1b (WS3.1).
+- **P3 (routing & guidance):** honest "we're not sure → here are options" — 3c (WS2.4) ·
+  surface the data-fit verdict on own-data (WS2.3) · intake "correct the detection"
+  affordances (WS2.2).
+- **P4 (analysis & output):** close the upload→run→save loop so an own-data run is a saved
+  Library artifact — the reachability gap (WS2.1).
+- **Cross-cutting dedup (NEXT#1):** column-override → one resolver (WS3.2) · param validation
+  → drop the redundant gate (WS3.3).
+- **Process (solo trim):** slim `CURRENT.md` (WS5.1) · solo-mode handoff note (WS5.2) · prune
+  the docs load (WS5.3).
 
 ---
 
