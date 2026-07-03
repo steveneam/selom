@@ -21,8 +21,12 @@
 live + booted (`D:/selom-{eng,erg,fig}`; junctioned deps · `API_PROXY_TARGET` per FE lane · Vercel git-email
 inherited · clean trees), awaiting kickoff in their own windows.   ·   **Full plan + kickoff prompts:**
 `docs/parallel-sprint-1/plan.md`. Sprint-1 slices add no new shared type → freezes are "don't break these APIs"
-declarations (see the plan). **Merge gate: owner DEFERRED branch protection for this solo-lead sprint** — the
-lead runs the discipline manually (rebase → CI green → review → owner-approved merge, one lane at a time; no merge on red).
+declarations (see the plan). **Merge model (owner-chosen): DELEGATED train** (Thalon-validated, Sprint 0). Branch
+protection deferred; the lead runs the whole train autonomously to **local** `main` — per lane in merge-order:
+rebase → CI/gates green → scope-leak check (`git diff --name-only main...<lane>` vs the lane's glob) → review →
+merge → board message. **Push stays the owner's gate** (nothing reaches origin/Vercel without the owner; owner
+inspects local `main` + messages post-hoc, then pushes). Any conflict **outside the board** = a partition leak →
+stop, don't resolve blindly. No merge on red.
 
 | lane | owner | owns (glob) | branch | status | depends-on | merge-order |
 |------|-------|-------------|--------|--------|------------|-------------|
@@ -33,7 +37,12 @@ lead runs the discipline manually (rebase → CI green → review → owner-appr
 Status vocab: `pending · in_progress · blocked:<what> · review · merged`.
 **One writer per row** — the lead owns assignments + merge-order; each owner writes only
 its own `status`. Messages below are append-only; you replace only your own state.
-**Merge gate (set up before the first fork):** CI gate job + protect `main`; then rebase→CI→review→merge, serialized. No merge on red.
+**Merge mechanics (delegated train — Thalon-validated, Sprint 0):** serialized per lane — rebase onto latest
+`main` → CI/gates green → **scope-leak check** (`git diff --name-only main...<lane>` must stay within the lane's
+glob) → **trust-but-verify** (lead re-runs the lane's gates, not just its report) → review → merge. Conflicts are
+a tripwire: a board-row conflict is the ONE expected conflict (trivial — one-writer-per-row); any **non-board**
+conflict = a partition leak → stop. An out-of-glob need → ship an **`.example`/proposal inside your own glob + a
+board message** (lead activates at merge), never an ad-hoc edit. No history surgery on `main` mid-sprint. No merge on red.
 
 ## Messages (append-only)
 
@@ -46,6 +55,14 @@ its own `status`. Messages below are append-only; you replace only your own stat
   checklist above. Owner deferred branch protection → lead merges manually, serialized, owner-approved. Lanes:
   update only your own row `pending → in_progress → review`; commit to your branch only (named paths, no AI
   sign-off); do **not** merge — ping the lead at `review`.
+- **2026-07-03 21:40 +10:00 · lead:** Adopted **Thalon's Sprint-0-validated mechanics** (E-drive, 2 lanes merged,
+  0 partition violations) + owner chose the **delegated merge train** (push = owner's gate). Concrete adds folded
+  into the board above: scope-leak check at merge · conflict-as-tripwire · `.example` escape hatch for out-of-glob
+  needs · trust-but-verify · no history surgery mid-sprint. **Lanes now DO commit their own board row** (the async
+  signal) — superseding the earlier kickoff note. **Selom-specific gotcha:** worktrees run under a *separate*
+  agent-memory namespace (`D--selom-eng` ≠ `D--selom`), so a lane can't recall D:/selom auto-memory — all landmines
+  are inlined into the kickoff prompts and shared state lives in committed files (this board, CLAUDE.md, specs),
+  never memory. Lanes fast-forwarded to this commit as their base.
 
 ---
 
