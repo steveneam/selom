@@ -1,0 +1,17 @@
+# .worktreeinclude — gitignore syntax. Claude Code copies these gitignored files
+# into every new git worktree so a parallel-agent lane boots with full context.
+# Tracked files (.context/, .env.example, CLAUDE.md, AGENTS.md, infra/) already
+# come with the checkout — do NOT list them here.
+#
+# See COORDINATION.md for the per-worktree boot checklist + infra-isolation matrix.
+
+.env
+**/.env
+**/.env.local
+.claude/settings.local.json
+
+# NOT copied, on purpose:
+#   app/backend/dev.db — dev runs on a local SQLite seam, so each worktree gets
+#     its own fresh DB (free isolation). Never share one dev DB across lanes.
+#   node_modules/ · .venv/ — gitignored but too large to copy; each worktree
+#     installs its own (npm install --legacy-peer-deps / uv sync). See COORDINATION.md.

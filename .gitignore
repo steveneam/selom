@@ -57,6 +57,12 @@ docs/aws-materialization/aws-access-setup.md
 # `npx impeccable skills install --providers=claude` (do not commit the tool).
 .claude/skills/impeccable/
 
+# ── Parallel-agent worktrees (git-worktree lanes; never committed) ──
+# `claude --worktree <lane>` creates .claude/worktrees/<lane>/ per lane.
+# Protocol lives in the research vault (Forj/bones/parallel-agents.md); the
+# repo-side board + boot checklist is COORDINATION.md.
+.claude/worktrees/
+
 # ── Graphify outputs (regenerable — AST graph auto-rebuilds on commit) ───────────────────────────
 # Ignore the whole tree: dated snapshots accumulate daily and every artifact is
 # rebuilt from source by the post-commit hook, so none of it needs versioning.

@@ -1,0 +1,79 @@
+# COORDINATION — Selom parallel-agent lane board
+
+> **Inert until we fork lanes.** Selom is parallel-ready but runs in **sequential mode**
+> by default. This board activates only when a sprint has ≥2 dependency-independent
+> buckets with disjoint file sets that meet at a freezable contract.
+>
+> **Protocol (read-only research vault — cite it, never write to it):**
+> `…/EAMOS Web Tool/Forj/bones/parallel-agents.md` (the what) +
+> `…/Forj/Wiki/reference/parallel-agent-workflow.md` (the how — exact worktree commands,
+> the merge gate, the retrofit checklist).
+>
+> **The contract in one line:** one file → one owner · freeze the shared interface before
+> forking · isolate each lane in its own git worktree+branch · coordinate through THIS
+> ledger (not OS locks) · integrate via serialized *rebase → CI → review → merge* · the
+> owner approves the seams (partition · frozen contract · every merge). 3–5 lanes max;
+> coupled work stays sequential (it's faster serial).
+
+## Active sprint
+
+**Lead:** —   ·   **Frozen contract:** —   ·   **Sprint:** none (sequential mode)
+
+| lane | owner | owns (glob) | branch | status | depends-on | merge-order |
+|------|-------|-------------|--------|--------|------------|-------------|
+| _(no lanes active)_ | | | | | | |
+
+Status vocab: `pending · in_progress · blocked:<what> · review · merged`.
+**One writer per row** — the lead owns assignments + merge-order; each owner writes only
+its own `status`. Messages below are append-only; you replace only your own state.
+
+## Messages (append-only)
+
+- (none yet)
+
+---
+
+## Selom lane taxonomy (where the disjoint globs are)
+
+| Axis | Lanes | Frozen contract |
+|---|---|---|
+| **Coarse: FE vs BE** | `app/frontend/**` · `app/backend/**` | JSON skill/endpoint contract; FE decouples via the MSW mock |
+| **BE skills sprint** | one skill = one lane: `app/backend/skills/<name>/**` | the `SkillSpec` shape + `run_skill` registration |
+| **FE feature sprint** | one feature = one lane: `app/frontend/lib/<feature>/**` + its page | store contract + `lib/api/` types |
+| **Infra / IaC** | `infra/**` · `.github/workflows/**` | — the apply/deploy step is a human seam, never an autonomous lane |
+
+## Per-worktree boot checklist
+
+A worktree is a *fresh checkout* — untracked/installed state does NOT come with it.
+On fork (`claude --worktree <lane>` → `.claude/worktrees/<lane>/`):
+
+1. `.worktreeinclude` auto-copies `.env` + `.claude/settings.local.json`.
+2. **Offset ports** — BE `:801X`, FE `:300X`. **`:8000` is eamos — never bind it.**
+3. **Point the FE at its own BE** — set that worktree's `NEXT_PUBLIC_API_BASE=http://localhost:801X`
+   (the committed example says `:8000`, which is eamos — always override per worktree).
+4. **Install deps** — `npm install --legacy-peer-deps` (FE) + `uv sync` (BE). Each worktree
+   owns its own `node_modules`/`.venv` (or a symlink — decide per sprint).
+5. **Fresh dev DB** — a new local SQLite `dev.db`; never point a worktree at cloud Postgres.
+6. **Guard the Vercel email** — confirm `git config user.email` is the Vercel-allowed
+   noreply address, or Vercel blocks the branch's preview deploy.
+
+## Infra & dependency isolation (dev = all local seams → isolation is free)
+
+| Resource | Dev seam | Per-worktree / per-lane rule |
+|---|---|---|
+| Database | SQLite `dev.db` (`SELOM_DB_AUTO_CREATE=false`) | fresh file per worktree; NEVER share the cloud Postgres — a migration test = a branched DB, owner-approved |
+| Object store | `SELOM_OBJECT_STORE=local` | local dir per worktree; if a lane needs S3 → per-lane key prefix |
+| Queue / jobs | `SELOM_QUEUE=inline` · `SELOM_JOB_STORE=memory` | inline per worktree; never share a live Redis |
+| FE deploy | Vercel (GitHub integration) | each branch → its own preview URL (a benefit); keep the git-email guard (checklist #6) |
+| BE server | `uvicorn :801X` | own port per worktree; `:8000` = eamos, off-limits |
+| AWS creds | shared `selom-dev` key in `.env` | read-only fine; shared-bucket writes need per-lane namespacing; $10/mo budget → keep dev local |
+| Dep manifests | `package-lock.json` · `uv.lock` | a dep change is a **single-owner coordinated step — never split across parallel lanes** |
+| Live keys (Stripe/Clerk/Resend/AI gateway) | `.env` | use dev/test keys; no lane triggers live charges/sends |
+
+## Merge gate (set up before the first fork)
+
+`main` is **not yet branch-protected**. Before the first parallel merge, add a small
+always-on CI **gate** job (the existing `backend-ci`/`frontend-ci` are path-filtered, so
+marking them "required" as-is would deadlock cross-path PRs) and protect `main` to require
+it. Merges are then serialized: **rebase onto latest `main` → CI green → review → merge**,
+one lane at a time in merge-order; the next lane rebases on the new `main`. **No merge on red.**
