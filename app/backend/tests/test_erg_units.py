@@ -624,6 +624,126 @@ def test_erg_traces_emits_mark_meta_and_optional_dots(tmp_path):
     assert any(t.get("mode") == "markers+text" for t in on["data"])
 
 
+# --- manual-marks provenance (erg-manual-marks R6, v2) -----------------------
+
+def _write_flicker_waveforms(path, hz=10.0):
+    """erg_waveforms_long flicker steps: a clean ``hz`` sinusoid (corneal-negative first) per
+    condition, so the Selom folded-cycle N1→P1 path runs (no device markers)."""
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["condition", "time_ms", "voltage_uv", "flicker_hz", "stimulus_type"])
+        for cond, amp in (("Control", 12.0), ("Untreated", 4.0)):
+            for i in range(0, 601):  # 0..300 ms @ 0.5 ms (3 cycles @ 10 Hz)
+                tm = i * 0.5
+                v = -amp * math.sin(2.0 * math.pi * hz * tm / 1000.0)
+                w.writerow([cond, round(tm, 3), round(v, 4), hz, "flicker"])
+
+
+def test_landmarks_returns_auto_seed_times():
+    """`landmarks` always returns the auto seed times (`a_auto_t_ms`/`b_auto_t_ms`) for the R6
+    provenance log — equal to the reported time on the auto path, preserved under an override."""
+    t = [float(x) for x in range(0, 121)]
+    amp = 300.0
+    y = [amp * (math.exp(-((tm - 70.0) / 14.0) ** 2) - 0.35 * math.exp(-((tm - 30.0) / 6.0) ** 2))
+         for tm in t]
+    auto = _erg.landmarks(t, y, fs=1000.0)
+    assert auto["a_auto_t_ms"] == auto["a_t_ms"]          # pure-auto: seed == reported
+    assert auto["b_auto_t_ms"] == auto["b_t_ms"]
+    moved = _erg.landmarks(t, y, fs=1000.0, manual={"b_ms": 50.0})
+    assert moved["b_auto_t_ms"] == auto["b_t_ms"]         # auto seed preserved under the override
+    assert abs(moved["b_t_ms"] - 50.0) <= 1.0             # but measured at the set time
+    assert moved["a_auto_t_ms"] == auto["a_t_ms"]
+
+
+def test_flicker_landmarks_returns_auto_seed_phases():
+    hz, amp = 10.0, 8.0
+    t = [i * 0.5 for i in range(0, 601)]
+    y = [-amp * math.sin(2.0 * math.pi * hz * tm / 1000.0) for tm in t]
+    auto = _erg.flicker_landmarks(t, y, hz)
+    assert auto["n1_auto_ms"] == auto["n1_implicit_ms"]
+    assert auto["p1_auto_ms"] == auto["p1_implicit_ms"]
+    moved = _erg.flicker_landmarks(t, y, hz, manual={"n1_ms": 40.0})
+    assert moved["n1_source"] == "manual"
+    assert moved["n1_auto_ms"] == auto["n1_implicit_ms"]  # auto seed preserved under the override
+
+
+def test_provenance_entry_and_operator_adjusted_note():
+    e = _erg.provenance_entry("Control||Group4|", "b", 70.0, 50.0, "manual")
+    assert e == {"segment": "Control||Group4|", "marker": "b",
+                 "auto_ms": 70.0, "set_ms": 50.0, "moved": True}
+    assert _erg.provenance_entry("s", "a", 12.0, 12.0, "auto")["moved"] is False
+    assert _erg.operator_adjusted_note(0, 12) == ""       # nothing moved → byte-identical caption
+    assert _erg.operator_adjusted_note(3, 12) == ", 3 of 12 operator-adjusted"
+
+
+def test_erg_traces_manual_marks_provenance_log_and_caption(tmp_path):
+    """erg_traces emits the per-marker provenance log (meta.selom.markProvenance) + the operator-
+    adjusted caption when a mark moves; the moved seeded mark carries its auto seed; no manual_marks
+    → no log, no caption, byte-identical to the default run (R6 + the R8 default-off invariant)."""
+    from skills.proprietary.erg_traces.run_real import run as run_traces
+
+    p = tmp_path / "wave.csv"
+    _write_waveforms(p)  # Control + Untreated, one Group4 trace each
+    base = run_traces(str(p), {})
+    moved = run_traces(str(p), {"marks": True,
+                                "manual_marks": '{"Control||Group4|": {"b_ms": 50.0}}'})
+
+    log = moved["layout"]["meta"]["selom"]["markProvenance"]
+    assert len(log) == 4                                   # 2 cells × (a, b)
+    assert all({"segment", "marker", "auto_ms", "set_ms", "moved"} <= set(e) for e in log)
+    control_b = next(e for e in log if e["segment"] == "Control||Group4|" and e["marker"] == "b")
+    assert control_b["moved"] is True
+    assert control_b["auto_ms"] != control_b["set_ms"]     # moved off the auto seed
+    assert sum(1 for e in log if e["moved"]) == 1          # only Control's b was moved
+    # the moved seeded mark carries its auto seed (editor "moved from …" readout).
+    b_mark = next(m for m in moved["layout"]["meta"]["selom"]["marks"]
+                  if m["segment"] == "Control||Group4|" and m["role"] == "b")
+    assert b_mark["source"] == "manual" and "auto_t_ms" in b_mark
+    assert "operator-adjusted" in moved["table"]["title"]
+
+    # Default path: no provenance log, no caption, byte-identical.
+    assert "markProvenance" not in base["layout"]["meta"]["selom"]
+    assert not any("auto_t_ms" in m for m in base["layout"]["meta"]["selom"]["marks"])
+    assert "operator-adjusted" not in base["table"]["title"]
+    assert run_traces(str(p), {}) == base
+
+
+def test_erg_flicker_manual_marks_provenance_log_and_caption(tmp_path):
+    """erg_flicker (waveform view) emits the N1/P1 provenance log + the operator-adjusted caption
+    (the caption was missing from the waveform view in v1); no manual_marks → byte-identical."""
+    from skills.proprietary.erg_flicker.run_real import run as run_flicker
+
+    p = tmp_path / "flick.csv"
+    _write_flicker_waveforms(p)
+    base = run_flicker(str(p), {"view": "waveform"})
+    moved = run_flicker(str(p), {"view": "waveform",
+                                 "manual_marks": '{"Control|10|": {"n1_ms": 30.0, "p1_ms": 70.0}}'})
+
+    log = moved["layout"]["meta"]["selom"]["markProvenance"]
+    assert {e["marker"] for e in log} >= {"n1", "p1"}
+    assert all({"segment", "marker", "auto_ms", "set_ms", "moved"} <= set(e) for e in log)
+    assert any(e["moved"] and e["segment"] == "Control|10|" for e in log)
+    assert "operator-adjusted" in moved["table"]["title"]
+
+    assert "markProvenance" not in base["layout"]["meta"].get("selom", {})
+    assert "operator-adjusted" not in base["table"]["title"]
+    assert run_flicker(str(p), {"view": "waveform"}) == base
+
+
+def test_erg_intensity_response_manual_marks_caption(tmp_path):
+    """The intensity-response table caption flags the operator-adjusted mix on the measure-from-
+    traces path; no manual_marks → byte-identical (R6 caption + R8 default-off)."""
+    from skills.proprietary.erg_intensity_response.run_real import run as run_ir
+
+    p = tmp_path / "wave_series.csv"
+    _write_waveform_series(p)
+    base = run_ir(str(p), {})
+    moved = run_ir(str(p), {"manual_marks": '{"Control||Group4|": {"b_ms": 50.0}}'})
+    assert "operator-adjusted" in moved["table"]["title"]
+    assert "operator-adjusted" not in base["table"]["title"]
+    assert run_ir(str(p), {}) == base
+
+
 def _approx(v, rel=1e-3):
     import pytest
 

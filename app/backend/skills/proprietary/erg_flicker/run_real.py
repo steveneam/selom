@@ -62,6 +62,9 @@ def run(data_path: str, params: dict) -> dict:
     # (condition, flicker_hz, eye); the grid aggregates over eyes, so the seed/lookup uses empty eye.
     manual_marks = _erg.parse_manual_marks(params.get("manual_marks", ""))
     n_manual = n_selom = 0
+    # Per-run mark provenance (erg-manual-marks R6): one entry per N1/P1 marker per Selom-measured
+    # cell (device-sourced cells aren't operator-editable, so they don't enter the log).
+    prov_log: list = []
     has_hz = "flicker_hz" in df.columns
     # Device N1→P1 ride-along (Diagnosys materialize path) → prefer it over Selom re-derivation (D2).
     has_device = "device_n1p1_uv" in df.columns and df["device_n1p1_uv"].notna().any()
@@ -149,6 +152,11 @@ def run(data_path: str, params: dict) -> dict:
                     n_selom += 1
                     if "manual" in (n1_src, p1_src):
                         n_manual += 1
+                    seg_key = _erg.segment_key(cond, f"{float(f):g}", "")
+                    prov_log.append(_erg.provenance_entry(
+                        seg_key, "n1", lm["n1_auto_ms"], lm["n1_implicit_ms"], n1_src))
+                    prov_log.append(_erg.provenance_entry(
+                        seg_key, "p1", lm["p1_auto_ms"], lm["p1_implicit_ms"], p1_src))
             # Seed the N1/P1 marks (R4): mark_meta carries the segment identity + source so the Marks
             # panel can list/edit them; device-sourced marks aren't editable (the device wins).
             if marks and has_hz:
@@ -178,8 +186,10 @@ def run(data_path: str, params: dict) -> dict:
                    (p1 if p1 is not None else "—"), n]
                   for c, hz, v, p1, n in tbl_rows]
     source = "device" if used_device else "Selom"  # honest provenance (R-honesty-1 / R-flicker-3)
-    # Manual-marks provenance (erg-manual-marks R6) — caption-level operator-adjusted count.
-    provenance = f", {n_manual} of {n_selom} operator-adjusted" if n_manual else ""
+    # Manual-marks provenance (erg-manual-marks R6) — caption-level operator-adjusted count (both
+    # views) + the per-marker log on meta.selom.markProvenance. Empty/absent with no manual marks.
+    provenance = _erg.operator_adjusted_note(n_manual, n_selom)
+    has_moved = any(e["moved"] for e in prov_log)
 
     if view == "summary":
         if not has_hz:
@@ -196,11 +206,16 @@ def run(data_path: str, params: dict) -> dict:
         spec = freq_spec(cond_series, unit=unit, factor=factor,
                          title="Flicker N1–P1 vs frequency")
         spec["table"] = flicker_table(table_rows, unit, source=source, provenance=provenance)
+        if has_moved:
+            spec.setdefault("layout", {}).setdefault("meta", {}).setdefault(
+                "selom", {})["markProvenance"] = prov_log
         return jsonable(spec)
 
     title = "Flicker ERG (" + ", ".join(row_labels) + ")" if has_hz else "Flicker ERG"
     spec = flicker_grid(panels, nrows=len(freqs), ncols=len(order),
                         row_labels=row_labels, col_labels=col_labels,
                         params=params, unit=unit, factor=factor, title=title)
-    spec["table"] = flicker_table(table_rows, unit, source=source)
+    spec["table"] = flicker_table(table_rows, unit, source=source, provenance=provenance)
+    if has_moved:
+        spec["layout"].setdefault("meta", {}).setdefault("selom", {})["markProvenance"] = prov_log
     return jsonable(spec)

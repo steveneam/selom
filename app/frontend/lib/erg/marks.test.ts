@@ -119,6 +119,25 @@ describe("readSeededMarks", () => {
     expect(marks[1].trace).toBeUndefined();
   });
 
+  it("reads the auto seed time (autoTMs) on an operator-moved mark, undefined when absent (R6)", () => {
+    const spec = {
+      data: [],
+      layout: {
+        meta: {
+          selom: {
+            marks: [
+              { segment: "Control||Group4|", role: "b", t_ms: 50, source: "manual", auto_t_ms: 70, label: "c" },
+              { segment: "Control||Group4|", role: "a", t_ms: 30, source: "auto", label: "c" },
+            ],
+          },
+        },
+      },
+    } as unknown as FigureSpec;
+    const marks = readSeededMarks(spec);
+    expect(marks[0]).toMatchObject({ role: "b", source: "manual", autoTMs: 70 });
+    expect(marks[1].autoTMs).toBeUndefined(); // auto mark carries no separate seed
+  });
+
   it("returns [] when there are no seeded marks", () => {
     expect(readSeededMarks(undefined)).toEqual([]);
     expect(readSeededMarks({ data: [], layout: {} } as unknown as FigureSpec)).toEqual([]);

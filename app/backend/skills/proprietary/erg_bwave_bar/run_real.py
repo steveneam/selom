@@ -132,8 +132,7 @@ def run(data_path: str, params: dict) -> dict:
     if measured_from_traces and src_col and src_col in sub.columns:
         plotted = sub[sub["condition"].isin(order) & sub[value_col].notna()]
         n_manual = int((plotted[src_col].astype(str) == "manual").sum())
-        if n_manual:
-            prov = f", {n_manual} of {len(plotted)} operator-adjusted"
+        prov = _erg.operator_adjusted_note(n_manual, len(plotted))
     spec["table"] = table(["condition", "n (eyes)", f"mean {wave_label} ({unit})", f"{err_label} ({unit})"],
                           tbl_rows, title=f"ERG {wave_label} (mean ± {err_label}, {source}{prov})")
     return spec

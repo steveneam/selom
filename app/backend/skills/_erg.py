@@ -173,7 +173,9 @@ def landmarks(time_ms, y, fs: float = 5000.0, *, mode: str = "scotopic",
     ``{"a_ms": …, "b_ms": …}`` (either or both). The amplitude is re-measured from the trace AT
     that time per ISCEV — a = baseline − value(a_ms); the manual a-trough also becomes the b-wave's
     reference, so b = value(b_ms) − value(a_ms). Each value is tagged ``a_source``/``b_source`` ∈
-    {auto, manual}. No ``manual`` → byte-identical to the auto path (the override never runs)."""
+    {auto, manual}, and the auto seed times are always returned as ``a_auto_t_ms``/``b_auto_t_ms``
+    (for the R6 provenance log). No ``manual`` → the measured a/b values and times are the pure-auto
+    path (the override never runs) and the auto seeds equal ``a_t_ms``/``b_t_ms``."""
     import numpy as np
 
     awin, bwin, a_sm, b_sm = _LANDMARK_MODES.get(str(mode or "scotopic").lower(), _LANDMARK_MODES["scotopic"])
@@ -190,17 +192,28 @@ def landmarks(time_ms, y, fs: float = 5000.0, *, mode: str = "scotopic",
     am = (t >= awin[0]) & (t <= awin[1])
     if not am.any():
         am = t >= 0
-    # a-wave + the trough reference the b-wave subtracts from. Manual a → measure at the set time
-    # and use that as the b-trough (ISCEV: b = a-trough → b-peak); auto a → the windowed min.
+    # Auto a-wave (and the trough the b-wave subtracts from) + auto b-wave — computed even under a
+    # manual override so the provenance log (erg-manual-marks R6) can report where the auto detector
+    # WOULD have placed each mark (`a_auto_t_ms`/`b_auto_t_ms`) alongside the operator's set time.
+    ai = int(np.argmin(sm_a[am]))
+    auto_a_t = float(t[am][ai])
+    auto_a_val = float(sm_a[am][ai])
+    auto_b_trough = float(np.min(sm_b[am]))
+    bm = (t >= bwin[0]) & (t <= bwin[1])
+    if not bm.any():
+        bm = t >= bwin[0]
+    bi = int(np.argmax(sm_b[bm]))
+    auto_b_t = float(t[bm][bi])
+    auto_b_peak = float(sm_b[bm][bi])
+
+    # a-wave + the trough the b-wave subtracts from. Manual a → measure at the set time and use that
+    # as the b-trough (ISCEV: b = a-trough → b-peak); auto a → the windowed min.
     if a_ms is not None:
         a_t, a_val = _value_at(t, sm_a, a_ms)
         _, b_trough = _value_at(t, sm_b, a_ms)
         a_source = "manual"
     else:
-        ai = int(np.argmin(sm_a[am]))
-        a_t = float(t[am][ai])
-        a_val = float(sm_a[am][ai])
-        b_trough = float(np.min(sm_b[am]))
+        a_t, a_val, b_trough = auto_a_t, auto_a_val, auto_b_trough
         a_source = "auto"
     a_wave = base - a_val
 
@@ -208,12 +221,7 @@ def landmarks(time_ms, y, fs: float = 5000.0, *, mode: str = "scotopic",
         b_t, b_peak = _value_at(t, sm_b, b_ms)
         b_source = "manual"
     else:
-        bm = (t >= bwin[0]) & (t <= bwin[1])
-        if not bm.any():
-            bm = t >= bwin[0]
-        bi = int(np.argmax(sm_b[bm]))
-        b_t = float(t[bm][bi])
-        b_peak = float(sm_b[bm][bi])
+        b_t, b_peak = auto_b_t, auto_b_peak
         b_source = "auto"
     b_wave = b_peak - b_trough
 
@@ -224,6 +232,10 @@ def landmarks(time_ms, y, fs: float = 5000.0, *, mode: str = "scotopic",
         "b_t_ms": round(b_t, 1),
         "a_source": a_source,
         "b_source": b_source,
+        # Auto seed times (erg-manual-marks R6 provenance): where the auto detector placed each mark,
+        # regardless of any manual override — equal to a_t_ms/b_t_ms on the pure-auto path.
+        "a_auto_t_ms": round(auto_a_t, 1),
+        "b_auto_t_ms": round(auto_b_t, 1),
     }
 
 
@@ -310,6 +322,37 @@ def marks_for(marks: dict | None, *parts) -> dict | None:
         if all(s == "" or s == w for s, w in zip(stored, want)):
             return val
     return None
+
+
+# --- Manual-marks provenance (erg-manual-marks R6) ---------------------------
+# The measured a/b (N1/P1) values already carry an `auto`/`manual` source tag; R6 aggregates those
+# into a per-run provenance log so a figure is auditable — for each marker: where the auto detector
+# placed it, where it was finally measured, and whether the operator moved it. The log rides the
+# figure's render-inert `meta.selom.markProvenance` (recorded in the reproducibility config); the
+# skills also state the operator-adjusted mix in the attached table caption. Both are emitted ONLY
+# when a mark actually moved, so a run with no manual_marks stays byte-identical (goldens unchanged).
+
+def provenance_entry(segment: str, marker: str, auto_ms, set_ms, source: str) -> dict:
+    """One per-marker provenance record → ``{segment, marker, auto_ms, set_ms, moved}``.
+
+    ``segment`` = the segment-identity key; ``marker`` = the role (``a``/``b``/``n1``/``p1``);
+    ``auto_ms`` = where the auto detector placed the mark; ``set_ms`` = where it was finally measured
+    (the operator's set time when moved, else the auto time); ``moved`` = the operator adjusted it
+    (``source == "manual"``)."""
+    return {
+        "segment": segment,
+        "marker": marker,
+        "auto_ms": auto_ms,
+        "set_ms": set_ms,
+        "moved": source == "manual",
+    }
+
+
+def operator_adjusted_note(n_moved: int, n_total: int) -> str:
+    """Table-caption fragment stating the operator-adjusted mix (R6), e.g.
+    ``", 3 of 12 operator-adjusted"``. Empty when nothing moved → the caption (and the default-path
+    golden) stays byte-identical."""
+    return f", {int(n_moved)} of {int(n_total)} operator-adjusted" if n_moved else ""
 
 
 def metrics_from_waveforms(df, *, default_mode: str = "scotopic", marks: dict | None = None):
@@ -588,8 +631,9 @@ def flicker_landmarks(time_ms, voltage, hz: float, *, n_bins: int = 120,
                       start_ms: float = 0.0, manual: dict | None = None) -> dict | None:
     """N1→P1 on the phase-folded steady-state cycle: N1 = the trough, P1 = the following peak.
 
-    Returns ``{n1p1_uv, p1_implicit_ms, n1_implicit_ms, n1_uv, p1_uv, n1_source, p1_source}``
-    (µV / ms), or None when no cycle could be formed. ``n1p1_uv`` is the peak-to-trough amplitude
+    Returns ``{n1p1_uv, p1_implicit_ms, n1_implicit_ms, n1_uv, p1_uv, n1_source, p1_source,
+    n1_auto_ms, p1_auto_ms}`` (µV / ms; the ``*_auto_ms`` are the pure-auto seed phases for the R6
+    provenance log), or None when no cycle could be formed. ``n1p1_uv`` is the peak-to-trough amplitude
     (the ISCEV flicker measure); ``p1_implicit_ms`` is the P1 phase within the cycle.
 
     ``manual`` (docs/records/erg-manual-marks/spec.md) optionally overrides the N1 and/or P1 TIME
@@ -608,13 +652,19 @@ def flicker_landmarks(time_ms, voltage, hz: float, *, n_bins: int = 120,
     n1_ms = _num_or_none(man.get("n1_ms"))
     p1_ms = _num_or_none(man.get("p1_ms"))
 
+    # Pure-auto N1 (trough) + P1 (peak after it) — computed even under a manual override so the
+    # provenance log (erg-manual-marks R6) can report the auto seed phases (`n1_auto_ms`/`p1_auto_ms`).
+    auto_ni = int(np.argmin(cyc_a))
+    auto_after = np.arange(auto_ni, cyc_a.size)
+    auto_pi = int(auto_after[int(np.argmax(cyc_a[auto_after]))])
+
     # N1 first (auto trough, or the bin nearest the operator's phase), then P1 (auto peak AFTER N1,
     # or the operator's phase) — so the "P1 follows N1" relationship holds under a partial override.
     if n1_ms is not None and period > 0:
         ni = int(np.argmin(np.abs(ph_a - (float(n1_ms) % period))))
         n1_source = "manual"
     else:
-        ni = int(np.argmin(cyc_a))
+        ni = auto_ni
         n1_source = "auto"
     if p1_ms is not None and period > 0:
         pi = int(np.argmin(np.abs(ph_a - (float(p1_ms) % period))))
@@ -631,6 +681,9 @@ def flicker_landmarks(time_ms, voltage, hz: float, *, n_bins: int = 120,
         "p1_uv": round(float(cyc_a[pi]), 3),
         "n1_source": n1_source,
         "p1_source": p1_source,
+        # Auto seed phases (R6 provenance) — equal to n1/p1_implicit_ms on the pure-auto path.
+        "n1_auto_ms": round(float(ph[auto_ni]), 1),
+        "p1_auto_ms": round(float(ph[auto_pi]), 1),
     }
 
 

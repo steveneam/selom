@@ -23,6 +23,9 @@ export interface SeededMark {
   /** Current landmark time (ms) — the auto seed, or the operator's set time. */
   tMs: number;
   source: MarkSource;
+  /** Where the auto detector placed this mark (ms) — present only on an operator-moved mark
+   *  (erg-manual-marks R6 provenance), so the editor can show "moved from …". */
+  autoTMs?: number;
   /** Measured amplitude (µV) at the mark — the resulting value the panel shows. */
   uv?: number;
   /** Human label for the cell, e.g. "Control · 1.0". */
@@ -87,6 +90,7 @@ export function readSeededMarks(spec: FigureSpec | null | undefined): SeededMark
       role,
       tMs: r.t_ms,
       source: src === "manual" || src === "device" ? src : "auto",
+      autoTMs: typeof r.auto_t_ms === "number" ? r.auto_t_ms : undefined,
       uv: typeof r.uv === "number" ? r.uv : undefined,
       label: typeof r.label === "string" ? r.label : r.segment,
       trace: typeof r.trace === "number" ? r.trace : undefined,
