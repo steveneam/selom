@@ -71,6 +71,11 @@ export function MarksEditor({
     onParamsChange((p) => ({ ...p, mark_labels: v }));
   };
 
+  // R7 blinding — hide the condition/group labels (and grey the cell headers) while marking, so an
+  // adjustment can't be biased toward a hypothesis. Pure local FE state: it never touches
+  // manual_marks, so the marks (and any staged override) survive toggling it on and off.
+  const [blind, setBlind] = React.useState(false);
+
   // Group marks by cell (segment), preserving first-seen order.
   const cells = React.useMemo(() => {
     const bySeg = new Map<string, { label: string; marks: SeededMark[] }>();
@@ -158,6 +163,20 @@ export function MarksEditor({
         </>
       )}
 
+      {cells.length > 0 && (
+        <label className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-border/70 bg-background/40 px-2.5 py-1.5">
+          <span className="flex items-center gap-1.5 text-xs text-foreground/90">
+            Blind marking <ModeChip mode="live" />
+            <span className="text-[10px] text-muted-foreground/70">hide condition labels</span>
+          </span>
+          <Switch
+            checked={blind}
+            onCheckedChange={setBlind}
+            aria-label="Blind marking (hide condition labels)"
+          />
+        </label>
+      )}
+
       {cells.length === 0 ? (
         <p className="mt-3 rounded-lg border border-dashed border-border/70 bg-background/40 p-3 text-[11px] leading-relaxed text-muted-foreground/80">
           Turn on <span className="text-foreground/80">landmark dots</span> and re-run to list each cell’s
@@ -165,22 +184,35 @@ export function MarksEditor({
         </p>
       ) : (
         <div className="mt-3 space-y-2.5">
-          {cells.map((cell) => (
-            <div key={cell.marks[0].segment} className="rounded-lg border border-border/70 bg-background/40 p-2">
-              <p className="mb-1.5 truncate text-[11px] font-medium text-foreground/80">{cell.label}</p>
-              <div className="space-y-1">
-                {cell.marks.map((m) => (
-                  <MarkRow
-                    key={m.role}
-                    mark={m}
-                    override={manualMarkValue(manual, m.segment, m.role)}
-                    onSet={(ms) => setMark(m.segment, m.role, ms)}
-                    onReset={() => resetMark(m.segment, m.role)}
-                  />
-                ))}
+          {cells.map((cell, i) => {
+            // Blinded → a neutral positional token + greyed header, so the operator marks by
+            // cell POSITION without seeing which condition it is. The mark data is untouched.
+            const cellLabel = blind ? `Cell ${i + 1}` : cell.label;
+            return (
+              <div key={cell.marks[0].segment} className="rounded-lg border border-border/70 bg-background/40 p-2">
+                <p
+                  className={cn(
+                    "mb-1.5 truncate text-[11px] font-medium",
+                    blind ? "italic text-muted-foreground/40" : "text-foreground/80",
+                  )}
+                >
+                  {cellLabel}
+                </p>
+                <div className="space-y-1">
+                  {cell.marks.map((m) => (
+                    <MarkRow
+                      key={m.role}
+                      mark={m}
+                      cellLabel={cellLabel}
+                      override={manualMarkValue(manual, m.segment, m.role)}
+                      onSet={(ms) => setMark(m.segment, m.role, ms)}
+                      onReset={() => resetMark(m.segment, m.role)}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -217,17 +249,27 @@ function ModeChip({ mode }: { mode: "live" | "rerun" }) {
 
 function MarkRow({
   mark,
+  cellLabel,
   override,
   onSet,
   onReset,
 }: {
   mark: SeededMark;
+  /** The cell's display label (blinded to a neutral token when blind marking is on) — used for the
+   *  input's accessible name so a screen reader marks blind too. */
+  cellLabel: string;
   override: number | undefined;
   onSet: (ms: number) => void;
   onReset: () => void;
 }) {
   const isDevice = mark.source === "device";
   const isManual = override !== undefined;
+  // Operator-moved state (erg-manual-marks R6): the last re-run measured this at an operator point
+  // (server source "manual"), or an override is staged for the next re-run. Either way it was moved
+  // off the auto seed — surfaced explicitly with the auto time it came from (`autoTMs` once
+  // re-measured; before a re-run the current seed IS still the auto value).
+  const moved = !isDevice && (isManual || mark.source === "manual");
+  const autoSeed = mark.autoTMs ?? mark.tMs;
   // The shown time = the operator override if set, else the auto seed.
   const shown = override ?? mark.tMs;
   // Free-typed draft, reset to `shown` whenever it changes externally (after a re-run) — the
@@ -246,44 +288,52 @@ function MarkRow({
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="w-12 shrink-0 text-[11px] font-medium text-foreground/70">{roleLabel(mark.role)}</span>
-      <div className="relative flex-1">
-        <Input
-          value={draft}
-          inputMode="decimal"
-          aria-label={`${mark.label} ${roleLabel(mark.role)} time (ms)`}
-          disabled={isDevice}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-          }}
-          className={cn("tabular h-7 pr-7 text-xs", isManual && "border-primary/50")}
-        />
-        <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-muted-foreground">
-          ms
+    <div className="space-y-0.5">
+      <div className="flex items-center gap-2">
+        <span className="w-12 shrink-0 text-[11px] font-medium text-foreground/70">{roleLabel(mark.role)}</span>
+        <div className="relative flex-1">
+          <Input
+            value={draft}
+            inputMode="decimal"
+            aria-label={`${cellLabel} ${roleLabel(mark.role)} time (ms)`}
+            disabled={isDevice}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+            className={cn("tabular h-7 pr-7 text-xs", isManual && "border-primary/50")}
+          />
+          <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-muted-foreground">
+            ms
+          </span>
+        </div>
+        <span className="tabular w-16 shrink-0 text-right text-[11px] text-muted-foreground">
+          {mark.uv != null ? `${mark.uv} µV` : "—"}
         </span>
+        <SourceTag source={mark.source} manual={isManual} />
+        <button
+          type="button"
+          aria-label={`Reset ${roleLabel(mark.role)} to auto`}
+          title={isManual ? "Reset to auto" : "Auto-detected"}
+          onClick={onReset}
+          disabled={!isManual}
+          className={cn(
+            "grid size-6 shrink-0 place-items-center rounded-md transition-colors",
+            isManual
+              ? "cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              : "cursor-default text-transparent",
+          )}
+        >
+          <RotateCcw className="size-3.5" />
+        </button>
       </div>
-      <span className="tabular w-16 shrink-0 text-right text-[11px] text-muted-foreground">
-        {mark.uv != null ? `${mark.uv} µV` : "—"}
-      </span>
-      <SourceTag source={mark.source} manual={isManual} />
-      <button
-        type="button"
-        aria-label={`Reset ${roleLabel(mark.role)} to auto`}
-        title={isManual ? "Reset to auto" : "Auto-detected"}
-        onClick={onReset}
-        disabled={!isManual}
-        className={cn(
-          "grid size-6 shrink-0 place-items-center rounded-md transition-colors",
-          isManual
-            ? "cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            : "cursor-default text-transparent",
-        )}
-      >
-        <RotateCcw className="size-3.5" />
-      </button>
+      {/* R6 / DoD #3 — surface the operator-moved state + the auto seed it came from. */}
+      {moved && (
+        <p className="pl-14 text-[10px] leading-tight text-primary/80">
+          operator-moved{Number.isFinite(autoSeed) && autoSeed !== shown ? ` · auto ${autoSeed} ms` : ""}
+        </p>
+      )}
     </div>
   );
 }

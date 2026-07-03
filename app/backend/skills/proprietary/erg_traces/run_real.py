@@ -122,6 +122,9 @@ def run(data_path: str, params: dict) -> dict:
 
     panels, tbl_rows = [], []
     peak_uv, n_seen = 0.0, []
+    # Per-run mark provenance (erg-manual-marks R6): one entry per a/b marker per cell, aggregating
+    # the auto seed time, the finally-measured time, and whether the operator moved it.
+    prov_log: list = []
     for cond in order:
         cd = df[df["condition"] == cond]
         color = color_of[cond]
@@ -167,12 +170,20 @@ def run(data_path: str, params: dict) -> dict:
             # (gated by `marks`) sit on the DRAWN trace at the landmark times.
             seg = _erg.segment_key(cond, "", g, "")
             row_lab = str(ig_log.get(g, g))
-            panel["mark_meta"] = [
-                {"segment": seg, "role": "a", "t_ms": lm["a_t_ms"], "source": lm["a_source"],
-                 "uv": lm["a_wave_uv"], "label": f"{cond} · {row_lab}"},
-                {"segment": seg, "role": "b", "t_ms": lm["b_t_ms"], "source": lm["b_source"],
-                 "uv": lm["b_wave_uv"], "label": f"{cond} · {row_lab}"},
-            ]
+            cell_label = f"{cond} · {row_lab}"
+            a_meta = {"segment": seg, "role": "a", "t_ms": lm["a_t_ms"], "source": lm["a_source"],
+                      "uv": lm["a_wave_uv"], "label": cell_label}
+            b_meta = {"segment": seg, "role": "b", "t_ms": lm["b_t_ms"], "source": lm["b_source"],
+                      "uv": lm["b_wave_uv"], "label": cell_label}
+            # Surface the auto seed on an operator-moved mark (R6 / editor "moved from …" readout);
+            # omitted on the auto path so `meta.selom.marks` stays byte-identical with no manual_marks.
+            if lm["a_source"] == "manual":
+                a_meta["auto_t_ms"] = lm["a_auto_t_ms"]
+            if lm["b_source"] == "manual":
+                b_meta["auto_t_ms"] = lm["b_auto_t_ms"]
+            panel["mark_meta"] = [a_meta, b_meta]
+            prov_log.append(_erg.provenance_entry(seg, "a", lm["a_auto_t_ms"], lm["a_t_ms"], lm["a_source"]))
+            prov_log.append(_erg.provenance_entry(seg, "b", lm["b_auto_t_ms"], lm["b_t_ms"], lm["b_source"]))
             if show_marks:
                 panel["markers"] = [
                     {"x": lm["a_t_ms"], "y": _y_at(panel["x"], panel["y"], lm["a_t_ms"]),
@@ -218,12 +229,17 @@ def run(data_path: str, params: dict) -> dict:
         row_labels=row_labels, col_labels=col_labels,
         title=title,
     )
+    # Manual-marks provenance (R6): caption states the operator-adjusted mix, and the per-marker log
+    # rides meta.selom.markProvenance. Both only when a mark actually moved → byte-identical default.
+    n_moved = sum(1 for e in prov_log if e["moved"])
+    if n_moved:
+        spec["layout"].setdefault("meta", {}).setdefault("selom", {})["markProvenance"] = prov_log
     spec["table"] = table(
         ["condition", "intensity (log cd·s/m²)", f"b-wave ({unit})", f"a-wave ({unit})",
          "b-wave t (ms)"],
         [[c, ig, _erg.disp_round(b, factor), _erg.disp_round(a, factor), bt]
          for c, ig, b, a, bt in tbl_rows],
-        title=tbl_title)
+        title=tbl_title + _erg.operator_adjusted_note(n_moved, len(prov_log)))
     return jsonable(spec)
 
 

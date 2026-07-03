@@ -78,6 +78,7 @@ def run(data_path: str, params: dict) -> dict:
     # a/b peak per (condition × intensity × eye) from the same traces the grid draws, so the
     # intensity-response runs without a separate device-metrics CSV (closes the other half of the
     # materialize gap, mirroring erg_bwave_bar). Device markers win when a metrics table is supplied.
+    measured_from_traces = False
     if value_col not in df.columns and {"time_ms", "voltage_uv"}.issubset(df.columns):
         # Cone-aware a/b (per-row stimulus_type wins; this default = the user's adaptation hint for a
         # plain waveform CSV) — photopic responses are faster, so they need the cone landmark windows.
@@ -85,6 +86,7 @@ def run(data_path: str, params: dict) -> dict:
         default_mode = _erg.adaptation_mode(params.get("adaptation", "auto"), params.get("stimulus_type", ""))
         marks = _erg.parse_manual_marks(params.get("manual_marks", ""))
         df = _erg.metrics_from_waveforms(df, default_mode=default_mode, marks=marks)
+        measured_from_traces = True
 
     missing = (_REQUIRED | {value_col}) - set(df.columns)
     if missing:
@@ -143,7 +145,15 @@ def run(data_path: str, params: dict) -> dict:
                              title=f"{adapt or 'scotopic'} b-wave intensity-response".capitalize(),
                              unit=unit, factor=factor, spread=spread, points=points,
                              band_alpha=band_alpha, boundary=boundary, band_color=band_color)
+    # Manual-marks provenance (erg-manual-marks R6): caption the operator-adjusted mix on the
+    # measure-from-traces path (device-metrics input carries no source tags). Empty → byte-identical.
+    prov = ""
+    src_col = {"a_wave_uv": "a_source", "b_wave_uv": "b_source"}.get(value_col)
+    if measured_from_traces and src_col and src_col in df.columns:
+        plotted = df[df["condition"].isin(order) & df[value_col].notna()]
+        n_manual = int((plotted[src_col].astype(str) == "manual").sum())
+        prov = _erg.operator_adjusted_note(n_manual, len(plotted))
     spec["table"] = table(
         ["condition", f"Vmax ({unit})", "log K (cd·s/m²)", "n", "R²"], tbl_rows,
-        title="Naka-Rushton fit")
+        title="Naka-Rushton fit" + prov)
     return spec
