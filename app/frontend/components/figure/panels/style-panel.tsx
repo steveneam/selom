@@ -1,13 +1,24 @@
 "use client";
 
 import * as React from "react";
-import { ColorField, Section, SelectField, SliderField, SwitchField } from "./controls";
+import { ColorField, Section, SelectField, SliderField, SwitchField, TextField } from "./controls";
 import { Input } from "@/components/ui/input";
 import type { FigureStore } from "@/hooks/use-figure-store";
 import type { FigureSpec } from "@/lib/figure/figure-spec";
 import { COLORBAR_POSITIONS, COLORWAYS, findColorbarTrace } from "@/lib/figure/figure-spec";
 import { type FigureModel, seriesColorOps } from "@/lib/figure/figure-model";
-import { heatmapColorscaleState } from "@/lib/figure/contract";
+import { styleGroups } from "@/lib/figure/style-groups";
+import {
+  GRID_DASH_OPTIONS,
+  gridColorOps,
+  gridDashOps,
+  gridShowOps,
+  gridSpacingOps,
+  gridWidthOps,
+  minorDashOps,
+  minorShowOps,
+  readGridlines,
+} from "@/lib/figure/gridlines";
 import { readTones, toneOps, zExtent } from "@/lib/heatmap/colorscale";
 import {
   type LabelRow,
@@ -24,7 +35,6 @@ import {
 import {
   colTreeFraction,
   hasColTree,
-  hasDendrogram,
   hasRowTree,
   maxDistance,
   rowTreeFraction,
@@ -72,34 +82,26 @@ export function StylePanel({
   spec: FigureSpec;
   model: FigureModel;
 }) {
-  const { capabilities: cap } = model;
-  // The heatmap colour-scale section's fail-safe state (Task B2): a heatmap trace → the controls; a
-  // declared-heatmap-but-traceless spec → an explicit "no heatmap trace" note (never a crash); a
-  // non-heatmap colorscale (trajectory/markers continuous colour) → hidden, exactly as before.
-  const colorscaleState = heatmapColorscaleState({
-    heatmapTones: cap.heatmapTones,
-    heatmapLabels: cap.heatmapLabels,
-    heatmapTraceCount: model.heatmapTraceIndices.length,
-  });
+  // Which control groups render is decided in ONE place (lib/figure/style-groups.ts) so a node-env
+  // golden test asserts the same set the panel shows — the two can't drift. Covers the heatmap
+  // colour-scale fail-safe (a declared-but-traceless heatmap shows an explicit note, never a crash)
+  // and the new Cartesian-gated "Axis gridlines" group.
+  const groups = React.useMemo(() => new Set(styleGroups(model, spec)), [model, spec]);
 
   return (
     <div className="space-y-6">
-      {cap.markers && <MarkerControls store={store} spec={spec} model={model} />}
-      {cap.lines && <LineControls store={store} spec={spec} model={model} />}
-      {colorscaleState === "ready" && <ColorscaleControls store={store} spec={spec} model={model} />}
-      {colorscaleState === "empty" && (
+      {groups.has("markers") && <MarkerControls store={store} spec={spec} model={model} />}
+      {groups.has("lines") && <LineControls store={store} spec={spec} model={model} />}
+      {groups.has("colorscale") && <ColorscaleControls store={store} spec={spec} model={model} />}
+      {groups.has("colorscaleEmpty") && (
         <Section title="Colour scale">
           <p className="text-[11px] leading-relaxed text-muted-foreground/70">
             No heatmap trace in this figure.
           </p>
         </Section>
       )}
-      {model.heatmapTraceIndices.length > 0 && hasDendrogram(spec) && (
-        <DendrogramControls store={store} spec={spec} />
-      )}
-      {cap.heatmapLabels && model.heatmapTraceIndices.length > 0 && (
-        <LabelsControls store={store} spec={spec} />
-      )}
+      {groups.has("dendrogram") && <DendrogramControls store={store} spec={spec} />}
+      {groups.has("labels") && <LabelsControls store={store} spec={spec} />}
 
       <PaletteControls store={store} spec={spec} model={model} />
 
@@ -116,8 +118,79 @@ export function StylePanel({
         />
       </Section>
 
-      <ColorbarControls store={store} spec={spec} model={model} />
+      {groups.has("gridlines") && <GridlineControls store={store} spec={spec} />}
+
+      {groups.has("colorbar") && <ColorbarControls store={store} spec={spec} model={model} />}
     </div>
+  );
+}
+
+/**
+ * Axis gridlines — native Plotly `xaxis/yaxis` gridline leaves (showgrid / gridcolor / gridwidth /
+ * griddash / dtick + a minor sub-grid), written uniformly to both axes as client-classified
+ * JSON-Patch `set` ops (lib/figure/gridlines.ts). Instant + undoable via the store; WYSIWYG export
+ * unchanged. Shown only for Cartesian figures (scatter / line / bar / box / violin) — a heatmap,
+ * sankey or radar hides the whole group (docs/pillar-2-direct-manipulation/spec.md §5.1). Labelled
+ * "Axis gridlines" (vs a future Inkscape-style "Canvas grid", spec §7 risk 4). The appearance
+ * sub-controls collapse when gridlines are off.
+ */
+function GridlineControls({ store, spec }: { store: FigureStore; spec: FigureSpec }) {
+  const g = readGridlines(spec);
+  return (
+    <Section title="Axis gridlines">
+      <SwitchField
+        label="Show gridlines"
+        checked={g.showgrid}
+        onChange={(v) => store.commit(gridShowOps(v))}
+      />
+      {g.showgrid && (
+        <>
+          <ColorField
+            label="Colour"
+            value={g.gridcolor}
+            onCommit={(v) => store.commit(gridColorOps(v))}
+          />
+          <SliderField
+            label="Width"
+            value={g.gridwidth}
+            min={0.5}
+            max={4}
+            step={0.5}
+            store={store}
+            build={(v) => gridWidthOps(v)}
+          />
+          <SelectField
+            label="Line style"
+            value={g.griddash}
+            options={GRID_DASH_OPTIONS}
+            onChange={(v) => store.commit(gridDashOps(v))}
+          />
+          <TextField
+            label="Grid spacing"
+            value={g.dtick == null ? "" : String(g.dtick)}
+            placeholder="Auto"
+            mono
+            onCommit={(v) => {
+              const n = Number.parseFloat(v);
+              store.commit(gridSpacingOps(Number.isFinite(n) && n > 0 ? n : null));
+            }}
+          />
+          <SwitchField
+            label="Minor gridlines"
+            checked={g.minorShow}
+            onChange={(v) => store.commit(minorShowOps(spec, v))}
+          />
+          {g.minorShow && (
+            <SelectField
+              label="Minor style"
+              value={g.minorDash}
+              options={GRID_DASH_OPTIONS}
+              onChange={(v) => store.commit(minorDashOps(spec, v))}
+            />
+          )}
+        </>
+      )}
+    </Section>
   );
 }
 

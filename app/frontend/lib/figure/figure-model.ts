@@ -35,6 +35,21 @@ export type TraceKind =
 const HEATMAP_TYPES = new Set(["heatmap", "heatmapgl", "contour", "contourcarpet"]);
 const SCATTER_TYPES = new Set(["scatter", "scattergl", "scatterternary", "scattercarpet"]);
 
+/**
+ * Trace kinds drawn on a standard Cartesian x/y frame where axis gridlines are meaningful
+ * (scatter/line/bar/box/violin). Deliberately EXCLUDES heatmap (cells fill the plot area),
+ * sankey / polar (radar) / network (no Cartesian gridlines) — those hide the gridline group.
+ * See docs/pillar-2-direct-manipulation/spec.md §5.1 (slice 1).
+ */
+const CARTESIAN_GRIDLINE_KINDS = new Set<TraceKind>([
+  "markerScatter",
+  "lineScatter",
+  "lineMarkerScatter",
+  "bar",
+  "box",
+  "violin",
+]);
+
 /** Classify one trace from its `type` + `mode` (+ which sub-objects it carries). */
 export function inferTraceKind(trace: PlotlyTrace): TraceKind {
   const type = String(trace?.type ?? "scatter").toLowerCase();
@@ -165,6 +180,9 @@ export interface FigureModel {
     colorbar: boolean;
     scalebar: boolean;
     subplotRanges: boolean;
+    /** The figure sits on a Cartesian x/y frame where axis gridlines apply (scatter/line/bar/box/
+     *  violin) — gates the Style "Axis gridlines" group. False for heatmap/sankey/radar/network. */
+    cartesianAxes: boolean;
     /** Editable ERG landmark dots (a/b, N1/P1) → dot-drag + numeric Marks editor. Declared by the
      *  skill in meta.selom.capabilities.tools.landmarkMarks; falls back to "seeded marks present"
      *  during migration so today's ERG figures keep working before they declare it. */
@@ -539,6 +557,9 @@ function deriveCapabilities(spec: FigureSpec, infos: TraceInfo[]) {
 
   const colorbar = findColorbarLike(data);
   const scalebar = hasScalebar(spec, hint);
+  // Cartesian gridlines apply if ANY trace is a Cartesian-frame kind (union, per spec §6 risk 1):
+  // a scatter+line overlay still gets the group; a pure heatmap/sankey/radar figure does not.
+  const cartesianAxes = infos.some((i) => CARTESIAN_GRIDLINE_KINDS.has(i.kind));
 
   const primitives: FigurePrimitive[] = [];
   if (scalebar) primitives.push({ kind: "scalebar", label: "Scale bar" });
@@ -555,6 +576,7 @@ function deriveCapabilities(spec: FigureSpec, infos: TraceInfo[]) {
       colorbar,
       scalebar,
       subplotRanges,
+      cartesianAxes,
     },
     primitives,
     markerTraceIndices,
