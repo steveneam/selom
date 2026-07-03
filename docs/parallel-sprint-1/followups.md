@@ -86,16 +86,32 @@ hardening.
 
 ## RESUME PROMPT (next session)
 
-> # Selom — Sprint 1 review-fix pass · <stamp when you start> · Claude
-> Read `docs/parallel-sprint-1/followups.md` (this file) + `COORDINATION.md` first. `git fetch && git status`.
-> Sprint 1 is merged on `main` (`1d76ae7` at capture; may be pushed/advanced — check). **Apply the review
-> fixes here.** Suggested order: **P1** (FIG `minorShowOps` writes the shown dash — WYSIWYG bug, `gridlines.ts`
-> + a unit test) → **P2** (ERG contrast one-liner, `marks-editor.tsx:196`) → **P3** (get the owner's blind-scope
-> decision **before** coding: true-blind vs honest-rename — it's a product call) → **P4** FIG gridline polish
-> (optional, as prioritized). Mostly FE (`marks-editor.tsx`, `lib/figure/gridlines.ts` + `style-panel.tsx`);
-> P3(a) may reach the figure canvas (`components/figure/figure-canvas.tsx`) — that crosses the ERG↔FIG line, so
-> scope it deliberately. Landmines unchanged: BE via uv-3.12 PY + PYTHONPATH (not `uv run`), `npx next dev
-> --webpack`, verify on real data + live backend (FIG gridlines are client-side → `dev:mock` ok), git email =
-> the Vercel noreply, no AI sign-off. After the fixes: FE tsc/eslint/vitest (+ a targeted re-verify), then
-> commit + hand back for push. The 3 Sprint-1 worktrees (`D:/selom-{eng,erg,fig}`) + branches are merged and
-> can be removed (`git worktree remove …` + delete branch) once you're sure nothing else needs them.
+> # Selom — Sprint 1 review-fix pass (do everything) · 2026-07-04 04:15 +10:00 · Claude
+> **Read first:** this file (`docs/parallel-sprint-1/followups.md`) — the ranked findings — then `COORDINATION.md`
+> + `agent_handoff/CURRENT.md` (NEXT item **S1**). `git fetch && git status`.
+> **State:** Sprint 1 (ENG·ERG·FIG) is merged on local `main` (`7ff02a2` at capture — **14 commits ahead of
+> `origin/main`, UNPUSHED**; confirm `git rev-list --count origin/main..HEAD`). The 3 lane worktrees
+> `D:/selom-{eng,erg,fig}` + their merged branches still exist. Back to sequential single-session (no lanes).
+> **This session = do everything:** apply the review fixes, make the P3 call, verify, commit, get it pushed, clean up.
+> **Order:**
+>  1. **P3 FIRST — it's a product decision, not a bug.** Before any P3 code, put the forcing question to the owner
+>     (`AskUserQuestion`): should "Blind marking" (a) **truly blind** — thread `blind` to the figure canvas +
+>     de-identify facet titles/legend/condition-colours while blind, randomise cell order, mask µV (bigger; reaches
+>     `components/figure/figure-canvas.tsx`), or (b) **honest scope** — keep it editor-only + rename to "Hide
+>     condition labels" (cheap)? Both reviews confirmed the canvas/µV/cell-order leak. Don't code P3 until answered.
+>  2. **P1 (fix)** — FIG minor-gridline WYSIWYG bug: `lib/figure/gridlines.ts` `minorShowOps()` must write the
+>     *shown* minor dash (+ minor colour/width if you take P4#4) on toggle-on so the control matches the render. Add a unit test.
+>  3. **P2 (fix)** — ERG a11y one-liner: `components/project/marks-editor.tsx:196`, drop the `/40` on the blind
+>     branch → `italic text-muted-foreground` (keep the italic as the blinded cue).
+>  4. **P3 (implement per the decision).**
+>  5. **P4 (optional polish)** — FIG gridline affordances as prioritised (minor colour/width · per-axis · per-group
+>     reset · axes→style breadcrumb · spacing unit hint/validation).
+> **Verify:** FE tsc + eslint(0) + vitest; live-verify P1 + P3 in the running editor (`npx next dev --webpack`; FIG
+> gridlines are client-side → `dev:mock` fine; if P3(a) touches the canvas, drive a real ERG figure). Anything
+> backend → real data + a live uvicorn.
+> **Close out:** commit the fixes (named paths, no AI sign-off) → get `main` **pushed** (owner's gate; origin was
+> 14 behind) → remove the 3 worktrees (`git worktree remove D:/selom-eng` ×3, `--force` if dirty) + delete the
+> merged branches (`git branch -d agent/{eng/consistency,erg/marks-v2,fig/gridlines}`).
+> **Landmines:** BE via the uv-3.12 PY + `PYTHONPATH=…\.venv\Lib\site-packages` (NOT `uv run` — EDR) · `npx next
+> dev --webpack` (plain `next dev`/Turbopack panics 0xc0000142) · verify on real data not `dev:mock` for anything
+> data-bearing · git `user.email` = the Vercel noreply · **no AI sign-off** on commits/PRs.
