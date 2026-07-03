@@ -1,8 +1,9 @@
 """Engine spine — role→column resolution, with an honest user override (P1 ingest hook).
 
 The single source of truth for "which column plays role R" (R ∈ logFC / pval / gene). It composes
-the classifier synonym sets (:data:`engine.databundle._LOGFC` / ``_PVAL``) + a gene-label synonym
-set, and adds the **user column-override** the AI ``map_columns`` action stages: a ``{role: column}``
+the shared classifier synonym sets (:data:`engine.vocab.DE_LOGFC_SYNONYMS` / ``DE_PVAL_SYNONYMS``) +
+a gene-label synonym set, and adds the **user column-override** the AI ``map_columns`` action stages:
+a ``{role: column}``
 map that **wins over synonym auto-detection** — but only ever points at an *existing* column
 (override-only, never fabricate; the honesty rule shared with :mod:`engine.compat`).
 
@@ -17,7 +18,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from engine.databundle import _LOGFC, _PVAL
+from engine.vocab import DE_LOGFC_SYNONYMS as _LOGFC
+from engine.vocab import DE_PVAL_SYNONYMS as _PVAL
 
 # Gene/feature label-column synonyms — the row key a DE / ranked table carries. Canonical here so
 # :mod:`engine.compat` (D1) and any runner read the same set (no drift).

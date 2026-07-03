@@ -27,6 +27,7 @@ from engine.models import (
     QCReport,
     SourceRef,
 )
+from engine.vocab import DE_LOGFC_SYNONYMS, DE_PVAL_SYNONYMS, METABOLOMICS_TOKENS
 
 
 @dataclass
@@ -51,11 +52,15 @@ class DataBundle:
 
 # --- modality classification ------------------------------------------------------------
 
-# A fold-change column + a p-value column => differential-expression results (DESeq2/edgeR/Seurat).
-_LOGFC = ("log2foldchange", "logfoldchange", "logfc", "log2fc", "avg_log2fc", "log fold change")
-_PVAL = ("padj", "pvalue", "p_val", "p.value", "pval", "adj.p.val", "fdr", "qvalue")
-# Metabolomics feature labels (m/z or database tokens) — a conservative, honest signal.
-_METAB_TOKENS = ("m/z", "hmdb", "metabolite", "kegg c")
+# The DE / metabolomics column vocabulary is the single named engine primitive in ``engine.vocab``
+# (imported here for classify + by columns/compat/frame_schema/qc; a drift-guard test fails if a
+# second copy forks). These module-private aliases keep the historical import path
+# ``engine.databundle._LOGFC`` / ``_PVAL`` / ``_METAB_TOKENS`` resolving to the SAME tuple objects,
+# so identity-based lookups elsewhere (columns._ROLE_BY_SYNONYMS_ID, frame_schema._NUMERIC_SYNONYM_SETS)
+# stay valid. A fold-change column + a p-value column => DE results (DESeq2/edgeR/Seurat).
+_LOGFC = DE_LOGFC_SYNONYMS
+_PVAL = DE_PVAL_SYNONYMS
+_METAB_TOKENS = METABOLOMICS_TOKENS
 
 
 def classify(payload: Any, *, hint: str | None = None, source: SourceRef | None = None,
@@ -111,7 +116,17 @@ def _classify_frame(df: Any, override: dict | None = None) -> str:
 
     miss = _missing_fraction(num)
     integral = _is_integral(num)
-    if integral and miss < 0.02:
+    # WS2.8 — a real counts matrix with a dropped/failed sample arrives with one entirely-empty
+    # column, pushing whole-frame missingness to ~1/n_samples (16.7% for 6 samples): enough to fail
+    # the <2% counts gate and demote to generic_table, losing both counts routing AND QC's
+    # ``all_nan_columns`` empty-sample warn (which only runs in the counts branch). Score the counts
+    # gate over the columns that actually carry data — a fully-empty column is an *absent sample*, not
+    # a scattered gap. Tight by design: only WHOLE-empty columns are excused, so scattered missingness
+    # still reads as not-counts and a genuinely generic table is never misread as counts. QC then
+    # surfaces the empty column (:func:`engine.qc._all_nan_column_flag`).
+    populated = num.loc[:, ~_all_nan_columns_mask(num)]
+    counts_miss = _missing_fraction(populated) if populated.shape[1] else 1.0
+    if integral and populated.shape[1] and counts_miss < 0.02:
         return BULK_COUNTS
     if miss >= 0.05 and not integral:
         return PROTEOMICS
@@ -126,6 +141,13 @@ def _missing_fraction(num: Any) -> float:
     if num.size == 0:
         return 0.0
     return float(num.isna().to_numpy().mean())
+
+
+def _all_nan_columns_mask(num: Any) -> Any:
+    """Boolean per-column mask (aligned with ``num.columns``) marking columns that are entirely NaN —
+    a dropped/empty sample, as opposed to a scattered gap. Used by the counts gate (WS2.8) to score
+    missingness over the populated columns only, and mirrors the column QC uses to warn on the same."""
+    return num.isna().all(axis=0).to_numpy()
 
 
 def _is_integral(num: Any) -> bool:

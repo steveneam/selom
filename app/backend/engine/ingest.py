@@ -93,24 +93,47 @@ def _sniff_delimiter(sample: str) -> str:
         return best if counts[best] else ","
 
 
-def _load_csv(path: Path, *, sep: str | None = None, **_: Any) -> Any:
-    """Read a delimited text file (.csv/.tsv/.txt) robustly: sniff the encoding (UTF-8 ± BOM / cp1252 /
-    latin-1) and — unless the caller pins ``sep`` or the suffix is ``.tsv`` — the delimiter, so a messy
-    real export loads instead of crashing on a non-UTF-8 byte or collapsing to one column. An empty
-    file is an honest ``ValueError``; a genuine parse failure propagates for :func:`ingest` to turn
-    into a clear, actionable message (never a 500)."""
+def _parse_delimited(raw: bytes, *, name: str, suffix: str, sep: str | None) -> Any:
+    """Parse already-read delimited-text bytes robustly — the shared body of the plain-text and the
+    gzip CSV loaders, so gzip reuses the SAME encoding/delimiter sniffing (never a second CSV reader).
+    Sniff the encoding (UTF-8 ± BOM / cp1252 / latin-1) and — unless the caller pins ``sep`` or the
+    logical ``suffix`` is ``.tsv`` — the delimiter. Empty input is an honest ``ValueError``; a genuine
+    parse failure propagates for :func:`ingest` to turn into a clear message (never a 500)."""
     import io
 
     import pandas as pd
 
-    raw = path.read_bytes()
     if not raw.strip():
-        raise ValueError(f"{path.name!r} is empty — no data to read.")
+        raise ValueError(f"{name!r} is empty — no data to read.")
     enc = _resolve_encoding(raw)
     if sep is None:
-        sep = ("\t" if path.suffix.lower() == ".tsv"
+        sep = ("\t" if suffix == ".tsv"
                else _sniff_delimiter(raw[:65536].decode(enc, errors="replace")))
     return pd.read_csv(io.BytesIO(raw), sep=sep, encoding=enc)
+
+
+def _load_csv(path: Path, *, sep: str | None = None, **_: Any) -> Any:
+    """Read a delimited text file (.csv/.tsv/.txt) robustly: sniff the encoding and — unless the caller
+    pins ``sep`` or the suffix is ``.tsv`` — the delimiter, so a messy real export loads instead of
+    crashing on a non-UTF-8 byte or collapsing to one column."""
+    return _parse_delimited(path.read_bytes(), name=path.name, suffix=path.suffix.lower(), sep=sep)
+
+
+def _gz_inner_suffix(p: Path) -> str:
+    """The logical suffix under a ``.gz`` wrapper: ``foo.csv.gz`` -> ``.csv``, ``foo.tsv.gz`` -> ``.tsv``."""
+    return Path(p.name[: -len(".gz")]).suffix.lower()
+
+
+def _load_csv_gz(path: Path, *, sep: str | None = None, **_: Any) -> Any:
+    """Transparently decompress a gzipped delimited table (``.csv.gz`` / ``.tsv.gz`` / ``.txt.gz`` —
+    the near-universal shape of a GEO count matrix) and parse the decompressed bytes with the SAME
+    sniffing as :func:`_load_csv` (WS2.7; no second CSV reader). The result classifies as its real
+    modality; the ``.tsv.gz`` tab default follows the inner suffix. A corrupt gzip raises for
+    :func:`ingest` to turn into a clear 400."""
+    import gzip
+
+    raw = gzip.decompress(path.read_bytes())
+    return _parse_delimited(raw, name=path.name, suffix=_gz_inner_suffix(path), sep=sep)
 
 
 def _load_iwxdata(path: Path, **_: Any) -> Any:
@@ -148,6 +171,12 @@ def _is_csv(p: Path) -> bool:
     return p.suffix.lower() in (".csv", ".tsv", ".txt")
 
 
+def _is_gzip_table(p: Path) -> bool:
+    # A gzipped delimited table: foo.csv.gz / foo.tsv.gz / foo.txt.gz (WS2.7). The inner suffix (under
+    # the .gz) picks the reader default. A gzipped non-table (e.g. a .h5ad.gz) is not handled here.
+    return p.suffix.lower() == ".gz" and _gz_inner_suffix(p) in (".csv", ".tsv", ".txt")
+
+
 def _is_iwxdata(p: Path) -> bool:
     return p.suffix.lower() == ".iwxdata"
 
@@ -172,6 +201,7 @@ REGISTRY: tuple[_Loader, ...] = (
     _Loader("iwxdata", _is_iwxdata, _load_iwxdata, materialize=True, erg=True),
     _Loader("diagnosys_erg", _is_diagnosys, _load_diagnosys, materialize=True, erg=True),  # before csv
     _Loader("csv", _is_csv, _load_csv),
+    _Loader("csv_gz", _is_gzip_table, _load_csv_gz),  # transparent gunzip → reuses _load_csv sniffing
 )
 
 
@@ -188,6 +218,8 @@ def _load_failure_message(loader: _Loader, path: Path, exc: Exception) -> str:
     by_loader = {
         "csv": (f"couldn't parse {name!r} as a table — check the delimiter, the header row, and that "
                 f"every row has the same number of columns ({kind})."),
+        "csv_gz": (f"couldn't read {name!r} as a gzipped table — it may not be valid gzip, or the "
+                   f"decompressed text isn't a delimited table ({kind})."),
         "xlsx": (f"couldn't open {name!r} as an Excel file — it may be corrupt or not a real "
                  f".xlsx/.xls ({kind})."),
         "h5ad": f"couldn't open {name!r} as an AnnData/.h5ad file — it may be corrupt ({kind}).",
@@ -229,7 +261,8 @@ def ingest(
     loader = _pick_loader(path)
     if loader is None:
         raise ValueError(
-            f"no ingest loader for {path.name!r}; supported: .h5ad, 10x-mtx dir, .xlsx/.xls, .csv/.tsv"
+            f"no ingest loader for {path.name!r}; supported: .h5ad, 10x-mtx dir, .xlsx/.xls, "
+            ".csv/.tsv (optionally .gz-compressed)"
         )
     try:
         payload = loader.load(path, sheet=sheet, sep=sep)

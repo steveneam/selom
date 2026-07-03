@@ -187,12 +187,13 @@ def _frame_signature(payload: Any) -> tuple[list[str], int]:
 # need is about *named columns* have a contract — a fold-change + significance table (volcano /
 # enrichment) or a ranked gene list (gsea). Matrix/count skills are checked by modality alone (their
 # Kind IS the precise signal). Column groups are matched by case-insensitive substring against the
-# synonym sets reused from the classifier (``engine.databundle._LOGFC`` / ``_PVAL``) so header
+# shared synonym primitive (``engine.vocab.DE_LOGFC_SYNONYMS`` / ``DE_PVAL_SYNONYMS``) so header
 # variants (``avg_log2FC``, ``p_val_adj``, ``adj.P.Val``) all resolve. See
 # ``docs/architecture-consistency-gate/skill-input-contract.md`` (D1).
 from engine.columns import GENE as _GENE  # noqa: E402 — single-source the gene synonyms
 from engine.columns import override_column, role_of_synonyms  # noqa: E402
-from engine.databundle import _LOGFC, _PVAL  # noqa: E402 — kept beside its only consumer
+from engine.vocab import DE_LOGFC_SYNONYMS as _LOGFC  # noqa: E402 — the shared column vocabulary
+from engine.vocab import DE_PVAL_SYNONYMS as _PVAL  # noqa: E402
 # A named column group: (human label, synonym substrings). A table satisfies it if any column
 # name contains any synonym.
 _FC = ("a fold-change column", _LOGFC)

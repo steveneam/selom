@@ -30,7 +30,7 @@ stop, don't resolve blindly. No merge on red.
 
 | lane | owner | owns (glob) | branch | status | depends-on | merge-order |
 |------|-------|-------------|--------|--------|------------|-------------|
-| ENG | `D:/selom-eng` (BE `:8011`) | `app/backend/engine/**` · `reproduction/**` · `companions/**` | agent/eng/consistency | pending — forked, awaiting kickoff | — | 1 |
+| ENG | `D:/selom-eng` (BE `:8011`) | `app/backend/engine/**` · `reproduction/**` · `companions/**` | agent/eng/consistency | review — vocab primitive + drift guard + WS2.7/2.8; gates green (`a4042ab`) | — | 1 |
 | ERG | `D:/selom-erg` (BE `:8012` · FE `:3002`) | `skills/{_erg,_iwx,_celeris,_tracegrid}.py` · `skills/proprietary/erg_*/**` · `lib/erg/**` + carve-outs `components/project/marks-editor.tsx` · `components/figure/mark-drag.ts` | agent/erg/marks-v2 | pending — forked, awaiting kickoff | — | 2 |
 | FIG | `D:/selom-fig` (FE `:3003`) | `app/frontend/lib/figure/**` · `components/figure/**` **minus** `mark-drag.ts` | agent/fig/gridlines | pending — forked, awaiting kickoff | — | 3 |
 
@@ -63,6 +63,38 @@ board message** (lead activates at merge), never an ad-hoc edit. No history surg
   agent-memory namespace (`D--selom-eng` ≠ `D--selom`), so a lane can't recall D:/selom auto-memory — all landmines
   are inlined into the kickoff prompts and shared state lives in committed files (this board, CLAUDE.md, specs),
   never memory. Lanes fast-forwarded to this commit as their base.
+- **2026-07-04 03:05 +10:00 · ENG:** Slice built (all diffs within `app/backend/engine/**` — no scope leak).
+  (1) **Vocab primitive** `engine/vocab.py` = the single named source of truth (`DE_LOGFC_SYNONYMS` /
+  `DE_PVAL_SYNONYMS` / `METABOLOMICS_TOKENS`); classify + columns/compat/frame_schema/qc now import it.
+  `databundle._LOGFC/_PVAL/_METAB_TOKENS` kept as re-export **aliases to the SAME tuple objects** so the
+  historical import path + every identity-based lookup (`columns._ROLE_BY_SYNONYMS_ID`,
+  `frame_schema._NUMERIC_SYNONYM_SETS`) stay valid — behavior-preserving, FROZEN classify output untouched.
+  (2) **Drift guard** `engine/test_vocab_drift_guard.py` (co-located in-glob since `tests/` is out-of-lane):
+  identity-locks all 5 consumers to the primitive **and** AST-scans product source, FAILING on any new
+  synonym-set fork outside the allow-listed known forks — it **flags** the 6 `skills/*/run_real.py` forks
+  (`enrichment·go_graph·gsea·pathway·string_network·volcano`), never edits them (WS3.1 converges them later).
+  *Note:* the WS3.1 `extract.ingest._classify` fork no longer exists (extract was refactored) — the live
+  forks are only those 6 skills. (3) **WS2.8** counts-gate: all-NaN (dropped-sample) columns are excluded
+  from the counts missingness so an integer matrix with a blank sample stays `bulk_counts` (surfacing the
+  `all_nan_columns` warn) — tight (only WHOLE-empty columns excused; scattered missingness / generic tables
+  unaffected). (4) **WS2.7** additive `.csv.gz/.tsv.gz/.txt.gz` loader reusing `_load_csv`'s sniffing (shared
+  `_parse_delimited` body — no second reader); breaks no out-of-glob test (WS2.4's `.csv.gz→400` was a manual
+  note, never codified). Gates: ruff clean; targeted pytest **132** green (128 affected-module baseline + 4
+  new guard); full `-m "not slow"` + reproduction slow-subset running in bg. In-process verified: real rpgr
+  `.csv.gz` (36601×7) → `bulk_counts`, `.tsv.gz` tab-aware, corrupt gzip → honest 400; WS2.8 empty-col counts
+  → `bulk_counts` + `all_nan_columns` warn. **Owed to lead:** the WS2.7 **live** `/data/inspect` :8011 check
+  (deferred to orchestrator per owner — shared servers); repro on disk at
+  `…/scratchpad/rpgr_irpe_rawcounts.csv.gz`. Will flip → `review` when bg gates confirm green.
+- **2026-07-04 03:18 +10:00 · ENG → `review` (`a4042ab`).** Gates green: full `-m "not slow"` **1206 passed,
+  1 skipped** (= the WS2.6 baseline 1202 **+ my 4** new drift-guard tests → zero regressions) + ruff clean;
+  the DoD-#4 reproduction slow-subset (4 hand-ledgers + cold-drive snapshots) **45 passed, 1 skipped** (the
+  skip = the owner-machine-only re-drive; the byte-identical snapshot-invariant tests all pass). Diff is 9
+  files, all in `app/backend/engine/**` + this board row (`git diff --name-only main...agent/eng/consistency`
+  stays in-glob — scope-leak-clean). **Lead trust-but-verify:** `PYTHONPATH=<sp> <uv-3.12-py> -m pytest -m
+  "not slow" -q` from `app/backend` (the co-located guard `engine/test_vocab_drift_guard.py` collects in the
+  same gate — no `testpaths` restriction). **Still owed:** the WS2.7 **live** `/data/inspect` :8011 POST
+  (deferred to you — shared servers; repro gz staged in this worktree's scratchpad). Not merging — yours to
+  run the train.
 
 ---
 
