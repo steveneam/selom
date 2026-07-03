@@ -14,7 +14,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from engine.databundle import _PVAL, _is_anndata, _is_dataframe
+from engine.databundle import _is_anndata, _is_dataframe
+from engine.vocab import DE_PVAL_SYNONYMS as _PVAL
 from engine.models import (
     BULK_COUNTS,
     DE_RESULTS,

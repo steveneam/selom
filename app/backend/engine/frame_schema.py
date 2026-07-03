@@ -22,8 +22,8 @@ overridable (``override=true``). Dependency-free — a lightweight, ``lazy``-sty
 violation reported at once), not a new venv dependency on the EDR-fragile hand-sewn venv (the C1
 "no diskcache" precedent + [[selom-uv-sync-footgun]]).
 
-The per-skill column rules are **derived from D1's** ``compat._SCHEMA`` (and the classifier synonym
-sets in :mod:`engine.databundle`) so the column vocabulary stays single-sourced: D1 reads a group's
+The per-skill column rules are **derived from D1's** ``compat._SCHEMA`` (and the shared synonym
+primitive :mod:`engine.vocab`) so the column vocabulary stays single-sourced: D1 reads a group's
 *presence*, D2 reads the *usability* of the same resolved column. See
 ``docs/architecture-consistency-gate/frame-validation.md``.
 """
@@ -36,7 +36,9 @@ from pydantic import BaseModel
 
 from engine.columns import override_column, role_of_synonyms
 from engine.compat import _SCHEMA
-from engine.databundle import _LOGFC, _PVAL, _is_dataframe
+from engine.databundle import _is_dataframe
+from engine.vocab import DE_LOGFC_SYNONYMS as _LOGFC
+from engine.vocab import DE_PVAL_SYNONYMS as _PVAL
 
 # Named stages a frame crosses (the seams). The skill-input seam is enforced now; the result seam
 # is a declared schema guarded by a test (a future endpoint can enforce it too).
@@ -44,8 +46,8 @@ STAGE_SKILL_INPUT = "skill_input"
 STAGE_RESULT = "result"
 
 # Which D1 column groups carry *numbers* (their resolved column must parse as numeric): the
-# fold-change and significance groups. Derived from the classifier synonym sets so the vocabulary is
-# single-sourced — a gene/label group (e.g. ``compat._GENE_G``) is exempt from the numeric check.
+# fold-change and significance groups. Holds the shared vocabulary's tuple objects so the vocabulary
+# is single-sourced — a gene/label group (e.g. ``compat._GENE_G``) is exempt from the numeric check.
 _NUMERIC_SYNONYM_SETS = (_LOGFC, _PVAL)
 
 
