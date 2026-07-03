@@ -71,9 +71,13 @@ export function MarksEditor({
     onParamsChange((p) => ({ ...p, mark_labels: v }));
   };
 
-  // R7 blinding — hide the condition/group labels (and grey the cell headers) while marking, so an
-  // adjustment can't be biased toward a hypothesis. Pure local FE state: it never touches
-  // manual_marks, so the marks (and any staged override) survive toggling it on and off.
+  // R7 — "Hide condition labels": relabel each cell to a neutral Cell 1..N token (+ an italic header)
+  // in THIS editor list while marking, so a numeric adjustment isn't anchored to the condition. Scope
+  // is deliberately the editor list only — the waveform canvas (facet titles, legend, condition
+  // colours) and the µV column are NOT blinded, so this is an honest "hide labels here", not a full
+  // blind of the marking surface (docs/parallel-sprint-1/followups.md P3; canvas-wide "true blind" is
+  // a documented future slice). Pure local FE state: it never touches manual_marks, so the marks (and
+  // any staged override) survive toggling it on and off.
   const [blind, setBlind] = React.useState(false);
 
   // Group marks by cell (segment), preserving first-seen order.
@@ -166,13 +170,13 @@ export function MarksEditor({
       {cells.length > 0 && (
         <label className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-border/70 bg-background/40 px-2.5 py-1.5">
           <span className="flex items-center gap-1.5 text-xs text-foreground/90">
-            Blind marking <ModeChip mode="live" />
-            <span className="text-[10px] text-muted-foreground/70">hide condition labels</span>
+            Hide condition labels <ModeChip mode="live" />
+            <span className="text-[10px] text-muted-foreground/70">in this list</span>
           </span>
           <Switch
             checked={blind}
             onCheckedChange={setBlind}
-            aria-label="Blind marking (hide condition labels)"
+            aria-label="Hide condition labels in this list"
           />
         </label>
       )}
@@ -185,15 +189,18 @@ export function MarksEditor({
       ) : (
         <div className="mt-3 space-y-2.5">
           {cells.map((cell, i) => {
-            // Blinded → a neutral positional token + greyed header, so the operator marks by
-            // cell POSITION without seeing which condition it is. The mark data is untouched.
+            // Labels hidden → a neutral positional token (Cell 1..N) + an italic header, so the
+            // operator marks by cell POSITION in this list without the condition name. Mark data is
+            // untouched. The italic is the "label hidden" cue; the text stays at full-contrast
+            // muted-foreground (≈6.3:1) — it's the ONLY per-cell identifier while labels are hidden,
+            // so it must stay legible (WCAG 1.4.3, docs/parallel-sprint-1/followups.md P2).
             const cellLabel = blind ? `Cell ${i + 1}` : cell.label;
             return (
               <div key={cell.marks[0].segment} className="rounded-lg border border-border/70 bg-background/40 p-2">
                 <p
                   className={cn(
                     "mb-1.5 truncate text-[11px] font-medium",
-                    blind ? "italic text-muted-foreground/40" : "text-foreground/80",
+                    blind ? "italic text-muted-foreground" : "text-foreground/80",
                   )}
                 >
                   {cellLabel}
@@ -255,8 +262,8 @@ function MarkRow({
   onReset,
 }: {
   mark: SeededMark;
-  /** The cell's display label (blinded to a neutral token when blind marking is on) — used for the
-   *  input's accessible name so a screen reader marks blind too. */
+  /** The cell's display label (a neutral Cell N token when "Hide condition labels" is on) — used for
+   *  the input's accessible name so a screen reader gets the same hidden-label view. */
   cellLabel: string;
   override: number | undefined;
   onSet: (ms: number) => void;

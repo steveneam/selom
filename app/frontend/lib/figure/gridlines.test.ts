@@ -76,25 +76,45 @@ describe("gridline ops write both axes as client-side layout leaves", () => {
 });
 
 describe("minor gridlines write the whole merged minor object (no orphan-parent add)", () => {
-  it("creates minor when absent", () => {
+  it("creates minor when absent — toggle-on also writes the shown dash (WYSIWYG)", () => {
+    // On a bare spec the "Minor style" control shows the GRID_DEFAULTS.minorDash fallback ("dot"),
+    // so toggle-on must emit that dash — else the render lags the control until it's re-picked.
     expect(minorShowOps(spec(), true)).toEqual([
-      { op: "add", path: "/layout/xaxis/minor", value: { showgrid: true } },
-      { op: "add", path: "/layout/yaxis/minor", value: { showgrid: true } },
+      { op: "add", path: "/layout/xaxis/minor", value: { showgrid: true, griddash: GRID_DEFAULTS.minorDash } },
+      { op: "add", path: "/layout/yaxis/minor", value: { showgrid: true, griddash: GRID_DEFAULTS.minorDash } },
+    ]);
+  });
+
+  it("toggle-on emits the dash the control is showing; toggle-off leaves the dash alone", () => {
+    // An explicit minor dash is what the control displays → toggle-on writes that same value back
+    // (idempotent, still matches the render), not the fallback.
+    const withDash = spec({
+      xaxis: { minor: { griddash: "dash" } },
+      yaxis: { minor: { griddash: "dash" } },
+    });
+    expect(minorShowOps(withDash, true)).toEqual([
+      { op: "add", path: "/layout/xaxis/minor", value: { griddash: "dash", showgrid: true } },
+      { op: "add", path: "/layout/yaxis/minor", value: { griddash: "dash", showgrid: true } },
+    ]);
+    // Toggle-off only flips showgrid — it must NOT force a dash onto a spec that has none.
+    expect(minorShowOps(spec(), false)).toEqual([
+      { op: "add", path: "/layout/xaxis/minor", value: { showgrid: false } },
+      { op: "add", path: "/layout/yaxis/minor", value: { showgrid: false } },
     ]);
   });
 
   it("preserves existing minor props while setting the changed field", () => {
     const s = spec({
-      xaxis: { minor: { ticks: "outside", showgrid: false } },
-      yaxis: { minor: { ticks: "outside", showgrid: false } },
+      xaxis: { minor: { ticks: "outside", showgrid: false, griddash: "dash" } },
+      yaxis: { minor: { ticks: "outside", showgrid: false, griddash: "dash" } },
     });
     expect(minorShowOps(s, true)).toEqual([
-      { op: "add", path: "/layout/xaxis/minor", value: { ticks: "outside", showgrid: true } },
-      { op: "add", path: "/layout/yaxis/minor", value: { ticks: "outside", showgrid: true } },
+      { op: "add", path: "/layout/xaxis/minor", value: { ticks: "outside", showgrid: true, griddash: "dash" } },
+      { op: "add", path: "/layout/yaxis/minor", value: { ticks: "outside", showgrid: true, griddash: "dash" } },
     ]);
-    expect(minorDashOps(s, "dash")).toEqual([
-      { op: "add", path: "/layout/xaxis/minor", value: { ticks: "outside", showgrid: false, griddash: "dash" } },
-      { op: "add", path: "/layout/yaxis/minor", value: { ticks: "outside", showgrid: false, griddash: "dash" } },
+    expect(minorDashOps(s, "dot")).toEqual([
+      { op: "add", path: "/layout/xaxis/minor", value: { ticks: "outside", showgrid: false, griddash: "dot" } },
+      { op: "add", path: "/layout/yaxis/minor", value: { ticks: "outside", showgrid: false, griddash: "dot" } },
     ]);
   });
 });

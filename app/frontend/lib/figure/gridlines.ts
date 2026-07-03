@@ -94,7 +94,14 @@ function minorMergeOps(spec: FigureSpec, patch: Record<string, unknown>): Operat
   });
 }
 
+/**
+ * Toggle-ON also writes the minor dash the control is showing (`readGridlines().minorDash` — the
+ * live value or the "dot" fallback), not just `showgrid:true`. Without it the "Minor style" select
+ * displays the fallback dash while Plotly renders its own default until the user re-picks it — the
+ * panel's live/WYSIWYG promise fails for this one leaf (docs/parallel-sprint-1/followups.md P1).
+ * Toggle-OFF leaves any existing dash untouched (it's hidden anyway).
+ */
 export const minorShowOps = (spec: FigureSpec, show: boolean): Operation[] =>
-  minorMergeOps(spec, { showgrid: show });
+  minorMergeOps(spec, show ? { showgrid: true, griddash: readGridlines(spec).minorDash } : { showgrid: false });
 export const minorDashOps = (spec: FigureSpec, dash: string): Operation[] =>
   minorMergeOps(spec, { griddash: dash });

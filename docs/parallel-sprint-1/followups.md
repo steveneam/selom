@@ -7,6 +7,18 @@ milestone **review-gauntlet** (2 confirmed) + **fe-review** (26 agents) ran over
 this session.** Main is push-ready as-is; the items below are polish/hardening on the *new* Sprint-1 code,
 not regressions to existing features.
 
+> **RESOLVED — 2026-07-04 (sequential single-session fix pass).** **P1 fixed** (`minorShowOps` now writes
+> the shown minor dash on toggle-on; unit test added + **live-verified** in the running editor — toggling
+> minor writes `minor.griddash:"dot"` into the Plotly layout so the control matches the render). **P2 fixed**
+> (dropped the `/40`; blinded header is now full-contrast `italic text-muted-foreground`). **P3 decided →
+> option (b) HONEST SCOPE**: renamed "Blind marking" → **"Hide condition labels"** (subtext "in this list",
+> matching aria-label), scope documented as the editor list only — the canvas + µV are **not** blinded.
+> Option **(a) true-blind-the-canvas is a documented future slice** (cross-lane, reaches
+> `components/figure/figure-canvas.tsx`; masking µV is a real marking-cue tradeoff — an owner product call,
+> not a bug). **P4 deferred** — the FIG gridline affordance polish is parked (see items below; not a
+> regression). Gates: FE `tsc` clean · `eslint 0` err · vitest **511**. Field report on the parallel workflow
+> written to the vault (`Selom/Wiki/syntheses/parallel-agent-workflow-experience.md`).
+
 Clean bill: **ENG** (vocab single-sourcing, drift-guard, WS2.7/2.8) and **FIG core** drew **zero
 correctness/invariant findings** — the behavior-preserving refactor + the frozen-contract invariants held
 under adversarial verification. All findings are FE interaction/a11y/affordance, concentrated in the two new
