@@ -17,9 +17,8 @@
 
 ## Active sprint
 
-**Lead:** Claude (main tree `D:/selom`)   ·   **Sprint 1** — **FORKED 2026-07-03 21:15 +10:00.** 3 worktrees
-live + booted (`D:/selom-{eng,erg,fig}`; junctioned deps · `API_PROXY_TARGET` per FE lane · Vercel git-email
-inherited · clean trees), awaiting kickoff in their own windows.   ·   **Full plan + kickoff prompts:**
+**Lead:** Claude (main tree `D:/selom`)   ·   **Sprint 1** — **MERGED 2026-07-04.** All 3 lanes landed on local `main` (eng `7b50038` → erg `889bfb2` →
+fig `5d940f0`); integrated gates green (FE tsc·eslint 0·vitest 510 / BE ruff·pytest 1212·1skip); **awaiting owner push.**   ·   **Full plan + kickoff prompts:**
 `docs/parallel-sprint-1/plan.md`. Sprint-1 slices add no new shared type → freezes are "don't break these APIs"
 declarations (see the plan). **Merge model (owner-chosen): DELEGATED train** (Thalon-validated, Sprint 0). Branch
 protection deferred; the lead runs the whole train autonomously to **local** `main` — per lane in merge-order:
@@ -30,9 +29,9 @@ stop, don't resolve blindly. No merge on red.
 
 | lane | owner | owns (glob) | branch | status | depends-on | merge-order |
 |------|-------|-------------|--------|--------|------------|-------------|
-| ENG | `D:/selom-eng` (BE `:8011`) | `app/backend/engine/**` · `reproduction/**` · `companions/**` | agent/eng/consistency | review — vocab primitive + drift guard + WS2.7/2.8; gates green (`a4042ab`) | — | 1 |
-| ERG | `D:/selom-erg` (BE `:8012` · FE `:3002`) | `skills/{_erg,_iwx,_celeris,_tracegrid}.py` · `skills/proprietary/erg_*/**` · `lib/erg/**` + carve-outs `components/project/marks-editor.tsx` · `components/figure/mark-drag.ts` | agent/erg/marks-v2 | pending — forked, awaiting kickoff | — | 2 |
-| FIG | `D:/selom-fig` (FE `:3003`) | `app/frontend/lib/figure/**` · `components/figure/**` **minus** `mark-drag.ts` | agent/fig/gridlines | pending — forked, awaiting kickoff | — | 3 |
+| ENG | `D:/selom-eng` (BE `:8011`) | `app/backend/engine/**` · `reproduction/**` · `companions/**` | agent/eng/consistency | **merged** `7b50038` — vocab primitive + drift guard + WS2.7/2.8 | — | 1 |
+| ERG | `D:/selom-erg` (BE `:8012` · FE `:3002`) | `skills/{_erg,_iwx,_celeris,_tracegrid}.py` · `skills/proprietary/erg_*/**` · `lib/erg/**` + carve-outs `components/project/marks-editor.tsx` · `components/figure/mark-drag.ts` | agent/erg/marks-v2 | **merged** `889bfb2` — manual-marks v2 (R6 provenance + R7 blinding) | — | 2 |
+| FIG | `D:/selom-fig` (FE `:3003`) | `app/frontend/lib/figure/**` · `components/figure/**` **minus** `mark-drag.ts` | agent/fig/gridlines | **merged** `5d940f0` — axis gridline controls (Pillar-2 Slice 1) | — | 3 |
 
 Status vocab: `pending · in_progress · blocked:<what> · review · merged`.
 **One writer per row** — the lead owns assignments + merge-order; each owner writes only
@@ -43,6 +42,9 @@ glob) → **trust-but-verify** (lead re-runs the lane's gates, not just its repo
 a tripwire: a board-row conflict is the ONE expected conflict (trivial — one-writer-per-row); any **non-board**
 conflict = a partition leak → stop. An out-of-glob need → ship an **`.example`/proposal inside your own glob + a
 board message** (lead activates at merge), never an ad-hoc edit. No history surgery on `main` mid-sprint. No merge on red.
+**Live verify is the orchestrator's, batched:** lanes run **static gates only**; the lead does ALL live
+verification in ONE pass on integrated `main` after merges (shared-server contention makes per-lane live
+verify a non-starter — owner-directed mid-Sprint-1). Lanes leave the lead a concrete repro (staged file + steps).
 
 ## Messages (append-only)
 
@@ -95,6 +97,15 @@ board message** (lead activates at merge), never an ad-hoc edit. No history surg
   same gate — no `testpaths` restriction). **Still owed:** the WS2.7 **live** `/data/inspect` :8011 POST
   (deferred to you — shared servers; repro gz staged in this worktree's scratchpad). Not merging — yours to
   run the train.
+- **2026-07-04 03:45 +10:00 · lead → MERGED (train complete).** Ran the delegated train ENG→ERG→FIG: each
+  rebased-clean on `main`, scope-leak-checked, merged. **Every merge's ONLY conflict was this board file —
+  zero code conflicts across all 3 lanes → the partition held.** One benign out-of-glob note: ERG's
+  `app/backend/tests/test_erg_units.py` is ERG-exclusive (no other lane touches `tests/`) → accepted; lesson
+  = a lane's glob should include its own tests (ENG co-located in `engine/`, the cleaner pattern). Board
+  resolved main-side per merge; this is the consolidated final state. **Integrated trust-but-verify green:**
+  FE tsc · eslint 0-err · vitest **510**; BE ruff · `-m "not slow"` **1212 passed / 1 skip** (1206 ENG-baseline
+  + 6 ERG). Merges: eng `7b50038` · erg `889bfb2` · fig `5d940f0`. Remaining before push: the WS2.7 live
+  `/data/inspect` check (owed) + the milestone review-gauntlet + fe-review.
 
 ---
 
