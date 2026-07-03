@@ -115,7 +115,7 @@ Commit to YOUR branch only (named paths, no AI sign-off). Do NOT merge. Update o
 ---
 
 ## RESUME PROMPT (next session)
-> # Selom — Parallel Sprint 1 · fork + drive · <stamp date+time +10:00> · Claude (lead)
+> # Selom — Parallel Sprint 1 · fork + drive · 2026-07-03 16:22 +10:00 · Claude (lead)
 > Read `docs/parallel-sprint-1/plan.md` (this file) + `COORDINATION.md` first. `git fetch && git status` — origin/main at the prep stamp.
 > **This session = execute Sprint 1.** Order: (1) get owner sign-off on the partition above if not already given; (2) set up the merge gate (CI gate job + protect `main`, enforce_admins=false); (3) create the 3 worktrees + hand the owner the 3 kickoff prompts (or spawn per the run-model); (4) as each lane reaches `review` in COORDINATION.md, run the serialized merge gate (rebase→CI→review→merge) WITH owner approval each merge; the next lane rebases on the new `main`. No merge on red. (5) After all 3 merge, run one milestone review-gauntlet + fe-review over the sprint diff (cadence = milestone, [[review-cadence-phase-not-task]]).
 > **Also still parked:** the restructure board WS2.7→WS2.8 is now folded INTO the ENG lane; if Sprint 1 is deferred, WS2.7 resumes solo/sequential (nothing was built — clean park).
