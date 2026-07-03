@@ -31,7 +31,7 @@ stop, don't resolve blindly. No merge on red.
 | lane | owner | owns (glob) | branch | status | depends-on | merge-order |
 |------|-------|-------------|--------|--------|------------|-------------|
 | ENG | `D:/selom-eng` (BE `:8011`) | `app/backend/engine/**` · `reproduction/**` · `companions/**` | agent/eng/consistency | pending — forked, awaiting kickoff | — | 1 |
-| ERG | `D:/selom-erg` (BE `:8012` · FE `:3002`) | `skills/{_erg,_iwx,_celeris,_tracegrid}.py` · `skills/proprietary/erg_*/**` · `lib/erg/**` + carve-outs `components/project/marks-editor.tsx` · `components/figure/mark-drag.ts` | agent/erg/marks-v2 | pending — forked, awaiting kickoff | — | 2 |
+| ERG | `D:/selom-erg` (BE `:8012` · FE `:3002`) | `skills/{_erg,_iwx,_celeris,_tracegrid}.py` · `skills/proprietary/erg_*/**` · `lib/erg/**` + carve-outs `components/project/marks-editor.tsx` · `components/figure/mark-drag.ts` | agent/erg/marks-v2 | review — R6+R7 done · gates green · live-verified | — | 2 |
 | FIG | `D:/selom-fig` (FE `:3003`) | `app/frontend/lib/figure/**` · `components/figure/**` **minus** `mark-drag.ts` | agent/fig/gridlines | pending — forked, awaiting kickoff | — | 3 |
 
 Status vocab: `pending · in_progress · blocked:<what> · review · merged`.
@@ -63,6 +63,31 @@ board message** (lead activates at merge), never an ad-hoc edit. No history surg
   agent-memory namespace (`D--selom-eng` ≠ `D--selom`), so a lane can't recall D:/selom auto-memory — all landmines
   are inlined into the kickoff prompts and shared state lives in committed files (this board, CLAUDE.md, specs),
   never memory. Lanes fast-forwarded to this commit as their base.
+
+- **2026-07-04 02:59 +10:00 · ERG:** marks-v2 (R6+R7) **complete → `review`.** (1) BE: `_erg.py`
+  aggregates the a/b/N1/P1 source tags into a per-run provenance log
+  `{segment,marker,auto_ms,set_ms,moved}` on render-inert `meta.selom.markProvenance`, and every ERG
+  skill captions "N of M operator-adjusted" (added the missing flicker-**waveform** + intensity-response
+  captions; bar/flicker refactored onto the shared `operator_adjusted_note` — byte-identical output).
+  `landmarks`/`flicker_landmarks` now also return the auto seed times (behavior-preserving refactor —
+  existing values unchanged). (2) FE: `marks-editor.tsx` gains a **blind** toggle (hides condition
+  labels + greys headers while marking, marks survive the toggle — pure local state, never touches
+  `manual_marks`) + a per-marker **operator-moved** readout showing the auto seed; `lib/erg/marks.ts`
+  reads the optional `autoTMs`. (3) INVARIANT held: no `manual_marks` ⇒ byte-identical (goldens
+  unchanged). Frozen APIs untouched — `_iwx.read_iwxdata`, `_celeris.is_diagnosys_export`, and the
+  `lib/erg/marks.ts` exports (`SeededMark.autoTMs` is an **additive optional** field). `_tracegrid.py`
+  and the `mark-drag.ts` carve-out untouched. **Gates:** BE ruff clean · golden **102✓** (byte-identical)
+  · erg_units **37✓** (6 new); FE tsc clean · lint **0-err** (11 pre-existing warnings, none mine) ·
+  vitest marks✓. The `lib/figure/ssr-plotly-import` guard hit its 5 s per-test timeout only under
+  full-suite parallel I/O on this EDR-scanned box — passes in isolation / with a larger timeout
+  (pre-existing env flake, not ERG; that file is FIG's). **Live-verified** (real Fig1E
+  `erg_waveforms_long`, FE :3002 → BE :8012): auto b landed on a 98.4 ms hum crest, operator→50 ms →
+  logged `moved:true auto_ms 98.4 set_ms 50.0`, caption "1 of 84 operator-adjusted"; the base run
+  carries neither (byte-clean). Servers killed + ports flushed (owner steer — lanes share them; the
+  orchestrator runs the shared live verify). **In-lane test note:** BE tests added to
+  `tests/test_erg_units.py` (the ERG-exclusive unit-test file — no other lane touches it) +
+  `lib/erg/marks.test.ts` (in the FE glob); flagging `tests/test_erg_units.py` for the scope-leak pass
+  as an intentional in-lane addition. No merge — lead runs the train.
 
 ---
 
