@@ -17,15 +17,20 @@
 
 ## Active sprint
 
-**Lead:** —   ·   **Frozen contract:** —   ·   **Sprint:** none (sequential mode)
+**Lead:** Claude (main tree `D:/selom`)   ·   **Sprint 1** — PLANNED, forks NEXT session
+(this session = plan+scout+prep).   ·   **Full plan + kickoff prompts:** `docs/parallel-sprint-1/plan.md`.
+Sprint-1 slices add no new shared type → freezes are "don't break these APIs" declarations (see the plan).
 
 | lane | owner | owns (glob) | branch | status | depends-on | merge-order |
 |------|-------|-------------|--------|--------|------------|-------------|
-| _(no lanes active)_ | | | | | | |
+| ENG | tbd | `app/backend/engine/**` · `reproduction/**` · `companions/**` | agent/eng/consistency | pending (fork next session) | — | 1 |
+| ERG | tbd | `skills/{_erg,_iwx,_celeris,_tracegrid}.py` · `skills/proprietary/erg_*/**` · `lib/erg/**` + carve-outs `components/project/marks-editor.tsx` · `components/figure/mark-drag.ts` | agent/erg/marks-v2 | pending (fork next session) | — | 2 |
+| FIG | tbd | `app/frontend/lib/figure/**` · `components/figure/**` **minus** `mark-drag.ts` | agent/fig/gridlines | pending (fork next session) | — | 3 |
 
 Status vocab: `pending · in_progress · blocked:<what> · review · merged`.
 **One writer per row** — the lead owns assignments + merge-order; each owner writes only
 its own `status`. Messages below are append-only; you replace only your own state.
+**Merge gate (set up before the first fork):** CI gate job + protect `main`; then rebase→CI→review→merge, serialized. No merge on red.
 
 ## Messages (append-only)
 
