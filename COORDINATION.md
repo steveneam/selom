@@ -32,7 +32,7 @@ stop, don't resolve blindly. No merge on red.
 |------|-------|-------------|--------|--------|------------|-------------|
 | ENG | `D:/selom-eng` (BE `:8011`) | `app/backend/engine/**` · `reproduction/**` · `companions/**` | agent/eng/consistency | pending — forked, awaiting kickoff | — | 1 |
 | ERG | `D:/selom-erg` (BE `:8012` · FE `:3002`) | `skills/{_erg,_iwx,_celeris,_tracegrid}.py` · `skills/proprietary/erg_*/**` · `lib/erg/**` + carve-outs `components/project/marks-editor.tsx` · `components/figure/mark-drag.ts` | agent/erg/marks-v2 | pending — forked, awaiting kickoff | — | 2 |
-| FIG | `D:/selom-fig` (FE `:3003`) | `app/frontend/lib/figure/**` · `components/figure/**` **minus** `mark-drag.ts` | agent/fig/gridlines | in_progress | — | 3 |
+| FIG | `D:/selom-fig` (FE `:3003`) | `app/frontend/lib/figure/**` · `components/figure/**` **minus** `mark-drag.ts` | agent/fig/gridlines | review | — | 3 |
 
 Status vocab: `pending · in_progress · blocked:<what> · review · merged`.
 **One writer per row** — the lead owns assignments + merge-order; each owner writes only
@@ -72,6 +72,17 @@ board message** (lead activates at merge), never an ad-hoc edit. No history surg
   (tsc 0 · eslint 0 · vitest 509). `next build` (Turbopack) FATALs on the worktree's junctioned
   `node_modules` ("Symlink out of filesystem root") — infra, not code; running `next build --webpack`
   instead. Live editor verify next.
+- **2026-07-04 02:52 +10:00 · FIG → review (@lead):** Pillar-2 Slice 1 DONE + committed (`9a55627`).
+  8 files, all inside the FIG glob (`git diff --name-only main...agent/fig/gridlines` = `lib/figure/{gridlines,style-groups,figure-model}{,.test}.ts` + `components/figure/panels/{style-panel,axes-panel}.tsx`) — no scope leak, no FigureSpec/`meta.selom` change.
+  **Gates:** `tsc --noEmit` 0 · `eslint` 0 · `vitest` 509 pass (incl. new gridline-op + per-archetype
+  golden). **Build:** `next build` (Turbopack, the npm-script default) FATALs on the worktree's
+  junctioned `node_modules` (Symlink-out-of-root) — infra, not code; `next build --webpack` **compiled
+  successfully** (killed only during the redundant TS phase already covered by `tsc`). **Live verify:
+  DELEGATED to the orchestrator** (owner directive 02:5x — lanes share the servers); I flushed my dev
+  server + freed `:3003`. Verify hint: `?demo=umap_scrna` on a fresh project auto-runs a scatter → open
+  the **Style** tab → the new **"Axis gridlines"** group toggles gridlines live + undo restores. The
+  mock only emits a umap scatter, so the heatmap/sankey/radar *hidden*-group case is covered by the
+  `style-groups` golden, not the live app. Ready for the merge train (order 3).
 
 ---
 
