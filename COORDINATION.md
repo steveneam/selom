@@ -17,15 +17,18 @@
 
 ## Active sprint
 
-**Lead:** Claude (main tree `D:/selom`)   ·   **Sprint 1** — PLANNED, forks NEXT session
-(this session = plan+scout+prep).   ·   **Full plan + kickoff prompts:** `docs/parallel-sprint-1/plan.md`.
-Sprint-1 slices add no new shared type → freezes are "don't break these APIs" declarations (see the plan).
+**Lead:** Claude (main tree `D:/selom`)   ·   **Sprint 1** — **FORKED 2026-07-03 21:15 +10:00.** 3 worktrees
+live + booted (`D:/selom-{eng,erg,fig}`; junctioned deps · `API_PROXY_TARGET` per FE lane · Vercel git-email
+inherited · clean trees), awaiting kickoff in their own windows.   ·   **Full plan + kickoff prompts:**
+`docs/parallel-sprint-1/plan.md`. Sprint-1 slices add no new shared type → freezes are "don't break these APIs"
+declarations (see the plan). **Merge gate: owner DEFERRED branch protection for this solo-lead sprint** — the
+lead runs the discipline manually (rebase → CI green → review → owner-approved merge, one lane at a time; no merge on red).
 
 | lane | owner | owns (glob) | branch | status | depends-on | merge-order |
 |------|-------|-------------|--------|--------|------------|-------------|
-| ENG | tbd | `app/backend/engine/**` · `reproduction/**` · `companions/**` | agent/eng/consistency | pending (fork next session) | — | 1 |
-| ERG | tbd | `skills/{_erg,_iwx,_celeris,_tracegrid}.py` · `skills/proprietary/erg_*/**` · `lib/erg/**` + carve-outs `components/project/marks-editor.tsx` · `components/figure/mark-drag.ts` | agent/erg/marks-v2 | pending (fork next session) | — | 2 |
-| FIG | tbd | `app/frontend/lib/figure/**` · `components/figure/**` **minus** `mark-drag.ts` | agent/fig/gridlines | pending (fork next session) | — | 3 |
+| ENG | `D:/selom-eng` (BE `:8011`) | `app/backend/engine/**` · `reproduction/**` · `companions/**` | agent/eng/consistency | pending — forked, awaiting kickoff | — | 1 |
+| ERG | `D:/selom-erg` (BE `:8012` · FE `:3002`) | `skills/{_erg,_iwx,_celeris,_tracegrid}.py` · `skills/proprietary/erg_*/**` · `lib/erg/**` + carve-outs `components/project/marks-editor.tsx` · `components/figure/mark-drag.ts` | agent/erg/marks-v2 | pending — forked, awaiting kickoff | — | 2 |
+| FIG | `D:/selom-fig` (FE `:3003`) | `app/frontend/lib/figure/**` · `components/figure/**` **minus** `mark-drag.ts` | agent/fig/gridlines | pending — forked, awaiting kickoff | — | 3 |
 
 Status vocab: `pending · in_progress · blocked:<what> · review · merged`.
 **One writer per row** — the lead owns assignments + merge-order; each owner writes only
@@ -34,7 +37,15 @@ its own `status`. Messages below are append-only; you replace only your own stat
 
 ## Messages (append-only)
 
-- (none yet)
+- **2026-07-03 21:15 +10:00 · lead:** Sprint 1 forked. 3 worktrees created at base `b0497d9` on branches
+  `agent/{eng/consistency,erg/marks-v2,fig/gridlines}` + booted: `.env`/`settings.local.json` copied per
+  `.worktreeinclude`; `node_modules` junctioned into erg+fig, `.venv` into eng+erg (shared read — no lane
+  changes deps this sprint); `API_PROXY_TARGET` written to erg (`:8012`)/fig (`:8013`) `.env.local`; git-email
+  = Vercel noreply (inherited); all 3 trees clean. **Boot-doc fix:** the FE proxy var is `API_PROXY_TARGET`
+  (read by `next.config.ts`), **not** `NEXT_PUBLIC_API_BASE` (which the FE ignores) — corrected in the plan +
+  checklist above. Owner deferred branch protection → lead merges manually, serialized, owner-approved. Lanes:
+  update only your own row `pending → in_progress → review`; commit to your branch only (named paths, no AI
+  sign-off); do **not** merge — ping the lead at `review`.
 
 ---
 
@@ -54,8 +65,9 @@ On fork (`claude --worktree <lane>` → `.claude/worktrees/<lane>/`):
 
 1. `.worktreeinclude` auto-copies `.env` + `.claude/settings.local.json`.
 2. **Offset ports** — BE `:801X`, FE `:300X`. **`:8000` is eamos — never bind it.**
-3. **Point the FE at its own BE** — set that worktree's `NEXT_PUBLIC_API_BASE=http://localhost:801X`
-   (the committed example says `:8000`, which is eamos — always override per worktree).
+3. **Point the FE at its own BE** — set that worktree's `API_PROXY_TARGET=http://localhost:801X`
+   in `app/frontend/.env.local` (read by `next.config.ts`'s `/api/*` rewrite; default `:8000` = eamos —
+   always override per worktree). *(Not `NEXT_PUBLIC_API_BASE`; that name is unused in the FE.)*
 4. **Install deps** — `npm install --legacy-peer-deps` (FE) + `uv sync` (BE). Each worktree
    owns its own `node_modules`/`.venv` (or a symlink — decide per sprint).
 5. **Fresh dev DB** — a new local SQLite `dev.db`; never point a worktree at cloud Postgres.

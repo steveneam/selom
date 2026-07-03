@@ -58,7 +58,7 @@ This makes `D:/selom-eng`, `D:/selom-erg`, `D:/selom-fig` — each a full checko
 **Boot each worktree** (a worktree is a fresh checkout — no installed state):
 - Deps: `npm install --legacy-peer-deps` (FE lanes) + `uv sync` (BE lanes) — **or** junction the main tree's `node_modules` into each worktree (the Thalon symlink) to skip the reinstall.
 - Ports: offset per worktree — BE `:8011/:8012/:8013` (**never `:8000` = eamos**), FE `:3001/:3002/:3003`.
-- FE lanes: set that worktree's `NEXT_PUBLIC_API_BASE=http://localhost:801X` (the committed example says `:8000`, which is eamos).
+- FE lanes: set that worktree's `API_PROXY_TARGET=http://localhost:801X` in `app/frontend/.env.local` (read by `next.config.ts`'s `/api/*` rewrite; default `:8000` = eamos). *(Not `NEXT_PUBLIC_API_BASE` — that name is unused in the FE.)*
 - Confirm `git config user.email` = `282747725+steveneam@users.noreply.github.com` (or Vercel blocks the branch's preview).
 
 **Open each — your question, answered:** it is **3 separate VSCode windows, each opening a DIFFERENT worktree folder** (`D:/selom-eng`, `-erg`, `-fig`) — *not* 3 terminals on the same `D:/selom` folder, and *not* 3 windows on `D:/selom`.
