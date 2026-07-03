@@ -23,7 +23,6 @@ const Y_SIDE = [
 export function AxesPanel({ store, spec }: { store: FigureStore; spec: FigureSpec }) {
   const xTitle = getAt<string>(spec, "/layout/xaxis/title/text", "")!;
   const yTitle = getAt<string>(spec, "/layout/yaxis/title/text", "")!;
-  const showGrid = getAt<boolean>(spec, "/layout/xaxis/showgrid", true)!;
   const zeroLine = getAt<boolean>(spec, "/layout/xaxis/zeroline", false)!;
   const xType = getAt<string>(spec, "/layout/xaxis/type", "-")!;
   const yType = getAt<string>(spec, "/layout/yaxis/type", "-")!;
@@ -47,14 +46,9 @@ export function AxesPanel({ store, spec }: { store: FigureStore; spec: FigureSpe
         />
       </Section>
 
-      <Section title="Gridlines">
-        <SwitchField
-          label="Show gridlines"
-          checked={showGrid}
-          onChange={(v) =>
-            store.commit([set("/layout/xaxis/showgrid", v), set("/layout/yaxis/showgrid", v)])
-          }
-        />
+      {/* Gridline styling lives in the Style tab's "Axis gridlines" group; the zero reference line
+          stays here with the axis structure. */}
+      <Section title="Zero line">
         <SwitchField
           label="Zero lines"
           checked={zeroLine}

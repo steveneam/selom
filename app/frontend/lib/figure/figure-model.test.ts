@@ -206,6 +206,28 @@ describe("other archetypes", () => {
   });
 });
 
+describe("cartesianAxes capability (Style gridline gating, Pillar-2 slice 1)", () => {
+  const cart = (data: unknown[]) => deriveFigureModel(spec(data)).capabilities.cartesianAxes;
+
+  it("is true for scatter / line / bar / box / violin", () => {
+    expect(cart([{ type: "scatter", mode: "markers" }])).toBe(true);
+    expect(cart([{ type: "scatter", mode: "lines", line: { color: "#111" } }])).toBe(true);
+    expect(cart([{ type: "bar", marker: { color: "#111" } }])).toBe(true);
+    expect(cart([{ type: "box" }])).toBe(true);
+    expect(cart([{ type: "violin" }])).toBe(true);
+  });
+
+  it("is false for heatmap / sankey / radar figures (they hide the gridline group)", () => {
+    expect(cart([{ type: "heatmap", z: [[1, 2]] }])).toBe(false);
+    expect(cart([{ type: "sankey", node: {}, link: {} }])).toBe(false);
+    expect(cart([{ type: "scatterpolar", r: [1, 2], theta: ["a", "b"] }])).toBe(false);
+  });
+
+  it("is true if ANY trace is Cartesian (a heatmap + scatter overlay)", () => {
+    expect(cart([{ type: "heatmap", z: [[1]] }, { type: "scatter", mode: "markers" }])).toBe(true);
+  });
+});
+
 describe("layout.meta.selom hints override inference", () => {
   it("uses the stamped series grouping when present", () => {
     const s = spec(
