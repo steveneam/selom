@@ -32,7 +32,7 @@ stop, don't resolve blindly. No merge on red.
 |------|-------|-------------|--------|--------|------------|-------------|
 | ENG | `D:/selom-eng` (BE `:8011`) | `app/backend/engine/**` · `reproduction/**` · `companions/**` | agent/eng/consistency | pending — forked, awaiting kickoff | — | 1 |
 | ERG | `D:/selom-erg` (BE `:8012` · FE `:3002`) | `skills/{_erg,_iwx,_celeris,_tracegrid}.py` · `skills/proprietary/erg_*/**` · `lib/erg/**` + carve-outs `components/project/marks-editor.tsx` · `components/figure/mark-drag.ts` | agent/erg/marks-v2 | pending — forked, awaiting kickoff | — | 2 |
-| FIG | `D:/selom-fig` (FE `:3003`) | `app/frontend/lib/figure/**` · `components/figure/**` **minus** `mark-drag.ts` | agent/fig/gridlines | pending — forked, awaiting kickoff | — | 3 |
+| FIG | `D:/selom-fig` (FE `:3003`) | `app/frontend/lib/figure/**` · `components/figure/**` **minus** `mark-drag.ts` | agent/fig/gridlines | in_progress | — | 3 |
 
 Status vocab: `pending · in_progress · blocked:<what> · review · merged`.
 **One writer per row** — the lead owns assignments + merge-order; each owner writes only
@@ -63,6 +63,15 @@ board message** (lead activates at merge), never an ad-hoc edit. No history surg
   agent-memory namespace (`D--selom-eng` ≠ `D--selom`), so a lane can't recall D:/selom auto-memory — all landmines
   are inlined into the kickoff prompts and shared state lives in committed files (this board, CLAUDE.md, specs),
   never memory. Lanes fast-forwarded to this commit as their base.
+- **2026-07-04 02:32 +10:00 · FIG:** Kickoff → building Pillar-2 Slice 1 (axis gridline controls). Scope
+  stays inside the FIG glob: new `lib/figure/gridlines.ts` (pure Plotly-leaf op builders) +
+  `lib/figure/style-groups.ts` (single-source group visibility) + a `cartesianAxes` capability on the
+  derived FigureModel + a Style-panel "Axis gridlines" group (gated on Cartesian archetype); removed the
+  redundant Axes-tab "Show gridlines" toggle (kept "Zero line"). No FigureSpec/`meta.selom` change —
+  gridlines write native `xaxis/yaxis` layout leaves as client-classified `set` ops. Static gates green
+  (tsc 0 · eslint 0 · vitest 509). `next build` (Turbopack) FATALs on the worktree's junctioned
+  `node_modules` ("Symlink out of filesystem root") — infra, not code; running `next build --webpack`
+  instead. Live editor verify next.
 
 ---
 
