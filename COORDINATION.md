@@ -30,7 +30,7 @@ stop, don't resolve blindly. No merge on red.
 
 | lane | owner | owns (glob) | branch | status | depends-on | merge-order |
 |------|-------|-------------|--------|--------|------------|-------------|
-| ENG | `D:/selom-eng` (BE `:8011`) | `app/backend/engine/**` · `reproduction/**` · `companions/**` | agent/eng/consistency | in_progress — vocab primitive + drift guard + WS2.7/2.8 built; gates running | — | 1 |
+| ENG | `D:/selom-eng` (BE `:8011`) | `app/backend/engine/**` · `reproduction/**` · `companions/**` | agent/eng/consistency | review — vocab primitive + drift guard + WS2.7/2.8; gates green (`a4042ab`) | — | 1 |
 | ERG | `D:/selom-erg` (BE `:8012` · FE `:3002`) | `skills/{_erg,_iwx,_celeris,_tracegrid}.py` · `skills/proprietary/erg_*/**` · `lib/erg/**` + carve-outs `components/project/marks-editor.tsx` · `components/figure/mark-drag.ts` | agent/erg/marks-v2 | pending — forked, awaiting kickoff | — | 2 |
 | FIG | `D:/selom-fig` (FE `:3003`) | `app/frontend/lib/figure/**` · `components/figure/**` **minus** `mark-drag.ts` | agent/fig/gridlines | pending — forked, awaiting kickoff | — | 3 |
 
@@ -85,6 +85,16 @@ board message** (lead activates at merge), never an ad-hoc edit. No history surg
   → `bulk_counts` + `all_nan_columns` warn. **Owed to lead:** the WS2.7 **live** `/data/inspect` :8011 check
   (deferred to orchestrator per owner — shared servers); repro on disk at
   `…/scratchpad/rpgr_irpe_rawcounts.csv.gz`. Will flip → `review` when bg gates confirm green.
+- **2026-07-04 03:18 +10:00 · ENG → `review` (`a4042ab`).** Gates green: full `-m "not slow"` **1206 passed,
+  1 skipped** (= the WS2.6 baseline 1202 **+ my 4** new drift-guard tests → zero regressions) + ruff clean;
+  the DoD-#4 reproduction slow-subset (4 hand-ledgers + cold-drive snapshots) **45 passed, 1 skipped** (the
+  skip = the owner-machine-only re-drive; the byte-identical snapshot-invariant tests all pass). Diff is 9
+  files, all in `app/backend/engine/**` + this board row (`git diff --name-only main...agent/eng/consistency`
+  stays in-glob — scope-leak-clean). **Lead trust-but-verify:** `PYTHONPATH=<sp> <uv-3.12-py> -m pytest -m
+  "not slow" -q` from `app/backend` (the co-located guard `engine/test_vocab_drift_guard.py` collects in the
+  same gate — no `testpaths` restriction). **Still owed:** the WS2.7 **live** `/data/inspect` :8011 POST
+  (deferred to you — shared servers; repro gz staged in this worktree's scratchpad). Not merging — yours to
+  run the train.
 
 ---
 
