@@ -44,9 +44,10 @@ Status: `TODO` · `WIP` (≤1 at a time) · `DONE — <sha>` · `BLOCKED — <wh
 | 6 | **WS2.4** | Ingest robustness for messy real inputs | P1 | DONE — 4ee6ab9 | pillars P3c + P1d |
 | 7 | **WS2.5** | QC coverage vs deliberately-broken real data | P1 | DONE — 1be0a6b | pillars P1c (extension) |
 | 8 | **WS2.6** | Unify the run-path error taxonomy | P2 | DONE — e3e707f | pillars P1/P4 · NEW |
-| 8b | **WS2.7** | Gzip-wrapped table support (`.csv.gz`/`.tsv.gz`) | P2 | TODO | NEW (WS2.4 follow-up) |
-| 8c | **WS2.8** | Counts matrix with an empty/failed sample column demotes to `generic_table` | P2 | TODO | NEW (WS2.5 follow-up) |
-| 9 | **WS3.1** | Converge the two ingest/classify paths (shared primitive) | P2 | TODO | CURRENT NEXT#6 + NEXT#1 |
+| 8b | **WS2.7** | Gzip-wrapped table support (`.csv.gz`/`.tsv.gz`) | P2 | DONE — a4042ab | NEW (WS2.4 follow-up) |
+| 8c | **WS2.8** | Counts matrix with an empty/failed sample column demotes to `generic_table` | P2 | DONE — a4042ab | NEW (WS2.5 follow-up) |
+| — | **WS1.3** | Backend-ci green: WS1.1 prod-guard vs the extras-less CI closure | P0 | DONE — `<sha>` | NEW (CI red on every push since WS1.1) |
+| 9 | **WS3.1** | Converge the two ingest/classify paths (shared primitive) | P2 | TODO (engine-side landed a4042ab; forks remain) | CURRENT NEXT#6 + NEXT#1 |
 | 10 | **WS3.2** | Column-override logic → one resolver | P2 | TODO | NEXT#1 (concrete) |
 | 11 | **WS3.3** | Param validation → drop the redundant gate | P2 | TODO | NEXT#1 (concrete) |
 | 12 | **WS4.1** | `routers/_run.py` contract-frozen decomposition | P3 | DEFERRED | NEW (only if WS2 forces it) |
@@ -280,38 +281,74 @@ left as-is — not run-path.
   set untouched. The one error-path behavior change (unknown-skill `/run` 500→404) is a taxonomy
   unification, not a success-path change.
 
-### WS2.7 — Gzip-wrapped table support · P2 · Status: TODO
+### WS2.7 — Gzip-wrapped table support · P2 · Status: DONE — a4042ab
 A `.csv.gz`/`.tsv.gz` (the near-universal shape of a GEO count matrix — e.g. dorgau
 `GSM…_counts.csv.gz`) currently returns an honest 400 "no ingest loader" (never a crash), but a real
 stranger downloading from GEO hits a wall. Surfaced during WS2.4; captured here rather than expanding
 that task. Home: `engine/ingest.py` registry.
+**Done (BE-only, shipped in the Sprint-1 ENG merge `a4042ab`; board was stale — reconciled 2026-07-04):**
+`engine/ingest.py` gained an additive `csv_gz` loader (`_is_gzip_table` recognizer + `_load_csv_gz`) that
+transparently gunzips `.csv.gz`/`.tsv.gz`/`.txt.gz` and reuses `_load_csv`'s WS2.4 encoding/delimiter
+sniffing via a shared `_parse_delimited` body (no second CSV reader); a corrupt gzip is an honest 400.
 - **Definition of Done:** a gzipped delimited table (`.csv.gz`/`.tsv.gz`/`.txt.gz`) ingests as its
-  decompressed table (reusing the WS2.4 encoding/delimiter sniffing), classified as its real modality.
-- **Verify:** the real dorgau `*.csv.gz` → 200 with its true kind + routing, on live `/data/inspect`.
-- **Scope guard:** gzip only (no zip/tar bundles, no auto-fetch); reuse `_load_csv`'s sniffing — don't
-  fork a second CSV reader.
+  decompressed table (reusing the WS2.4 encoding/delimiter sniffing), classified as its real modality. **Met.**
+- **Verify (PASSED — real data + live `/data/inspect` on :8010, re-run 2026-07-04):** the real
+  `rpgr_irpe_rawcounts.csv` gzipped → **200 `bulk_counts`**, qc ok (same classification as the plain CSV).
+- **Scope guard (honored):** gzip only (no zip/tar bundles, no auto-fetch); reused `_load_csv`'s sniffing.
 
-### WS2.8 — Counts matrix with an empty/failed sample column demotes to `generic_table` · P2 · Status: TODO
+### WS1.3 — Backend-ci green: WS1.1 prod-guard vs the extras-less CI closure · P0 · Status: DONE — `<sha>`
+`backend-ci` had been **red on every push since WS1.1** (2026-07-02): `test_config_accepts_valid_s3`
+constructs a valid S3 (production-like) `Settings`, and WS1.1's guard (`config._validate_backend_combos`)
+refuses to boot when `is_production` and the skills engine resolves to `stub`. CI installs the *light*
+fast-gate closure (no `pydeseq2`/`gseapy`, deliberately — omics is multi-GB), so the engine resolved to
+`stub` and the guard tripped. The dev box has the full science stack, so the same test passed **locally**
+— every handoff's "BE fast 1202/1" was locally green while CI was silently red. Home: `tests/test_config_and_ready.py`.
+- **Definition of Done:** `backend-ci` (`pytest -m "not slow"` + ruff) passes on the light closure; the
+  S3-parsing test no longer depends on which extras happen to be installed.
+- **Verify (PASSED):** a CI-simulation probe (force `find_spec` to report the extras absent) reproduced the
+  exact `ValidationError`; the fix (mock `find_spec` to report the full `REQUIRED_ENGINE_MODULES` present,
+  mirroring `test_engine_policy_guard`) constructs `Settings()` and asserts `s3_bucket == "b"`. Full fast
+  gate **1212 passed, 1 skipped** + ruff clean locally; the CI closure is now green by the same mechanism
+  the four prod-guard tests already use. The prod+stub *refusal* stays covered by `test_engine_policy_guard`.
+- **Scope guard (honored):** test-only change; the WS1.1 guard + `is_production` semantics untouched. The
+  deeper question — *should CI install the real deg/gsea closure so the deploy gate faithfully verifies a
+  real-engine prod boot?* — is a WS6 decision, captured in "Open items" (not silently expanded here).
+
+### WS2.8 — Counts matrix with an empty/failed sample column demotes to `generic_table` · P2 · Status: DONE — a4042ab
 Surfaced during WS2.5 live verify. `_classify_frame` gates `bulk_counts` on `integral and miss < 0.02`
 (`engine/databundle.py`); a real counts matrix with one empty/failed sample column has missingness
 ≈ 1/n_samples (16.7 % for 6 samples), which fails that gate → the file demotes to `generic_table`.
 The stranger then loses the deg/volcano routing **and** the WS2.5 `all_nan_columns` empty-column warn
 (that flag lives in the counts QC branch, which never runs). A plausible real GEO shape (one dropped
 sample). Home: `engine/databundle.py` `_classify_frame` counts gate.
+**Done (BE-only, shipped in the Sprint-1 ENG merge `a4042ab`; board was stale — reconciled 2026-07-04):**
+`_classify_frame` now excludes all-NaN (dropped-sample) columns from the counts-gate missingness, so an
+integer matrix with a blank sample column stays `bulk_counts` and the QC `all_nan_columns` warn surfaces
+it. Tight: only *whole-empty* columns are excused — scattered missingness and genuinely-generic tables
+are unaffected (`non_integer` → `generic_table` still correct).
 - **Definition of Done:** an otherwise-integer counts matrix with a small number of all-NaN sample
   columns still classifies as `bulk_counts`, so the `all_nan_columns` warn surfaces the empty sample —
-  without loosening the gate enough to misread a genuinely generic table as counts.
-- **Verify:** the real rpgr counts with one blanked sample column → `bulk_counts` + `all_nan_columns`
-  on the natural (no-hint) `/data/inspect` path; a genuinely-generic table stays `generic_table`.
-- **Scope guard:** the counts gate only; do NOT touch the metabolomics/proteomics/DE branches or the
-  QC rule set (WS2.5). `non_integer` → `generic_table` is correct and out of scope.
+  without loosening the gate enough to misread a genuinely generic table as counts. **Met.**
+- **Verify (PASSED — real data + live `/data/inspect` on :8010, re-run 2026-07-04):** the real
+  `rpgr_irpe_rawcounts.csv` with one whole sample column (`CE2_1_c1_iRPE_3`, ~16.7 % missingness) blanked
+  → **200 `bulk_counts`** (not demoted) + `qc.all_nan_columns` **warn** naming the empty sample; the plain
+  CSV stays `bulk_counts`. Unit coverage rides in the ENG merge's `engine/qc.py` + databundle tests.
+- **Scope guard (honored):** the counts gate only; the metabolomics/proteomics/DE branches + the QC rule
+  set (WS2.5) untouched. `non_integer` → `generic_table` stays correct and out of scope.
 
 ## WS3 — Dedup / parallel-representation (executes CURRENT NEXT#1; case-by-case)
 
-### WS3.1 — Converge the two ingest/classify paths · P2 · Status: TODO
+### WS3.1 — Converge the two ingest/classify paths · P2 · Status: TODO (engine-side landed a4042ab; forks + extract path remain)
 `engine.classify()` (full, layered) and `extract.ingest._classify()` (cheap sheet-inventory)
 carry duplicate synonym sets (`_LOGFC`/`_PVAL`/`_METAB_TOKENS`) that can drift. Home:
 CURRENT NEXT#6 (the "compare + recommend how to converge" task) + NEXT#1.
+> **Partial progress (Sprint-1 ENG merge `a4042ab`):** the FE/DE-vocab synonym sets were promoted to
+> one named primitive `engine/vocab.py`; `classify`/`columns`/`compat`/`frame_schema`/`qc` now import it
+> (`databundle._LOGFC/_PVAL/_METAB_TOKENS` kept as aliases to the SAME tuple objects → behaviour-preserving),
+> and a drift-guard `engine/test_vocab_drift_guard.py` identity-locks the five consumers + AST-scans for a
+> forked copy. **Still open (→ the dedup scout, next session):** the guard *flags but does not converge* the
+> **six `skills/*/run_real.py` forks**, and `extract.ingest._classify()` (the cheap paper-side inventory) is
+> not yet on the shared primitive. Those are the substantive WS3.1 work — this row stays `TODO`.
 - **Posture (recommended): cross-pollinate, don't force-merge.** Extract one shared
   classify/synonym primitive both import; keep the two entry points (they differ in cost by
   design); add a drift-guard test.
@@ -398,6 +435,11 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 - **NEXT#0 residuals** (methods/legend draft persistence, bulk-revert, dedup cue) +
   **s5-followups #4** (Activity/Gaps drill-through) → `CURRENT NEXT#0` / `s5-followups.md`.
 - **Milestone-owed** live-gateway spot-check (`SELOM_AI_GATEWAY=gateway`, real Llama) → NEXT#0.
+- **CI-closure faithfulness (WS6 decision).** WS1.3 made `backend-ci` green on the *light* closure, but CI
+  therefore runs the **stub** engine — so a green `backend-ci` does not itself prove a real-engine prod boot
+  (that refusal path is unit-tested via `find_spec` mocks, not exercised end-to-end). Before making
+  `backend-ci` a *required* deploy gate (WS6), decide whether CI should install the real `deg`+`gsea` closure
+  (`pydeseq2`/`gseapy` — moderate, not the multi-GB `omics`/torch set) so the gate faithfully verifies boot.
 - **Reproduction + Extract-Skills moat** → deprioritized per decision #1; stays in pillars P5
   + on-hold (atlas reproductions).
 - **Pre-launch license gates** (MSigDB/AGPL RISKS #6, gsea sensitivity #10) → `RISKS.md` +
@@ -416,6 +458,7 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 
 | Date | Session | Task(s) | Result / sha |
 |---|---|---|---|
+| 2026-07-04 | CI-GREEN | WS1.3 + WS2.7/2.8 reconcile | **Fixed the red `backend-ci` + reconciled the stale board.** **WS1.3 (the one genuine build):** `backend-ci` had been red on *every push since WS1.1* — `test_config_accepts_valid_s3` builds a valid S3 (production-like) `Settings`, and WS1.1's guard refuses when `is_production` + the engine resolves `stub`; CI's *light* fast-gate closure has no `pydeseq2`/`gseapy` → stub → trip. The dev box has the full stack → the same test passed **locally**, so every "BE fast 1202/1" was locally green while CI was silently red (local gate ≠ CI gate — a process finding). Fix (test-only): the S3 test now mocks `find_spec` to report the full `REQUIRED_ENGINE_MODULES` present — mirroring the four `test_engine_policy_guard` prod cases — so it verifies S3 *parsing*, not which extras are installed; the prod+stub *refusal* stays covered there. A CI-simulation probe (force extras absent) reproduced the exact `ValidationError`; the fix constructs cleanly. Gates: full fast gate **1212 passed, 1 skipped** + ruff clean. **WS2.7 + WS2.8 reconcile (no re-build — [[verify-todo-not-already-shipped]]):** both landed in the Sprint-1 ENG merge `a4042ab` ("land WS2.7/WS2.8") but the board still read `TODO`. **Live-verified on :8010 + REAL data** [[verify-on-real-data-not-mock]]: the real `rpgr_irpe_rawcounts.csv` gzipped → **200 `bulk_counts`** (WS2.7); the same file with one whole sample column blanked (~16.7 % miss) → **200 `bulk_counts`** (not demoted) + `qc.all_nan_columns` warn naming `CE2_1_c1_iRPE_3` (WS2.8). Flipped both → DONE (a4042ab). Also noted **WS3.1 partial** on the board: `a4042ab` single-sourced the DE/metab vocab (`engine/vocab.py` + a drift-guard); the 6 `run_real.py` forks + `extract.ingest._classify` remain → the dedup scout (next session, owner-directed). `<sha>` |
 | 2026-07-02 | RESTRUCTURE-08 | WS2.6 | **Unified the run-path error taxonomy — genuine work (not a phantom-TODO).** New `routers/_errors.py` `RunError` (an `HTTPException` subclass) gives every run-path failure ONE envelope `detail = {error, category, message, fix, **context}`, mirroring the QC-flag shape (`engine/qc.py` QCFlag). Three categories — `bad_input` (400/422) · `unsupported` (404/409) · `internal` (5xx/504) — via paired-default-status constructors + shared `unknown_skill()`/`param_out_of_range()` builders (one home for a repeated shape). Converted **24 raise sites**: `_run.py` (7), `skills.py` (10), `ai.py` (3), `data.py` (4 inspect/combine `ValueError→400`); the **key fix** is the skill-runner `ValueError` — a **bare-string** 400 that fell through the FE's generic "Couldn't run… try again." frame (wrong for a data mismatch) — now `skill_run_failed` bad-input carrying the real cause + an actionable fix. Also mapped the `load_skill` `FileNotFoundError` at the shared `_execute_skill_run` chokepoint → an **unknown skill on the multipart `/run` path is a uniform 404** (was a 500; `/jobs`+`/run-dataset` already 404'd). `error`/`context` keys preserved verbatim so every `detail["error"]` test + the FE `data_check_failed` branch still resolve; `category`/`fix` additive. FE `parseSkillRunResponse` surfaces the taxonomy `message` + appends `fix` when present (self-framed gate messages set `fix=""` → no double). Left the 2 artifact-GET 404s in `data.py` (a separate lineage-retrieval feature) — not run-path. **Verified live on :8010 + REAL data** [[verify-on-real-data-not-mock]] — a probe drove all five classes: `param_out_of_range` (bad_input 400, real eyg28 DE), `data_contract_failed` (bad_input 422, volcano on real rpgr counts), `skill_run_failed` (bad_input 400, erg on real counts → the real "missing required columns […]" + fix), `unknown_skill` (unsupported 404 on multipart `/run`, was a 500), `invalid_hint` (bad_input 400, `/data/inspect`) — each returning the SAME `{error, category, message, fix}` envelope. Files: `routers/_errors.py` (new), `routers/{_run,skills,ai,data}.py`, `lib/skills/api.ts`, `tests/test_run_error_taxonomy.py` (new), `tests/{test_run_error_surface,test_ai_s2,test_data_inspect}.py`, `lib/skills/api.test.ts` (+2). Gates: BE fast **1202/1** + ruff clean; FE tsc + eslint(0) + vitest **489**. `e3e707f` |
 | 2026-07-02 | RESTRUCTURE-07 | WS2.5 | **Genuinely a small code gap + a coverage fill (not a phantom-TODO).** Of the five DoD conditions, four QC rules already existed (`too_few_samples` warn · `non_integer_counts` block · `all_zero_features` info · `maybe_transposed` warn); the one true gap was an **all-NaN sample column** → added `_all_nan_column_flag` in `engine/qc.py` (a `all_nan_columns` **warn** that names the offending column + a fix hint), fired for `bulk_counts` + `proteomics` (columns = samples). Added unit coverage for the two existing-but-untested rules. Kept `all_zero_features` **info** on purpose — the real rpgr base fires it and still reads `ok`, so promoting it to warn would wrongly flag every real counts matrix (D-e5 policy untouched; the new flag is override-able, never a hard block). **Verified live on :8010 `/data/inspect` with REAL data** [[verify-on-real-data-not-mock]] — broken fixtures from `rpgr_irpe_rawcounts.csv` (2000 genes × 6 real samples): natural path → single-sample `too_few_samples`, all-zero rows `all_zero_features` (stays `ok`), transpose `maybe_transposed`, clean base `ok=true`; typed as counts (`hint=bulk_counts`, the "declared counts" scenario) → all-NaN column (real col `CE2_1_c1_iRPE_3`) `all_nan_columns` warn, ÷3 `non_integer_counts` **block**. **Finding captured as WS2.8 (not fixed — stay on the board):** on the natural path an all-NaN column pushes missingness past the >2% counts gate in `_classify_frame`, demoting the matrix to `generic_table` (loses counts routing + the empty-column warn); `non_integer`→`generic_table` is correct (fractional ≠ raw counts). Files: `engine/qc.py` (+`_all_nan_column_flag`, wired into bulk+proteomics), `tests/test_qc.py` (+4 → 15). Gates: BE fast **1194/1** + ruff clean; FE untouched. `1be0a6b` |
 | 2026-07-02 | RESTRUCTURE-06 | WS2.4 | **Genuinely unbuilt (not a phantom-TODO like WS2.2/2.3) — real robustness work shipped.** BE-only: `_load_csv` now sniffs **encoding** (utf-8-sig ± BOM → cp1252 → latin-1 backstop) + **delimiter** (`csv.Sniffer` over `,\t;|`, header-max-fields fallback) so a semicolon/cp1252 real export loads into columns instead of crashing/blobbing; empty file → honest `ValueError`. `ingest` wraps `loader.load` → any parse failure becomes an actionable `ValueError` (`_load_failure_message` per loader) so the router returns **400, never a 500**. QC gains a `maybe_transposed` wrong-orientation warn (numeric cols > rows and ≥ 12) for bulk + proteomics. **Verified live on :8010 `/data/inspect` with REAL data** [[verify-on-real-data-not-mock]] — 6 messy files, **0 × 500**: semicolon real rpgr counts → 200 `bulk_counts` (6 cols, was a blob); cp1252 + µ header → 200 (was a `UnicodeDecodeError` 500); transposed real counts → 200 + `maybe_transposed` (fires on the no-hint path too); real alpk1 `.xlsx` gene list → 200 `generic_table` + honest options note; corrupt `.xlsx` → 400 friendly "…(BadZipFile)"; real `.csv.gz` → 400 honest "no ingest loader". The `UNKNOWN`/`GENERIC_TABLE` options surface already existed (`route.py` pca/corr_heatmap + note; QC `unclassified`) — the gap was the load path. Gzip support surfaced mid-task → captured as **WS2.7** (a new row, not scope creep; honest 400 today satisfies the DoD). Files: `engine/ingest.py`, `engine/qc.py`, `tests/test_ingest.py` (+6), `tests/test_qc.py` (+2), `tests/test_data_inspect.py` (+6). Gates: BE fast **1190/1** + ruff clean; FE untouched. `4ee6ab9` |
@@ -428,43 +471,44 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 
 ---
 
-## Next-session prompt (tailored — RESTRUCTURE-09 · WS2.7; supersedes the generic template below until stamped done)
+## Next-session prompt (tailored — DEDUP-SCOUT · WS3; the duplication audit — owner-directed; supersedes the generic template below until stamped done)
 
-Paste this to start the next session; re-stamp the header line with the real clock. When WS2.7 is
+Paste this to start the next session; re-stamp the header line with the real clock. When WS3 is
 `DONE`, rewrite this block for the next top-`TODO` (like the CURRENT.md LIVE pointer).
 
 ```
-# Selom — Restructure · 2026-07-02 HH:MM +10:00 · Claude (FE+BE, solo mode)
+# Selom — Restructure · 2026-07-04 HH:MM +10:00 · Claude (FE+BE, solo mode)
 (re-stamp this line with the real clock at session start)
 
 Read first: docs/restructure/plan.md (the tracker) → Status board + Progress log + the
 Working Agreement. Confirm git: `git fetch && git status` — origin/main should be in sync at the
-RESTRUCTURE-08 stamp commit (WS2.6 = the run-path error taxonomy, `routers/_errors.py`).
+CI-GREEN stamp commit (WS1.3 = the backend-ci fix + WS2.7/2.8 board reconcile).
 
-State: WS1 CODE-COMPLETE (1be60a5 + 8c7f09b). WS2.1 (9c9c382), WS2.2 (f51e0c2), WS2.3 (50c3bde),
-WS2.4 (4ee6ab9), WS2.5 (1be0a6b), WS2.6 DONE. WS2.6 gave every run-path failure ONE envelope
-`detail = {error, category, message, fix, **context}` (new `routers/_errors.py` `RunError`, mirroring
-the QC-flag shape) — three categories bad_input/unsupported/internal, 24 raise sites converted; the key
-fix was the skill-runner `ValueError` (a bare-string 400 → `skill_run_failed` with the real cause + a
-fix) and unknown-skill on multipart `/run` (500 → uniform 404). Follow-ups still pending: **WS2.8** (a
-counts matrix with an empty sample column demotes to `generic_table` past the >2% missingness gate in
-`_classify_frame`). **Recurring pattern:** WS2.2 + WS2.3 were already-shipped (stale "Deferred" docs);
-WS2.4/2.5/2.6 were genuine. **Before building any WS TODO, read + git-blame the target first**
-[[verify-todo-not-already-shipped]]; if already there, verify-live + reconcile-doc + stamp, don't
-re-build. **Reviews deferred to the VERY END** (Working Agreement #4): one review-gauntlet + fe-review
-pass over the whole restructure diff after ALL tasks are DONE (carries the owed WS1 boundary NEXT#R +
-WS2.1's in-browser click-through). Do NOT run them per-workstream.
+State: WS1 CODE-COMPLETE + backend-ci GREEN (WS1.3). ALL of WS2 DONE — WS2.1 (9c9c382), 2.2
+(f51e0c2), 2.3 (50c3bde), 2.4 (4ee6ab9), 2.5 (1be0a6b), 2.6 (e3e707f), **2.7 + 2.8 (a4042ab, landed in
+the Sprint-1 ENG merge — the board was stale, reconciled + live-verified 2026-07-04)**. So the
+foundation (WS1+WS2) is closed; the last gate before WS6 deploy is **WS3 (dedup)** — which is ALSO the
+owner's stated worry ("what else is duplicated across Selom?"). **Recurring pattern to expect:**
+WS2.2/2.3/2.7/2.8 were already-shipped (stale "Deferred"/"TODO" docs); **before building any WS TODO,
+read + git-blame the target first** [[verify-todo-not-already-shipped]] — if already there, verify-live
++ reconcile-doc + stamp, don't re-build. **Reviews still deferred to the VERY END** (Working Agreement
+#4): one review-gauntlet + fe-review pass over the whole restructure diff after ALL tasks DONE (carries
+the owed WS1 boundary NEXT#R StubEngineBanner G2 + WS2.1's in-browser click-through). Not per-workstream.
 
-Do: proceed to the top TODO by Order — WS2.7 (Gzip-wrapped table support; Order 8b, P2). Home:
-`engine/ingest.py` registry. A `.csv.gz`/`.tsv.gz`/`.txt.gz` (the near-universal GEO count-matrix shape)
-today returns an honest 400 "no ingest loader" (WS2.4 made it never a crash) — but a real stranger
-downloading from GEO hits a wall. **First read + git-blame `engine/ingest.py`** (the loader registry +
-`_load_csv`'s WS2.4 encoding/delimiter sniffing) to confirm it's genuinely unbuilt. DoD: a gzipped
-delimited table ingests as its DECOMPRESSED table (transparently gunzip, then REUSE `_load_csv`'s
-sniffing — do NOT fork a second CSV reader), classified as its real modality. Verify: a real
-`*.csv.gz` → 200 with its true kind + routing on live `/data/inspect` (gzip the real rpgr counts to
-`rpgr_irpe_rawcounts.csv.gz` if no real GEO `.csv.gz` is on disk). Scope guard: gzip only — NO zip/tar
-bundles, NO auto-fetch. Likely BE-only (FE untouched).
+Do (owner-directed = the DEDUP SCOUT, then converge): WS3 is the duplication audit. Run it in two moves.
+(1) SCOUT — a parallel read-only fan-out (Workflow or several Agent scouts, like the Sprint-1 plan's 3
+scouts) each on a different lens: engine/ classify+synonym sets · routers/ vs engine/ logic dup · FE
+lib/ parallel representations · validation/coercion gates. Dedup the findings → confirm/expand the WS3
+backlog (this answers "what ELSE is duplicated?", not just the 3 known rows). (2) CONVERGE the known +
+any confirmed-new, sequentially (they're small + coupled — NOT parallel worktree lanes; WS3.2+3.3 both
+touch routers/_run.py). Known rows: **WS3.1** — a4042ab already single-sourced the DE/metab vocab to
+`engine/vocab.py` + a drift-guard (`engine/test_vocab_drift_guard.py`); REMAINING = converge the 6
+`skills/*/run_real.py` forks the guard FLAGS + put `extract.ingest._classify()` on the shared primitive.
+**WS3.2** — `routers/_run.py:186–227` reimplements `engine/columns.py`; the router delegates to the
+engine resolver. **WS3.3** — the param re-check in `_run.py:138–146` duplicates
+`contract.validate_param_ranges()`; converge the two gates, keep the runner coercion. Verify each: the 4
+reproduction ledgers + engine classify tests stay byte-identical/green; a column-override run + an
+out-of-range 400 behave identically on live :8010 + real data.
 
 Rules (the anti-half-done contract):
 - Stay on the board. New work surfaced mid-task → add a WSx.y row FIRST, don't expand scope.

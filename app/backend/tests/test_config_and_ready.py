@@ -11,6 +11,17 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from config import Settings
+from skills import _engine
+
+
+def _fake_find_spec(present: set[str]):
+    """A find_spec stand-in (mirrors test_engine_policy_guard): a module is importable iff it's in
+    ``present``, so a Settings-construction test is deterministic regardless of the extras actually
+    installed. CI runs the light fast-gate closure (no pydeseq2/gseapy), so without this a valid
+    production-like config would trip the WS1.1 stub-engine guard on CI while passing on the dev box."""
+    def _spec(name: str):
+        return object() if name in present else None
+    return _spec
 
 
 def _clear_selom_env(monkeypatch):
@@ -45,6 +56,10 @@ def test_config_rejects_clerk_without_issuer(monkeypatch):
 
 def test_config_accepts_valid_s3(monkeypatch):
     _clear_selom_env(monkeypatch)
+    # S3 makes this config production (is_production), so the WS1.1 guard requires a real engine.
+    # Force the full science stack importable so this test verifies S3 *parsing* — not whatever
+    # extras happen to be installed (the prod+stub refusal is covered in test_engine_policy_guard).
+    monkeypatch.setattr(_engine, "find_spec", _fake_find_spec(set(_engine.REQUIRED_ENGINE_MODULES)))
     monkeypatch.setenv("SELOM_OBJECT_STORE", "s3")
     monkeypatch.setenv("SELOM_S3_BUCKET", "b")
     assert Settings().s3_bucket == "b"
