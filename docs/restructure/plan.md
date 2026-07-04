@@ -471,7 +471,22 @@ owner-pending GitHub→AWS OIDC role, kill the static `selom-dev` key, flip `API
 
 ---
 
-## Next-session prompt (tailored — DEDUP-SCOUT · WS3; the duplication audit — owner-directed; supersedes the generic template below until stamped done)
+## Next-session prompt (tailored — CONSOLIDATE + PLAN the parallel campaign; then WS3 dedup as lane 1 — owner-directed 2026-07-04; supersedes the generic template below until stamped done)
+
+> **Owner directive (2026-07-04, CI-GREEN close):** now the parallel-agent workflow is proven (Sprint 1
+> shipped 3 lanes; [[parallel-agent-lanes]]), the next session's PRIMARY deliverable is to **consolidate
+> the whole remaining surface and plan a parallel campaign** to finally clear the on-hold backlog —
+> "cover more ground, knock off a lot of the stuff that's been on hold." Survey inputs: **the on-hold
+> backlog** (`docs/on-hold/README.md` = the P6 parking lot: BAM/accession ingest, command-center C/B,
+> Supabase/arq/Kaleido; + parked memories: [[selom-multisample-scrna-assemble]],
+> [[selom-intake-questionnaire-rethink]], [[selom-journal-styles-feature]], [[selom-ask-selom-chat]],
+> [[selom-pipeline-flow-animation]], [[selom-trajectory-flowy-curve]]) **+ the remaining launch work**
+> (WS3 dedup, the owed reviews, WS6 deploy externals) **+ the differentiator** (Pillar-2 / Layer E).
+> Carve **disjoint contract-separated buckets** → propose worktree lanes + scout fan-outs (glob · frozen
+> contract · merge order + the owner steps) and **put the lane carve-up to the owner via forcing-questions
+> before forking**. Then **WS3 dedup is lane 1** (it gates WS6 and answers the "what else is duplicated?"
+> worry) — run it as the campaign's first scout fan-out + converge. Use the `plan`/`spec` skills; produce
+> a written campaign plan, don't just start forking.
 
 Paste this to start the next session; re-stamp the header line with the real clock. When WS3 is
 `DONE`, rewrite this block for the next top-`TODO` (like the CURRENT.md LIVE pointer).
