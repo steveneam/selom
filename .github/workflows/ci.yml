@@ -9,6 +9,9 @@
 # Supply-chain hardening: every `uses:` is SHA-pinned (renovate `helpers:pinGitHubActionDigests`
 # bumps the digests); least-privilege `permissions: contents: read` at the workflow level (no job
 # widens it); `persist-credentials: false` on checkout (artipacked). zizmor lints the workflows.
+#
+# Living contract -- what `ci` guarantees, why the permissions are shaped this way, and what CONFORM
+# actually means for a workflow change: ./README.md (read it before editing permissions or `needs:`).
 name: ci
 
 on:

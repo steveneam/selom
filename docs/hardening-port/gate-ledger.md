@@ -164,6 +164,20 @@ Verified locally: zizmor 0 on `ci.yml`; `ci.yml` + `renovate.json` parse. The pa
 (docs-only -> `ci` success with backend+frontend skipped; backend-only -> only backend runs) is
 verified on the first GitHub run (cannot run Actions locally).
 
+### Post-ship correction -- the `pull_request` token path (PR #1)
+
+The first real `pull_request` run (PR #1) went red: the `changes` job's dorny/paths-filter calls the
+`pulls.listFiles` API, which the workflow-level `contents: read` default does not grant -> `Resource
+not accessible by integration`. Fixed by scoping `pull-requests: read` to the `changes` job (commit
+`24c6797`); the re-run was green. Root cause the audit missed: **zizmor's `excessive-permissions`
+gate above catches *too many* permissions, never *too few*** -- and CONFORM was checked with local
+`zizmor`/`pytest`/`tsc`, none of which exercise the `pull_request` GITHUB_TOKEN. The least-privilege
+`contents: read` idiom was copied from Swordfish's `ci-guard.yml`, where it was justified per-job
+("no job here needs write access") because that job only runs a checkout + a grep script; Selom
+transplanted it onto a job that calls the GitHub API. The **living contract** for why the workflow is
+shaped the way it is now lives beside it at `.github/workflows/README.md` (Thalon's `CI-GUARD.md`
+idiom) -- edit that when you touch permissions or `needs:`. Lesson pointer: [[verify-ci-in-its-target-event]].
+
 ## M-005 -- parallel-lane worktree tooling
 
 Tooling milestone (no MEASURE/CONFORM/ENFORCE gate; acceptance = each artifact exists + works). Files:
