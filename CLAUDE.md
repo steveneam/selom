@@ -54,6 +54,17 @@ Selom is the owner's product and work. Every artifact is authored by the owner �
 - **Surgical changes** — touch only what the task needs; no drive-by rewrites.
 - **Goal-driven verify** — confirm the change does what it should, in the running app.
 
+## Engineering ratchets (the graphify-replacement doctrine)
+
+Wiring integrity is held by **executable ratchet tests**, not a maintained knowledge graph. The
+**ratchet strength ladder** — executable > structural > config > documentary > memory — governs every
+invariant: keep its strongest expression, prune the weaker restatement. A guard is only a ratchet if
+enforcement is gated on its **exit code** (never a `;`-chain that ignores failure); new invariants
+extend an existing guard test in the *same* change. Repo hygiene (conflict markers, forbidden tokens,
+board trailing-newline) runs via `scripts/guards/hygiene-scan.mjs` — `--all` in CI, `--staged` in the
+wired `.githooks/pre-commit` (`core.hooksPath=.githooks`). Plan + gate ledger:
+`docs/eng-practices-port/plan.md`, `docs/hardening-port/gate-ledger.md`.
+
 ## Repo structure conventions
 
 Keep the tree clean as we grow. Full plan + rationale: `docs/repo-structure/plan.md`.

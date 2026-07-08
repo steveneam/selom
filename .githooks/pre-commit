@@ -1,0 +1,25 @@
+#!/bin/sh
+# Repo-hygiene pre-commit gate (eng-practices port, M-001).
+#
+# Runs the hygiene scanner over STAGED content and aborts the commit on any hit. A guard is only
+# a ratchet if the commit is gated on its EXIT CODE -- so this returns the scanner's status
+# directly (never a `;`-chain that ignores failure). No skip-env backdoor.
+#
+# core.hooksPath=.githooks selects this hook; graphify's post-commit/post-checkout live beside it
+# (untracked) so the core.hooksPath switch does not silently retire them (their gated removal is M-007).
+
+# Fail CLOSED if node is missing -- a scanner that cannot run must not pass silently.
+if ! command -v node >/dev/null 2>&1; then
+    echo "[hygiene] node not found on PATH -- cannot run the pre-commit hygiene scan; aborting commit." >&2
+    echo "[hygiene] install Node or fix PATH; to bypass once (discouraged): git commit --no-verify" >&2
+    exit 1
+fi
+
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 1
+node "$ROOT/scripts/guards/hygiene-scan.mjs" --staged
+status=$?
+if [ "$status" -ne 0 ]; then
+    echo "[hygiene] pre-commit hygiene scan FAILED (exit $status) -- commit aborted." >&2
+    echo "[hygiene] fix the flagged lines above, or bypass once (discouraged): git commit --no-verify" >&2
+fi
+exit "$status"

@@ -68,3 +68,10 @@ docs/aws-materialization/aws-access-setup.md
 # rebuilt from source by the post-commit hook, so none of it needs versioning.
 # (Also why `git add -A` is banned here — it would otherwise sweep ~17 MB in.)
 graphify-out/
+
+# -- Migrated graphify git hooks (local/untracked; only .githooks/pre-commit is tracked) --
+# core.hooksPath=.githooks selects the tracked pre-commit gate; graphify's post-commit /
+# post-checkout were migrated into .githooks/ to keep firing until M-007's gated retirement.
+# They stay machine-local (graphify installs per-machine), so only pre-commit is versioned.
+.githooks/post-commit
+.githooks/post-checkout
