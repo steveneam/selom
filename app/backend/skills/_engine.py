@@ -13,7 +13,6 @@ Selection via ``SELOM_SKILLS_ENGINE`` (default ``auto``):
   stub  -> force stub  (what the golden tests pin, for determinism)
 """
 
-import os
 from importlib.util import find_spec
 
 # The union of heavy scientific modules any skill gates its real engine on (the args every
@@ -34,7 +33,9 @@ REQUIRED_ENGINE_MODULES = (
 
 
 def use_real_engine(*required_modules: str) -> bool:
-    engine = os.environ.get("SELOM_SKILLS_ENGINE", "auto").lower()
+    from config import settings  # lazy: avoids a config<->_engine import cycle at construction
+
+    engine = settings.skills_engine().lower()
     if engine == "stub":
         return False
     if engine in ("real", "scanpy"):
@@ -47,10 +48,14 @@ def missing_engine_modules() -> list[str]:
     return [m for m in REQUIRED_ENGINE_MODULES if find_spec(m) is None]
 
 
-def resolve_engine_policy() -> str:
+def resolve_engine_policy(engine: str | None = None) -> str:
     """The globally-resolved engine posture — ``"real"`` or ``"stub"`` — mirroring the decision
     ``use_real_engine`` makes per skill, so a figure's provenance can honestly say whether it was
     computed or fabricated.
+
+    ``engine`` is the raw ``SELOM_SKILLS_ENGINE`` selector; when ``None`` it is live-read via
+    ``config.settings.skills_engine()`` (the single env-reader home). The config boot guard passes
+    the value explicitly because the ``settings`` singleton is not yet bound during construction.
 
     * ``stub``  — forced ``SELOM_SKILLS_ENGINE=stub``, OR ``auto`` with a required module missing
       (so some skills fall back to a synthetic figure). Conservative: a partial install marks the
@@ -60,7 +65,11 @@ def resolve_engine_policy() -> str:
       ``real`` with a dep genuinely missing raises an honest ImportError inside the runner — an
       error, not a fabricated figure — so it is never mislabelled ``stub``.)
     """
-    engine = os.environ.get("SELOM_SKILLS_ENGINE", "auto").lower()
+    if engine is None:
+        from config import settings  # lazy: avoids a config<->_engine import cycle at construction
+
+        engine = settings.skills_engine()
+    engine = engine.lower()
     if engine == "stub":
         return "stub"
     if engine in ("real", "scanpy"):

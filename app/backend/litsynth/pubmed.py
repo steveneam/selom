@@ -9,7 +9,6 @@ bibliographic metadata is US-government, not copyrightable; we store fields, not
 
 from __future__ import annotations
 
-import os
 import re
 import time
 import urllib.parse
@@ -37,10 +36,12 @@ class NcbiConfig:
 
     @classmethod
     def from_env(cls) -> NcbiConfig:
+        from config import settings  # lazy: keep the pure client free of an import-time config dep
+
         return cls(
-            tool=os.environ.get("SELOM_NCBI_TOOL", "selom"),
-            email=os.environ.get("SELOM_NCBI_EMAIL") or None,
-            api_key=os.environ.get("SELOM_NCBI_API_KEY") or None,
+            tool=settings.ncbi_tool,
+            email=settings.ncbi_email or None,
+            api_key=settings.ncbi_api_key or None,
         )
 
     @property

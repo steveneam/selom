@@ -5,9 +5,29 @@ guards backstop the rules in CLAUDE.md / docs/repo-structure/plan.md so re-intro
 flat handler or a flat domain module fails CI/local before it lands.
 """
 
+import os
 import pathlib
 
 BACKEND = pathlib.Path(__file__).resolve().parents[1]
+
+# App-config env is read through config.Settings ONLY (single-env-reader ratchet, M-002). These
+# files may read os.environ/os.getenv directly because they are genuinely environmental (runtime
+# execution-env probes) or write a per-run override — not app config:
+_ENV_READER_ALLOWLIST = frozenset({
+    "config.py",                       # THE single typed home (Settings + the live accessors)
+    "db/engine.py",                    # AWS_LAMBDA_FUNCTION_NAME — runtime execution-env probe
+    "oracle.py",                       # LOCALAPPDATA — Windows environment probe
+    "reproduction/papers/hani.py",     # WRITES SELOM_UMAP_ENGINE as a per-reproduction override
+    "reproduction/papers/dorgau.py",   # WRITES SELOM_UMAP_ENGINE as a per-reproduction override
+})
+# Dirs the env scan prunes (third-party / generated code reads os.environ freely and is not ours).
+_ENV_SCAN_SKIP_DIRS = frozenset({
+    ".venv", "venv", "__pycache__", "node_modules", "data", ".pytest_cache",
+    ".ruff_cache", ".mypy_cache", "graphify-out", ".git", "build", "dist",
+})
+# Routers stay thin over the engine facade: a router may import only these engine.* submodules
+# (import boundary, M-002). Reaching into any other engine internal fails the guard.
+_ROUTER_ENGINE_ALLOWLIST = frozenset({"compat", "match", "recommend"})
 
 
 def test_main_has_no_app_route_decorators():
@@ -175,4 +195,66 @@ def test_ai_action_registry_matches_action_types():
     assert types_tuple == literal_members, (
         f"ACTION_TYPES tuple {sorted(types_tuple)} doesn't match ActionType Literal members "
         f"{sorted(literal_members)}.  Keep models.ACTION_TYPES and models.ActionType in sync."
+    )
+
+
+def _iter_backend_py():
+    """Every backend .py, pruning third-party/generated trees (so the scan is our code only)."""
+    for dirpath, dirnames, filenames in os.walk(BACKEND):
+        dirnames[:] = [d for d in dirnames if d not in _ENV_SCAN_SKIP_DIRS]
+        for fn in filenames:
+            if fn.endswith(".py"):
+                yield pathlib.Path(dirpath) / fn
+
+
+def test_single_env_reader():
+    """App-config env is read through config.Settings, not scattered os.environ/os.getenv reads.
+
+    A renamed or duplicated env key silently diverges when reads are scattered across modules;
+    routing them through the ONE typed home (config.Settings' fields + its live accessors) makes the
+    selector set a single reviewable surface — the seam parallel lanes depend on. tests/ (setup /
+    monkeypatch) and the explicit allowlist (genuine runtime env probes + the per-run
+    SELOM_UMAP_ENGINE writers) are exempt. See docs/eng-practices-port/plan.md M-002 +
+    docs/hardening-port/gate-ledger.md.
+    """
+    import re
+
+    pat = re.compile(r"\bos\.(?:environ|getenv)\b")
+    offenders = []
+    for p in _iter_backend_py():
+        rel = p.relative_to(BACKEND).as_posix()
+        if rel in _ENV_READER_ALLOWLIST or rel.startswith("tests/"):
+            continue
+        if pat.search(p.read_text(encoding="utf-8")):
+            offenders.append(rel)
+    assert not offenders, (
+        f"os.environ/os.getenv read outside config.Settings: {sorted(offenders)}. Route app-config "
+        "env through config.Settings (add a typed field or a live accessor in config.py); only a "
+        "genuine runtime env probe / per-run override belongs in _ENV_READER_ALLOWLIST (add it on "
+        "purpose). See docs/eng-practices-port/plan.md M-002."
+    )
+
+
+def test_routers_import_only_allowlisted_engine_facade():
+    """routers/ import only an explicit set of engine.* facade modules (import boundary, M-002).
+
+    Routers are the thin HTTP layer; reaching directly into a new engine internal couples the API to
+    engine implementation and is exactly the seam a frozen contract must protect. A new
+    engine.<module> import in a router fails here until _ROUTER_ENGINE_ALLOWLIST is extended on
+    purpose. See docs/eng-practices-port/plan.md M-002.
+    """
+    import re
+
+    # Anchored to line-start so a prose mention of "engine.x" never counts — only real imports.
+    pat = re.compile(r"^\s*(?:from|import)\s+engine\.([A-Za-z_]\w*)", re.MULTILINE)
+    offenders: dict[str, set[str]] = {}
+    for p in sorted((BACKEND / "routers").glob("*.py")):
+        for mod in pat.findall(p.read_text(encoding="utf-8")):
+            if mod not in _ROUTER_ENGINE_ALLOWLIST:
+                offenders.setdefault(p.name, set()).add(mod)
+    assert not offenders, (
+        f"router(s) import non-allowlisted engine internals: "
+        f"{ {k: sorted(v) for k, v in offenders.items()} }. Routers are the thin HTTP layer — route "
+        "through the service/facade layer, or extend _ROUTER_ENGINE_ALLOWLIST deliberately. "
+        "See docs/eng-practices-port/plan.md M-002."
     )

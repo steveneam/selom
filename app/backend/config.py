@@ -6,6 +6,7 @@ Set ``SELOM_QUEUE=arq`` (+ Redis) and ``SELOM_OBJECT_STORE=s3`` (+ an AWS bucket
 flip on the distributed/cloud path. Env-var names match the repo-root ``.env.example``.
 """
 
+import os
 import pathlib
 
 from pydantic import Field, model_validator
@@ -182,6 +183,41 @@ class Settings(BaseSettings):
         default=None, validation_alias="SELOM_GAP_STORE_PATH"
     )
 
+    # Lit-synthesizer + paper-metadata: external-service identity (NCBI/OpenAlex) and the on-disk
+    # response caches. App-config env routed through this single typed home (single-env-reader
+    # ratchet, M-002) — litsynth/pubmed.py, litsynth/lookup.py, paper_metadata.py read these fields,
+    # never os.environ directly. Empty string / None means unset (the caller degrades to a temp-dir
+    # cache path or anonymous/keyless access).
+    openalex_email: str = Field(default="", validation_alias="SELOM_OPENALEX_EMAIL")
+    ncbi_tool: str = Field(default="selom", validation_alias="SELOM_NCBI_TOOL")
+    ncbi_email: str = Field(default="", validation_alias="SELOM_NCBI_EMAIL")
+    ncbi_api_key: str = Field(default="", validation_alias="SELOM_NCBI_API_KEY")
+    citation_cache: pathlib.Path | None = Field(
+        default=None, validation_alias="SELOM_CITATION_CACHE"
+    )
+    paper_metadata_cache: pathlib.Path | None = Field(
+        default=None, validation_alias="SELOM_PAPER_METADATA_CACHE"
+    )
+
+    # --- live environment accessors (single-env-reader ratchet, M-002) --------------------------
+    # These re-read os.environ at CALL time (NOT captured at construction) because they are
+    # monkeypatched per-test and — for the UMAP engine — WRITTEN at run time as a per-reproduction
+    # override (reproduction/papers/hani.py, dorgau.py). config.py is the one allowlisted env-reader
+    # home, so these live probes stay here instead of scattering os.environ across the readers.
+    def skills_engine(self) -> str:
+        """Live-read the ``SELOM_SKILLS_ENGINE`` selector (default ``auto``: real iff every required
+        module imports, else stub). Re-read each call so a monkeypatch/override is honored."""
+        return os.environ.get("SELOM_SKILLS_ENGINE", "auto")
+
+    def umap_engine(self) -> str:
+        """Live-read the ``SELOM_UMAP_ENGINE`` selector (default ``auto``). Honored per-run so the
+        reproduction override that writes it at run time (hani.py, dorgau.py) still selects scanpy."""
+        return os.environ.get("SELOM_UMAP_ENGINE", "auto")
+
+    def anthropic_api_key_present(self) -> bool:
+        """Live presence check for ``ANTHROPIC_API_KEY`` (the ``live`` gateway credential)."""
+        return bool(os.environ.get("ANTHROPIC_API_KEY"))
+
     @property
     def is_production(self) -> bool:
         """A real deployment serving real users. True when explicitly `SELOM_ENV=prod`, OR when an
@@ -215,7 +251,9 @@ class Settings(BaseSettings):
             from skills._engine import missing_engine_modules, resolve_engine_policy
 
             missing = missing_engine_modules()
-            if resolve_engine_policy() == "stub":
+            # Pass the live selector explicitly: during construction the `settings` singleton is not
+            # yet bound, so resolve_engine_policy() must not re-import it (would be circular).
+            if resolve_engine_policy(self.skills_engine()) == "stub":
                 why = (f"required science modules are not importable ({', '.join(missing)})"
                        if missing else "SELOM_SKILLS_ENGINE=stub is set")
                 problems.append(

@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import difflib
 import json
-import os
 import pathlib
 import re
 import tempfile
@@ -33,6 +32,7 @@ from urllib.error import HTTPError
 
 from pydantic import BaseModel, Field
 
+from config import settings
 from litsynth import pubmed
 from litsynth.cache import JsonCache
 
@@ -576,9 +576,9 @@ _PUBMED_FETCH = pubmed.default_fetcher(_CFG)
 # OpenAlex permits 10 req/s with a mailto; CrossRef's polite pool is generous. One shared
 # throttled JSON fetcher just under that, with the descriptive UA the seam already sends.
 _JSON_FETCH = pubmed.ThrottledFetcher(min_interval=0.12)
-_EMAIL = os.environ.get("SELOM_OPENALEX_EMAIL") or os.environ.get("SELOM_NCBI_EMAIL") or None
+_EMAIL = settings.openalex_email or settings.ncbi_email or None
 _CACHE = JsonCache(
-    os.environ.get("SELOM_PAPER_METADATA_CACHE")
+    settings.paper_metadata_cache
     or (pathlib.Path(tempfile.gettempdir()) / "selom-paper-metadata-cache.json")
 )
 

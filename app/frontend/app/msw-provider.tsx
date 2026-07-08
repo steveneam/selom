@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const MOCKING_ENABLED = process.env.NEXT_PUBLIC_API_MOCKING === "enabled";
+import { apiMockingEnabled as MOCKING_ENABLED } from "@/lib/config/env";
 
 /**
  * Starts the MSW browser worker before rendering children, but ONLY when

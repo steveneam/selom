@@ -15,12 +15,13 @@ Engine selection via ``SELOM_UMAP_ENGINE`` (default "auto"):
 """
 
 import math
-import os
 from importlib.util import find_spec
+
+from config import settings
 
 
 def run(data_path: str, params: dict) -> dict:
-    engine = os.environ.get("SELOM_UMAP_ENGINE", "auto").lower()
+    engine = settings.umap_engine().lower()
     use_real = engine == "scanpy" or (engine == "auto" and find_spec("scanpy") is not None)
     if use_real:
         from skills.umap_scrna.run_scanpy import run as run_real

@@ -11,6 +11,7 @@ import type { StageKey, StageState } from "@/components/pipeline";
 import { Button } from "@/components/ui/button";
 import { useFigureStore } from "@/hooks/use-figure-store";
 import { getSkill } from "@/lib/catalog/seed";
+import { apiMockingEnabled } from "@/lib/config/env";
 import { deriveFigureModel } from "@/lib/figure/figure-model";
 import {
   labelableGenes,
@@ -137,7 +138,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const staleness = activeFigure
     ? figureStaleness(activeFigure, { sha256: activeDataset?.currentSha256 })
     : { stale: false, reasons: [] };
-  const mockMode = process.env.NEXT_PUBLIC_API_MOCKING === "enabled";
+  const mockMode = apiMockingEnabled;
   // Re-run needs the dataset bytes: an UPLOADED dataset runs from its dataset_id (WS2.1 — no
   // re-upload, so re-run works after reload), else this session's real bytes (lastFile), else
   // fabricated in mock mode. With none (a re-opened metadata-only dataset) it's disabled.
@@ -339,7 +340,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const demoRan = React.useRef(false);
   React.useEffect(() => {
     if (demoRan.current) return;
-    if (process.env.NEXT_PUBLIC_API_MOCKING !== "enabled") return;
+    if (!apiMockingEnabled) return;
     const sp = new URLSearchParams(window.location.search);
     if (!sp.has("demo")) return;
     const skillId = sp.get("demo") || installs[0]?.skillId;

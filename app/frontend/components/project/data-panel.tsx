@@ -19,6 +19,7 @@ import { detectModality, proposeForModality, proposeFromQc, type IntakeAnswers, 
 import { combineData, inspectData, modalityFromKind, qcFromInspect, type DataTypeOverride } from "@/lib/intake/inspect";
 import { designRunParams, timeCourseDesignFile, type DesignChoice } from "@/lib/intake/design";
 import { uploadDataset } from "@/lib/uploads/api";
+import { apiMockingEnabled } from "@/lib/config/env";
 import { projectStore } from "@/lib/projects/store";
 import type { AiActionDelta } from "@/lib/ai/types";
 import type { Dataset } from "@/lib/projects/types";
@@ -99,7 +100,7 @@ export function DataPanel({
   const [combineError, setCombineError] = React.useState<string | null>(null);
   // dev:mock has no upload/run-dataset handlers → skip the byte-upload handshake (WS2.1) and keep the
   // metadata-only + multipart mock path. Real backend (the verify target) runs the full loop.
-  const mockMode = process.env.NEXT_PUBLIC_API_MOCKING === "enabled";
+  const mockMode = apiMockingEnabled;
 
   React.useEffect(() => {
     setDisabledSteps(new Set());

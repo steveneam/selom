@@ -17,7 +17,6 @@ recorded ``provenance.params`` with zero AI in the loop (AI compiles away).
 from __future__ import annotations
 
 import json as _json
-import os
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -65,7 +64,7 @@ def get_action_gateway() -> ActionGateway:
 
         return OperatorActionGateway.from_recordings(settings.ai_operator_recordings_path)
 
-    if mode == "live" and os.environ.get("ANTHROPIC_API_KEY"):
+    if mode == "live" and settings.anthropic_api_key_present():
         from ai.live.pydantic_gateway import PydanticAIGateway  # lazy import
 
         return PydanticAIGateway(

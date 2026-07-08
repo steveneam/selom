@@ -8,11 +8,11 @@ never break the caller. ``fetch``/``cache``/``cfg`` are injectable so the glue
 
 from __future__ import annotations
 
-import os
 import pathlib
 import tempfile
 import xml.etree.ElementTree as ET
 
+from config import settings
 from litsynth import biorxiv, pubmed
 from litsynth.cache import JsonCache
 
@@ -20,7 +20,7 @@ _CONFIG = pubmed.NcbiConfig.from_env()
 _FETCHER = pubmed.default_fetcher(_CONFIG)
 _BIORXIV_FETCHER = biorxiv.default_fetcher()
 _CACHE = JsonCache(
-    os.environ.get("SELOM_CITATION_CACHE")
+    settings.citation_cache
     or (pathlib.Path(tempfile.gettempdir()) / "selom-citation-cache.json")
 )
 
