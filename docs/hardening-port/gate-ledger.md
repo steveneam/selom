@@ -81,3 +81,32 @@ router until `_ROUTER_ENGINE_ALLOWLIST` is extended on purpose.
 
 Gates green: BE fast **1214 passed / 1 skipped** (+2 guards) + ruff clean; FE tsc clean, eslint 0
 errors (1 pre-existing warning), vitest **513**.
+
+## M-003 -- LLM/AI call-site inventory + accessor allowlist
+
+Guard: `app/backend/tests/test_ai_call_site_inventory.py` (a genuinely new concern -> a new file,
+not an extension). Guard-only milestone: the surface already conforms, so the 3-move is MEASURE
+(inventory the sets) -> CONFORM (already zero-drift) -> ENFORCE (pin the exact sets; a new
+label/caller/raw-client is red until the matching EXPECTED_* set is bumped in the same change).
+
+| Inventory | Pinned set | Source |
+|---|---|---|
+| AI operation labels | `explain_score`, `propose_sweep`, `grade_advice`, `draft_methods`, `draft_legend` (5) | `request_type` dispatch in `ai/gateway.py` (extracted dynamically -> non-vacuous) |
+| `stamp_ai_actions` callers | `ai/execute.py`, `routers/ai.py` (2) | def lives in `companions/provenance.py` (excluded) |
+| Raw model-client homes | `ai/live/pydantic_gateway.py` (1) | `AnthropicModel(...)` construction; other providers denied elsewhere |
+| Gateway selection factory | `get_action_gateway` in `routers/ai.py` (1) | impls asserted present: `ai/gateway.py`, `ai/live/pydantic_gateway.py`, `ai/live/vercel_gateway.py` |
+
+**VERIFY (deferred, recorded not built):** Selom's gateways already **budget-assert** (`ai_token_budget`
+/ `ai_timeout_s` threaded into `PydanticAIGateway`/`VercelAIGateway`) and **degrade-clean** in both
+directions (any error/timeout -> the byte-identical deterministic fallback). They do NOT emit a
+trace span or **record usage metering** (the `withGatewayGuard` budget-assert -> trace -> record-usage
+shape). Metering is **warranted once the live gateway is a paid product path at scale** -> deferred to
+that point (build-now-gate-later), recorded here. No metering built in M-003.
+
+Gate green: the 4 inventory guards pass; ruff clean. No source changed (guard-only) -> BE fast gate
+unchanged from M-002 (**1214 / 1 skipped**) + the 4 new guards.
+
+**Tooling note (owner-endorsed 2026-07-09):** adopt `pytest-xdist` (`pytest -n auto`) for the fast
+gate; PIN it in the backend dev deps as part of **M-004** so CI + every invocation parallelize
+reproducibly (currently installed only in the owner's env, absent from `pyproject.toml`/`uv.lock`/
+`.venv`).
