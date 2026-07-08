@@ -28,6 +28,11 @@ it**. Every extra scope is granted at the job level, next to the step that needs
   the `pulls.listFiles` GitHub API to compute changed paths; `contents: read` alone does not grant it,
   and the call 403s (`Resource not accessible by integration`) → `changes` fails → the `ci` aggregate
   goes red. **Do not strip it.** (Fixed in PR #1, commit `24c6797`, after it shipped missing.)
+- `changes` also checks out with **`fetch-depth: 0`**. On a `push` event (not a PR) paths-filter diffs
+  against `github.event.before` using *git*, not the API; a shallow checkout lacks that commit and falls
+  back to a `git fetch` that fails (`could not read Username`) because `persist-credentials: false` left
+  no token. Full history makes the before-commit local, so no credential-less fetch happens. **Keep both
+  while `persist-credentials: false` is set.** (Surfaced on the first push-to-`main`, the FF-merge of PR #1.)
 
 **Rule for new jobs:** least-privilege is the *default*, not a finished setting. Any job that calls the
 GitHub API (lists PR files, comments, reads deployments, requests an OIDC token…) must declare the
@@ -43,6 +48,11 @@ to a feature branch, run in a *different* context: they do not exercise the `pul
 restricted `GITHUB_TOKEN`, or the path-gated `needs:` graph. The `contents: read` clamp that broke
 paths-filter passed every local gate and was only surfaced by the first real PR run. **Before
 branch-protecting `main` on `ci`, confirm `ci` has gone green on a genuine PR** (not just locally).
+
+This workflow has **two** trigger events — `pull_request` and `push` to `main` — and paths-filter
+behaves differently in each (GitHub API on a PR, git-diff on a push). Each is its own context and each
+surfaced its own bug (the two bullets above). Treat *every* trigger event as needing its own green run:
+the push-to-`main` path was not exercised until the FF-merge of PR #1, one commit after the PR was green.
 
 ## What this does NOT do
 
