@@ -15,6 +15,29 @@
 > owner approves the seams (partition · frozen contract · every merge). 3–5 lanes max;
 > coupled work stays sequential (it's faster serial).
 
+## Lane execution modes (pick by lane count)
+
+- **Mode A — ≤ 2 lanes: in-session worktree subagents.** The lead spawns the lanes as worktree
+  subagents from THIS session (git worktree + branch; `scripts/worktree-setup.ps1` junctions deps).
+  Cheapest; the lead orchestrates and runs the merge train inline. Default for a small sprint.
+- **Mode B — > 2 lanes: the vscode method.** Each lane runs in its own dedicated terminal / VS Code
+  window on its own worktree (a human boots them). Use when the fan-out exceeds what one session
+  should juggle. The lead still owns the single merge train.
+
+Operational rules (both modes):
+
+- **One web-writer per wave.** At most ONE lane per wave may touch a given external/web surface (a
+  Vercel project, a shared preview, any live external write) — concurrent web writes are not
+  partitionable. Serialize them across waves.
+- **Pre-provision runtimes at lane prep.** Junction `node_modules` + `.venv` and copy the
+  `.worktreeinclude` files (via `scripts/worktree-setup.ps1`) BEFORE a lane starts, so no lane runs
+  `npm install` in a worktree (the FE `preinstall` guard refuses it) and none stalls on a cold install.
+- **Kill a dev server by its PORT LISTENER, never a harness task-stop.** A backgrounded uvicorn/next
+  is killed by the process listening on its port:
+  `Get-NetTCPConnection -LocalPort 801X -State Listen | ForEach-Object { taskkill /PID $_.OwningProcess /F }`.
+  **`:8000` = eamos — never bind or kill it.**
+- The freeze rules the lanes fork on live in [`docs/operating/contract-window.md`](docs/operating/contract-window.md).
+
 ## Active sprint
 
 **Lead:** Claude (main tree `D:/selom`)   ·   **Sprint 1** — **MERGED 2026-07-04.** All 3 lanes landed on local `main` (eng `7b50038` → erg `889bfb2` →
@@ -147,10 +170,12 @@ On fork (`claude --worktree <lane>` → `.claude/worktrees/<lane>/`):
 | Dep manifests | `package-lock.json` · `uv.lock` | a dep change is a **single-owner coordinated step — never split across parallel lanes** |
 | Live keys (Stripe/Clerk/Resend/AI gateway) | `.env` | use dev/test keys; no lane triggers live charges/sends |
 
-## Merge gate (set up before the first fork)
+## Merge gate
 
-`main` is **not yet branch-protected**. Before the first parallel merge, add a small
-always-on CI **gate** job (the existing `backend-ci`/`frontend-ci` are path-filtered, so
-marking them "required" as-is would deadlock cross-path PRs) and protect `main` to require
-it. Merges are then serialized: **rebase onto latest `main` → CI green → review → merge**,
-one lane at a time in merge-order; the next lane rebases on the new `main`. **No merge on red.**
+M-004 consolidated CI into one `.github/workflows/ci.yml` whose always-run aggregate **`ci`** job is
+the single stable required check — a skipped path-gated job counts as pass, so it never deadlocks a
+cross-path PR (the reason the old path-filtered `backend-ci`/`frontend-ci` could not be marked
+required). **Owner step (once):** run `ci` green, then branch-protect `main` requiring exactly `ci`
+(`enforce_admins: false`; GitHub Pro — solo owner keeps direct-push, PRs are gated). Merges are then
+serialized: **rebase onto latest `main` → `ci` green → scope-leak check → review → merge**, one lane
+at a time in merge-order; the next lane rebases on the new `main`. **No merge on red.**

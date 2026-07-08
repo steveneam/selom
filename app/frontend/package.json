@@ -4,6 +4,7 @@
   "private": true,
   "//install": "react-plotly.js@3 supports React 19 (peer-deps allow ^18||^19). --legacy-peer-deps kept as a safety net for heavy transitive plotly.js deps.",
   "scripts": {
+    "preinstall": "node scripts/guard-worktree-install.mjs",
     "dev": "next dev",
     "dev:mock": "cross-env NEXT_PUBLIC_API_MOCKING=enabled next dev",
     "build": "next build",

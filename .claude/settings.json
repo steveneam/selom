@@ -9,5 +9,9 @@
     "vercel@claude-plugins-official": true
   },
   "effortLevel": "xhigh",
-  "theme": "dark"
+  "theme": "dark",
+  "includeCoAuthoredBy": false,
+  "worktree": {
+    "symlinkDirectories": ["app/frontend/node_modules"]
+  }
 }

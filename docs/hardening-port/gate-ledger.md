@@ -163,3 +163,21 @@ as it already does for the extras. A deliberate `uv lock` refresh is a separate 
 Verified locally: zizmor 0 on `ci.yml`; `ci.yml` + `renovate.json` parse. The path-trio behavior
 (docs-only -> `ci` success with backend+frontend skipped; backend-only -> only backend runs) is
 verified on the first GitHub run (cannot run Actions locally).
+
+## M-005 -- parallel-lane worktree tooling
+
+Tooling milestone (no MEASURE/CONFORM/ENFORCE gate; acceptance = each artifact exists + works). Files:
+`app/frontend/scripts/guard-worktree-install.mjs` (+ FE `package.json` `preinstall` wire),
+`scripts/worktree-setup.ps1`, `.claude/settings.json`, `COORDINATION.md`,
+`docs/operating/contract-window.md`.
+
+| Artifact | What | Verified |
+|---|---|---|
+| `guard-worktree-install.mjs` | FE `preinstall` refusing `npm install` inside a worktree (`.git`-as-file); escape `SELOM_WORKTREE_INSTALL_OK=1` | main tree -> exit 0 (owner/CI unaffected); worktree -> exit 1 (blocks); escape -> exit 0 |
+| `worktree-setup.ps1` | junction FE `node_modules` + BE `.venv` into a lane; copy `.worktreeinclude`; verify toolchain; idempotent; **teardown = `rmdir /s /q`, never `Remove-Item -Recurse`**; main `node_modules` count snapshot before/after | pure ASCII; PowerShell parse OK |
+| `.claude/settings.json` | `includeCoAuthoredBy: false` (makes the no-AI-signoff rule EXECUTABLE) + `worktree.symlinkDirectories` (admin-inert; the junction script is the real guarantee) | valid JSON |
+| `COORDINATION.md` | Mode A (<=2 lanes, in-session subagents) vs Mode B (>2, vscode method); one-web-writer-per-wave; pre-provision-at-prep; kill-by-port-listener; **merge-gate section updated to the M-004 `ci` required check** | board trailing-newline intact |
+| `contract-window.md` | freeze FE contract types + BE schema before fork; additive-only in-window; each invariant names its executable test; one window/sprint/owner | referenced from the playbook + COORDINATION |
+
+The FE env-reader guard (M-002) allowlists `scripts/`, so the new `.mjs`'s `process.env` read is
+clean; FE structure guard green.
