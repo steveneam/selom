@@ -181,3 +181,21 @@ Tooling milestone (no MEASURE/CONFORM/ENFORCE gate; acceptance = each artifact e
 
 The FE env-reader guard (M-002) allowlists `scripts/`, so the new `.mjs`'s `process.env` read is
 clean; FE structure guard green.
+
+## M-006 -- lean handoff, overwrite model
+
+Docs milestone. `agent_handoff/CURRENT.md` compressed **441 -> 52 lines** (SESSIONS as one-line
+rows; LIVE ~3 bullets; NEXT/DEFERRED/ENV/READ short lists + the Codex slot); the prior narrative
+archived verbatim to `agent_handoff/archive/2026-07-09-current-history.md` (write-once, 441 lines).
+`README.md` hard-rule 1 revised from "supersede by append; history preserved" to the **overwrite
+model** (narrative in commits + `archive/`, CURRENT = live slots) -- resolving the contradiction with
+the already-present "CURRENT.md shape (lean)" section; no rule still says "append". Board hygiene
+(single trailing newline, no conflict markers) green on both files.
+
+## Port W-002 -- COMPLETE (M-002..M-006)
+
+All of W-002 shipped on `port/m001-repo-hygiene` (`945ac73..HEAD`, NOT pushed). Remaining: **W-003**
+= M-007 (graphify wiring-retirement, GATED on M-001..M-004 green IN CI -> needs the owner to push so
+`ci` runs) + M-008 (deferred deploy/ops record, docs-only). Owner steps still open: **push the branch**;
+run `ci` green once then branch-protect `main` requiring `ci` (`enforce_admins:false`, GitHub Pro);
+confirm graphify semantic-nav is unused before M-007.

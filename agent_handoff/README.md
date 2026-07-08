@@ -31,9 +31,12 @@ Read these in order before doing any work:
 
 ## Hard rules
 
-1. **Never delete or overwrite the other agent's section or plan.** Supersede by
-   append, then archive the old content to
-   `agent_handoff/archive/<date>-<slug>.md`. History is preserved, never destroyed.
+1. **`CURRENT.md` is overwritten in place, never appended.** The per-session narrative lives
+   in git commit messages + a write-once `agent_handoff/archive/<date>-<codename>.md`; `CURRENT.md`
+   carries only the live slots (a SESSIONS index row + LIVE/NEXT/DEFERRED/ENV/READ — see "CURRENT.md
+   shape"). A finished LIVE block collapses to ONE new SESSIONS row; **history is preserved in git +
+   `archive/`, not by growing the file.** Don't destroy another agent's plan or section — supersede
+   it in place, and if it carried narrative worth keeping, archive that narrative first.
 2. **Each agent writes ONLY its own `CURRENT.md` section** — Claude writes
    `## Claude — Last Task & Resume`, Codex writes `## Codex — Last Task & Resume`.
    Do not edit the other agent's section.
