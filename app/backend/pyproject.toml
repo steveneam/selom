@@ -125,6 +125,10 @@ jobs = [
 ]
 dev = [
   "pytest",
+  # MIT — parallel test workers (`pytest -n auto`); the fast gate is CPU-bound so this ~halves it
+  # locally and in CI (owner-endorsed 2026-07-09). Tests are worker-isolated (monkeypatch env +
+  # injected caches), so the run is xdist-safe.
+  "pytest-xdist>=3",
   "httpx",
   "ruff",
   # Apache-2.0 — in-memory AWS mock so the REAL S3ObjectStore (boto3) is exercised in the

@@ -1,0 +1,170 @@
+# Consolidated CI -- the single required check `ci` for branch protection (eng-practices port, M-004).
+#
+# One workflow so GitHub `needs:`-aggregation can produce ONE stable required check across a monorepo:
+# two path-filtered workflows can never be required (a skipped required check blocks a PR forever).
+# A `changes` job gates the backend/frontend jobs by path; hygiene + workflow-lint run on every PR
+# regardless of path; the final `ci` job (needs all, `if: always()`) passes iff no required job
+# FAILED (a skipped path-gated job counts as pass).
+#
+# Supply-chain hardening: every `uses:` is SHA-pinned (renovate `helpers:pinGitHubActionDigests`
+# bumps the digests); least-privilege `permissions: contents: read` at the workflow level (no job
+# widens it); `persist-credentials: false` on checkout (artipacked). zizmor lints the workflows.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+      - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590 # v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - "app/backend/**"
+              - ".github/workflows/ci.yml"
+            frontend:
+              - "app/frontend/**"
+              - ".github/workflows/ci.yml"
+
+  backend:
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: app/backend
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      # Light fast-gate closure (no `omics` -- scvi-tools/torch are multi-GB and only `slow` tests
+      # need them). The science extras (pydeseq2/gseapy) are absent, so `auto` resolves the STUB
+      # engine for the science skills -- the required gate protects structure/contract/provenance,
+      # not real deg/gsea (deferred; DL-017). No literal SELOM_SKILLS_ENGINE=stub env is set: the
+      # prod-boot tests mock find_spec and would refuse to boot under a forced global stub.
+      - name: Install uv (+ pinned Python via .python-version)
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "app/backend/uv.lock"
+
+      - name: Install dependencies (light fast-gate closure)
+        run: uv sync --extra dev --extra db --extra jobs --extra scrna --extra pdf
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Fast test gate (pytest -m "not slow", parallel via xdist)
+        run: uv run pytest -m "not slow" -n auto
+
+  frontend:
+    needs: changes
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: app/frontend
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/frontend/package-lock.json
+
+      - name: Install (react-plotly.js stale peer-deps -> --legacy-peer-deps)
+        run: npm ci --legacy-peer-deps
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Unit tests (vitest)
+        run: npm run test
+
+      - name: Build (catches SSR/integration breaks)
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  hygiene:
+    # Repo-wide, NOT path-filtered -- the M-001 hygiene ratchet must run on every PR.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+      - name: Repo hygiene scan (conflict markers / secrets / board newline)
+        run: node scripts/guards/hygiene-scan.mjs --all
+
+  workflow-lint:
+    # zizmor supply-chain lint over the workflows themselves (unpinned-uses / excessive-permissions
+    # / artipacked / template-injection). Blocking: CONFORM proved zero on this ci.yml before it
+    # landed, so the gate is flipped onto a conforming repo.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+      - name: zizmor (workflow supply-chain lint)
+        run: uv tool run zizmor@latest --persona=regular .github/workflows/
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  ci:
+    # The single required check for branch protection. `if: always()` so it still reports when a
+    # path-gated job is skipped (a SKIPPED required check would otherwise block a PR forever); passes
+    # iff no required job FAILED or was cancelled (skipped == pass). Sharding later never changes the
+    # required name `ci`.
+    needs: [changes, backend, frontend, hygiene, workflow-lint]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Aggregate required-job results
+        env:
+          # Read the results via env (not inline in run:) so no `${{ }}` expands into the shell.
+          RESULTS: >-
+            ${{ needs.changes.result }} ${{ needs.backend.result }}
+            ${{ needs.frontend.result }} ${{ needs.hygiene.result }}
+            ${{ needs.workflow-lint.result }}
+        run: |
+          echo "results: $RESULTS"
+          for r in $RESULTS; do
+            case "$r" in
+              failure|cancelled)
+                echo "::error::a required job did not succeed: $r"
+                exit 1
+                ;;
+            esac
+          done
+          echo "all required jobs succeeded or were skipped"

@@ -110,3 +110,56 @@ unchanged from M-002 (**1214 / 1 skipped**) + the 4 new guards.
 gate; PIN it in the backend dev deps as part of **M-004** so CI + every invocation parallelize
 reproducibly (currently installed only in the owner's env, absent from `pyproject.toml`/`uv.lock`/
 `.venv`).
+
+## M-004 -- CI supply-chain hardening + stable aggregate required-check
+
+Files: `.github/workflows/ci.yml` (new; consolidates + replaces `backend-ci.yml` + `frontend-ci.yml`,
+both removed), `renovate.json` (new), `app/backend/pyproject.toml` (+`pytest-xdist`).
+MEASURE (zizmor `v1.26.1`, `--persona=regular`) taken 2026-07-09.
+
+### Gate -- workflow supply-chain (zizmor)
+
+| Audit | MEASURE (old backend-ci + frontend-ci) | CONFORM (new ci.yml) |
+|---|---|---|
+| `unpinned-uses` (high) | 4 (checkout/setup-uv/checkout/setup-node, all tag-pinned) | 0 -- every `uses:` a 40-char SHA + tag comment |
+| `excessive-permissions` (med) | 2 (no `permissions:` block on either workflow) | 0 -- `permissions: contents: read` at workflow level, no job widens it |
+| `artipacked` (med) | 2 (checkout persists credentials) | 0 -- `persist-credentials: false` on every checkout |
+| **total actionable** | **8** (14 findings, 6 suppressed) | **0** ("No findings to report", exit 0) |
+
+**3-move preserved:** MEASURE (8 on the old workflows) -> CONFORM (0 on the new `ci.yml`, proven
+locally via `uv tool run zizmor@latest`) -> ENFORCE (the blocking zizmor job is only added once the
+workflow it gates is already zero; branch protection is owner-run, below).
+
+### Consolidation
+
+One `ci.yml`, since two path-filtered workflows can never be a required check (a skipped required
+check blocks a PR forever) and `needs:` only aggregates within ONE workflow:
+
+- `changes` (dorny/paths-filter, SHA-pinned) -> `backend`/`frontend` booleans;
+- `backend` (path-gated; ruff + `pytest -m "not slow" -n auto`; steps moved verbatim + xdist) and
+  `frontend` (path-gated; lint + tsc + vitest + `next build`; verbatim);
+- `hygiene` (`hygiene-scan.mjs --all`, NOT path-filtered) + `workflow-lint` (zizmor, NOT filtered);
+- `ci` aggregate (`needs:` all; `if: always()`; passes iff no required job FAILED/cancelled --
+  skipped == pass) = the single stable required-check name, invariant under future sharding.
+
+**DL-017 (stub scope):** the light fast-gate closure omits the omics extras, so `auto` resolves the
+STUB engine for the science skills -- the required gate protects structure/contract/provenance, not
+real deg/gsea. NO literal `SELOM_SKILLS_ENGINE=stub` env is set: the prod-boot tests mock `find_spec`
+and would refuse to boot under a forced global stub (would break `test_config_accepts_valid_s3`).
+
+**pytest-xdist:** pinned in the `dev` extra so CI's `uv sync` installs it and the backend job runs
+`-n auto`. `uv.lock` NOT regenerated here -- a clean `uv lock` re-resolves/bumps the whole tree
+(+900 lines, unrelated packages), out of M-004 scope; `uv sync` (no `--locked`) resolves the new dep
+as it already does for the extras. A deliberate `uv lock` refresh is a separate Codex-lane task.
+
+### ENFORCE -- owner-run (VERIFY before flip)
+
+1. Push the branch; open a PR (or push to a branch) so `ci` runs green once (this is the first live
+   zizmor + `-n auto` MEASURE on CI infra).
+2. Branch-protect `main` requiring exactly the check name **`ci`**, `enforce_admins: false` (GitHub
+   Pro on a private repo -- owner has it), so the solo owner keeps direct-push while PRs are gated.
+3. Keep the git identity `282747725+steveneam@users.noreply.github.com` (Vercel).
+
+Verified locally: zizmor 0 on `ci.yml`; `ci.yml` + `renovate.json` parse. The path-trio behavior
+(docs-only -> `ci` success with backend+frontend skipped; backend-only -> only backend runs) is
+verified on the first GitHub run (cannot run Actions locally).
