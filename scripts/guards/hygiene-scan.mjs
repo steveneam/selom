@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 // hygiene-scan.mjs -- repo-hygiene ratchet scanner (eng-practices port, M-001).
 //
-// Flags three classes of defect over the tracked set (never the ignored tree):
+// Flags four classes of defect over the tracked set (never the ignored tree):
 //   1. merge-conflict markers  (repo-wide)   -- a `;`-chained rebase --continue can commit these
 //   2. forbidden tokens        (repo-wide)   -- leaked secrets/keys + a do-not-commit marker
 //   3. trailing-newline hygiene (board files) -- append-prone COORDINATION/CURRENT must end in one \n
+//   4. ci.yml paths-filter invariants        -- the two event-specific grants that each shipped
+//        missing (see .github/workflows/README.md): `pull-requests: read` (PR listFiles API) and
+//        `fetch-depth: 0` (push-event git-diff under persist-credentials:false). The PR gate cannot
+//        self-catch a stripped `fetch-depth: 0` -- the pull_request path never exercises it -- so a
+//        regression only breaks post-merge on push-to-main. This guard catches it at the gate instead.
 //
 // Ratchet-ladder note: this executable check replaces graphify's documentary wiring signal.
 // The patterns are ASSEMBLED FROM FRAGMENTS at runtime so this scanner passes its own scan.
@@ -42,6 +47,12 @@ const FORBIDDEN = [
 // Trailing-newline hygiene is enforced only on append-prone board files (the source ratchet's scope).
 const BOARD_FILES = new Set(['COORDINATION.md', 'agent_handoff/CURRENT.md']);
 
+// ci.yml paths-filter invariants: if the consolidated workflow uses dorny/paths-filter, it MUST keep
+// both event-specific grants (assembled from fragments so this scanner never trips its own check).
+const CI_WORKFLOW = '.github/workflows/ci.yml';
+const CI_PATHS_FILTER = 'dorny/' + 'paths-filter';
+const CI_REQUIRES = ['pull-' + 'requests: read', 'fetch-' + 'depth: 0'];
+
 // --- file list per mode ---------------------------------------------------------------
 function git(args) {
   return execFileSync('git', args, { cwd: process.cwd(), maxBuffer: 64 * 1024 * 1024 });
@@ -62,7 +73,7 @@ function readFileBytes(path) {
 
 const files = listFiles();
 const hits = [];
-const counts = { 'conflict-marker': 0, forbidden: 0, 'trailing-newline': 0 };
+const counts = { 'conflict-marker': 0, forbidden: 0, 'trailing-newline': 0, 'workflow-invariant': 0 };
 
 for (const path of files) {
   let buf;
@@ -109,12 +120,23 @@ for (const path of files) {
       counts['trailing-newline']++;
     }
   }
+
+  // 4. ci.yml paths-filter invariants (only when the workflow actually uses paths-filter)
+  if (path === CI_WORKFLOW && text.includes(CI_PATHS_FILTER)) {
+    for (const need of CI_REQUIRES) {
+      if (!text.includes(need)) {
+        hits.push(`${path}: [workflow-invariant] paths-filter requires '${need}' -- see .github/workflows/README.md`);
+        counts['workflow-invariant']++;
+      }
+    }
+  }
 }
 
 for (const h of hits) process.stdout.write(h + '\n');
 process.stdout.write(
   `\nhygiene-scan (${MODE}): scanned ${files.length} tracked file(s); ` +
     `conflict-marker=${counts['conflict-marker']} forbidden=${counts.forbidden} ` +
-    `trailing-newline=${counts['trailing-newline']} => ${hits.length} hit(s)\n`,
+    `trailing-newline=${counts['trailing-newline']} workflow-invariant=${counts['workflow-invariant']} ` +
+    `=> ${hits.length} hit(s)\n`,
 );
 process.exit(hits.length > 0 ? 1 : 0);
