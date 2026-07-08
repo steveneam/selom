@@ -8,6 +8,7 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
+| **PR1-CI-GREEN** | 2026-07-09 | `24c6797..00a1026` | Pushed `port/m001-repo-hygiene` + opened **PR #1**. First real `pull_request` run went RED -- `changes`/paths-filter calls `pulls.listFiles`, which the workflow default `contents: read` doesn't grant -> scoped `pull-requests: read` to the `changes` job (`24c6797`) -> **`ci` GREEN**. Added the living CI contract `.github/workflows/README.md` + gate-ledger post-ship correction (`00a1026`). Ratchet: [[verify-ci-in-its-target-event]]. |
 | **ENG-PORT-W2** | 2026-07-09 | `4e4ad48..ba8856e` (+this) | Eng-practices port **W-002**: M-002 single-env-reader + router import-boundary · M-003 LLM call-site inventory · M-004 CI → one `ci.yml` (SHA-pin/renovate/zizmor, aggregate `ci` check) · M-005 worktree tooling · M-006 lean handoff (this commit). Branch `port/m001-repo-hygiene`, **NOT pushed**. |
 | **ENG-PORT-M1** | 2026-07-09 | `945ac73..e9ba3ab` | Port plan + M-001 repo-hygiene scanner + wired `.githooks/pre-commit` (`core.hooksPath`) + ratchet doctrine. |
 | **CI-GREEN** | 2026-07-04 | `ff12198` | Fixed red backend-ci (S3 test tripped the WS1.1 stub guard on CI's light closure); reconciled WS2.7/2.8 → foundation (WS1+WS2) closed. |
@@ -16,15 +17,16 @@
 | **RESTRUCTURE 01–08** | 2026-07-02 | `1be60a5..e3e707f` | WS1 honesty (stub-engine prod guard) + WS2 ingest/QC robustness + run-path error taxonomy; tracker `docs/restructure/plan.md`. |
 | older | — | `git log` / `archive/` | AI-Helpers · AWS materialization steps · 7c FE state → Postgres · structure refactor · deploy backbone. |
 
-## ▸ LIVE · ENG-PORT-W2 · 2026-07-09 · `ba8856e` (NOT pushed) · Claude (FE+BE, solo)
+## ▸ LIVE · PR1-CI-GREEN · 2026-07-09 · `00a1026` (PUSHED, PR #1 open) · Claude (FE+BE, solo)
 
-- **Shipped:** the engineering-practices port **W-002 (M-002..M-006)** on `port/m001-repo-hygiene` — read `945ac73..ba8856e`. Executable ratchets now hold env-reader / router import-boundary / LLM-inventory; CI is one SHA-pinned zizmor-clean `ci.yml` with an aggregate `ci` required-check; worktree tooling + the lean handoff landed.
-- **Gates:** BE fast **1214/1skip** (+guards) + ruff clean; FE tsc + eslint 0-err + vitest **513**; zizmor **0** on `ci.yml`; the wired hygiene pre-commit green on every commit.
-- **Verified-live:** BE `:8010` `/health`+`/ready` ok with the refactored config; env live-read probe (UMAP/skills/anthropic re-read at call time); the FE preinstall guard blocks in a worktree, allows in main/CI.
+- **State:** `port/m001-repo-hygiene` is PUSHED; **PR #1 → `main` is open and `ci` is GREEN** (all of `changes`/backend/frontend/hygiene/workflow-lint + the aggregate `ci`). Owner-queue step 2 ("run `ci` green once") is DONE. W-001+W-002 (M-001..M-006) shipped; read `945ac73..00a1026`.
+- **First-PR fix:** the consolidated `ci.yml`'s `pull_request` path had never run until PR #1 — it went red because paths-filter needs `pull-requests: read` (workflow default `contents: read` is a floor, not a finished setting; zizmor catches too-many perms, never too-few). Fixed `24c6797`; the *why* now lives beside the workflow at `.github/workflows/README.md`. [[verify-ci-in-its-target-event]]
+- **Gates (last local run):** BE fast **1214/1skip** (+guards) + ruff clean; FE tsc + eslint 0-err + vitest **513**; zizmor **0** on the workflows; wired hygiene pre-commit green every commit.
 
 ## ▸ NEXT
 
-- **W-003 (port tail):** **M-007** graphify wiring-retirement — **GATED on M-001..M-004 green IN CI** (needs the owner to push so `ci` runs); confirm graphify semantic-nav is unused, then drop `.githooks/{post-commit,post-checkout}` + their `.gitignore` lines. **M-008** deferred deploy/ops ratchets — a docs-only record (`docs/hardening-port/deferred-ops-ratchets.md`), not built.
+- **W-003 (port tail):** **M-007** graphify wiring-retirement — **gate now MET** (M-001..M-004 green in CI via PR #1). Next action: **confirm with owner that graphify semantic-nav is unused**, then drop `.githooks/{post-commit,post-checkout}` + their `.gitignore` lines + repoint the graphify memory. **M-008** deferred deploy/ops ratchets — a docs-only record (`docs/hardening-port/deferred-ops-ratchets.md`), UNGATED, do anytime.
+- **Owner action still open:** branch-protect `main` requiring exactly the check **`ci`** (`enforce_admins: false`, GitHub Pro) — this is ENFORCE, independent of M-007. `ci` has now run green once, so the check name is proven.
 - **Then the parallel campaign** (owner-directed at CI-GREEN): survey the on-hold backlog (`docs/on-hold/README.md` + parked memories) + remaining launch work (**WS3 dedup** = lane 1 · owed WS1/restructure reviews · WS6 deploy) + **Pillar-2**; carve disjoint contract-separated buckets → forcing-Qs → fork lanes ([[parallel-agent-lanes]], now backed by M-005 tooling + `docs/operating/contract-window.md`).
 
 ## ▸ DEFERRED
