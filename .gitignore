@@ -29,6 +29,14 @@ Thumbs.db
 .tmp/
 .scratch/
 
+# Pre-edit backups left by tooling (e.g. .mcp.json.bak). Never a source of truth —
+# they are strict subsets of the file they shadow. Delete them, don't commit them.
+*.bak
+
+# Local dev SQLite, created by `SELOM_DATABASE_URL=sqlite:///dev.db` (alembic env.py,
+# test_engine_policy_guard). Regenerated on demand; never a source of truth.
+app/backend/dev.db
+
 # ── Omics data (never commit large/PHI-adjacent payloads) ─
 *.h5ad
 *.mzML
