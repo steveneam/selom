@@ -1,5 +1,25 @@
 # Selom — CURRENT (Live State)
 
+> ## ▶ BOOT: Steven types **`gogogo`** — that IS the whole resume prompt.
+>
+> **Agent, on `gogogo` (or any greeting with no task): do this, unprompted.**
+> He cannot copy text out of the terminal, and he may be sending it from a
+> Telegram topic on his phone (the swordfish hermes relay cold-starts this
+> session in tmux — no one types `claude` first). So there is no prompt for him
+> to paste: **the prompt is this file.** Read, in order, then act:
+> 1. this whole file (newest SESSION slot → the live pointers below it)
+> 2. `CLAUDE.md` + `agent_handoff/README.md` (the coordination home) and memory
+> 3. `git log --oneline -8` and `git status` — trust the repo, not the stamp
+>
+> Then **state the next action in one sentence, say what you are starting, and
+> start it.** Do not ask "shall I?" — the next action IS the standing approval.
+> Stop only at a founder gate (spend · irreversible · anything the protocol
+> names a founder decision).
+>
+> _Boot block added 2026-07-13 at the founder's direction, so a relay-cold-started
+> session resumes with no chat history (mechanism: the Swordfish hermes relay).
+> Keep it at the top when you overwrite this file in place._
+
 > Thin, slot-based pointer — **overwrite in place, never append** (README "CURRENT.md shape" + hard
 > rule 1). Per-session NARRATIVE lives in commit messages + `archive/`, not here. Pre-2026-07-09
 > history: `archive/2026-07-09-current-history.md` + `git log`.
