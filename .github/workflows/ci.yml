@@ -19,6 +19,13 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  # Cancel superseded runs on a PR branch, but NEVER on main: a cancelled main run would leave the
+  # required `ci` check unreported (branch protection reads the latest run's conclusion). Ports
+  # thalon's CI diet -- saves minutes on rapid PR pushes without ever risking the required check.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 permissions:
   contents: read
 
