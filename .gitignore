@@ -71,6 +71,17 @@ docs/aws-materialization/aws-access-setup.md
 # repo-side board + boot checklist is COORDINATION.md.
 .claude/worktrees/
 
+# ── Cross-agent coordination working-copies + migration artifacts (kept LOCAL) ──
+# The swordfish channel files are read by watchers from disk, not git; Selom's "no migration detail /
+# box topology in a tracked file" rule keeps them out of history. (Peers track the channel files; swap
+# these to tracked only on an explicit call.) The drive-ark / resume-prompt / drive-notes are one-off
+# migration artifacts that must never enter git.
+agent_handoff/FROM-SWORDFISH.md
+agent_handoff/FROM-SWORDFISH-DRIVE-ARK.md
+agent_handoff/ASK-BACKS-FOR-SWORDFISH.md
+agent_handoff/RESUME-PROMPT-2026-07-13.txt
+agent_handoff/drive-notes/
+
 # ── Graphify outputs (regenerable — never versioned) ─────────────────────────────────────────────
 # Ignore the whole tree: dated snapshots accumulate and every artifact is regenerable output, so
 # none of it needs versioning. (Also why `git add -A` is banned here — it would otherwise sweep
