@@ -213,3 +213,30 @@ All of W-002 shipped on `port/m001-repo-hygiene` (`945ac73..HEAD`, NOT pushed). 
 `ci` runs) + M-008 (deferred deploy/ops record, docs-only). Owner steps still open: **push the branch**;
 run `ci` green once then branch-protect `main` requiring `ci` (`enforce_admins:false`, GitHub Pro);
 confirm graphify semantic-nav is unused before M-007.
+
+## Port W-003 -- COMPLETE (M-007, M-008) -- 2026-07-19
+
+W-003 closes the engineering-practices port. Landed on the new Linux host as part of the drive-path
+portability pass, superseding the "Remaining" note above.
+
+- **M-007 -- graphify wiring-retirement.** Gate met (M-001..M-004 green in CI on both trigger events;
+  owner confirmed 2026-07-10 to retire fully). On a fresh clone this reduced to: dropped the
+  `.gitignore` lines for `.githooks/{post-commit,post-checkout}` (the hooks never arrived -- a clone
+  gets only the tracked `.githooks/pre-commit`), deleted the tracked `.graphifyignore`, and repointed
+  the graphify memory to record the retired role. `graphify-out/` stays gitignored; the ratchet
+  doctrine in `CLAUDE.md` (the *why*) stays. Acceptance: commits still succeed, `.githooks/pre-commit`
+  still fires, no tracked file cites `graphify-out` as a wiring source of truth.
+- **M-008 -- deferred deploy/ops ratchets.** Recorded (not built) in
+  `docs/hardening-port/deferred-ops-ratchets.md`: OIDC-only deploy, content-verified restore drill,
+  external dead-man cron ping, migration/seed idempotency, post-deploy posture re-assert, self-arming
+  rot latch -- each as principle-ported vs machinery-skipped, build trigger = the AWS backend deploy.
+
+Landed alongside W-003 in the same host-portability change: the three review workflows
+(`review-gauntlet`/`retro`/`fe-review`) no longer hardcode a checkout path; `app/backend/config.py`
+resolves the external datasets + papers corpora from `SELOM_DATASETS_DIR` / `SELOM_PAPERS_DIR` (no
+drive-letter default; absent => the guarded tests skip), proven by `tests/test_config_data_dirs.py`;
+and `hygiene-scan.mjs` gains a fifth check class forbidding absolute drive paths in tracked code/json
+(scoped to `.py .ts .tsx .js .mjs .json` this pass; prose widening deferred to a later change).
+
+Owner steps still open (unchanged, not part of the port): branch-protect `main` requiring `ci`
+(`enforce_admins:false`); the rotation / GitHub->AWS OIDC queue.
