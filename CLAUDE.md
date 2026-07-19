@@ -36,7 +36,7 @@ Selom is the owner's product and work. Every artifact is authored by the owner �
 ## Development
 
 **Backend** (Codex lane — for reference)
-- uv binary: `C:/Users/seamegdool/.local/bin/uv.exe`
+- uv binary: `uv` (on PATH; install from https://astral.sh/uv)
 - Install: `uv sync` in `app/backend`
 - Run: `uv run uvicorn main:app --reload` on port `:8000`
 - Python `3.12` is pinned via uv (the system interpreter is `3.10` — do not use it directly).

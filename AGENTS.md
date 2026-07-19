@@ -4,8 +4,7 @@ Selom is a no-code multi-omics figure SaaS: drop an h5ad/CSV/mzML, apply analysi
 
 Any AI agent: read in this order.
 
-1. **Research vault** (canonical research/context layer):
-   `C:/Users/seamegdool/Desktop/Claude code and website tips/EAMOS Web Tool`
+1. **Research vault** (canonical research/context layer) — location provided out-of-band (`$SELOM_VAULT_DIR`):
    - `Business/selom.md` — product identity (mission, north star, model).
    - `Selom/Wiki/semantic-index.md` — machine-readable map of all Selom research.
 2. **This repo entry points** — `CLAUDE.md` (Claude Code) / `CODEX.md` (Codex backend).

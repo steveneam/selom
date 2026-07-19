@@ -29,7 +29,7 @@ Claude owns `app/frontend`. Cross the line only for a contract change that needs
 
 ## Development
 
-- uv binary: `C:/Users/seamegdool/.local/bin/uv.exe`
+- uv binary: `uv` (on PATH; install from https://astral.sh/uv)
 - Install: `uv sync` in `app/backend`
 - Run: `uv run uvicorn main:app --reload` on `:8000`
 - Python `3.12` is pinned via uv (system interpreter is `3.10` — do not use it directly).
