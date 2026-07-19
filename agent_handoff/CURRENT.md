@@ -34,18 +34,18 @@
 | **ENG-PORT-M1** | 2026-07-09 | `945ac73..e9ba3ab` | Port plan + M-001 repo-hygiene scanner + wired `.githooks/pre-commit` (`core.hooksPath`) + ratchet doctrine. |
 | older | — | `git log` / `archive/` | CI-GREEN · PARALLEL-SPRINT-1 · AI-DRAFT/HARDCODE-HUNT · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · HOST-PORTABILITY · 2026-07-19 · `main` @ `f305b04` (ahead of `origin/main@4dc51e4` by 8, **unpushed**) · Claude (FE+BE, solo)
+## ▸ LIVE · HOST-PORTABILITY · 2026-07-19 · `main` @ `96d7296` **pushed to origin** · CI billing-blocked · Claude (FE+BE, solo)
 
-- **State:** first session on syd4 (Linux). The repo arrived portable-but-unfixed; this session made it host-portable and **closed W-003** (the whole engineering-practices port). 7 atomic commits `b037f67..f305b04` on top of the prior boot-block `c512dbc`. Everything verified; the gauntlet ran clean (its running at all = the acceptance test for the workflow-path fix).
+- **State:** first session on syd4 (Linux). Made the repo host-portable and **closed W-003** (the whole engineering-practices port); 8 atomic commits + a coordination-gitignore, **pushed to `origin/main` (`4dc51e4..96d7296`)**. Everything verified; the gauntlet ran clean. ⚠ **CI is red = a GitHub Actions BILLING block** (account payment / spending-limit — every job failed to *start* in 1–3s; not a code defect); it clears at the monthly billing renewal.
 - **Gates (this host):** BE fast **1209 passed / 16 skipped / 0 failed** (`uv run pytest -m "not slow" -n auto`, full extras) + ruff clean; FE **tsc 0 · eslint 0-err · vitest 513**; `hygiene-scan --all`/`--staged` green (5 classes); zizmor clean. `test_config_data_dirs.py` is the executable proof of the resolver (the corpora never come to this host).
 - **`selom-data` is NOT on this host and never will be** (employer-adjacent, fleet-wide). `$SELOM_DATASETS_DIR` / `$SELOM_PAPERS_DIR` stay unset → the guarded reproduction tests skip by design. Green with those skipped tells you nothing about the data path — never read it as "reproduction works".
 
 ## ▸ NEXT
 
-- **Push (owner-gated):** `origin/main` is 8 commits behind. Owner authorises the push of `c512dbc..f305b04`.
-- **Owner action — the ONLY blocker:** branch-protect `main` requiring exactly the check **`ci`** (`enforce_admins:false`, GitHub Pro). `ci` has run green on both a PR and a push, so the check name is proven.
-- **Peer-hygiene follow-ups (queued, [[selom-repo-hygiene-vs-peers]]):** verify what M-002's single-env-reader already enforces before adding a thalon-style import-boundary guard; a short `SECURITY.md` leak runbook; `.dockerignore` when the BE containerizes (thalon's OIDC `deploy-infra.yml` is the reference for the pending GH→AWS OIDC cutover).
-- **Then the parallel campaign** (owner-directed): survey the on-hold backlog (`docs/on-hold/README.md` + parked memories) + remaining launch work (WS3 dedup · owed WS1/restructure reviews · WS6 deploy) + Pillar-2; carve disjoint contract-separated buckets → forcing-Qs → fork lanes ([[parallel-agent-lanes]]).
+- **⭐ Primary (next session): kick off the parallel launch campaign** (owner-directed). Survey the on-hold backlog (`docs/on-hold/README.md` + parked memories) + remaining launch work (WS3 dedup · owed WS1/restructure reviews · WS6 deploy) + Pillar-2; carve **disjoint contract-separated buckets** → forcing-Qs to the founder → fork worktree lanes ([[parallel-agent-lanes]], backed by M-005 tooling).
+- **Blocked on billing:** branch-protect `main` on exactly the check **`ci`** — deferred until the **monthly billing renewal** lets CI run green (the check name is proven on a prior PR + push; it just can't run while Actions is payment-blocked). No code action.
+- **Peer-hygiene follow-ups (small, [[selom-repo-hygiene-vs-peers]]):** verify what M-002's single-env-reader already enforces before adding a thalon-style import-boundary guard; a short `SECURITY.md` leak runbook; `.dockerignore` + GH→AWS OIDC (thalon's `deploy-infra.yml` is the reference) when the BE containerizes.
+- **Owed reviews (batch at the next milestone):** WS1 boundary + the whole-restructure gauntlet/fe-review; a **live-gateway** spot-check of the AI surfaces (all prior verify was gateway-off).
 
 ## ▸ DEFERRED
 
