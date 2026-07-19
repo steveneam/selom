@@ -10,6 +10,11 @@
 //        `fetch-depth: 0` (push-event git-diff under persist-credentials:false). The PR gate cannot
 //        self-catch a stripped `fetch-depth: 0` -- the pull_request path never exercises it -- so a
 //        regression only breaks post-merge on push-to-main. This guard catches it at the gate instead.
+//   5. drive-path              (code globs) -- no absolute drive-letter path (the Windows drive
+//        shape: a single letter, colon, slash) in tracked code; hardcoded checkout/data paths broke
+//        portability on the host move. Scoped to .py/.ts/.tsx/.js/.mjs/.json this pass; prose
+//        (docs/handoff) widening is a later change. A single letter NOT preceded by another letter,
+//        so URL schemes (`http:`, `data:`) never match.
 //
 // Ratchet-ladder note: this executable check replaces graphify's documentary wiring signal.
 // The patterns are ASSEMBLED FROM FRAGMENTS at runtime so this scanner passes its own scan.
@@ -53,6 +58,13 @@ const CI_WORKFLOW = '.github/workflows/ci.yml';
 const CI_PATHS_FILTER = 'dorny/' + 'paths-filter';
 const CI_REQUIRES = ['pull-' + 'requests: read', 'fetch-' + 'depth: 0'];
 
+// Drive-path invariant (class 5): forbid an absolute drive-letter path in tracked CODE. Assembled
+// from fragments (and applied only to code globs) so this scanner passes its own scan. The pattern
+// is a single letter, NOT preceded by another letter (start-of-line or a non-letter), then a colon
+// then a slash -- which matches the Windows drive shape but never a multi-letter URL scheme.
+const CODE_EXTS = new Set(['py', 'ts', 'tsx', 'js', 'mjs', 'json']);
+const DRIVE_PATH = new RegExp('(^|[^A-Za-z])' + '[A-Za-z]' + ':' + '[\\\\/]');
+
 // --- file list per mode ---------------------------------------------------------------
 function git(args) {
   return execFileSync('git', args, { cwd: process.cwd(), maxBuffer: 64 * 1024 * 1024 });
@@ -73,7 +85,7 @@ function readFileBytes(path) {
 
 const files = listFiles();
 const hits = [];
-const counts = { 'conflict-marker': 0, forbidden: 0, 'trailing-newline': 0, 'workflow-invariant': 0 };
+const counts = { 'conflict-marker': 0, forbidden: 0, 'trailing-newline': 0, 'workflow-invariant': 0, 'drive-path': 0 };
 
 for (const path of files) {
   let buf;
@@ -87,6 +99,8 @@ for (const path of files) {
   const lines = text.split('\n');
   const hasOpen = text.includes(OPEN);
   const hasClose = text.includes(CLOSE);
+  const ext = path.includes('.') ? path.slice(path.lastIndexOf('.') + 1).toLowerCase() : '';
+  const isCode = CODE_EXTS.has(ext);
 
   lines.forEach((line, i) => {
     const ln = i + 1;
@@ -107,6 +121,11 @@ for (const path of files) {
         hits.push(`${path}:${ln}: [forbidden] ${label}`);
         counts.forbidden++;
       }
+    }
+    // 5. drive-path (tracked code globs only; prose widening deferred)
+    if (isCode && DRIVE_PATH.test(line)) {
+      hits.push(`${path}:${ln}: [drive-path] absolute drive-letter path in tracked code`);
+      counts['drive-path']++;
     }
   });
 
@@ -137,6 +156,7 @@ process.stdout.write(
   `\nhygiene-scan (${MODE}): scanned ${files.length} tracked file(s); ` +
     `conflict-marker=${counts['conflict-marker']} forbidden=${counts.forbidden} ` +
     `trailing-newline=${counts['trailing-newline']} workflow-invariant=${counts['workflow-invariant']} ` +
+    `drive-path=${counts['drive-path']} ` +
     `=> ${hits.length} hit(s)\n`,
 );
 process.exit(hits.length > 0 ? 1 : 0);
