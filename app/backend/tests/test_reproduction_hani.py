@@ -9,10 +9,9 @@ The live marker recount from the deposited csv is the dev CLI (``python -m repro
 --live``) and a skipped-if-absent integration test below.
 """
 
-from pathlib import Path
-
 import pytest
 
+from config import datasets_dir, papers_dir
 import reproduction as R
 from reproduction.papers import hani as HN
 
@@ -114,11 +113,11 @@ def test_captured_ledger_round_trips(tmp_path):
 
 # --- live marker recount from the deposited mmc2.csv (skipped if absent) -------
 
-MMC2 = Path("C:/Users/seamegdool/Desktop/Claude code and website tips/Data/Hani/"
-            "1-s2.0-S2213671122005914-mmc2.csv")
+_PAPERS = papers_dir()
+MMC2 = (_PAPERS / "Hani/1-s2.0-S2213671122005914-mmc2.csv") if _PAPERS else None
 
 
-@pytest.mark.skipif(not MMC2.exists(), reason="Hani mmc2.csv not present (owner machine only)")
+@pytest.mark.skipif(MMC2 is None or not MMC2.exists(), reason="Hani mmc2.csv not present (owner machine only)")
 def test_live_marker_recount_matches_the_deposit():
     ledger, summary = HN.drive_live_markers(csv_path=MMC2)
     assert summary["captured_matches_live"] is True
@@ -133,10 +132,11 @@ def test_live_marker_recount_matches_the_deposit():
 
 # --- live organoid drive on the deposited GSE201356 scRNA (skipped if absent) --
 
-ORGANOID_H5AD = Path("D:/selom-data/hani/processed/hani_irpe_subset.h5ad")
+_DATASETS = datasets_dir()
+ORGANOID_H5AD = (_DATASETS / "hani/processed/hani_irpe_subset.h5ad") if _DATASETS else None
 
 
-@pytest.mark.skipif(not ORGANOID_H5AD.exists(),
+@pytest.mark.skipif(ORGANOID_H5AD is None or not ORGANOID_H5AD.exists(),
                     reason="Hani organoid h5ad not present (owner machine only)")
 def test_live_organoid_drive_reproduces_fig6a():
     ledger, summary = HN.drive_live_organoid(h5ad_path=ORGANOID_H5AD)

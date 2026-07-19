@@ -6,10 +6,9 @@ Covers: DE-count extraction (E2), the methods-digest lexicon, scope classificati
 the gated vision classifier, inconsistency capture (guard 2), and the bridge into the engine.
 """
 
-from pathlib import Path
-
 import pytest
 
+from config import papers_dir
 import reproduction as R
 from extract import (
     CaptionRuleClassifier,
@@ -350,18 +349,18 @@ def test_paper_bundle_find_table_locates_golden_sheet_by_name():
 
 # --- integration: the real JEV PDF (slow, opt-in; skipped if absent) ----------
 
-DATA = Path("C:/Users/seamegdool/Desktop/Claude code and website tips/Data")
-JEV_PDF = DATA / "Adrian" / "JEV2-12-12393.pdf"
-JEV_XLSX = DATA / "Adrian" / "JEV2-12-12393-s001.xlsx"
-RPGRIP1_PDF = DATA / "THL" / "mmc1.pdf"  # RPGRIP1 (Loi) main paper + supplement, combined
-HANI_MAIN = DATA / "Hani" / "1-s2.0-S2213671122005914-main.pdf"
+_PAPERS = papers_dir()
+JEV_PDF = (_PAPERS / "Adrian/JEV2-12-12393.pdf") if _PAPERS else None
+JEV_XLSX = (_PAPERS / "Adrian/JEV2-12-12393-s001.xlsx") if _PAPERS else None
+RPGRIP1_PDF = (_PAPERS / "THL/mmc1.pdf") if _PAPERS else None  # RPGRIP1 (Loi) main paper + supplement, combined
+HANI_MAIN = (_PAPERS / "Hani/1-s2.0-S2213671122005914-main.pdf") if _PAPERS else None
 HANI_SUPPS = [
-    (DATA / "Hani" / "1-s2.0-S2213671122005914-mmc1.pdf", "methods"),
-    (DATA / "Hani" / "1-s2.0-S2213671122005914-mmc2.csv", "tables"),
-]
+    (_PAPERS / "Hani/1-s2.0-S2213671122005914-mmc1.pdf", "methods"),
+    (_PAPERS / "Hani/1-s2.0-S2213671122005914-mmc2.csv", "tables"),
+] if _PAPERS else []
 
 
-@pytest.mark.skipif(not JEV_PDF.exists(), reason="JEV PDF not present (owner machine only)")
+@pytest.mark.skipif(JEV_PDF is None or not JEV_PDF.exists(), reason="JEV PDF not present (owner machine only)")
 def test_integration_jev_pdf_recovers_printed_counts():
     from extract import ingest_pdf
 
@@ -376,7 +375,7 @@ def test_integration_jev_pdf_recovers_printed_counts():
     assert "TMM" in spec.methods[0].normalizations
 
 
-@pytest.mark.skipif(not RPGRIP1_PDF.exists(), reason="RPGRIP1 PDF not present (owner machine only)")
+@pytest.mark.skipif(RPGRIP1_PDF is None or not RPGRIP1_PDF.exists(), reason="RPGRIP1 PDF not present (owner machine only)")
 def test_integration_rpgrip1_methods_digest_generalizes_cross_paper():
     # Cross-paper proof: the methods-digest lexicon recovers the RPGRIP1 recipe from a DIFFERENT
     # paper's PDF (edgeR/fgsea/Cepo/GLM-PCA/Louvain + TMM) — matching reproduction_rpgrip1's digest.
@@ -390,7 +389,7 @@ def test_integration_rpgrip1_methods_digest_generalizes_cross_paper():
     assert "TMM" in spec.methods[0].normalizations
 
 
-@pytest.mark.skipif(not (JEV_PDF.exists() and JEV_XLSX.exists()),
+@pytest.mark.skipif(JEV_PDF is None or JEV_XLSX is None or not (JEV_PDF.exists() and JEV_XLSX.exists()),
                     reason="JEV main+supplement not present (owner machine only)")
 def test_integration_jev_two_input_intake_main_pdf_plus_xlsx():
     # E7: main PDF (figures/counts) + a SEPARATE xlsx supplement (the golden tables ST2/ST6).
@@ -404,7 +403,7 @@ def test_integration_jev_two_input_intake_main_pdf_plus_xlsx():
     assert de[("4", "de_total")] == 180 and de[("1", "de_total")] == 35
 
 
-@pytest.mark.skipif(not HANI_MAIN.exists(),
+@pytest.mark.skipif(HANI_MAIN is None or not HANI_MAIN.exists(),
                     reason="Hani main not present (owner machine only)")
 def test_integration_hani_two_input_intake_main_pdf_plus_csv():
     # E7 cross-format: Hani ships csv supplements (not xlsx) + a separate methods PDF.

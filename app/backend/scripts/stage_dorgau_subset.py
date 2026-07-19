@@ -8,19 +8,21 @@ QC metadata, subsampled per sample for a tractable live drive.
 
 Not shipped runtime — a reproducible staging recipe (like ``stage_panel_assets.py``). Run once::
 
-    python -m scripts.stage_dorgau_subset            # -> D:/selom-data/dorgau/processed/dorgau_subset.h5ad
+    python -m scripts.stage_dorgau_subset            # -> $SELOM_DATASETS_DIR/dorgau/processed/dorgau_subset.h5ad
 """
 
 from __future__ import annotations
 
 import gzip
 import io
-import pathlib
 import tarfile
 
-DATA = pathlib.Path("D:/selom-data/dorgau")
-TAR = DATA / "GSE234963_RAW.tar"
-OUT = DATA / "processed" / "dorgau_subset.h5ad"
+from config import datasets_dir
+
+_DATASETS = datasets_dir()
+DATA = (_DATASETS / "dorgau") if _DATASETS else None
+TAR = (DATA / "GSE234963_RAW.tar") if DATA else None
+OUT = (DATA / "processed" / "dorgau_subset.h5ad") if DATA else None
 CELLS_PER_SAMPLE = 1500  # cap per sample for a tractable Melody/UMAP drive
 
 # A stage-spanning subset (GSM member, sample id, PCW stage, tissue) — 7.5 -> 21 PCW, Eye + Retina,
@@ -70,6 +72,9 @@ def _load_sample(tar, gsm, sample, stage, tissue, rng):
 
 
 def main() -> None:
+    if DATA is None:
+        raise SystemExit("SELOM_DATASETS_DIR is unset — point it at the datasets corpus root")
+
     import anndata as ad
     import numpy as np
 

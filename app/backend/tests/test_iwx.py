@@ -6,12 +6,12 @@ file when present. The headline: a dropped .iwxdata is recognized as ERG by FORM
 runs end-to-end through the path-based erg_traces skill via the materialized-CSV bridge.
 """
 
-import os
 import struct
 import zipfile
 
 import pytest
 
+from config import datasets_dir
 from engine import ingest, profile_data, plan_cleaning
 from skills import _iwx
 
@@ -133,10 +133,11 @@ def test_unknown_count_decodes_generically(tmp_path):
 
 
 # --- opt-in: run against a real staged .iwxdata when present (owner machine / CMRI share) -----
-_REAL = "D:/selom/graphify-out/scratch/iwx/C57Bl6 #677_LE Scotopic Green.iwxdata"
+_DATASETS = datasets_dir()
+_REAL = (_DATASETS / "iwx/C57Bl6 #677_LE Scotopic Green.iwxdata") if _DATASETS else None
 
 
-@pytest.mark.skipif(not os.path.exists(_REAL), reason="no real .iwxdata staged")
+@pytest.mark.skipif(_REAL is None or not _REAL.exists(), reason="no real .iwxdata staged")
 def test_real_iwxdata_runs_through_erg_traces():
     from skills.contract import run_bundle_with_table
 

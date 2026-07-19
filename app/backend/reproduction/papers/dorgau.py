@@ -32,7 +32,7 @@ goldens:
   ``trajectory`` (DPT+PAGA) is a measured engine-delta.
 
 Library-only (D12); no HTTP. The PDF + supplements live outside the repo (Dorgau/ Desktop folder);
-the raw matrices stage to ``D:/selom-data/dorgau`` (gitignored).
+the raw matrices stage to ``$SELOM_DATASETS_DIR/dorgau`` (gitignored).
 
 Dev/validation entrypoints::
 

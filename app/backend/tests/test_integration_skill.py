@@ -8,18 +8,19 @@ owner-machine h5ad is absent, so CI stays green.
 """
 
 import importlib.util
-from pathlib import Path
 
 import pytest
 
+from config import datasets_dir
 from skills.contract import run_skill
 
-HANI_H5AD = Path("D:/selom-data/hani/processed/hani_irpe_subset.h5ad")
+_DATASETS = datasets_dir()
+HANI_H5AD = (_DATASETS / "hani/processed/hani_irpe_subset.h5ad") if _DATASETS else None
 _HAS_SCANPY = importlib.util.find_spec("scanpy") is not None
 
 
 @pytest.mark.skipif(
-    not (_HAS_SCANPY and HANI_H5AD.exists()),
+    not _HAS_SCANPY or HANI_H5AD is None or not HANI_H5AD.exists(),
     reason="scanpy or the Hani organoid h5ad not present (owner machine only)",
 )
 def test_integration_melody_mixes_hani_libraries(monkeypatch):

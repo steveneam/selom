@@ -7,15 +7,16 @@ is validated by opt-in tests against the staged samples, skipped when those file
 from __future__ import annotations
 
 import csv
-import os
 
 import pytest
 
+from config import datasets_dir
 from skills import _celeris
 
-# Staged real samples (opt-in; see D:\selom-data\diagnosys-erg\README.md).
-_FULL_TXT = "D:/selom-data/diagnosys-erg/full-txt-exp8/453_AAV_C1 - Long RK-PROM1-3’UTR-BPolyA_10+E9.TXT"
-_REDUCED_CSV = "D:/selom-data/diagnosys-erg/reduced-csv/dr1.CSV"
+# Staged real samples (opt-in; see $SELOM_DATASETS_DIR/diagnosys-erg/README.md).
+_DATASETS = datasets_dir()
+_FULL_TXT = (_DATASETS / "diagnosys-erg/full-txt-exp8/453_AAV_C1 - Long RK-PROM1-3’UTR-BPolyA_10+E9.TXT") if _DATASETS else None
+_REDUCED_CSV = (_DATASETS / "diagnosys-erg/reduced-csv/dr1.CSV") if _DATASETS else None
 
 
 # ---- pure-helper unit tests ------------------------------------------------------------
@@ -211,7 +212,7 @@ def test_not_a_diagnosys_export(tmp_path):
 
 
 # ---- opt-in real-sample validation -----------------------------------------------------
-@pytest.mark.skipif(not os.path.exists(_FULL_TXT), reason="staged full-TXT sample absent")
+@pytest.mark.skipif(_FULL_TXT is None or not _FULL_TXT.exists(), reason="staged full-TXT sample absent")
 def test_real_full_txt_all_three_modes():
     exp = _celeris.load_export(_FULL_TXT)
     assert "Dark & Light Adapted" in exp.meta.get("Protocol", "")
@@ -233,7 +234,7 @@ def test_real_full_txt_all_three_modes():
     assert sorted(df["channel"].unique()) == [1, 2]
 
 
-@pytest.mark.skipif(not os.path.exists(_REDUCED_CSV), reason="staged reduced-CSV sample absent")
+@pytest.mark.skipif(_REDUCED_CSV is None or not _REDUCED_CSV.exists(), reason="staged reduced-CSV sample absent")
 def test_real_reduced_csv():
     exp = _celeris.load_export(_REDUCED_CSV)
     met = _celeris.metrics_long(exp)

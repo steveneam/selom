@@ -9,10 +9,9 @@ zero Selom-engine bugs. The deposit re-derivations (``--markers`` / ``--qc``) ar
 skipped-if-absent integration tests below.
 """
 
-from pathlib import Path
-
 import pytest
 
+from config import datasets_dir, papers_dir
 import reproduction as R
 from reproduction.papers import dorgau as DG
 
@@ -118,12 +117,13 @@ def test_captured_ledger_round_trips(tmp_path):
 
 # --- live deposit re-derivations (skipped if the supplements are absent) -------
 
-DORGAU = Path("C:/Users/seamegdool/Desktop/Claude code and website tips/Data/Dorgau")
-SUPP1 = DORGAU / "Supplementary Data 1.xlsx"
-SUPP2 = DORGAU / "Supplementary Data 2.xlsx"
+_PAPERS = papers_dir()
+DORGAU = (_PAPERS / "Dorgau") if _PAPERS else None
+SUPP1 = (DORGAU / "Supplementary Data 1.xlsx") if DORGAU else None
+SUPP2 = (DORGAU / "Supplementary Data 2.xlsx") if DORGAU else None
 
 
-@pytest.mark.skipif(not SUPP2.exists(), reason="Dorgau Supp Data 2 not present (owner machine only)")
+@pytest.mark.skipif(SUPP2 is None or not SUPP2.exists(), reason="Dorgau Supp Data 2 not present (owner machine only)")
 def test_live_marker_table_matches_the_deposit():
     ledger, summary = DG.drive_live_markers(xlsx_path=SUPP2)
     assert summary["captured_matches_live"] is True
@@ -137,7 +137,7 @@ def test_live_marker_table_matches_the_deposit():
     assert _blame(ledger, "1B", "n_cell_type_labels") is None
 
 
-@pytest.mark.skipif(not SUPP1.exists(), reason="Dorgau Supp Data 1 not present (owner machine only)")
+@pytest.mark.skipif(SUPP1 is None or not SUPP1.exists(), reason="Dorgau Supp Data 1 not present (owner machine only)")
 def test_live_cohort_qc_matches_the_deposit():
     qc = DG.drive_live_qc(SUPP1)
     assert qc["n_samples"] == 24 and qc["n_samples_matches"] is True
@@ -147,10 +147,11 @@ def test_live_cohort_qc_matches_the_deposit():
 
 # --- live Fig-1 drive on the raw GSE234963 subset (the Melody dogfood; skipped if absent) -------
 
-FIG1_H5AD = Path("D:/selom-data/dorgau/processed/dorgau_subset.h5ad")
+_DATASETS = datasets_dir()
+FIG1_H5AD = (_DATASETS / "dorgau/processed/dorgau_subset.h5ad") if _DATASETS else None
 
 
-@pytest.mark.skipif(not FIG1_H5AD.exists(),
+@pytest.mark.skipif(FIG1_H5AD is None or not FIG1_H5AD.exists(),
                     reason="Dorgau scRNA subset not staged (run scripts.stage_dorgau_subset)")
 def test_live_fig1_melody_integrates_and_recovers_cell_types():
     ledger, summary = DG.drive_live_fig1(h5ad_path=FIG1_H5AD)

@@ -6,7 +6,7 @@ sample with real coverage from a primary, openly-licensed source. The GO annotat
 GeneID) directly — no ID mapping needed.
 
 Pipeline (one-off; not on the runtime hot path):
-  1. download go-basic.obo + goa_human.gaf.gz (cached under D:/selom-data/genesets/raw)
+  1. download go-basic.obo + goa_human.gaf.gz (cached under $SELOM_DATASETS_DIR/genesets/raw)
   2. parse the ontology (obonet) -> is_a + part_of ancestor closure
   3. parse the GAF -> gene symbol -> directly-annotated GO terms (drop NOT qualifiers)
   4. propagate each annotation up to all ancestors (true-path rule)
@@ -27,9 +27,12 @@ import pathlib
 import shutil
 import urllib.request
 
+from config import datasets_dir
+
 OBO_URL = "https://current.geneontology.org/ontology/go-basic.obo"
 GAF_URL = "https://current.geneontology.org/annotations/goa_human.gaf.gz"
-CACHE = pathlib.Path("D:/selom-data/genesets/raw")
+_DATASETS = datasets_dir()
+CACHE = (_DATASETS / "genesets/raw") if _DATASETS else None
 OUT = pathlib.Path(__file__).resolve().parent.parent / "skills" / "enrichment" / "gene_sets_go.json"
 DAG_OUT = OUT.parent.parent / "go_graph" / "go_dag.json"  # id -> {name, ns, ancestors, genes}
 
@@ -70,6 +73,9 @@ def _ancestors(graph) -> dict:
 
 
 def main() -> None:
+    if CACHE is None:
+        raise SystemExit("SELOM_DATASETS_DIR is unset — point it at the datasets corpus root")
+
     import obonet
 
     obo = _download(OBO_URL, CACHE / "go-basic.obo")

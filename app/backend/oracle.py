@@ -3,7 +3,7 @@
 The **blame instrument**: it recapitulates the authors' *actual* tool (edgeR / fgsea) on
 the same data to disambiguate ``engine-delta`` vs ``upstream-delta`` vs
 ``paper-irreproducible`` (spec §Validation & Blame; the dogfood pattern from
-``D:/tmp-thl/{fig5,fig6}-real/*_oracle.R``). It is **validation-only (ADR 0002), gated, and
+``<scratch-dir>/{fig5,fig6}-real/*_oracle.R``). It is **validation-only (ADR 0002), gated, and
 NEVER on the shipped path** — disabled by default, so the product profile degrades blame to
 ``delta-unmeasured`` honestly (config ``SELOM_ORACLE``; spec D9/D12).
 

@@ -6,10 +6,9 @@ the **bless / refresh** step — run it on a machine where the paper PDFs + supp
 (owner-only paths below), review the JSON diff, and commit. The committed snapshots are then the
 regression anchors the opt-in real re-drive test asserts against (``tests/test_reproduction_fixtures``).
 
-  uv-run-free (EDR stub) — from app/backend:
-    $env:PYTHONPATH = "D:\\selom\\app\\backend\\.venv\\Lib\\site-packages;D:\\selom\\app\\backend"
-    & $PY -m scripts.regen_reproduction_fixtures            # all staged papers
-    & $PY -m scripts.regen_reproduction_fixtures hani jev   # a subset
+  Run from app/backend:
+    uv run python -m scripts.regen_reproduction_fixtures            # all staged papers
+    uv run python -m scripts.regen_reproduction_fixtures hani jev   # a subset
 
 A paper whose main PDF is not present is skipped (not an error) — so this runs cleanly anywhere and
 only refreshes what is locally stageable. **Adding a paper = one entry in FIXTURE_PAPERS** (the
@@ -22,25 +21,33 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-_DATA = r"C:\Users\seamegdool\Desktop\Claude code and website tips\Data"
+from config import papers_dir
 
-# paper_id -> (main PDF, [ (supplement path, role) ... ]). Owner-machine absolute paths, mirroring
-# the existing live-ledger tests. The supplements are the tabular files the matcher can see.
-FIXTURE_PAPERS: dict[str, tuple[str, list[tuple[str, str]]]] = {
+_PAPERS = papers_dir()  # papers corpus root; None when SELOM_PAPERS_DIR is unset
+
+
+def _rel(sub: str) -> str | None:
+    """Absolute path under the papers corpus, or None when SELOM_PAPERS_DIR is unset (paper skipped)."""
+    return str(_PAPERS / sub) if _PAPERS else None
+
+
+# paper_id -> (main PDF, [ (supplement path, role) ... ]). Paths resolve under $SELOM_PAPERS_DIR,
+# mirroring the existing live-ledger tests. The supplements are the tabular files the matcher can see.
+FIXTURE_PAPERS: dict[str, tuple[str | None, list[tuple[str | None, str]]]] = {
     "jev": (
-        _DATA + r"\Adrian\JEV2-12-12393.pdf",
-        [(_DATA + r"\Adrian\JEV2-12-12393-s001.xlsx", "tables")],
+        _rel("Adrian/JEV2-12-12393.pdf"),
+        [(_rel("Adrian/JEV2-12-12393-s001.xlsx"), "tables")],
     ),
     "hani": (
-        _DATA + r"\Hani\1-s2.0-S2213671122005914-main.pdf",
-        [(_DATA + r"\Hani\1-s2.0-S2213671122005914-mmc2.csv", "tables"),
-         (_DATA + r"\Hani\1-s2.0-S2213671122005914-mmc3.csv", "tables")],
+        _rel("Hani/1-s2.0-S2213671122005914-main.pdf"),
+        [(_rel("Hani/1-s2.0-S2213671122005914-mmc2.csv"), "tables"),
+         (_rel("Hani/1-s2.0-S2213671122005914-mmc3.csv"), "tables")],
     ),
     "dorgau": (
-        _DATA + r"\Dorgau\Single-cell analyses reveal transient retinal progenitor cells in the "
-                r"ciliary margin of developing human retina.pdf",
-        [(_DATA + r"\Dorgau\Source Data.xlsx", "tables"),
-         (_DATA + r"\Dorgau\Supplementary Data 2.xlsx", "tables")],
+        _rel("Dorgau/Single-cell analyses reveal transient retinal progenitor cells in the "
+             "ciliary margin of developing human retina.pdf"),
+        [(_rel("Dorgau/Source Data.xlsx"), "tables"),
+         (_rel("Dorgau/Supplementary Data 2.xlsx"), "tables")],
     ),
     # RPGRIP1 (Loi 2025): no PDF staged on this machine — documented slot, fill when staged.
     "rpgrip1": ("", []),

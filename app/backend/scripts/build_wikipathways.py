@@ -22,9 +22,12 @@ import re
 import shutil
 import urllib.request
 
+from config import datasets_dir
+
 WP_INDEX = "https://data.wikipathways.org/current/gmt/"
 GENEINFO_URL = "https://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz"
-CACHE = pathlib.Path("D:/selom-data/genesets/raw")
+_DATASETS = datasets_dir()
+CACHE = (_DATASETS / "genesets/raw") if _DATASETS else None
 OUT = pathlib.Path(__file__).resolve().parent.parent / "gene_sets" / "corpus" / "gene_sets_wikipathways.json"
 
 MIN_SET, MAX_SET = 5, 500  # drop tiny noise + giant near-meta pathways
@@ -69,6 +72,8 @@ def _entrez_to_symbol(gene_info: pathlib.Path) -> dict[str, str]:
 
 
 def main() -> None:
+    if CACHE is None:
+        raise SystemExit("SELOM_DATASETS_DIR is unset — point it at the datasets corpus root")
     gmt_name = _resolve_current_gmt()
     gmt = _download(f"{WP_INDEX}{gmt_name}", CACHE / "wikipathways-Homo_sapiens.gmt")
     gene_info = _download(GENEINFO_URL, CACHE / "Homo_sapiens.gene_info.gz")

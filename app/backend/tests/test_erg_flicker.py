@@ -6,14 +6,15 @@ when the sample is absent (CI stays green).
 """
 from __future__ import annotations
 
-import os
 import tempfile
 
 import pytest
 
+from config import datasets_dir
 from skills.contract import run_skill, run_skill_with_table
 
-_FULL_TXT = "D:/selom-data/diagnosys-erg/full-txt-exp8/453_AAV_C1 - Long RK-PROM1-3’UTR-BPolyA_10+E9.TXT"
+_DATASETS = datasets_dir()
+_FULL_TXT = (_DATASETS / "diagnosys-erg/full-txt-exp8/453_AAV_C1 - Long RK-PROM1-3’UTR-BPolyA_10+E9.TXT") if _DATASETS else None
 
 
 @pytest.fixture(autouse=True)
@@ -45,7 +46,7 @@ def test_stub_summary_view_is_an_axes_bearing_line():
     assert figure["data"] and all("fit" not in str(tr.get("name", "")).lower() for tr in figure["data"])
 
 
-@pytest.mark.skipif(not os.path.exists(_FULL_TXT), reason="staged full-TXT sample absent")
+@pytest.mark.skipif(_FULL_TXT is None or not _FULL_TXT.exists(), reason="staged full-TXT sample absent")
 def test_real_flicker_folded_cycle(monkeypatch):
     """On the real LA 10/30 Hz flicker steps: the folded-cycle N1→P1 is positive and attenuates
     from 10 Hz to 30 Hz (cone temporal roll-off), matching the device markers' ~2× drop."""

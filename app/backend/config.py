@@ -12,7 +12,7 @@ import pathlib
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-_REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent  # D:/selom
+_REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent  # repo root (app/backend/../..)
 
 
 class Settings(BaseSettings):
@@ -273,3 +273,22 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+# --- external data-corpus resolvers (offline reproduction / build inputs) -----------------------
+# Two large corpora live OUTSIDE the repo and are read only by build scripts + skipif-guarded
+# reproduction tests, never the running server. An ABSENT env var resolves to None, so those tests
+# SKIP (they must skip, never fail — the corpora are not present on every host, by design) and NO
+# drive-letter default ever enters the tree. Read at call time so a per-test monkeypatch/setenv is
+# honored. Distinct from ``Settings.data_dir`` / SELOM_DATA_DIR above (the local object-store root).
+def datasets_dir() -> pathlib.Path | None:
+    """Root of the external datasets + build-cache corpus (processed h5ad, gene-set raw downloads,
+    ERG instrument captures). ``SELOM_DATASETS_DIR``; None when unset."""
+    v = os.environ.get("SELOM_DATASETS_DIR")
+    return pathlib.Path(v) if v else None
+
+
+def papers_dir() -> pathlib.Path | None:
+    """Root of the published-paper PDF + supplement corpus. ``SELOM_PAPERS_DIR``; None when unset."""
+    v = os.environ.get("SELOM_PAPERS_DIR")
+    return pathlib.Path(v) if v else None

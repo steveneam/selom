@@ -10,7 +10,7 @@ at request time.
 Input — ``repro-assets/{slug}/bboxes.json`` (hand/segmenter authored)::
 
     {
-      "pdf": "C:/.../1-s2.0-S2213671122005914-main.pdf",
+      "pdf": "Hani/1-s2.0-S2213671122005914-main.pdf",  # relative to $SELOM_PAPERS_DIR
       "panels": {
         "2B": {"page_index": 3, "bbox": [60, 470, 300, 700], "chart_form": "bar"},
         "3B": {"page_index": 4, "bbox": [40, 120, 560, 560], "chart_form": "upset"}
@@ -34,6 +34,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
+from config import papers_dir  # noqa: E402
 from extract import lift as X3  # noqa: E402
 from repro_assets import ASSETS_ROOT, DIGITIZABLE_FORMS  # noqa: E402
 
@@ -66,7 +67,13 @@ def stage(slug: str, *, bboxes_path: pathlib.Path | None = None, scale: float = 
         raise SystemExit(f"no bbox table at {bboxes_path} — author it first (see the module docstring)")
 
     table = json.loads(bboxes_path.read_text(encoding="utf-8"))
-    pdf_path = pathlib.Path(table["pdf"])
+    _raw_pdf = pathlib.Path(table["pdf"])
+    if not _raw_pdf.is_absolute():
+        _pp = papers_dir()
+        if _pp is None:
+            raise SystemExit("SELOM_PAPERS_DIR is unset — needed to resolve the relative bbox 'pdf' path")
+        _raw_pdf = _pp / _raw_pdf
+    pdf_path = _raw_pdf
     if not pdf_path.exists():
         raise SystemExit(f"PDF not found: {pdf_path}")
     pdf_bytes = pdf_path.read_bytes()

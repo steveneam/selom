@@ -523,6 +523,10 @@ def format_scorecard(ledger: Ledger) -> str:
 if __name__ == "__main__":  # pragma: no cover — dev/validation harness (ADR 0002, library-only)
     import argparse
 
+    from config import datasets_dir, papers_dir
+
+    _d = datasets_dir()
+    _pp = papers_dir()
     p = argparse.ArgumentParser(
         description="Kim/Hani reproduction ledger — drive it through the engine (validation-only)")
     p.add_argument("--live", action="store_true",
@@ -530,9 +534,9 @@ if __name__ == "__main__":  # pragma: no cover — dev/validation harness (ADR 0
     p.add_argument("--live-organoid", action="store_true",
                    help="drive Fig 6A live on the deposited GSE201356 organoid scRNA (h5ad)")
     p.add_argument("--csv",
-                   default="C:/Users/seamegdool/Desktop/Claude code and website tips/Data/"
-                           "Hani/1-s2.0-S2213671122005914-mmc2.csv")
-    p.add_argument("--h5ad", default="D:/selom-data/hani/processed/hani_irpe_subset.h5ad")
+                   default=(str(_pp / "Hani/1-s2.0-S2213671122005914-mmc2.csv") if _pp else None))
+    p.add_argument("--h5ad",
+                   default=(str(_d / "hani/processed/hani_irpe_subset.h5ad") if _d else None))
     p.add_argument("--save", action="store_true", help="save the ledger JSON under data_dir/repro")
     args = p.parse_args()
 

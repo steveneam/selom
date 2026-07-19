@@ -8,12 +8,11 @@ the router must reproduce each figure's in-scope skills and out-of-scope modalit
 
 from __future__ import annotations
 
-import os
-
 import pytest
 
 import reproduction as R
 
+from config import datasets_dir
 from extract.routing import (
     NullVerifier,
     OperatorRouteVerifier,
@@ -369,10 +368,11 @@ def test_paper_inventory_lists_deduped_skills_and_oos():
     assert len(fmap.skills) == len(set(fmap.skills))  # the inventory is deduped
 
 
-_JEV_TEXT = r"D:/selom-data/_jev_text.txt"
+_DATASETS = datasets_dir()
+_JEV_TEXT = (_DATASETS / "_jev_text.txt") if _DATASETS else None
 
 
-@pytest.mark.skipif(not os.path.exists(_JEV_TEXT), reason="real JEV PDF text not staged")
+@pytest.mark.skipif(_JEV_TEXT is None or not _JEV_TEXT.exists(), reason="real JEV PDF text not staged")
 def test_real_jev_inventory_recall_and_tiers():
     fmap = route_text(open(_JEV_TEXT, encoding="utf-8").read(), paper_id="jev")
     # L3 core deliverable — the ledger's in-scope skills are all surfaced in the paper inventory.
@@ -468,7 +468,7 @@ def test_to_engine_panels_stamps_skill_id_only_with_feasibility():
     assert stamped[0].skill_id == "deg" and stamped[0].scope == R.TRANSCRIPTOMIC
 
 
-@pytest.mark.skipif(not os.path.exists(_JEV_TEXT), reason="real JEV PDF text not staged")
+@pytest.mark.skipif(_JEV_TEXT is None or not _JEV_TEXT.exists(), reason="real JEV PDF text not staged")
 def test_real_jev_auto_ledger_skeleton():
     led = build_auto_ledger(open(_JEV_TEXT, encoding="utf-8").read(), paper_id="jev")
     inventory = set(led.paper.methods_digest["skills"])
@@ -549,7 +549,7 @@ def test_mine_synonym_candidates_surfaces_gap_without_writing_moat():
     assert load_synonyms() == before        # the curated moat was NOT auto-written
 
 
-@pytest.mark.skipif(not os.path.exists(_JEV_TEXT), reason="real JEV PDF text not staged")
+@pytest.mark.skipif(_JEV_TEXT is None or not _JEV_TEXT.exists(), reason="real JEV PDF text not staged")
 def test_real_jev_all_recovered_figures_flagged_for_review():
     fmap = route_text(open(_JEV_TEXT, encoding="utf-8").read(), paper_id="jev")
     # every recovered-tier figure (the real JEV had 8) is offered to the paid L4 tier.

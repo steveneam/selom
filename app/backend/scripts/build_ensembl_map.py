@@ -20,11 +20,16 @@ import gzip
 import json
 import pathlib
 
-CACHE = pathlib.Path("D:/selom-data/genesets/raw/Homo_sapiens.gene_info.gz")
+from config import datasets_dir
+
+_DATASETS = datasets_dir()
+CACHE = (_DATASETS / "genesets/raw/Homo_sapiens.gene_info.gz") if _DATASETS else None
 OUT = pathlib.Path(__file__).resolve().parent.parent / "gene_sets" / "corpus" / "ensembl_symbols.json"
 
 
 def main() -> None:
+    if _DATASETS is None:
+        raise SystemExit("SELOM_DATASETS_DIR is unset — point it at the datasets corpus root")
     if not CACHE.exists():
         raise SystemExit(
             f"missing {CACHE} — run scripts/build_wikipathways.py first (it caches gene_info)"

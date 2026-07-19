@@ -1,6 +1,6 @@
 {
   "_comment": "Staging recipe for the ★D bridge (dev input to scripts/stage_panel_assets.py). bbox = (x0,y0,x1,y1) in PDF points, origin bottom-left, on the Kim 2023 main PDF. Authored by rendering page 3 (Figure 2) with a coordinate grid and reading panel boundaries. The PDF lives outside the repo (owner machine).",
-  "pdf": "C:/Users/seamegdool/Desktop/Claude code and website tips/Data/Hani/1-s2.0-S2213671122005914-main.pdf",
+  "pdf": "Hani/1-s2.0-S2213671122005914-main.pdf",
   "panels": {
     "2A": {"page_index": 3, "bbox": [35, 425, 298, 702], "chart_form": "corr_heatmap"},
     "2C": {"page_index": 3, "bbox": [338, 262, 588, 500], "chart_form": "box"},

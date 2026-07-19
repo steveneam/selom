@@ -16,7 +16,7 @@ concatenates all samples, and writes the merged AnnData.
 Run (rdata is dev-only, pulled transiently so it never enters the runtime deps):
     uv run --with rdata --directory app/backend python scripts/shinycell_to_h5ad.py
 
-Defaults read D:/selom-data/rpgrip1/raw and write D:/selom-data/rpgrip1/processed
+Defaults read $SELOM_DATASETS_DIR/rpgrip1/raw and write $SELOM_DATASETS_DIR/rpgrip1/processed
 (kept outside the repo so large data survives even if the source share goes away).
 """
 
@@ -120,10 +120,17 @@ def _build_sample(sample_dir: pathlib.Path) -> anndata.AnnData:
 
 
 def main() -> None:
+    from config import datasets_dir
+
+    _d = datasets_dir()
     ap = argparse.ArgumentParser(description="Convert ShinyCell bundles to a merged .h5ad")
-    ap.add_argument("--raw", default="D:/selom-data/rpgrip1/raw")
-    ap.add_argument("--out", default="D:/selom-data/rpgrip1/processed/rpgrip1_merged.h5ad")
+    ap.add_argument("--raw", default=(str(_d / "rpgrip1/raw") if _d else None))
+    ap.add_argument("--out", default=(str(_d / "rpgrip1/processed/rpgrip1_merged.h5ad") if _d else None))
     args = ap.parse_args()
+
+    if args.raw is None or args.out is None:
+        raise SystemExit("SELOM_DATASETS_DIR is unset — point it at the datasets corpus root, "
+                         "or pass --raw and --out explicitly")
 
     raw = pathlib.Path(args.raw)
     sample_dirs = sorted(

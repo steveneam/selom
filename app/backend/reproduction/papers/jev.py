@@ -471,13 +471,15 @@ def format_scorecard(ledger: Ledger) -> str:
 if __name__ == "__main__":  # pragma: no cover — dev/validation harness (ADR 0002, library-only)
     import argparse
 
+    from config import papers_dir
+
+    _pp = papers_dir()
     p = argparse.ArgumentParser(
         description="JEV reproduction ledger — drive it through the engine (validation-only)")
     p.add_argument("--live", action="store_true",
                    help="re-count miRNA/proteome DE from the deposited supplement")
     p.add_argument("--xlsx",
-                   default="C:/Users/seamegdool/Desktop/Claude code and website tips/Data/"
-                           "Adrian/JEV2-12-12393-s001.xlsx")
+                   default=(str(_pp / "Adrian/JEV2-12-12393-s001.xlsx") if _pp else None))
     p.add_argument("--save", action="store_true", help="save the ledger JSON under data_dir/repro")
     args = p.parse_args()
 

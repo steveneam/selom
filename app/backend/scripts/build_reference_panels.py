@@ -5,7 +5,7 @@ from papers / public repos are not license-gated (symbols are facts) — ship th
 **attribute the source**. Each panel here records its own ``attribution`` + ``license`` in
 the rich corpus format consumed by gene_sets/library.py (the ``reference`` source).
 
-Sources live under D:/selom-data (outside the repo); the OUTPUT json is committed so the
+Sources live under $SELOM_DATASETS_DIR (outside the repo); the OUTPUT json is committed so the
 panels ship without the raw files. Only clean, single-symbol-column lists are ingested;
 messy multi-header supplementary tables are skipped.
 
@@ -17,7 +17,9 @@ from __future__ import annotations
 import json
 import pathlib
 
-ROOT = pathlib.Path("D:/selom-data")
+from config import datasets_dir
+
+ROOT = datasets_dir()  # datasets corpus root; None when SELOM_DATASETS_DIR is unset (guarded in main)
 OUT = pathlib.Path(__file__).resolve().parent.parent / "gene_sets" / "corpus" / "gene_sets_reference.json"
 
 # (display name, file, symbol column, attribution, license)
@@ -54,12 +56,14 @@ def _symbols(path: pathlib.Path, column: str) -> list[str]:
 
 
 def main() -> None:
+    if ROOT is None:
+        raise SystemExit("SELOM_DATASETS_DIR is unset — point it at the datasets corpus root")
     panels: dict[str, object] = {
         "_provenance": (
             "Attributed reference panels (gene-set builder Phase B). Gene lists from CMRI "
             "Fidelle curation + published resources; each set cites its own source + license "
             "(owner-cleared 2026-06-14: symbols are facts, attribute the source). "
-            "Built by scripts/build_reference_panels.py from D:/selom-data."
+            "Built by scripts/build_reference_panels.py from the datasets corpus ($SELOM_DATASETS_DIR)."
         )
     }
     for name, rel, column, attribution, license_ in PANELS:

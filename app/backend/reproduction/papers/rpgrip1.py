@@ -2,7 +2,7 @@
 
 This is the first end-to-end integration of the Reproduction Engine (build-plan R0+R1+R2+R3)
 on a real paper. It hand-encodes the RPGRIP1 ledger — the structured form of
-``docs/records/rpgrip1-figrepro.md`` + ``D:/tmp-thl/rpgrip1_target_spec.md`` (until R4's extraction
+``docs/records/rpgrip1-figrepro.md`` + ``<scratch-dir>/rpgrip1_target_spec.md`` (until R4's extraction
 subsystem generates it from the PDF) — and drives it through the full loop:
 verdict (D4) -> sweep (stage 9) -> oracle (stage 7, gated) -> revalidate -> findings-first
 scorecard (D10). It exercises the deterministic core (``reproduction.py``), the blame
@@ -11,7 +11,7 @@ instruments (``sweep.py`` / ``oracle.py``), and their glue together on real data
 Two drive modes:
 
 * :func:`drive_captured` — pure-Python, **no heavy deps, no real data**: replays the verified
-  dogfood observations (logged in ``D:/tmp-thl/{fig5,fig6}-real/``, sessions 11-12) through the
+  dogfood observations (logged in ``<scratch-dir>/{fig5,fig6}-real/``, sessions 11-12) through the
   engine so the scorecard the engine *produces* is asserted to equal the verdicts reached by
   hand. CI-safe; the regression artifact + the first complete real scorecard.
 * :func:`drive_live_fig5` — re-runs the Fig 5 signature-count loop on the real **GSE293982**
@@ -29,8 +29,8 @@ Dev/validation entrypoint (not a product endpoint; the engine is library-only, D
 
     # live Fig 5 proof on the real deposit (oracle gated; add --oracle to upgrade blame)
     SELOM_ORACLE=r python -m reproduction.papers.rpgrip1 --live-fig5 --oracle \
-        --fig5-dir D:/tmp-thl/fig5-real \
-        --counts C:/Temp/selom-geo/GSE293982/GSE293982_dedup_countTable_geneName.tsv.gz
+        --fig5-dir <scratch-dir>/fig5-real \
+        --counts <scratch-dir>/GSE293982/GSE293982_dedup_countTable_geneName.tsv.gz
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ from sweep import signature_set, sweep_panel
 
 PAPER_ID = "rpgrip1"
 
-# --- golden target VALUES (printed in the paper; D:/tmp-thl/rpgrip1_target_spec.md) ----------
+# --- golden target VALUES (printed in the paper; <scratch-dir>/rpgrip1_target_spec.md) ----------
 # The figures + results text say signature = 78 (methods says 181 — flagged inconsistency);
 # 49 down-in-both. Gene magnitudes are normalized-expression % changes vs Control-1.
 GOLD_UNIVERSE = 1133            # deterministic RPGRIP1-associated GO union (reproduced exactly)
@@ -525,9 +525,8 @@ if __name__ == "__main__":  # pragma: no cover — dev/validation harness (ADR 0
                    help="re-run the Fig 5 count loop on the real GSE293982 deposit")
     p.add_argument("--oracle", action="store_true",
                    help="enable the gated edgeR oracle in the live run (needs SELOM_ORACLE=r)")
-    p.add_argument("--fig5-dir", default="D:/tmp-thl/fig5-real")
-    p.add_argument("--counts",
-                   default="C:/Temp/selom-geo/GSE293982/GSE293982_dedup_countTable_geneName.tsv.gz")
+    p.add_argument("--fig5-dir", default=None)
+    p.add_argument("--counts", default=None)
     p.add_argument("--save", action="store_true", help="save the ledger JSON under data_dir/repro")
     args = p.parse_args()
 

@@ -1,5 +1,5 @@
 {
- "_provenance": "Attributed reference panels (gene-set builder Phase B). Gene lists from CMRI Fidelle curation + published resources; each set cites its own source + license (owner-cleared 2026-06-14: symbols are facts, attribute the source). Built by scripts/build_reference_panels.py from D:/selom-data.",
+ "_provenance": "Attributed reference panels (gene-set builder Phase B). Gene lists from CMRI Fidelle curation + published resources; each set cites its own source + license (owner-cleared 2026-06-14: symbols are facts, attribute the source). Built by scripts/build_reference_panels.py from the datasets corpus ($SELOM_DATASETS_DIR).",
  "Ciliopathy genes (CiliaCarta)": {
   "genes": [
    "ABCA4",
