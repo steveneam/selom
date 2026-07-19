@@ -16,7 +16,8 @@ const _A = (typeof args === 'string')
 const SCOPE = _A.scope ? String(_A.scope)
   : 'the uncommitted working-tree changes; if the tree is clean, the latest commit (HEAD)'
 
-const GIT = 'git -C "D:/selom"'
+// Run git from the workflow's cwd (the repo root) — no hardcoded checkout path.
+const GIT = 'git'
 
 // Lenses are defined INLINE here, on purpose: the .claude/agents registry only loads at SESSION
 // START, so a workflow that depends on a freshly-added custom agentType can't run in the same

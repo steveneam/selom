@@ -19,7 +19,8 @@ const _A = (typeof args === 'string')
 const SCOPE = _A.scope ? String(_A.scope)
   : 'the uncommitted working-tree changes; if the tree is clean, the latest commit (HEAD)'
 
-const GIT = 'git -C "D:/selom"'
+// Run git from the workflow's cwd (the repo root) — no hardcoded checkout path.
+const GIT = 'git'
 
 // Selom grounding shared by every lens prompt — keep the checks specific to OUR system, not generic.
 const SELOM = (
