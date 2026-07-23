@@ -21,51 +21,50 @@
 > Keep it at the top when you overwrite this file in place._
 
 > Thin, slot-based pointer — **overwrite in place, never append** (README "CURRENT.md shape" + hard
-> rule 1). Per-session NARRATIVE lives in commit messages + `archive/`, not here. Pre-2026-07-09
-> history: `archive/2026-07-09-current-history.md` + `git log`.
+> rule 1). Per-session NARRATIVE lives in commit messages + `archive/`, not here.
 
 ## ▸ SESSIONS  (newest first — scan here; detail = the commit range + git log)
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
-| **HOST-PORTABILITY / W-003** | 2026-07-19 | `c512dbc..HEAD` | First session on the new **Linux host (syd4)**. Removed every hardcoded Windows drive path: the three review workflows resolve `git` from cwd; `config.py` resolves the external datasets + papers corpora from **`SELOM_DATASETS_DIR` / `SELOM_PAPERS_DIR`** (no drive default; absent ⇒ the skipif-guarded tests skip), ~24 backend files repointed, proven by `tests/test_config_data_dirs.py`; `hygiene-scan.mjs` gains a **5th class** forbidding absolute drive paths in tracked code. Closed the eng-practices port: **M-007** graphify wiring-retirement (dropped the migrated-hook ignores + `.graphifyignore`) + **M-008** deferred-ops-ratchets doc → **W-003 COMPLETE**. Folded in two peer-repo hygiene practices (CI concurrency diet + a retro documented-command pass; [[selom-repo-hygiene-vs-peers]]). `review-gauntlet` ran clean over the diff (1 low finding fixed). BE fast **1209/16skip** · FE tsc+eslint+vitest green. |
-| **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | Pushed `port/m001-repo-hygiene`, opened **PR #1**, `ci` green, **FF-merged to `main`** (linear, exact SHAs) + deleted the branch. Two trigger-event holes in M-004's `ci.yml`: `pull_request` needed `pull-requests: read` (`24c6797`); push-to-`main` needed `fetch-depth: 0` (`2cb4cb9`). Ratchet: [[verify-ci-in-its-target-event]]. |
-| **ENG-PORT-W2** | 2026-07-09 | `4e4ad48..ba8856e` | Eng-practices port W-002: M-002 single-env-reader + router import-boundary · M-003 LLM call-site inventory · M-004 CI → one `ci.yml` · M-005 worktree tooling · M-006 lean handoff. |
-| **ENG-PORT-M1** | 2026-07-09 | `945ac73..e9ba3ab` | Port plan + M-001 repo-hygiene scanner + wired `.githooks/pre-commit` (`core.hooksPath`) + ratchet doctrine. |
-| older | — | `git log` / `archive/` | CI-GREEN · PARALLEL-SPRINT-1 · AI-DRAFT/HARDCODE-HUNT · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
+| **LAUNCH-CAMPAIGN** | 2026-07-23 | branch `campaign/parallel-lanes` `60df628..5ab0103` (**unpushed**) | Owner-directed parallel launch campaign (fanned out several build lanes). **Committed on the branch:** WS3.1 converge 6 skill runners → `engine.vocab`/`columns`, kill drifted forks (fixes a silent classify split, `7440f56`) · Pillar-2 slice-0 figure-editor **canvas shell** (4-region frame, relocate-not-rewrite, `3db8f0b`) · **ERG** OP extraction + PhNR + flicker-FFT + opt-in robust a/b, non-breaking (`a84636c`) · **fe-review drops `frontend-design`** → `impeccable` wins (`5ab0103`). **Held (uncommitted):** FACS `facs_gating` skill — built + verified, but **FlowKit ⊥ pandas-3.0** (needs out-of-process for prod, RISKS-worthy). **Building:** cloud-storage integrations (self-host **Nango** + Google/Dropbox/URL import+export → the existing intake pipeline; Docker installed). Also produced the **ERG Fig-1E n=5 mean±SEM** figure + data (real `erg_traces` engine; delivery pending the cloud channel). |
+| **HOST-PORTABILITY / W-003** | 2026-07-19 | `c512dbc..96d7296` | First session on **Linux host syd4**. Host-portable: review workflows resolve `git` from cwd; `config.py` reads `SELOM_DATASETS_DIR`/`SELOM_PAPERS_DIR`; hygiene-scan 5th class (drive-paths). Closed W-003 (M-007/M-008). Pushed to `origin/main`. |
+| **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
+| older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · HOST-PORTABILITY · 2026-07-19 · `main` @ `96d7296` **pushed to origin** · CI billing-blocked · Claude (FE+BE, solo)
+## ▸ LIVE · LAUNCH-CAMPAIGN · 2026-07-23 · branch `campaign/parallel-lanes` (**unpushed**) · Claude (FE+BE, solo)
 
-- **State:** first session on syd4 (Linux). Made the repo host-portable and **closed W-003** (the whole engineering-practices port); 8 atomic commits + a coordination-gitignore, **pushed to `origin/main` (`4dc51e4..96d7296`)**. Everything verified; the gauntlet ran clean. ⚠ **CI is red = a GitHub Actions BILLING block** (account payment / spending-limit — every job failed to *start* in 1–3s; not a code defect); it clears at the monthly billing renewal.
-- **Gates (this host):** BE fast **1209 passed / 16 skipped / 0 failed** (`uv run pytest -m "not slow" -n auto`, full extras) + ruff clean; FE **tsc 0 · eslint 0-err · vitest 513**; `hygiene-scan --all`/`--staged` green (5 classes); zizmor clean. `test_config_data_dirs.py` is the executable proof of the resolver (the corpora never come to this host).
-- **`selom-data` is NOT on this host and never will be** (employer-adjacent, fleet-wide). `$SELOM_DATASETS_DIR` / `$SELOM_PAPERS_DIR` stay unset → the guarded reproduction tests skip by design. Green with those skipped tells you nothing about the data path — never read it as "reproduction works".
+- **State:** parallel launch campaign in flight. **`main` untouched at `60df628`**; all work is on `campaign/parallel-lanes`. 4 lanes committed there; **FACS held** (FlowKit reconciliation); **cloud/Nango foundation building** (a background dev). Reviews (gauntlet + fe-review) **batch at the campaign milestone** before any merge to main.
+- **Gates:** each committed lane passed its own gate (BE fast pytest + ruff / FE tsc + eslint + vitest 513). One **pre-existing, unrelated** full-tree failure: `test_ingest.py::test_ingest_h5ad_single_cell` (anndata ↔ pandas-3.0 `ArrowStringArray` h5ad write) — not campaign work.
+- **selom-data IS on this host** (corrects the old stamp): full corpus at `/home/deploy/migration/selom-migration-staging/selom-data/` — set `SELOM_DATASETS_DIR` there and the data-dependent tests RUN. [[selom-machine-migration]] corrected.
+- **Docker installed** (Engine v29.6 + Compose v5.3) to self-host Nango; the "ask before Docker" rule was Windows-only [[ask-before-docker-wsl]] corrected.
 
 ## ▸ NEXT
 
-- **⭐ Primary (next session): kick off the parallel launch campaign** (owner-directed). Survey the on-hold backlog (`docs/on-hold/README.md` + parked memories) + remaining launch work (WS3 dedup · owed WS1/restructure reviews · WS6 deploy) + Pillar-2; carve **disjoint contract-separated buckets** → forcing-Qs to the founder → fork worktree lanes ([[parallel-agent-lanes]], backed by M-005 tooling).
-- **Blocked on billing:** branch-protect `main` on exactly the check **`ci`** — deferred until the **monthly billing renewal** lets CI run green (the check name is proven on a prior PR + push; it just can't run while Actions is payment-blocked). No code action.
-- **Peer-hygiene follow-ups (small, [[selom-repo-hygiene-vs-peers]]):** verify what M-002's single-env-reader already enforces before adding a thalon-style import-boundary guard; a short `SECURITY.md` leak runbook; `.dockerignore` + GH→AWS OIDC (thalon's `deploy-infra.yml` is the reference) when the BE containerizes.
-- **Owed reviews (batch at the next milestone):** WS1 boundary + the whole-restructure gauntlet/fe-review; a **live-gateway** spot-check of the AI surfaces (all prior verify was gateway-off).
+- **Cloud integration (top):** finish the Nango foundation → wire **Google + Dropbox** (client IDs already in `app/backend/.env`, gitignored) → give the owner the **callback/redirect URLs** to paste into the two provider apps. Google app being **published to Production** (non-sensitive `drive.file` → no CASA). **OneDrive/Microsoft ON HOLD** (owner — Azure login/token trouble; resume on a better machine).
+- **FACS reconciliation** (then commit the held lane): FlowKit ⊥ pandas-3.0 → move `flowkit` OUT of `REQUIRED_ENGINE_MODULES` to a per-skill/`find_spec` gate + document the **out-of-process-for-prod** path (RISKS #9 OmicVerse pattern) + add a RISKS.md entry. Prod-real FACS needs the isolated worker; interim real path is a flowkit-installed dev env, prod serves the WS1.1-labelled stub.
+- **ERG figure/table wiring:** surface the new OP/PhNR/flicker metrics in the figures + `companions/methods.py` (the ERG lane left this — a table-structure decision; `methods.py` is also edited by the held FACS lane, so do it AFTER FACS lands).
+- **ERG Fig-1E delivery:** figure + data zip at `selom-data/erg-fig1e/export/n5_sem_2026-07-23/` (PDF/PNG/TIFF + Excel/CSVs). Deliver via the cloud **export** once live; interim = scp/SFTP (the agent cannot hand-carry binary through chat — base64 corrupts).
+- **Milestone:** run review-gauntlet + fe-review over the whole branch → **owner merges to `main` + pushes**.
 
 ## ▸ DEFERRED
 
-- Owed reviews: WS1 boundary (gauntlet + fe-review G2 stub-banner) + the whole-restructure gauntlet/fe-review; a **live-gateway** spot-check of the AI surfaces (all prior verify was gateway-off).
-- Server/deploy: 7c-(b) FE-3 upload wiring · step-8 split deploy (Lambda+Fargate+Aurora, GitHub→AWS OIDC, kill the static key) — `docs/aws-materialization/plan.md`.
-- **`uv.lock` completion** — the committed lock does not fully cover the optional extras, so `uv sync`/`uv run` re-resolves + churns it; a deliberate `uv lock` refresh is a Codex-lane hygiene task (kept OUT of this milestone's commits).
+- **OneDrive/Microsoft** cloud provider (owner on hold until a machine that logs into Azure cleanly).
+- **FACS real path in PROD** → the out-of-process FlowKit worker (isolated env / thin RPC), RISKS #9 OmicVerse pattern.
+- WS6 AWS deploy — owner chose **"this box first, AWS later"**. Owed WS1/restructure reviews fold into the campaign milestone review. `uv.lock` completion (Codex-lane).
 
-## ▸ ENV / landmines (Linux · syd4 — the Windows rules are dead)
+## ▸ ENV / landmines (Linux · syd4)
 
-- **Backend:** `uv run uvicorn main:app --reload` on `:8000`. Fast gate: `uv run pytest -m "not slow" -n auto`. Full test extras (as CI): `uv sync --extra dev --extra db --extra jobs --extra scrna --extra pdf`. Ruff: `uv run ruff check .`. zizmor: `uv tool run zizmor@latest --persona=regular .github/workflows/`.
-- **Frontend:** `npm install --legacy-peer-deps` then `npm run dev`. Turbopack no longer panics (that was Windows); `--webpack` not needed.
-- **Shared multi-agent box:** every Next dev server defaults to `:3000` and the 2nd **silently** takes `:3001` (wrong-app-verify risk) — derive the lane (`~/work/swordfish/provisioning/workstation/dev-lane.sh`; Selom FE=3152) before `npm run dev`. NOT yet applied to `package.json` (still `next dev`) — a follow-up. Before anything that restarts services/apt: `who-is-live.sh --gate`.
-- Every commit runs `.githooks/pre-commit` (`core.hooksPath`, hygiene-scan `--staged`, 5 classes). `git user.email` MUST stay the noreply (`282747725+steveneam@…`) or Vercel blocks deploys [[selom-git-commit-email-vercel]].
-- **MCP env keys** (`CONTEXT7_API_KEY` / `RENDER_API_KEY` / `OBSIDIAN_API_KEY`) live in `~/.config/agent-env/selom.env`, sourced by the session launcher — present inside this session; a shell started elsewhere must source that file.
-- Reviews (gauntlet/fe-review) bat at a phase/milestone boundary, not per task [[review-cadence-phase-not-task]]. Cross-agent live coordination = the **`live-comm`** skill (never hand-roll tmux send-keys); async = `agent_handoff/FROM-SWORDFISH.md` (in) / `ASK-BACKS-FOR-SWORDFISH.md` (out).
+- **selom-data IS here** at `/home/deploy/migration/selom-migration-staging/selom-data/` → `SELOM_DATASETS_DIR`. **Docker installed** — in a fresh shell use `sudo docker` until the `deploy` docker-group login refreshes.
+- Backend: `uv run uvicorn main:app --reload` on `:8000`; fast gate `uv run pytest -m "not slow" -n auto` + `uv run ruff check .`. Frontend: `npm install --legacy-peer-deps`; derive the FE dev-lane port (Selom FE=3152) to avoid the shared-box `:3000` collision.
+- Every commit runs `.githooks/pre-commit` (hygiene-scan, 5 classes). `git user.email` MUST stay the noreply (`282747725+steveneam@…`) or Vercel blocks deploys [[selom-git-commit-email-vercel]].
+- **Cloud OAuth creds** staged in `app/backend/.env` (gitignored): `GOOGLE_*` ✓ · `DROPBOX_*` ✓ · `MS_*` empty (on hold). Self-hosted **Nango** stack under `deploy/nango/`.
+- **The agent cannot marshal binary/large files through chat** (base64 reproduction corrupts, even ~20 KB) — deliver files via a real channel (scp/SFTP/rclone/the cloud integration), never by pasting base64 into a tool call. Emailing via the Gmail MCP is draft-only + attachment-limited; Drive `create_file` needs valid inline base64 (same wall).
 
 ## ▸ READ FIRST
 
-`docs/hardening-port/gate-ledger.md` (W-003 COMPLETE) · `docs/eng-practices-port/plan.md` · CLAUDE.md "Engineering ratchets" · `docs/restructure/plan.md` (the post-port launch tracker) · `docs/operating/{playbook,contract-window}.md`. Memory: [[executable-ratchets-over-implicit-wiring]] [[selom-repo-hygiene-vs-peers]] [[parallel-agent-lanes]] [[verify-on-real-data-not-mock]] [[selom-git-commit-email-vercel]].
+`docs/restructure/plan.md` (WS3 done) · `docs/fe-review/spec.md` (now impeccable-only) · CLAUDE.md · `deploy/nango/` (once built). Memory: [[parallel-agent-lanes]] · [[selom-machine-migration]] · [[ask-before-docker-wsl]] · [[selom-fe-review-framework]] · [[verify-on-real-data-not-mock]] · [[selom-git-commit-email-vercel]].
 
 ## Codex — Last Task & Resume
 
-Codex is away; Claude covers both lanes ([[claude-covers-both-selom-lanes]]). Keep the BE handoff drop-in-ready. Last Codex-lane state of record = the restructure tracker (`docs/restructure/plan.md`) + `plans/v2-backend.md`.
+Codex is away; Claude covers both lanes ([[claude-covers-both-selom-lanes]]). Keep the BE handoff drop-in-ready. Last Codex-lane state of record = `docs/restructure/plan.md` + `plans/v2-backend.md`.
