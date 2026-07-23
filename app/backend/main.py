@@ -3,7 +3,7 @@ import pathlib
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from routers import ai, data, extract, figures, gene_sets, jobs, library, litsynth, papers, reproduction, skills, system
+from routers import ai, cloud, data, extract, figures, gene_sets, jobs, library, litsynth, papers, reproduction, skills, system
 
 app = FastAPI(title="Selom API")
 
@@ -26,3 +26,4 @@ app.include_router(jobs.router)
 app.include_router(litsynth.router)
 app.include_router(figures.router)
 app.include_router(library.router)
+app.include_router(cloud.router)

@@ -199,6 +199,25 @@ class Settings(BaseSettings):
         default=None, validation_alias="SELOM_PAPER_METADATA_CACHE"
     )
 
+    # Cloud-storage integrations (docs — cloud/). Import (provider -> S3) + export ride the existing
+    # intake -> confirm -> parse pipeline; OAuth is brokered by a self-hosted Nango (deploy/nango/).
+    # URL/S3 needs no OAuth and works out of the box; the three OAuth providers stay OFF until the
+    # owner adds their client IDs to Nango and flips the matching flag. All default-off/empty so the
+    # offline inner loop is unchanged.
+    nango_base_url: str = Field(
+        default="http://localhost:3003", validation_alias="SELOM_NANGO_BASE_URL"
+    )
+    nango_secret_key: str = Field(default="", validation_alias="SELOM_NANGO_SECRET_KEY")
+    nango_timeout_s: float = Field(default=15.0, validation_alias="SELOM_NANGO_TIMEOUT_S")
+    # Per-provider feature flags — a provider only lights up once its client IDs live in Nango.
+    cloud_google_enabled: bool = Field(default=False, validation_alias="SELOM_CLOUD_GOOGLE")
+    cloud_onedrive_enabled: bool = Field(default=False, validation_alias="SELOM_CLOUD_ONEDRIVE")
+    cloud_dropbox_enabled: bool = Field(default=False, validation_alias="SELOM_CLOUD_DROPBOX")
+    # Byte-cap for one remote import when the tenant has no storage-quota row (bytes). 5 GiB default.
+    cloud_import_max_bytes: int = Field(
+        default=5 * 1024 * 1024 * 1024, validation_alias="SELOM_CLOUD_IMPORT_MAX_BYTES"
+    )
+
     # --- live environment accessors (single-env-reader ratchet, M-002) --------------------------
     # These re-read os.environ at CALL time (NOT captured at construction) because they are
     # monkeypatched per-test and — for the UMAP engine — WRITTEN at run time as a per-reproduction

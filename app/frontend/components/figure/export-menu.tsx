@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, Download, Loader2, Palette } from "lucide-react";
+import { AlertCircle, Cloud, Download, Loader2, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { exportFigure, fetchExportPresets, resolveExportDimensions, type ExportFormat, type ExportPreset } from "@/lib/figure/export";
@@ -219,6 +219,18 @@ export function ExportMenu({
             {busy ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
             {busy ? "Rendering…" : `Export ${format.toUpperCase()}`}
           </Button>
+
+          {/* Export to cloud — scaffold entry; lights up with the cloud-storage integrations. */}
+          <button
+            type="button"
+            disabled
+            title="Coming soon"
+            className="mt-2 flex w-full items-center gap-2 rounded-lg border border-border/70 bg-background/40 px-2.5 py-1.5 text-left opacity-70"
+          >
+            <Cloud className="size-3.5 text-muted-foreground/80" />
+            <span className="text-xs text-muted-foreground">Export to cloud</span>
+            <span className="ml-auto text-[11px] font-medium text-muted-foreground/70">Coming soon</span>
+          </button>
           </div>
         </>
       )}

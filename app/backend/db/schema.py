@@ -151,6 +151,7 @@ datasets = sa.Table(
     sa.Column("size_bytes", sa.BigInteger, nullable=False, server_default=sa.text("0")),
     sa.Column("qc", JSON_PORTABLE, nullable=True),          # QcReport — small, FE reads inline
     sa.Column("status", sa.Text, nullable=False, server_default="pending_upload"),  # |ready|failed (T2)
+    sa.Column("source", JSON_PORTABLE, nullable=True),      # cloud-import provenance {provider, ref, fetched_at}
     _created_at(),
     sa.Index("idx_datasets_project", "project_id"),
     sa.Index("idx_datasets_user", "user_id"),

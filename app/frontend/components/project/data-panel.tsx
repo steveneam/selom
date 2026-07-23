@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Database, FileSpreadsheet, Plus, ShieldAlert, X } from "lucide-react";
 import { IntakeQuestionnaire } from "@/components/intake/intake-questionnaire";
+import { CloudImportMenu } from "@/components/intake/cloud-import-menu";
 import { Dropzone } from "./dropzone";
 import { CleaningReport } from "./cleaning-report";
 import { DataTypeStrip } from "./data-type-strip";
@@ -247,6 +248,16 @@ export function DataPanel({
     setOverride(undefined);
   }
 
+  // A cloud import (URL/S3): the backend already streamed the bytes into the store AND ran the
+  // server-side parse (qc is stamped), so we add the server-authoritative dataset to the store and
+  // open it read-only — its bytes live server-side, so there's nothing to re-inspect locally.
+  function onCloudImported(dataset: Dataset) {
+    const added = projectStore.addUploadedDataset(dataset);
+    setActive({ dataset: added, file: new File(["remote"], added.filename), real: false });
+    setDisabledSteps(new Set());
+    setOverride(undefined);
+  }
+
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       {/* left: upload + dataset list */}
@@ -276,6 +287,10 @@ export function DataPanel({
             variant="secondary"
           />
         )}
+        {/* Files that live off the machine: URL/S3 works now; the cloud accounts are scaffolded. */}
+        <div className="flex items-center gap-2">
+          <CloudImportMenu projectId={projectId} onImported={onCloudImported} />
+        </div>
         {uploading && (
           <p className="text-xs text-muted-foreground" role="status">
             Uploading your data…

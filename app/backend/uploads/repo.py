@@ -62,7 +62,7 @@ def _dataset_public(row) -> dict:
         "label": row.label, "modality": row.modality, "status": row.status,
         "size_bytes": int(row.size_bytes or 0), "current_sha256": row.current_sha256,
         "upload_s3_key": row.upload_s3_key, "parquet_s3_key": row.parquet_s3_key,
-        "qc": row.qc, "created_at": _iso(row.created_at),
+        "qc": row.qc, "source": row.source, "created_at": _iso(row.created_at),
     }
 
 
@@ -297,6 +297,45 @@ class UploadRepo:
                 tq.update(datasets, dataset_id, parquet_s3_key=parquet_s3_key,
                           current_sha256=current_sha256, qc=qc)
                 return _dataset_public(tq.get(datasets, dataset_id))
+        return run_with_db_retry(_work)
+
+    def set_source(self, user_id: str, dataset_id: str, source: dict) -> dict | None:
+        """Stamp cloud-import provenance (``{provider, ref, fetched_at}``) on a dataset row
+        (routers/cloud.py). ``None`` ⇒ not this tenant's dataset."""
+        def _work():
+            with self.engine.begin() as conn:
+                set_tenant(conn, user_id)
+                tq = TenantQuery(conn, user_id)
+                if tq.get(datasets, dataset_id) is None:
+                    return None
+                tq.update(datasets, dataset_id, source=source)
+                return _dataset_public(tq.get(datasets, dataset_id))
+        return run_with_db_retry(_work)
+
+    def fail(self, user_id: str, dataset_id: str) -> dict | None:
+        """Mark a dataset ``failed`` (a remote import that couldn't stream/parse — spec cloud/).
+        Fail-soft: the row + any partial object are swept later (T2); ``None`` ⇒ not this tenant's."""
+        def _work():
+            with self.engine.begin() as conn:
+                set_tenant(conn, user_id)
+                tq = TenantQuery(conn, user_id)
+                if tq.get(datasets, dataset_id) is None:
+                    return None
+                tq.update(datasets, dataset_id, status=FAILED)
+                return _dataset_public(tq.get(datasets, dataset_id))
+        return run_with_db_retry(_work)
+
+    def storage_headroom(self, user_id: str) -> int | None:
+        """Bytes this tenant may still store (``max_storage_bytes`` − reserved). ``None`` when the
+        tenant has no quota row (unlimited) — the caller falls back to a config cap. Used as the
+        running byte-cap for a remote import, so a stream can't blow past the plan (spec cloud/)."""
+        def _work():
+            with self.engine.connect() as conn:
+                set_tenant(conn, user_id)
+                q = self._quota(conn, user_id)
+                if q is None:
+                    return None
+                return max(0, int(q.max_storage_bytes) - self._storage_used(conn, user_id))
         return run_with_db_retry(_work)
 
     def get_dataset(self, user_id: str, dataset_id: str) -> dict | None:

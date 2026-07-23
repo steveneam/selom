@@ -1,0 +1,3 @@
+# Secrets + Postgres data — never commit.
+.env
+nango-data/

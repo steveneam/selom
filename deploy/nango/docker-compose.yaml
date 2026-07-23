@@ -1,0 +1,84 @@
+# Selom — self-hosted Nango (OAuth broker for the cloud-storage integrations).
+#
+# Three services on a private network: the Nango server + its own Postgres + Redis. Everything is
+# bound to 127.0.0.1 (never 0.0.0.0) — a later reverse proxy is what exposes the callback publicly.
+# Ports are remapped off the box defaults: DB -> :5433 (host :5432 is taken), Redis -> :6380, the
+# server keeps :3003 and the Connect UI :3009 (both free here, and off Selom's :3000/:8000).
+#
+# Config + secrets come from ./.env (gitignored). `sudo docker compose up -d`, then verify:
+#   curl -fsS http://localhost:3003/health
+#
+# NOTE: the server image ships its own providers.yaml, so — unlike the upstream repo compose — we do
+# NOT bind-mount packages/providers/providers.yaml (there is no repo checkout here). Pin the image to
+# a version/commit-hash tag before production (`nangohq/nango-server:hosted` tracks latest hosted).
+name: selom-nango
+
+services:
+  nango-db:
+    image: postgres:16.0-alpine
+    container_name: selom-nango-db
+    environment:
+      POSTGRES_USER: ${NANGO_DB_USER:-nango}
+      POSTGRES_PASSWORD: ${NANGO_DB_PASSWORD}
+      POSTGRES_DB: ${NANGO_DB_NAME:-nango}
+    ports:
+      - '127.0.0.1:${NANGO_DB_PORT:-5433}:5432'
+    volumes:
+      - ./nango-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${NANGO_DB_USER:-nango} -d ${NANGO_DB_NAME:-nango}']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [nango]
+
+  nango-redis:
+    image: redis:7.2.4
+    container_name: selom-nango-redis
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    ports:
+      - '127.0.0.1:6380:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [nango]
+
+  nango-server:
+    # Pin to a commit-hash / version tag before production (see note above).
+    image: nangohq/nango-server:hosted
+    container_name: selom-nango-server
+    platform: linux/amd64
+    env_file: [.env]
+    environment:
+      # Wire the server to the sibling containers (internal ports, over the private network).
+      - NANGO_DB_HOST=nango-db
+      - NANGO_DB_PORT=5432
+      - RECORDS_DATABASE_URL=postgresql://${NANGO_DB_USER:-nango}:${NANGO_DB_PASSWORD}@nango-db:5432/${NANGO_DB_NAME:-nango}
+      - NANGO_REDIS_URL=redis://nango-redis:6379
+      - SERVER_PORT=${SERVER_PORT:-3003}
+      - CONNECT_UI_PORT=${CONNECT_UI_PORT:-3009}
+      - FLAG_SERVE_CONNECT_UI=true
+      - CSP_REPORT_ONLY=true
+    ports:
+      - '127.0.0.1:${SERVER_PORT:-3003}:${SERVER_PORT:-3003}'
+      - '127.0.0.1:${CONNECT_UI_PORT:-3009}:${CONNECT_UI_PORT:-3009}'
+    depends_on:
+      nango-db:
+        condition: service_healthy
+      nango-redis:
+        condition: service_healthy
+    healthcheck:
+      # node + global fetch ship in the server image (Node 20+); exec-form avoids shell quoting.
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3003/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 45s
+    restart: unless-stopped
+    networks: [nango]
+
+networks:
+  nango:
+    name: selom-nango

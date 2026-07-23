@@ -36,6 +36,16 @@ class ObjectStore(Protocol):
         """Write bytes at ``key`` (content-addressed keys make an overwrite idempotent)."""
         ...
 
+    def put_stream(
+        self, key: str, fileobj, content_type: str = "application/octet-stream"
+    ) -> None:
+        """Stream a readable ``fileobj`` (``.read(size)``) to ``key`` **without buffering the whole
+        object in memory** — the cloud-import path streams a provider→store transfer through here so a
+        GB-scale omics file never lands in the process heap (``put_bytes`` would OOM). S3 uses a
+        multipart ``upload_fileobj``; the local backend copies in chunks to a temp then atomically
+        renames. The caller's ``fileobj`` is responsible for any running byte-cap (spec — cloud/)."""
+        ...
+
     def head(self, key: str) -> bool:
         """True if the object exists (a cross-process completion probe)."""
         ...
@@ -97,6 +107,28 @@ class LocalObjectStore:
         tmp = p.with_name(f"{p.name}.{os.getpid()}.tmp")
         tmp.write_bytes(data)
         os.replace(tmp, p)
+
+    def put_stream(
+        self, key: str, fileobj, content_type: str = "application/octet-stream"
+    ) -> None:
+        # Copy the source stream to a temp in 1 MiB chunks (never buffering the whole object), then
+        # atomically rename — same torn-write safety as put_bytes. content_type is unused on disk.
+        p = self._path(key)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_name(f"{p.name}.{os.getpid()}.tmp")
+        try:
+            with open(tmp, "wb") as out:
+                while True:
+                    chunk = fileobj.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    out.write(chunk)
+            os.replace(tmp, p)
+        except BaseException:
+            # A capped/aborted stream must not leave a half-written temp behind (the sweep only
+            # knows about uploads/ keys, and this could be a data/ key too). Clean up, re-raise.
+            pathlib.Path(tmp).unlink(missing_ok=True)
+            raise
 
     def head(self, key: str) -> bool:
         return self._path(key).exists()
@@ -165,6 +197,16 @@ class S3ObjectStore:
     ) -> None:
         self.client.put_object(
             Bucket=self.bucket, Key=key, Body=data, ContentType=content_type
+        )
+
+    def put_stream(
+        self, key: str, fileobj, content_type: str = "application/octet-stream"
+    ) -> None:
+        # Multipart streaming upload — boto3 reads ``fileobj`` in parts and never buffers the whole
+        # object (the OOM fix for GB omics files). If the caller's capped reader raises mid-stream,
+        # boto3 aborts the multipart upload and the exception propagates (the row is marked failed).
+        self.client.upload_fileobj(
+            fileobj, self.bucket, key, ExtraArgs={"ContentType": content_type}
         )
 
     def head(self, key: str) -> bool:
