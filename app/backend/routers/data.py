@@ -150,6 +150,64 @@ async def combine_data(files: list[UploadFile] = File(...), labels: str | None =
                  "Content-Disposition": f'attachment; filename="{bundle.source.filename}"'})
 
 
+@router.post("/data/assemble-scrna")
+async def assemble_scrna_data(files: list[UploadFile] = File(...), obs_map: str | None = Form(None)):
+    # The scRNA sibling of /data/combine: a real GEO scRNA deposit (e.g. Kim/Hani GSE201356) arrives
+    # as a SET of per-sample 10x matrices (loose barcodes/features/matrix triplets or per-sample
+    # .h5ad) with NO per-cell design in obs — the design (line/genotype, sample id) lives in the
+    # FILENAMES. This reads that set, concatenates it into ONE AnnData, and materializes the
+    # filename-encoded design into obs (sample_id always; plus the line/condition the caller keys per
+    # sample in `obs_map`). Returns the assembled .h5ad bytes + a JSON summary header, exactly like
+    # /data/combine returns the merged CSV — the FE turns it into a normal dataset (the usual
+    # /uploads/intake → confirm → parse/materialize_dataset path), where the standard run path takes
+    # over. `obs_map` is an optional JSON object {sample key → {obs field: value}} (the confirmed
+    # intake answers); omit it for a filename-only assembly (sample_id per file, no design overlay).
+    from engine import assemble
+
+    if not files:
+        raise RunError.bad_input(
+            "assemble_no_files", "assemble-scrna: no files.",
+            fix="Attach the per-sample 10x matrices (barcodes/features/matrix triplets, a 10x "
+                "directory, or a per-sample .h5ad) to assemble.")
+    parsed_obs_map = None
+    if obs_map:
+        try:
+            parsed_obs_map = json.loads(obs_map)
+        except (ValueError, TypeError) as e:
+            raise RunError.bad_input(
+                "assemble_bad_obs_map",
+                "obs_map must be a JSON object mapping a sample key to its obs fields.",
+                fix='e.g. {"GSM6061839_2niPE2-ANAI-3": {"line": "2niPE2", "condition": "iRPE"}}') from e
+        if not isinstance(parsed_obs_map, dict):
+            raise RunError.bad_input(
+                "assemble_bad_obs_map",
+                "obs_map must be a JSON object mapping a sample key to its obs fields.",
+                fix='e.g. {"GSM6061839_2niPE2-ANAI-3": {"line": "2niPE2", "condition": "iRPE"}}')
+    paths = [_save_upload(f) for f in files]
+    adata = None
+    try:
+        adata = assemble.assemble_scrna(paths, obs_map=parsed_obs_map)
+        summary = assemble.summarize(adata)
+        h5ad_bytes = assemble.to_h5ad_bytes(adata)
+    except ValueError as e:
+        # A deposit we can't assemble (an unrecognized file, an incomplete triplet, an unreadable
+        # matrix) — the real cause as `message`, a bad-input 400 in the shared envelope (WS2.6).
+        raise RunError.bad_input(
+            "assemble_failed", str(e),
+            fix="Attach a complete 10x triplet (matrix + barcodes + features) per sample, a 10x "
+                "directory, or one .h5ad per sample.") from e
+    finally:
+        for p in paths:
+            pathlib.Path(p).unlink(missing_ok=True)
+    summary["filename"] = "assembled_scrna.h5ad"
+    summary["n_files"] = len(files)
+    return Response(
+        content=h5ad_bytes, media_type="application/octet-stream",
+        headers={"X-Assemble-Summary": json.dumps(summary),
+                 "Access-Control-Expose-Headers": "X-Assemble-Summary",
+                 "Content-Disposition": 'attachment; filename="assembled_scrna.h5ad"'})
+
+
 @router.get("/artifacts/{artifact_id}")
 def get_artifact(artifact_id: str):
     # D3 — the lineage record for a materialized intermediate table: its metadata (shape, recipe,

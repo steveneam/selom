@@ -10,6 +10,7 @@ Ingest registry (``engine.ingest``) and QC (``engine.qc``) follow.
 
 from __future__ import annotations
 
+from engine.assemble import assemble_scrna
 from engine.databundle import DataBundle, classify
 from engine.cleaning import CleaningPlan, DataProfile, plan_cleaning, profile_data
 from engine.ingest import clear_input_cache, ingest, ingest_cached, ingest_many
@@ -37,6 +38,7 @@ __all__ = [
     "ingest",
     "ingest_cached",
     "ingest_many",
+    "assemble_scrna",
     "clear_input_cache",
     "run_qc",
     "route_data",
