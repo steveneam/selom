@@ -13,8 +13,9 @@ gauntlet. Same shape (parallel lenses → adversarially-verified findings), diff
 interaction / layout / affordance instead of correctness / invariants. It is delivered as a
 **workflow peer** (`.claude/workflows/fe-review.js`, invoked by `scriptPath` like its siblings)
 governed by one mutation-lifecycle lens (V·R·D·A·R·N) plus two FE-specific gates, wired into the
-Selom Playbook so it runs by default on FE diffs. It **orchestrates** the three design skills
-(ui-ux-pro-max / frontend-design / impeccable) — it does not rewrite them.
+Selom Playbook so it runs by default on FE diffs. It **orchestrates** the design skills
+(ui-ux-pro-max + impeccable — **`frontend-design` dropped 2026-07-23**; it doesn't compose with
+`impeccable`, which is the more capable and covers generation itself) — it does not rewrite them.
 
 ## Context
 
@@ -42,13 +43,14 @@ The owner's six pieces of feedback are themselves a coherent lens (see Design). 
 codify that lens + the two missing passes so the assistant runs them without being asked.
 
 **What exists today.**
-- Three design skills (CLAUDE.md "## Coding Guidelines" + the Playbook dispatch table):
-  **ui-ux-pro-max** (a searchable design knowledge DB), **frontend-design** (distinctive
-  generation), **impeccable** (`audit` technical / `critique` heuristic / `polish` / etc.;
-  installed locally at `.claude/skills/impeccable/`, gitignored).
+- Design skills (CLAUDE.md "## Coding Guidelines" + the Playbook dispatch table):
+  **ui-ux-pro-max** (a searchable design knowledge DB) + **impeccable** (`audit` technical /
+  `critique` heuristic / `polish` / generation; installed locally at `.claude/skills/impeccable/`,
+  gitignored). **`frontend-design` was dropped** (owner 2026-07-23): it and `impeccable` don't
+  compose, and `impeccable` is the more capable skill and covers generation itself.
 - The **Selom Playbook** (`docs/operating/playbook.md` + the CLAUDE.md dispatch table) already
   routes "FE work or any FE audit/review → the design skills". This spec makes that row point at
-  the new review skill, which then fans out to the three.
+  the new review skill, which then fans out to the two.
 - Selom's design system: stage tokens in `app/frontend/app/globals.css`
   (`--stage-ai` fuchsia · `--stage-figuredata` amber · `--stage-figure` cyan · `--stage-skill`
   violet · `--stage-data` blue · `--stage-publish` green); the `TintChip` tinted-pill vocabulary;
@@ -88,7 +90,7 @@ R3. The skill MUST require two passes the static audit lacked, as **definition-o
 R4. The skill MUST dispatch the **correct** impeccable mode, not default to one:
 - interaction / affordance / heuristics / "feels off" → `impeccable critique`;
 - a11y / perf / theming / responsive / anti-patterns → `impeccable audit`;
-- new visual generation → `frontend-design`; design-knowledge lookups → `ui-ux-pro-max`.
+- new visual generation → `impeccable` (generation / `polish`); design-knowledge lookups → `ui-ux-pro-max`.
 It records which modes it ran and why.
 
 R5. The lens checks MUST be **grounded in Selom's system**, not generic: V/A reference the stage
@@ -192,7 +194,7 @@ This is a process skill, so "tests" are validation that it *works as a procedure
 
 ## Out of Scope
 
-- Rewriting or forking ui-ux-pro-max / frontend-design / impeccable (D2).
+- Rewriting or forking ui-ux-pro-max / impeccable (D2).
 - Mobile/responsive breakpoints — Selom is desktop-only ([[selom-desktop-only]]); G2 verifies at
   desktop widths + the fixed dock widths only.
 - A numeric scoring system (impeccable `audit` already scores; this layer is about coverage, not a

@@ -33,7 +33,7 @@ Three layers, different reliability. Put each rule in the layer that actually fi
 - **Verify** — `verify`, `browser-verify` (real data + live backend, not dev:mock), the EDR-safe
   test runner (uv-3.12 PY + `PYTHONPATH=.venv\Lib\site-packages`, fast gate `pytest -m "not slow"`).
 - **Research** — `deep-research`, `context7` (live library docs), PubMed MCP (domain).
-- **Design (FE)** — `impeccable`, `ui-ux-pro-max`, `frontend-design`, `ui-ux-consultant`.
+- **Design (FE)** — `impeccable`, `ui-ux-pro-max`, `ui-ux-consultant`. (`frontend-design` dropped 2026-07-23 — doesn't compose with `impeccable`, which wins.)
 - **Orchestrate** — `Workflow` (deterministic fan-out), background / git-worktree / remote agents.
 - **Remember** — the Ratchet: one durable home per lesson + a lean memory pointer.
 

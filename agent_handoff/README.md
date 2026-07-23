@@ -116,7 +116,7 @@ do not re-encode them.
 ## Ownership
 
 - **Claude** — frontend UI / design / product copy / browser iteration. Invoke
-  the `ui-ux-pro-max` and `frontend-design` skills.
+  the `ui-ux-pro-max` and `impeccable` skills.
 - **Codex** — backend APIs / skill runners / data / tests / verification.
 
 ---
