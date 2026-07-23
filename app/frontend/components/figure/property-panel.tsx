@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Layers, Palette, Ruler, Shapes, Tags } from "lucide-react";
+import { Asterisk, FileText, Layers, Palette, Ruler, Shapes, Tags } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { FigureStore } from "@/hooks/use-figure-store";
-import { annotationItems, deriveFigureModel, seriesForTrace } from "@/lib/figure/figure-model";
+import { deriveFigureModel, seriesForTrace } from "@/lib/figure/figure-model";
+import { nonSelomAnnotationItems } from "@/lib/figure/annotations";
 import { StylePanel } from "./panels/style-panel";
 import { AxesPanel } from "./panels/axes-panel";
 import { LegendPanel } from "./panels/legend-panel";
 import { DataPanel } from "./panels/data-panel";
 import { MarksPanel } from "./panels/marks-panel";
+import { AnnotationsPanel } from "./panels/annotations-panel";
 import { PagePanel } from "./panels/page-panel";
 import { PaneBoundary } from "@/components/ui/error-boundary";
 import { PaneShell } from "@/components/ui/pane-shell";
@@ -35,7 +37,9 @@ export function PropertyPanel({
   // The adaptive inspector is driven by the derived model (inference-first); memoised so
   // it recomputes only when the spec changes. Style + Data + Marks render from it.
   const model = useMemo(() => (spec ? deriveFigureModel(spec) : null), [spec]);
-  const hasMarks = !!model?.scalebar || (spec ? annotationItems(spec).length > 0 : false);
+  // Marks lists the scale bar + skill-emitted labels only — the Selom annotation-layer items (brackets,
+  // free text, arrows) live in the always-present Annotate tab, so an item never shows in both places.
+  const hasMarks = !!model?.scalebar || (spec ? nonSelomAnnotationItems(spec).length > 0 : false);
 
   const [tab, setTab] = useState("style");
   const [focusedSeriesKey, setFocusedSeriesKey] = useState<string | null>(null);
@@ -65,9 +69,11 @@ export function PropertyPanel({
     );
   }
 
+  const annotateTab = { value: "annotate", label: "Annotate", icon: Asterisk } as const;
+  const pageTab = { value: "page", label: "Page", icon: FileText } as const;
   const tabs = hasMarks
-    ? [...BASE_TABS, { value: "marks", label: "Marks", icon: Shapes }, { value: "page", label: "Page", icon: FileText }]
-    : [...BASE_TABS, { value: "page", label: "Page", icon: FileText }];
+    ? [...BASE_TABS, annotateTab, { value: "marks", label: "Marks", icon: Shapes }, pageTab]
+    : [...BASE_TABS, annotateTab, pageTab];
 
   return (
     <Tabs value={tab} onValueChange={setTab} className="flex h-full min-h-0 flex-col">
@@ -114,6 +120,11 @@ export function PropertyPanel({
           <TabsContent value="data">
             <PaneBoundary label="data" resetKeys={[spec]}>
               <DataPanel store={store} spec={spec} model={model} focusedSeriesKey={focusedSeriesKey} />
+            </PaneBoundary>
+          </TabsContent>
+          <TabsContent value="annotate">
+            <PaneBoundary label="annotate" resetKeys={[spec]}>
+              <AnnotationsPanel store={store} spec={spec} />
             </PaneBoundary>
           </TabsContent>
           {hasMarks && (

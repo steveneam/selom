@@ -7,13 +7,13 @@ import { Section, SwitchField, TextField } from "./controls";
 import type { FigureStore } from "@/hooks/use-figure-store";
 import type { FigureSpec } from "@/lib/figure/figure-spec";
 import {
-  annotationItems,
   annotationTextOp,
   annotationVisibilityOp,
   scalebarResizeOps,
   scalebarVisibilityOps,
   type FigureModel,
 } from "@/lib/figure/figure-model";
+import { nonSelomAnnotationItems } from "@/lib/figure/annotations";
 import { cn } from "@/lib/ui/cn";
 
 /**
@@ -33,7 +33,9 @@ export function MarksPanel({
   model: FigureModel;
 }) {
   const sb = model.scalebar;
-  const annos = annotationItems(spec);
+  // Skill-emitted labels only — the Selom annotation-layer items (brackets, free text, arrows) are
+  // managed in the Annotate panel, so they're excluded here to avoid double-listing.
+  const annos = nonSelomAnnotationItems(spec);
 
   return (
     <div className="space-y-6">

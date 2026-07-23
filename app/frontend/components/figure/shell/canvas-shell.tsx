@@ -58,7 +58,8 @@ export function CanvasShell({
       <CommandBar>{command}</CommandBar>
       <ToolContextStrip />
       <div className="flex min-h-0 flex-1">
-        <ToolsRail />
+        {/* Draw tools commit to the store; a frozen ("paper") figure gets no store → they disable. */}
+        <ToolsRail store={readOnly ? undefined : store} />
         <ArtboardHost
           store={store}
           elevated={elevated}
