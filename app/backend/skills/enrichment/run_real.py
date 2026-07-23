@@ -8,6 +8,8 @@ Input: a CSV carrying a gene column (e.g. a DE gene list). The background is the
 union of all genes across the bundled sets. Emits the dotplot spec in ``run``.
 """
 
+from engine.columns import GENE, override_column
+from engine.vocab import DE_LOGFC_SYNONYMS, DE_PVAL_SYNONYMS
 from skills.enrichment.run import dotplot_spec, dotplot_split_spec
 
 # The ``gene_sets`` param selects which license-clean library the ORA scores against
@@ -20,14 +22,6 @@ _SOURCE_ALIASES = {
     "all": "all",
 }
 
-# Priority order: prefer a clean gene-symbol column over an id column, so a biomaRt-style
-# DE table (clean ``external_gene_name`` alongside a composite ``GeneID`` = ``ENSG…~SYMBOL``)
-# resolves to the mappable symbols rather than the unmappable composite id.
-_GENE_COLS = ["external_gene_name", "gene_symbol", "gene_name", "symbol", "gene", "genes",
-              "feature", "geneid", "gene_id", "ensembl_gene_id", "entrezgene_id", "names", "id"]
-_FC_COLS = ["log2foldchange", "log2fc", "logfc", "log2_fold_change", "avg_log2fc"]
-_P_COLS = ["padj", "adj.p.val", "fdr", "qvalue", "q.value", "pvals_adj", "pvalue", "pval", "p.value"]
-
 
 def run(data_path: str, params: dict) -> dict:
     import pandas as pd
@@ -36,12 +30,15 @@ def run(data_path: str, params: dict) -> dict:
     background = {g for genes in sets.values() for g in genes}
 
     df = pd.read_csv(data_path)
-    cols = {c.lower(): c for c in df.columns}
-    gene_col = next((cols[name] for name in _GENE_COLS if name in cols), None)
+    cols = {str(c).strip().lower(): c for c in df.columns}
+    # Shared column vocabulary + the user column-override path (same as volcano): a mapped, EXISTING
+    # column wins over synonym auto-detection; recorded in provenance → reproduces with no AI.
+    ov = params.get("_column_override")
+    gene_col = override_column(ov, "gene", df.columns) or _pick(cols, GENE)
     # If the input is a full DE table (has an FDR column), derive the query from the
     # SIGNIFICANT rows; a bare/pre-filtered gene list (no FDR column) is used as-is.
-    fdr_col = next((cols[c] for c in _P_COLS if c in cols), None)
-    fc_col = next((cols[c] for c in _FC_COLS if c in cols), None)
+    fdr_col = override_column(ov, "pval", df.columns) or _pick(cols, DE_PVAL_SYNONYMS)
+    fc_col = override_column(ov, "logFC", df.columns) or _pick(cols, DE_LOGFC_SYNONYMS)
     sub = df
     if fdr_col is not None:
         sub = sub[pd.to_numeric(sub[fdr_col], errors="coerce") <= float(params.get("fdr_threshold", 0.05))]
@@ -133,3 +130,14 @@ def _benjamini_hochberg(rows: list[dict]) -> list[dict]:
         rows[idx]["padj"] = adj
         prev = adj
     return rows
+
+
+def _pick(cols: dict, synonyms) -> str | None:
+    """First column whose lower/stripped name CONTAINS a synonym (synonyms in priority order).
+    Substring match, single-sourced from :mod:`engine.vocab` / :mod:`engine.columns` — the same
+    header semantics the engine's D1 gate uses, so no forked vocabulary (restructure WS3.1)."""
+    for syn in synonyms:
+        for low, orig in cols.items():
+            if syn in low:
+                return orig
+    return None

@@ -2,14 +2,19 @@
 
 Mirrors the volcano fix: real DE tables name the gene column `GeneID` etc., so the
 query-gene column must be found explicitly (not only via the first-column fallback).
+
+Post-WS3.1: the runner reads the single-source gene vocabulary (``engine.columns.GENE``) by
+*substring* (the same header semantics as the engine's D1 gate), via the runner's own ``_pick``.
 """
 
-from skills.enrichment.run_real import _GENE_COLS
+from engine.columns import GENE
+from skills.enrichment.run_real import _pick
 
 
 def _detect(columns):
-    # same one-liner the runner uses
-    return next((c for c in columns if c.lower() in _GENE_COLS), None)
+    # the same detection the runner uses: substring match against the shared GENE vocabulary.
+    cols = {str(c).strip().lower(): c for c in columns}
+    return _pick(cols, GENE)
 
 
 def test_detects_geneid_from_real_de_table():
@@ -17,8 +22,10 @@ def test_detects_geneid_from_real_de_table():
 
 
 def test_detects_common_symbol_variants():
+    # A clean symbol column wins over an id column (the priority baked into GENE's order).
     assert _detect(["gene_symbol", "logFC"]) == "gene_symbol"
     assert _detect(["symbol", "padj"]) == "symbol"
+    assert _detect(["GeneID", "external_gene_name", "logFC"]) == "external_gene_name"
 
 
 def test_no_gene_column_returns_none():

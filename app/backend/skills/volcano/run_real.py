@@ -7,15 +7,9 @@ frame index). Emits the same spec shape as the stub via ``run._assemble``.
 
 import math
 
+from engine.columns import GENE, override_column
+from engine.vocab import DE_LOGFC_SYNONYMS, DE_PVAL_SYNONYMS
 from skills.volcano.run import _assemble
-
-_FC_COLS = ["log2foldchange", "log2fc", "logfc", "log2_fold_change", "avg_log2fc"]
-_P_COLS = ["padj", "adj.p.val", "fdr", "qvalue", "q.value", "pvals_adj", "pvalue", "pval", "p.value"]
-# Priority order: prefer a clean gene-symbol column over an id column, so a biomaRt-style
-# DE table (clean ``external_gene_name`` alongside a composite ``GeneID`` = ``ENSG…~SYMBOL``)
-# resolves to the mappable symbols rather than the unmappable composite id.
-_GENE_COLS = ["external_gene_name", "gene_symbol", "gene_name", "symbol", "gene", "genes",
-              "feature", "geneid", "gene_id", "ensembl_gene_id", "entrezgene_id", "names", "id"]
 
 
 def run(data_path: str, params: dict) -> dict:
@@ -23,18 +17,16 @@ def run(data_path: str, params: dict) -> dict:
     import pandas as pd
 
     df = pd.read_csv(data_path)
-    cols = {c.lower(): c for c in df.columns}
+    cols = {str(c).strip().lower(): c for c in df.columns}
     # User column-override (the AI map_columns action / a hand-set override): a mapped, EXISTING
     # column wins over synonym auto-detection, so a non-standard-named fold-change/significance/gene
-    # column the _*_COLS sets miss is still read. Recorded in provenance → reproduces with no AI.
-    from engine.columns import override_column
-
+    # column the shared synonym sets miss is still read. Recorded in provenance → reproduces with no AI.
     ov = params.get("_column_override")
-    fc_col = override_column(ov, "logFC", df.columns) or _pick(cols, _FC_COLS)
-    p_col = override_column(ov, "pval", df.columns) or _pick(cols, _P_COLS)
+    fc_col = override_column(ov, "logFC", df.columns) or _pick(cols, DE_LOGFC_SYNONYMS)
+    p_col = override_column(ov, "pval", df.columns) or _pick(cols, DE_PVAL_SYNONYMS)
     if fc_col is None or p_col is None:
         raise ValueError("volcano needs a log2 fold-change column and an adjusted-p column")
-    gene_col = override_column(ov, "gene", df.columns) or _pick(cols, _GENE_COLS)
+    gene_col = override_column(ov, "gene", df.columns) or _pick(cols, GENE)
     # Always a Series (positional-aligned with the row arrays below) so the .iloc / .str reads later
     # work whether the labels come from a gene column or the frame index — a bare Index has no .iloc.
     genes = df[gene_col].astype(str) if gene_col else pd.Series(df.index.astype(str))
@@ -93,8 +85,16 @@ def _parse_panel(raw) -> set[str]:
     return {tok.upper() for tok in re.split(r"[,\s]+", str(raw or "").strip()) if tok}
 
 
-def _pick(cols: dict, candidates: list[str]):
-    for cand in candidates:
-        if cand in cols:
-            return cols[cand]
+def _pick(cols: dict, synonyms) -> str | None:
+    """First column whose lower/stripped name CONTAINS a synonym (synonyms in priority order).
+
+    Substring match, single-sourced from :mod:`engine.vocab` / :mod:`engine.columns` — the same
+    header semantics the engine's D1 data-contract gate and role resolver use, so a header the gate
+    recognizes as a fold-change / significance / gene column is the same one the runner reads (no
+    forked vocabulary — restructure WS3.1). ``cols`` is ``{lower-stripped: original}`` in column
+    order, so a tie between two synonym-matching columns resolves to the earlier column."""
+    for syn in synonyms:
+        for low, orig in cols.items():
+            if syn in low:
+                return orig
     return None

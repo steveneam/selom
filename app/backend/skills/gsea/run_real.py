@@ -25,12 +25,14 @@ Shares the three-panel figure with the stub via ``run._assemble``.
 import re
 from importlib.util import find_spec
 
+from engine.columns import GENE, override_column
+from engine.vocab import DE_LOGFC_SYNONYMS
 from skills.gsea.run import _assemble
 
-_METRIC_COLS = ["log2foldchange", "log2fc", "logfc", "log2_fold_change", "avg_log2fc",
-                "stat", "score", "t", "signed_rank", "metric"]
-_GENE_COLS = ["external_gene_name", "gene_symbol", "gene_name", "symbol", "gene", "genes",
-              "feature", "geneid", "gene_id", "names", "id"]
+# GSEA ranks by a signed fold-change OR a signed statistic. The fold-change half is the shared DE
+# vocabulary (single-sourced — no fork); RANK_EXTRA is gsea's own ranking-stat-only extras, composed
+# AFTER the FC synonyms so a fold-change column still wins when both are present.
+RANK_EXTRA = ("stat", "score", "t", "signed_rank", "metric")
 _MAX_PLOT = 800   # downsample the curve/metric to keep the spec light
 _MIN_SIZE = 5
 _MAX_SIZE = 2000
@@ -42,7 +44,7 @@ def run(data_path: str, params: dict) -> dict:
     import pandas as pd
 
     df = pd.read_csv(data_path)
-    ranked = _ranked(df)
+    ranked = _ranked(df, params.get("_column_override"))
     sets, lib_mode = _resolve_sets(params, ranked)
 
     engine = str(params.get("engine", "auto")).strip().lower()
@@ -64,16 +66,17 @@ def run(data_path: str, params: dict) -> dict:
 
 
 # ---- inputs ------------------------------------------------------------------
-def _ranked(df):
+def _ranked(df, override=None):
     """A clean, de-duplicated descending rank: DataFrame[gene, metric]. Keeps the row with
-    the largest |metric| per gene, then sorts by the signed metric descending."""
+    the largest |metric| per gene, then sorts by the signed metric descending. A user column-override
+    (the AI map_columns action / a hand-set map) wins over synonym auto-detection, same as volcano."""
     import pandas as pd
 
-    cols = {c.lower(): c for c in df.columns}
-    metric_col = _pick(cols, _METRIC_COLS)
+    cols = {str(c).strip().lower(): c for c in df.columns}
+    metric_col = override_column(override, "logFC", df.columns) or _pick(cols, DE_LOGFC_SYNONYMS + RANK_EXTRA)
     if metric_col is None:
         raise ValueError("gsea needs a ranking metric column (log2 fold-change or a signed statistic)")
-    gene_col = _pick(cols, _GENE_COLS)
+    gene_col = override_column(override, "gene", df.columns) or _pick(cols, GENE)
     genes = (df[gene_col] if gene_col else df.index.to_series()).astype(str).str.upper()
     metric = pd.to_numeric(df[metric_col], errors="coerce")
     sub = pd.DataFrame({"gene": genes, "metric": metric}).dropna(subset=["metric"])
@@ -328,8 +331,12 @@ def _parse_panel(raw) -> set:
     return {tok.upper() for tok in re.split(r"[,\s]+", str(raw or "").strip()) if tok}
 
 
-def _pick(cols: dict, candidates: list):
-    for cand in candidates:
-        if cand in cols:
-            return cols[cand]
+def _pick(cols: dict, synonyms) -> str | None:
+    """First column whose lower/stripped name CONTAINS a synonym (synonyms in priority order).
+    Substring match, single-sourced from :mod:`engine.vocab` / :mod:`engine.columns` — the same
+    header semantics the engine's D1 gate uses, so no forked vocabulary (restructure WS3.1)."""
+    for syn in synonyms:
+        for low, orig in cols.items():
+            if syn in low:
+                return orig
     return None

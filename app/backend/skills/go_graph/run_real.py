@@ -12,29 +12,35 @@ import json
 import math
 import pathlib
 
+from engine.columns import GENE, override_column
+from engine.vocab import DE_LOGFC_SYNONYMS, DE_PVAL_SYNONYMS
 from skills.go_graph.run import nodelink_spec
-
-# Priority order: prefer a clean gene-symbol column over an id column, so a biomaRt-style
-# DE table (clean ``external_gene_name`` alongside a composite ``GeneID`` = ``ENSG…~SYMBOL``)
-# resolves to the mappable symbols rather than the unmappable composite id.
-_GENE_COLS = ["external_gene_name", "gene_symbol", "gene_name", "symbol", "gene", "genes",
-              "feature", "geneid", "gene_id", "ensembl_gene_id", "entrezgene_id", "names", "id"]
-_FC_COLS = ["log2foldchange", "log2fc", "logfc", "log2_fold_change", "avg_log2fc"]
-_P_COLS = ["padj", "adj.p.val", "fdr", "qvalue", "q.value", "pvals_adj", "pvalue", "pval", "p.value"]
 
 
 def _load_dag() -> dict:
     return json.loads((pathlib.Path(__file__).parent / "go_dag.json").read_text())
 
 
+def _pick(cols: dict, synonyms) -> str | None:
+    """First column whose lower/stripped name CONTAINS a synonym (synonyms in priority order).
+    Substring match, single-sourced from :mod:`engine.vocab` / :mod:`engine.columns` — the same
+    header semantics the engine's D1 gate uses, so no forked vocabulary (restructure WS3.1)."""
+    for syn in synonyms:
+        for low, orig in cols.items():
+            if syn in low:
+                return orig
+    return None
+
+
 def _query_genes(pd, data_path: str, params: dict, background: set) -> set:
     """Query set from a gene list or full DE table — filter to significant rows when an
     FDR column is present, else use every gene (same contract as the enrichment skill)."""
     df = pd.read_csv(data_path)
-    cols = {c.lower(): c for c in df.columns}
-    gene_col = next((cols[name] for name in _GENE_COLS if name in cols), None)
-    fdr_col = next((cols[c] for c in _P_COLS if c in cols), None)
-    fc_col = next((cols[c] for c in _FC_COLS if c in cols), None)
+    cols = {str(c).strip().lower(): c for c in df.columns}
+    ov = params.get("_column_override")
+    gene_col = override_column(ov, "gene", df.columns) or _pick(cols, GENE)
+    fdr_col = override_column(ov, "pval", df.columns) or _pick(cols, DE_PVAL_SYNONYMS)
+    fc_col = override_column(ov, "logFC", df.columns) or _pick(cols, DE_LOGFC_SYNONYMS)
     sub = df
     if fdr_col is not None:
         sub = sub[pd.to_numeric(sub[fdr_col], errors="coerce") <= float(params.get("fdr_threshold", 0.05))]

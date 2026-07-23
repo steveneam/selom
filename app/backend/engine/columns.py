@@ -22,8 +22,15 @@ from engine.vocab import DE_LOGFC_SYNONYMS as _LOGFC
 from engine.vocab import DE_PVAL_SYNONYMS as _PVAL
 
 # Gene/feature label-column synonyms — the row key a DE / ranked table carries. Canonical here so
-# :mod:`engine.compat` (D1) and any runner read the same set (no drift).
-GENE = ("gene", "feature", "symbol", "protein", "gene_id", "gene_name", "geneid", "ensembl")
+# :mod:`engine.compat` (D1) and the six DE runners (``skills/*/run_real.py``) read the SAME set (no
+# drift — restructure WS3.1). Substring-matched like the DE vocabulary: a column matches when its
+# lower-cased name *contains* a member. Ordered by runner-selection priority — a clean symbol/name
+# label (``external_gene_name``, ``gene_symbol``, ``gene_name``) before the generic ``gene`` before
+# an id column (a composite ``GeneID`` / ``ensembl_gene_id``), so a mappable symbol wins over an
+# unmappable composite id; ``names`` (scanpy ``rank_genes_groups``) is the weakest fallback. The
+# order is *selection*-only — every engine consumer reads GENE for column *presence*
+# (``compat._GENE_G``, ``classify`` doesn't use it at all), which is order-independent.
+GENE = ("symbol", "gene_name", "protein", "gene", "feature", "gene_id", "geneid", "ensembl", "names")
 
 # The roles a user may override, → their synonym group. Disjoint from ``set_design`` (condition/
 # batch): two AI actions must not own the same effect. ``logFC``/``pval``/``gene`` are the DE-figure

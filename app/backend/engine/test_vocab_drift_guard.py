@@ -12,10 +12,15 @@ Two halves, one invariant — *the DE / metabolomics synonym vocabulary has exac
 
 2. **No second copy forks (AST scan).** A scan of the product source tree flags any *new* module that
    defines its own collection-literal of these synonyms. The engine primitive (``engine/vocab.py``) is
-   the one allowed definition; the historical out-of-lane forks in ``skills/*/run_real.py`` are a
-   **known, allow-listed** debt that a later coordinated step (restructure WS3.1) converges onto this
-   primitive — this guard *flags* them (never edits them). Any fork outside the allow-list fails the
-   test with a pointer at the primitive.
+   the one allowed definition. The six ``skills/*/run_real.py`` forks (fold-change / p-value / gene)
+   were converged onto this primitive by restructure WS3.1, so the allow-list is now empty — any new
+   fork anywhere fails the test with a pointer at the primitive.
+
+3. **The six DE runners single-source the GENE vocabulary (identity).** Each ``skills/*/run_real.py``
+   that reads a gene-label column binds its module-level ``GENE`` to :data:`engine.columns.GENE` (the
+   same object), so a future gene-fork (re-declaring ``_GENE_COLS`` and dropping the import) fails the
+   identity check — the gene half of the same single-source invariant the FC/p-value halves already
+   hold.
 
 Co-located in ``engine/`` (not ``tests/``) because the parallel-sprint ENG lane owns
 ``app/backend/engine/**`` and must not touch ``tests/``; the backend has no ``testpaths`` restriction,
@@ -31,22 +36,25 @@ from pathlib import Path
 
 from engine import columns, compat, databundle, frame_schema, qc, vocab
 
-# Known out-of-lane forks (relative to the backend root, posix). Each defines its own ``_FC_COLS`` /
-# ``_P_COLS`` / ``_METRIC_COLS`` copy of the fold-change / p-value vocabulary. They live under
-# ``skills/**`` (a different sprint lane) so this guard only *flags* them — converging them onto
-# :mod:`engine.vocab` is restructure WS3.1. Removing an entry (a fork converged) keeps the test green;
-# adding a NEW fork anywhere else fails it.
-KNOWN_OUT_OF_LANE_FORKS = frozenset({
-    "skills/enrichment/run_real.py",
-    "skills/go_graph/run_real.py",
-    "skills/gsea/run_real.py",
-    "skills/pathway/run_real.py",
-    "skills/string_network/run_real.py",
-    "skills/volcano/run_real.py",
-})
+# Historically the six ``skills/*/run_real.py`` runners each carried their own ``_FC_COLS`` /
+# ``_P_COLS`` / ``_METRIC_COLS`` copy of the fold-change / p-value vocabulary; restructure WS3.1
+# converged them onto :mod:`engine.vocab`, so the allow-list is now empty. Adding a NEW fork anywhere
+# fails :func:`test_no_unexpected_synonym_set_fork` — the whole point of an empty allow-list.
+KNOWN_OUT_OF_LANE_FORKS: frozenset[str] = frozenset()
 
 # The one allowed engine-side definition.
 PRIMITIVE_REL = "engine/vocab.py"
+
+# The six DE runners that read the shared column vocabulary — converged by WS3.1. Each binds a
+# module-level ``GENE`` to :data:`engine.columns.GENE`; the identity test below locks that.
+DE_RUNNER_MODULES = (
+    "skills.volcano.run_real",
+    "skills.enrichment.run_real",
+    "skills.go_graph.run_real",
+    "skills.pathway.run_real",
+    "skills.string_network.run_real",
+    "skills.gsea.run_real",
+)
 
 # How many members must overlap for a collection-literal to count as "a copy of the set" (not an
 # incidental list that happens to mention one column name, e.g. deg's ``["log2FoldChange", "padj"]``).
@@ -139,6 +147,23 @@ def test_vocabulary_values_are_stable():
         "padj", "pvalue", "p_val", "p.value", "pval", "adj.p.val", "fdr", "qvalue",
     )
     assert vocab.METABOLOMICS_TOKENS == ("m/z", "hmdb", "metabolite", "kegg c")
+
+
+# --- 1b. the six DE runners single-source the GENE vocabulary (identity) -------------------
+
+def test_de_runners_share_the_gene_vocabulary_by_identity():
+    """Every converged DE runner reads the SAME gene-label synonym object the engine exports — so the
+    gene half no longer forks (the FC/p-value halves are AST-scanned + engine-identity-locked above).
+    A future gene-fork (a runner re-declaring its own ``_GENE_COLS`` and dropping the import) rebinds
+    or drops this name and fails here, with a pointer at the one home."""
+    import importlib
+
+    for mod_name in DE_RUNNER_MODULES:
+        mod = importlib.import_module(mod_name)
+        assert getattr(mod, "GENE", None) is columns.GENE, (
+            f"{mod_name} must read the shared gene vocabulary — bind `GENE` to "
+            f"engine.columns.GENE (`from engine.columns import GENE`), never a local copy."
+        )
 
 
 # --- 2. no second copy forks (AST scan) ---------------------------------------------------

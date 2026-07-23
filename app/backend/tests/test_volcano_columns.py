@@ -3,51 +3,65 @@
 Real edgeR / limma / RUVseq exports name the gene column things like `GeneID`, not
 just `gene`/`symbol`. These pure-function tests (no pandas) guard that detection so a
 real table gets gene-symbol labels instead of falling back to the row index.
+
+Post-WS3.1: the runner reads the single-source column vocabulary (``engine.vocab`` for
+fold-change / significance, ``engine.columns.GENE`` for the gene label) by *substring* — the same
+header semantics the engine's D1 data-contract gate uses — via the runner's own ``_pick``.
 """
 
-from skills.volcano.run_real import _GENE_COLS, _FC_COLS, _P_COLS, _pick
+from engine.columns import GENE
+from engine.vocab import DE_LOGFC_SYNONYMS, DE_PVAL_SYNONYMS
+from skills.volcano.run_real import _pick
 
 
 def _cols(*names):
-    return {c.lower(): c for c in names}
+    return {str(c).strip().lower(): c for c in names}
 
 
 def test_picks_geneid_from_limma_header():
     # Header from EYG_28 RUVseq/limma DE tables.
     cols = _cols("GeneID", "ensembl_gene_id", "entrezgene_id", "logFC", "AveExpr", "t", "P.Value", "B", "FDR")
-    assert _pick(cols, _GENE_COLS) == "GeneID"
-    assert _pick(cols, _FC_COLS) == "logFC"
-    assert _pick(cols, _P_COLS) == "FDR"  # FDR preferred over raw P.Value
+    assert _pick(cols, GENE) == "GeneID"
+    assert _pick(cols, DE_LOGFC_SYNONYMS) == "logFC"
+    # Significance now follows the shared vocabulary order (``engine.vocab.DE_PVAL_SYNONYMS``):
+    # ``padj`` first (DESeq2's adjusted p), then the raw ``p.value``/``pvalue`` variants BEFORE
+    # ``fdr``. So a limma table carrying both P.Value and FDR resolves to the raw P.Value — the SAME
+    # column the engine's D1/D2 resolver picks (no runner<->engine split). This is a deliberate WS3.1
+    # convergence, not the old FDR-first fork.
+    assert _pick(cols, DE_PVAL_SYNONYMS) == "P.Value"
 
 
 def test_prefers_external_gene_name_over_composite_geneid():
     # biomaRt-style header (ALPK1 RO/iRPE limma export): GeneID is a composite
-    # ENSG...~SYMBOL that maps to nothing, so the clean external_gene_name must win.
+    # ENSG...~SYMBOL that maps to nothing, so the clean external_gene_name must win. GENE's order
+    # (clean symbol/name before the generic gene / id tokens) preserves this under substring match.
     cols = _cols("Comparison", "GeneID", "ensembl_gene_id", "external_gene_name",
                  "entrezgene_id", "logFC", "AveExpr", "t", "PValue", "B", "FDR")
-    assert _pick(cols, _GENE_COLS) == "external_gene_name"
-    assert _pick(cols, _FC_COLS) == "logFC"
-    assert _pick(cols, _P_COLS) == "FDR"
+    assert _pick(cols, GENE) == "external_gene_name"
+    assert _pick(cols, DE_LOGFC_SYNONYMS) == "logFC"
+    assert _pick(cols, DE_PVAL_SYNONYMS) == "PValue"  # raw p before FDR (shared-vocabulary order)
 
 
-def test_gene_col_lists_agree_across_skills():
-    # The gene/fc/p column lists are duplicated in each DE-consuming skill; keep them in
-    # lock-step so a fix in one (e.g. symbol-over-id priority) can't silently drift.
-    from skills.enrichment.run_real import _GENE_COLS as enrichment_cols
-    from skills.go_graph.run_real import _GENE_COLS as go_graph_cols
-    from skills.pathway.run_real import _GENE_COLS as pathway_cols
+def test_gene_vocabulary_is_single_sourced_across_skills():
+    # The gene vocabulary is no longer duplicated per skill — every DE runner imports the SAME
+    # engine.columns.GENE object, so a symbol-over-id priority fix lands once and can't drift.
+    # (The full six-runner identity lock lives in engine/test_vocab_drift_guard.py.)
+    import skills.enrichment.run_real as enrichment
+    import skills.go_graph.run_real as go_graph
+    import skills.pathway.run_real as pathway
+    import skills.volcano.run_real as volcano
 
-    assert _GENE_COLS == enrichment_cols == go_graph_cols == pathway_cols
+    assert volcano.GENE is enrichment.GENE is go_graph.GENE is pathway.GENE is GENE
 
 
 def test_picks_symbol_and_gene_name_variants():
-    assert _pick(_cols("gene_name", "log2FC", "padj"), _GENE_COLS) == "gene_name"
-    assert _pick(_cols("symbol", "log2FC", "padj"), _GENE_COLS) == "symbol"
+    assert _pick(_cols("gene_name", "log2FC", "padj"), GENE) == "gene_name"
+    assert _pick(_cols("symbol", "log2FC", "padj"), GENE) == "symbol"
 
 
 def test_no_gene_column_returns_none():
     # Nothing gene-like -> None, so the runner falls back to the frame index.
-    assert _pick(_cols("foo", "log2fc", "fdr"), _GENE_COLS) is None
+    assert _pick(_cols("foo", "log2fc", "fdr"), GENE) is None
 
 
 # --- gene labels are ONE draggable representation (unify-on-superior-framework) ---------------
