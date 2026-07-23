@@ -64,6 +64,19 @@ pdf = [
   # back into the PDF). Optional: paper_metadata degrades cleanly when it is absent.
   "pikepdf>=9",
 ]
+# Flow cytometry (facs_gating skill): FlowIO (FCS I/O) + FlowUtils (compensation + the
+# GatingML logicle/arcsinh/log transforms) — both BSD-3-Clause, numpy-only, and (unlike the
+# high-level FlowKit toolkit, which hard-pins `pandas<3`) fully compatible with this backend's
+# `pandas>=3.0`. So they CO-RESOLVE into the pinned stack and run IN-PROCESS: the real engine
+# (skills/facs_gating/run_real.py) reads/compensates/transforms with these two libs and does the
+# gate-tree + population stats in clean-room numpy (the Melody↔Harmony pattern). FlowKit itself is
+# deliberately NOT a dependency — its pandas<3 pin is the only thing that would have forced an
+# out-of-process worker, and we don't need it. Pulled into `omics` so the prod boot guard (which
+# requires flowio/flowutils via REQUIRED_ENGINE_MODULES) is satisfied by `uv sync --extra omics`.
+flow = [
+  "flowio>=1.4",
+  "flowutils>=1.1",
+]
 # AI Helpers — the Probabilistic Shell / Action Gateway (docs/ai-helpers/spec.md). The LIVE
 # PydanticAIGateway translator is gated behind SELOM_AI_GATEWAY=live + ANTHROPIC_API_KEY and
 # lazy-imports pydantic_ai, so the core skeleton runs WITHOUT this and degrades clean to
@@ -91,6 +104,7 @@ ai = [
 omics = [
   "selom-backend[scrna]",
   "selom-backend[export]",
+  "selom-backend[flow]",
   "scvi-tools>=1.4.3",
   "decoupler",
   "pydeseq2>=0.5.4",

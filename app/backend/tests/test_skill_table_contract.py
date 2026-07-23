@@ -35,6 +35,7 @@ NATIVE = {
     "gsea", "ssgsea",                                                  # conditional attach (real data)
     "diff_abundance", "markers", "normalization_qc", "pseudotime_genes",  # attach in run_real only
     "erg_traces", "erg_bwave_bar", "erg_intensity_response", "erg_flicker",  # attach in the stub (proprietary)
+    "facs_gating",                                                     # attach in the stub + run_real
 }
 
 # The reviewed L4-only allowlist: node-link skills with no faithful table → the L4 Pro-AI tier. A
@@ -45,7 +46,7 @@ L4_ONLY = {"go_graph", "pathway", "string_network"}
 # The native skills whose STUB attaches a table with default params (the rest attach only in
 # ``run_real`` or conditionally on real data — covered by the source check, not runnable stubless).
 STUB_NATIVE = {"volcano", "deg", "proteomics_de", "enrichment", "cepo", "mixing_metrics", "erg_traces",
-               "erg_bwave_bar", "erg_intensity_response", "erg_flicker"}
+               "erg_bwave_bar", "erg_intensity_response", "erg_flicker", "facs_gating"}
 
 
 def _attaches_table(skill_id: str) -> bool:

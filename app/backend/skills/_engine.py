@@ -27,9 +27,16 @@ REQUIRED_ENGINE_MODULES = (
     "sklearn",
     "gseapy",
     "networkx",
+    "flowio",
+    "flowutils",
     "numpy",
     "pandas",
 )
+# flowio + flowutils are the flow-cytometry real engine (facs_gating): FCS parsing (FlowIO) +
+# compensation & logicle/arcsinh transforms (FlowUtils) — both BSD-3, numpy-only, so they run on
+# this backend's pandas 3.0 and DO live in the shared venv (unlike the high-level FlowKit toolkit,
+# which hard-pins pandas<3 and is NOT used). Being REQUIRED makes facs_gating a first-class
+# engine-gated skill: the WS1.1 prod boot guard + honest provenance cover it (RISKS #12 resolved).
 
 
 def use_real_engine(*required_modules: str) -> bool:

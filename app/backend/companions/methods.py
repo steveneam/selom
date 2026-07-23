@@ -46,6 +46,9 @@ HARMONY = "Korsunsky, I. et al. Fast, sensitive and accurate integration of sing
 ENTREZ = "Sayers, E.W. et al. Database resources of the National Center for Biotechnology Information. Nucleic Acids Research 50, D20-D26 (2022)."
 ISCEV = "Robson, A.G. et al. ISCEV Standard for full-field clinical electroretinography (2022 update). Documenta Ophthalmologica 144, 165-177 (2022)."
 NAKA_RUSHTON = "Naka, K.I. & Rushton, W.A.H. S-potentials from luminosity units in the retina of fish (Cyprinidae). Journal of Physiology 185, 587-599 (1966)."
+FLOWKIT = "White, S. et al. FlowKit: A Python Toolkit for Integrated Manual and Automated Cytometry Analysis Workflows. Frontiers in Immunology 12, 768541 (2021)."
+LOGICLE = "Parks, D.R., Roederer, M. & Moore, W.A. A new 'Logicle' display method avoids deceptive effects of logarithmic scaling for low signals and compensated data. Cytometry Part A 69A, 541-551 (2006)."
+GATINGML = "Spidlen, J. et al. Gating-ML 2.0: International Society for Advancement of Cytometry (ISAC) standard for representing gating descriptions in flow cytometry. Cytometry Part A 87, 683-687 (2015)."
 
 
 def _umap(p: dict):
@@ -683,8 +686,55 @@ def _erg_flicker(p: dict):
     return text, [ISCEV]
 
 
+def _facs_gating(p: dict):
+    comp = str(p.get("compensate", "auto")).strip().lower()
+    if comp == "none":
+        comp_txt = "no fluorescence compensation was applied"
+    elif comp == "matrix":
+        comp_txt = "an operator-supplied spillover matrix was applied"
+    else:
+        comp_txt = "the acquisition spillover matrix embedded in the FCS ($SPILLOVER) was applied where present"
+
+    transform = str(p.get("transform", "logicle")).strip().lower()
+    if transform == "arcsinh":
+        xform_txt = f"an inverse-hyperbolic-sine (arcsinh) transform (cofactor {float(p.get('cofactor', 150.0)):g})"
+        xform_cite = []
+    elif transform == "log":
+        xform_txt = "a decade log transform"
+        xform_cite = []
+    elif transform == "linear":
+        xform_txt = "a linear display scale"
+        xform_cite = []
+    else:
+        xform_txt = "the Logicle (bi-exponential) display transform"
+        xform_cite = [LOGICLE]
+
+    views = {"density": "a two-dimensional density plot", "contour": "a two-dimensional density-contour plot",
+             "histogram": "a single-parameter histogram",
+             "scatter": "a density-coloured scatter plot"}
+    view = views.get(str(p.get("plot", "density")).strip().lower(), "a two-dimensional density plot")
+
+    gated = str(p.get("gates") or "").strip()
+    gate_txt = (
+        " A hierarchical gate tree (rectangle, polygon and quadrant gates defined in the "
+        "transformed display space) was applied with a GatingML-compliant gating strategy, and "
+        "each population's event count, frequency of parent, frequency of total, and median "
+        "fluorescence intensity were tabulated."
+        if gated else
+        " Population statistics (event count, frequency of parent, frequency of total, and median "
+        "fluorescence intensity) were tabulated for the ungated sample."
+    )
+    text = (
+        "Flow-cytometry standard (FCS) event data were read with FlowIO and compensated and "
+        f"transformed with FlowUtils; {comp_txt}, and fluorescence intensities were displayed on "
+        f"{xform_txt}. Events are shown as {view}.{gate_txt}"
+    )
+    return text, [FLOWKIT, *xform_cite, GATINGML]
+
+
 _TEMPLATES = {
     "umap_scrna": _umap,
+    "facs_gating": _facs_gating,
     "erg_traces": _erg_traces,
     "erg_bwave_bar": _erg_bwave_bar,
     "erg_intensity_response": _erg_intensity_response,

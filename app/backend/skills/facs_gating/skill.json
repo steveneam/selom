@@ -1,0 +1,45 @@
+{
+  "id": "facs_gating",
+  "version": "0.1.0",
+  "title": "Flow-cytometry gating & population stats",
+  "engine": "python",
+  "omics": "flow-cytometry",
+  "omics_type": ["general"],
+  "entrypoint": "skills.facs_gating.run:run",
+  "origin": "commodity",
+  "inputs": [{ "name": "sample", "kind": "fcs", "required": true }],
+  "param_spec": {
+    "x_channel": { "type": "str", "default": "" },
+    "y_channel": { "type": "str", "default": "" },
+    "plot": { "type": "str", "default": "density", "options": ["density", "contour", "histogram", "scatter"] },
+    "compensate": { "type": "str", "default": "auto", "options": ["auto", "none", "matrix"] },
+    "comp_matrix": { "type": "str", "default": "" },
+    "transform": { "type": "str", "default": "logicle", "options": ["logicle", "arcsinh", "log", "linear"] },
+    "cofactor": { "type": "float", "default": 150.0, "min": 1.0, "max": 100000.0 },
+    "bins": { "type": "int", "default": 256, "min": 16, "max": 1024 },
+    "max_events": { "type": "int", "default": 50000, "min": 1000, "max": 500000 },
+    "gates": { "type": "str", "default": "" }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table", "kind": "csv" }
+  ],
+  "background": "Loads a raw FCS file, applies compensation (embedded $SPILLOVER matrix, an operator-supplied matrix, or none) and a display transform (logicle, arcsinh, log or linear), then draws one publication-ready Plotly view — density, contour, histogram or density-coloured scatter. A rectangle/polygon/quadrant gate tree (bounds in transformed display space) is evaluated to a population table of counts, %-of-parent, %-of-total and median MFI. Compute runs on the BSD-3 FlowIO (FCS I/O) + FlowUtils (compensation + GatingML logicle/arcsinh transforms) stack with clean-room numpy gating; the Plotly figure is rendered by Selom. Runs in-process on pandas 3.0 — the high-level FlowKit toolkit (which pins pandas<3) is deliberately not used.",
+  "references": [
+    { "type": "tool", "title": "FlowIO: a pure-Python FCS file reader/writer", "url": "https://github.com/whitews/FlowIO", "note": "BSD-3-Clause — the dependency-free FCS 2.0/3.0/3.1 reader; numpy-only, runs on pandas 3.0." },
+    { "type": "tool", "title": "FlowUtils: numpy/C utilities for flow cytometry", "url": "https://github.com/whitews/FlowUtils", "note": "BSD-3-Clause — compensation ($SPILLOVER inverse) and the C-accelerated GatingML logicle / arcsinh / log transforms; numpy-only, runs on pandas 3.0." },
+    { "type": "publication", "title": "A new 'Logicle' display method avoids deceptive effects of logarithmic scaling for low signals and compensated data", "authors": "Parks, D.R., Roederer, M. & Moore, W.A.", "year": 2006, "doi": "10.1002/cyto.a.20258", "note": "The default display transform." },
+    { "type": "standard", "title": "Gating-ML 2.0: International Society for Advancement of Cytometry (ISAC) standard for representing gating descriptions in flow cytometry", "url": "https://isac-net.org/page/Data-Standards", "note": "Defines the rectangle / polygon / quadrant gate + transform semantics FlowKit implements." }
+  ],
+  "catalog": {
+    "name": "Selom Flow-Cytometry Gating",
+    "summary": "Drop an FCS file, compensate + transform, and get an editable density / contour / histogram / scatter view with a rectangle/polygon/quadrant gate tree and a population table (count, %parent, %total, median MFI). Built on the BSD-3 FlowKit stack for compute; the figure is native editable Plotly.",
+    "category": "flow-cytometry",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".fcs"],
+    "chains_with": ["boxplot", "composition"],
+    "license": "BSD-3-Clause",
+    "popularity": 30
+  }
+}

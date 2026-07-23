@@ -1,6 +1,18 @@
 # FACS `facs_gating` — Production Integration Spec
 
-_Status: DECISION-READY (design only; no code written). Date-stamped 2026-07-23._
+> **⚠️ SUPERSEDED 2026-07-23 — the out-of-process worker below was NOT built.** The premise
+> (FlowKit is required, and it pins `pandas<3`) turned out to be avoidable: FlowKit's hard parts —
+> FCS parsing (**FlowIO**) and compensation + logicle/arcsinh transforms (**FlowUtils**) — are
+> separate BSD-3, numpy-only packages that run on pandas 3.0. Only FlowKit's thin top layer
+> (gate-tree + report) pins pandas<3, and that is just numpy geometry + counting, reimplemented in
+> `app/backend/skills/facs_gating/run_real.py` (the Melody↔Harmony clean-room pattern). So
+> `facs_gating` ships **real, in-process, on pandas 3.0 with no sidecar worker** — flowio/flowutils
+> are now `REQUIRED_ENGINE_MODULES` + in the `flow`/`omics` extras, making FACS a first-class
+> engine-gated skill (WS1.1 prod boot guard + honest provenance cover it). RISKS #12 is RESOLVED.
+> This document is kept for the design rationale and the honest-provenance discussion; the
+> milestones M1–M4 (venv sidecar, RPC worker) are **obsolete**.
+
+_Status: SUPERSEDED (see banner). Original: DECISION-READY design, date-stamped 2026-07-23._
 _Owner-facing decisions are collected in §9. Backend lane (Codex/Claude BE). FE lane: no change required._
 
 Closes the two blockers in `agent_handoff/RISKS.md` #12 (FlowKit ⊥ pandas 3.0) and the honesty
