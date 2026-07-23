@@ -8,7 +8,7 @@ import { VersionBar } from "../version-bar";
 import { PublishConfidence } from "../publish-confidence";
 import { StubEngineBanner } from "../stub-engine-banner";
 import { EmptyState } from "./empty-state";
-import { EditorWorkspace } from "@/components/figure/editor-workspace";
+import { CanvasShell } from "@/components/figure/shell/canvas-shell";
 import { ExportMenu } from "@/components/figure/export-menu";
 import { StylePicker } from "@/components/figure/style-picker";
 import { getSkill } from "@/lib/catalog/seed";
@@ -33,14 +33,15 @@ function skillBadge(skillId: string): string | undefined {
   return `${origin} · v${sk.version}`;
 }
 
-type EditorProps = React.ComponentProps<typeof EditorWorkspace>;
+type EditorProps = React.ComponentProps<typeof CanvasShell>;
 type VersionBarProps = React.ComponentProps<typeof VersionBar>;
 
 /**
- * The figure-editor view (`view === "figure"`): the toolbar (undo/redo · staleness re-run · style ·
- * export · new), the version bar, publish-confidence, and the editor artboard — or an empty state when
- * there's no editable spec. Presentational: the figure store + run engine + versioning live in the
- * composition root; this renders them. `bundle`/`activeStyle`/the skill-name helpers are view-local.
+ * The figure-editor view (`view === "figure"`): publish-confidence + the stub banner above the
+ * CanvasShell (the four-region Inkscape frame around the artboard) — or an empty state when there's
+ * no editable spec. This view still BUILDS the command cluster (undo/redo · staleness re-run · style ·
+ * "Figure data" · export · "New figure" · version bar) and hands it to the shell as a `command` slot,
+ * so its view-local state (`bundle`/`activeStyle`/export/staleness) stays here, out of the shell.
  */
 export function FigureView({
   figure,
@@ -117,8 +118,10 @@ export function FigureView({
       }
     : null;
 
-  return (
-    <div className="flex h-full flex-col gap-3">
+  // The command cluster the shell frames in its top command bar — the toolbar (undo/redo ·
+  // staleness re-run · style · "Figure data" · export · "New figure") plus the version bar.
+  const command = (
+    <div className="flex flex-col gap-2.5">
       {/* flex-wrap so a long toolbar wraps within the content column at narrow widths rather
           than forcing a single overflowing row. (The AI panel now overlays rather than
           reserving width, so nothing is pushed — this is just graceful narrow-width wrapping.) */}
@@ -215,6 +218,11 @@ export function FigureView({
           onToggleFreeze={onToggleFreeze}
         />
       )}
+    </div>
+  );
+
+  return (
+    <div className="flex h-full flex-col gap-3">
       {/* Figure-forward (§3.7): the data-check routing + data-fit verdict relocate to the
           Figure-data stage (reachable from the toolbar / rail) so the artboard is the hero. */}
       <PublishConfidence
@@ -227,25 +235,26 @@ export function FigureView({
       {/* WS1.1 — a stub figure (backend without the science extras) is example data, not the
           user's results; label it loudly, right above the artboard. */}
       <StubEngineBanner provenance={bundle?.provenance} />
-      <div className="flex min-h-[520px] flex-1 overflow-hidden rounded-xl border border-border bg-background">
-        <EditorWorkspace
-          store={figure}
-          elevated={exportOpen}
-          readOnly={frozen}
-          onEditCopy={onEditCopy}
-          onMarkMove={onMarkMove}
-          onToggleLabel={onToggleLabel}
-          skill={
-            activeFigure?.skillId
-              ? {
-                  skillName: skillDisplayName(activeFigure.skillId),
-                  badge: skillBadge(activeFigure.skillId),
-                  onOpenFigureData: onOpenFigureData,
-                }
-              : undefined
-          }
-        />
-      </div>
+      {/* The four-region canvas shell (Pillar-2 s0) — the artboard is the centre hero, the command
+          cluster frames the top, the inspector docks right, the tools rail + palette are placeholders. */}
+      <CanvasShell
+        command={command}
+        store={figure}
+        elevated={exportOpen}
+        readOnly={frozen}
+        onEditCopy={onEditCopy}
+        onMarkMove={onMarkMove}
+        onToggleLabel={onToggleLabel}
+        skill={
+          activeFigure?.skillId
+            ? {
+                skillName: skillDisplayName(activeFigure.skillId),
+                badge: skillBadge(activeFigure.skillId),
+                onOpenFigureData: onOpenFigureData,
+              }
+            : undefined
+        }
+      />
     </div>
   );
 }
