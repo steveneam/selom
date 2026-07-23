@@ -85,7 +85,10 @@ def run(data_path: str, params: dict) -> dict:
         # Operator-set marks (erg-manual-marks) re-measure the matched segments at the chosen times.
         default_mode = _erg.adaptation_mode(params.get("adaptation", "auto"), params.get("stimulus_type", ""))
         marks = _erg.parse_manual_marks(params.get("manual_marks", ""))
-        df = _erg.metrics_from_waveforms(df, default_mode=default_mode, marks=marks)
+        # a/b auto-seed detector: `windowed` (default, byte-identical) or the opt-in `robust` detector.
+        ab_detector = str(params.get("ab_detector", "windowed")).strip().lower()
+        df = _erg.metrics_from_waveforms(df, default_mode=default_mode, marks=marks,
+                                         detector=ab_detector)
         measured_from_traces = True
 
     missing = (_REQUIRED | {value_col}) - set(df.columns)

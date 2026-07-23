@@ -22,7 +22,8 @@
     "boundary_lines": { "type": "str", "default": "none", "options": ["none", "solid", "dashed"] },
     "band_color": { "type": "str", "default": "" },
     "display_unit": { "type": "str", "default": "uV", "options": ["auto", "nV", "uV", "mV", "V"] },
-    "manual_marks": { "type": "str", "default": "" }
+    "manual_marks": { "type": "str", "default": "" },
+    "ab_detector": { "type": "str", "default": "windowed", "options": ["windowed", "robust"] }
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" },

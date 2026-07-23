@@ -100,6 +100,28 @@ def _movavg(arr, win: int):
     return np.convolve(a, k, mode="same")
 
 
+def _savgol(arr, win_ms, fs, polyorder: int = 2):
+    """Savitzky-Golay smooth (window from ``win_ms``, forced odd + clamped to the signal length).
+
+    Used only by the opt-in robust a/b detector (:func:`_robust_auto_ab`). Falls back to the raw
+    array when there are too few samples to fit the polynomial, so the robust path degrades to the
+    unsmoothed trace on a very short recording instead of raising."""
+    import numpy as np
+    from scipy.signal import savgol_filter
+
+    a = np.asarray(arr, dtype=float)
+    n = a.size
+    win = int(round(float(win_ms) / 1000.0 * float(fs)))
+    if win % 2 == 0:
+        win += 1
+    win = max(5, win)
+    if win > n:
+        win = n if n % 2 == 1 else n - 1
+    if win < 5 or win <= polyorder:
+        return a
+    return savgol_filter(a, win, polyorder)
+
+
 # Validated landmark windows (mouse scotopic ERG) — match iwx_parse.Eye.landmarks,
 # the metric reconciled to the Fig 1E ordering. Measure on the RAW baseline-corrected
 # trace (NOT the display-cleaned one); the dual smooth is internal to the metric.
@@ -153,8 +175,72 @@ def _value_at(t, sm, t_ms: float) -> tuple[float, float]:
     return float(t[i]), float(np.mean(sm[lo:hi]))
 
 
+def _robust_auto_ab(t, arr, awin, bwin, fs, a_sm_ms, b_sm_ms):
+    """Robust auto a-/b-wave seeds — the opt-in ``detector="robust"`` path for :func:`landmarks`.
+
+    Savitzky-Golay smoothing + prominence-gated peak/trough picking with a noise gate at ~2× the
+    pre-stimulus baseline's 95% band (``2 · 1.96 · SD_pre``): the b-wave is the tallest SavGol maximum
+    inside the b-window that both clears the gate above baseline AND is a prominence-gated local peak
+    (so a lone super-threshold sample or a sub-noise ripple can't masquerade as the b-wave); the
+    a-wave is the deepest gated SavGol minimum inside the a-window, constrained to precede the b-peak.
+    Each falls back to the windowed argmax/argmin when nothing clears the gate (a flat/noise eye), so
+    the peak-to-trough construction still reads near the noise floor. Returns the SAME five quantities
+    the windowed path computes — ``(auto_a_t, auto_a_val, auto_b_trough, auto_b_t, auto_b_peak)`` — so
+    the caller's manual-override + return logic is shared verbatim between the two detectors."""
+    import numpy as np
+    from scipy.signal import find_peaks
+
+    base_mask = t < _PRESTIM_MS
+    if base_mask.any() and int(base_mask.sum()) > 1:
+        pre = arr[base_mask]
+        base, sd = float(pre.mean()), float(pre.std(ddof=1))
+    else:
+        base = float(arr[base_mask].mean()) if base_mask.any() else 0.0
+        sd = 0.0
+    gate = 2.0 * 1.96 * sd  # a real deflection must clear ~2× the 95% baseline-noise band
+
+    sm_a = _savgol(arr, a_sm_ms, fs)
+    sm_b = _savgol(arr, b_sm_ms, fs)
+
+    # b-wave: the tallest prominence-gated SavGol maximum in the b-window clearing the noise gate.
+    bm = (t >= bwin[0]) & (t <= bwin[1])
+    if not bm.any():
+        bm = t >= bwin[0]
+    b_pos = np.where(bm)[0]
+    seg_b = sm_b[b_pos]
+    peaks, _ = find_peaks(seg_b, prominence=max(gate, 1e-9))
+    gated = [p for p in peaks if seg_b[p] - base >= gate]
+    if gated:
+        bi = int(b_pos[max(gated, key=lambda p: seg_b[p])])
+    else:
+        bi = int(b_pos[int(np.argmax(seg_b))])  # fallback: windowed-style argmax
+    auto_b_t = float(t[bi])
+    auto_b_peak = float(sm_b[bi])
+
+    # a-wave: the deepest gated SavGol minimum in the a-window, constrained to precede the b-peak.
+    am = (t >= awin[0]) & (t <= awin[1])
+    if not am.any():
+        am = t >= 0
+    a_ref = am & (t <= auto_b_t)
+    if not a_ref.any():
+        a_ref = am
+    a_pos = np.where(a_ref)[0]
+    seg_a = sm_a[a_pos]
+    troughs, _ = find_peaks(-seg_a, prominence=max(gate, 1e-9))
+    gated_t = [q for q in troughs if base - seg_a[q] >= gate]
+    if gated_t:
+        ai = int(a_pos[min(gated_t, key=lambda q: seg_a[q])])
+    else:
+        ai = int(a_pos[int(np.argmin(seg_a))])  # fallback: windowed-style argmin
+    auto_a_t = float(t[ai])
+    auto_a_val = float(sm_a[ai])
+    # b subtracts from the a-window trough (ISCEV peak-to-trough), on the b-smoothed trace.
+    auto_b_trough = float(np.min(sm_b[am]))
+    return auto_a_t, auto_a_val, auto_b_trough, auto_b_t, auto_b_peak
+
+
 def landmarks(time_ms, y, fs: float = 5000.0, *, mode: str = "scotopic",
-              manual: dict | None = None) -> dict:
+              manual: dict | None = None, detector: str = "windowed") -> dict:
     """a/b-wave amplitudes (µV) + implicit times (ms), noise-rejecting dual smooth.
 
     a-wave = baseline − min(a-window) on a LIGHT trace (sharp trough preserved).
@@ -175,7 +261,13 @@ def landmarks(time_ms, y, fs: float = 5000.0, *, mode: str = "scotopic",
     reference, so b = value(b_ms) − value(a_ms). Each value is tagged ``a_source``/``b_source`` ∈
     {auto, manual}, and the auto seed times are always returned as ``a_auto_t_ms``/``b_auto_t_ms``
     (for the R6 provenance log). No ``manual`` → the measured a/b values and times are the pure-auto
-    path (the override never runs) and the auto seeds equal ``a_t_ms``/``b_t_ms``."""
+    path (the override never runs) and the auto seeds equal ``a_t_ms``/``b_t_ms``.
+
+    ``detector`` selects the AUTO seed algorithm. ``windowed`` (default) is the validated dual-smooth
+    windowed argmin/argmax that produced the Fig 1E ordering — the byte-identical legacy path.
+    ``robust`` is the opt-in SavGol + prominence peak-picking detector with a pre-stimulus noise gate
+    (:func:`_robust_auto_ab`); it only changes the auto seeds, so the manual override, provenance, and
+    return shape are unchanged. Unknown/absent → ``windowed``."""
     import numpy as np
 
     awin, bwin, a_sm, b_sm = _LANDMARK_MODES.get(str(mode or "scotopic").lower(), _LANDMARK_MODES["scotopic"])
@@ -189,22 +281,28 @@ def landmarks(time_ms, y, fs: float = 5000.0, *, mode: str = "scotopic",
     a_ms = _num_or_none(man.get("a_ms"))
     b_ms = _num_or_none(man.get("b_ms"))
 
-    am = (t >= awin[0]) & (t <= awin[1])
-    if not am.any():
-        am = t >= 0
     # Auto a-wave (and the trough the b-wave subtracts from) + auto b-wave — computed even under a
     # manual override so the provenance log (erg-manual-marks R6) can report where the auto detector
-    # WOULD have placed each mark (`a_auto_t_ms`/`b_auto_t_ms`) alongside the operator's set time.
-    ai = int(np.argmin(sm_a[am]))
-    auto_a_t = float(t[am][ai])
-    auto_a_val = float(sm_a[am][ai])
-    auto_b_trough = float(np.min(sm_b[am]))
-    bm = (t >= bwin[0]) & (t <= bwin[1])
-    if not bm.any():
-        bm = t >= bwin[0]
-    bi = int(np.argmax(sm_b[bm]))
-    auto_b_t = float(t[bm][bi])
-    auto_b_peak = float(sm_b[bm][bi])
+    # WOULD have placed each mark (`a_auto_t_ms`/`b_auto_t_ms`) alongside the operator's set time. The
+    # `robust` detector (opt-in) swaps only these seeds for SavGol + prominence peak-picking with a
+    # noise gate; the default `windowed` branch is the byte-identical legacy computation.
+    if str(detector or "windowed").lower() == "robust":
+        auto_a_t, auto_a_val, auto_b_trough, auto_b_t, auto_b_peak = _robust_auto_ab(
+            t, arr, awin, bwin, fs, a_sm, b_sm)
+    else:
+        am = (t >= awin[0]) & (t <= awin[1])
+        if not am.any():
+            am = t >= 0
+        ai = int(np.argmin(sm_a[am]))
+        auto_a_t = float(t[am][ai])
+        auto_a_val = float(sm_a[am][ai])
+        auto_b_trough = float(np.min(sm_b[am]))
+        bm = (t >= bwin[0]) & (t <= bwin[1])
+        if not bm.any():
+            bm = t >= bwin[0]
+        bi = int(np.argmax(sm_b[bm]))
+        auto_b_t = float(t[bm][bi])
+        auto_b_peak = float(sm_b[bm][bi])
 
     # a-wave + the trough the b-wave subtracts from. Manual a → measure at the set time and use that
     # as the b-trough (ISCEV: b = a-trough → b-peak); auto a → the windowed min.
@@ -237,6 +335,133 @@ def landmarks(time_ms, y, fs: float = 5000.0, *, mode: str = "scotopic",
         "a_auto_t_ms": round(auto_a_t, 1),
         "b_auto_t_ms": round(auto_b_t, 1),
     }
+
+
+# --- Oscillatory potentials (OPs) --------------------------------------------
+# OPs are the small high-frequency wavelets riding on the ascending limb of the b-wave (inner-retinal
+# origin). The ISCEV standard extracts them with a band-pass that isolates the OP band (~75–300 Hz)
+# from the slow a-/b-wave; the individual wavelets (OP1…OP4) are then measured peak-to-preceding-
+# trough, and their SUM (ΣOP) plus an integrated RMS ("TOP") summarize inner-retinal function.
+# Clean-room from the public ISCEV / ERGAssist method descriptions — no external code copied.
+
+def oscillatory_potentials(time_ms, y, fs: float = 5000.0, *, low_hz: float = 75.0,
+                           high_hz: float = 300.0, n_ops: int = 4, order: int = 2,
+                           window=None) -> dict:
+    """Oscillatory potentials from an ERG trace via a zero-phase 75–300 Hz band-pass.
+
+    Filters ``y`` with a Butterworth band-pass (``scipy.signal.butter`` SOS + ``sosfiltfilt`` — the
+    wavelets stay phase-true), keeps up to ``n_ops`` of the most prominent positive peaks
+    (``find_peaks``), and measures each as ``peak − preceding trough`` (the ISCEV OP amplitude).
+    Returns::
+
+        {"op_amplitudes_uv": [OP1, OP2, …],   # peak-to-preceding-trough, ordered in time
+         "op_times_ms":      [t1, t2, …],      # implicit time of each OP peak
+         "op_sum_uv":  ΣOP,                     # sum of the wavelet amplitudes
+         "op_rms_uv":  RMS,                     # integrated RMS of the band-passed signal (TOP)
+         "n_ops":      k}                       # wavelets found (== len(op_amplitudes_uv))
+
+    ``window`` optionally restricts the analysis to ``(lo_ms, hi_ms)`` (peaks + RMS measured there);
+    default = the whole trace. ``high_hz`` is clamped just under Nyquist for low sample rates.
+    Degrades honestly to an all-zero / empty result (never raises) when the trace is too short to
+    filter or carries no OP-band deflection — a plain slow b-wave with no wavelets reads ≈ 0."""
+    import numpy as np
+    from scipy.signal import butter, find_peaks, sosfiltfilt
+
+    t = np.asarray(time_ms, dtype=float)
+    arr = np.asarray(y, dtype=float)
+    n = arr.size
+    empty = {"op_amplitudes_uv": [], "op_times_ms": [], "op_sum_uv": 0.0,
+             "op_rms_uv": 0.0, "n_ops": 0}
+    nyq = 0.5 * float(fs)
+    hi = min(float(high_hz), nyq * 0.99)
+    if n < 24 or nyq <= 0 or low_hz <= 0 or hi <= low_hz:
+        return empty
+    sos = butter(int(order), [float(low_hz) / nyq, hi / nyq], btype="band", output="sos")
+    try:
+        band = sosfiltfilt(sos, arr)
+    except ValueError:
+        return empty  # signal shorter than the filter padding → not measurable
+    wm = ((t >= float(window[0])) & (t <= float(window[1]))) if window is not None \
+        else np.ones(t.shape, dtype=bool)
+    if int(wm.sum()) < 5:
+        return empty
+    tw, bw = t[wm], band[wm]
+    rms = float(np.sqrt(np.mean(bw ** 2)))
+    peaks, props = find_peaks(bw, prominence=1e-9)
+    troughs, _ = find_peaks(-bw)
+    if peaks.size == 0:
+        return {**empty, "op_rms_uv": round(rms, 3)}
+    # Keep the n_ops most prominent wavelets, then order them in time (OP1…OPk).
+    keep = np.argsort(props["prominences"])[::-1][: max(1, int(n_ops))]
+    sel = np.sort(peaks[keep])
+    amps, times = [], []
+    for p in sel:
+        prior = troughs[troughs < p]
+        if prior.size:
+            trough_val = float(bw[prior[-1]])
+        else:
+            trough_val = float(bw[:p].min()) if p > 0 else float(bw[p])
+        amps.append(round(float(bw[p]) - trough_val, 3))
+        times.append(round(float(tw[p]), 2))
+    return {"op_amplitudes_uv": amps, "op_times_ms": times,
+            "op_sum_uv": round(float(sum(amps)), 3), "op_rms_uv": round(rms, 3),
+            "n_ops": len(amps)}
+
+
+# --- Photopic negative response (PhNR) ---------------------------------------
+# The PhNR is the slow negative wave that follows the b-wave in the light-adapted (photopic) ERG;
+# it reflects retinal-ganglion-cell / inner-retinal function and is reduced in glaucoma and optic-
+# nerve disease. Three amplitudes are in common use (Frishman / ISCEV descriptions): BT (baseline →
+# PhNR trough), BF (baseline → the value at a FIXED post-flash time ~72 ms, robust when the trough is
+# ill-defined), and PT (b-peak → PhNR trough). Clean-room from the public method descriptions.
+
+def photopic_negative_response(time_ms, y, fs: float = 5000.0, *, fixed_ms: float = 72.0,
+                               b_window_ms=(12.0, 80.0), trough_window_ms=None) -> dict | None:
+    """PhNR amplitudes (µV) on a light-adapted ERG trace → BT / BF / PT.
+
+    baseline = the pre-stimulus mean; the b-wave peak is the max within ``b_window_ms`` (the cone-ERG
+    b-window); the PhNR trough is the minimum AFTER the b-wave peak (within ``trough_window_ms`` when
+    given, else from the b-peak to the end of the trace). Returns::
+
+        {"phnr_bt_uv": baseline − trough,           # baseline-to-trough
+         "phnr_bf_uv": baseline − value(fixed_ms),  # baseline-to-fixed-time (~72 ms)
+         "phnr_pt_uv": b_peak − trough,             # peak-to-trough
+         "trough_t_ms": …, "b_peak_t_ms": …, "baseline_uv": …, "fixed_ms": …}
+
+    A positive BT/BF means the trough sits BELOW baseline (the normal PhNR). None when there is no
+    post-b-wave segment to measure (never raises)."""
+    import numpy as np
+
+    t = np.asarray(time_ms, dtype=float)
+    arr = np.asarray(y, dtype=float)
+    if t.size < 4:
+        return None
+    base = float(arr[t < _PRESTIM_MS].mean()) if (t < _PRESTIM_MS).any() else 0.0
+    bm = (t >= b_window_ms[0]) & (t <= b_window_ms[1])
+    if not bm.any():
+        bm = t >= 0
+    b_pos = np.where(bm)[0]
+    bpk = int(b_pos[int(np.argmax(arr[b_pos]))])
+    b_peak_t, b_peak_v = float(t[bpk]), float(arr[bpk])
+    if trough_window_ms is not None:
+        tm = (t >= float(trough_window_ms[0])) & (t <= float(trough_window_ms[1]))
+    else:
+        tm = t > b_peak_t
+    if not tm.any():
+        return None
+    tr_pos = np.where(tm)[0]
+    tri = int(tr_pos[int(np.argmin(arr[tr_pos]))])
+    trough_t, trough_v = float(t[tri]), float(arr[tri])
+    fi = int(np.argmin(np.abs(t - float(fixed_ms))))
+    lo, hi = max(0, fi - 1), min(arr.size, fi + 2)
+    fixed_v = float(np.mean(arr[lo:hi]))
+    return {"phnr_bt_uv": round(base - trough_v, 2),
+            "phnr_bf_uv": round(base - fixed_v, 2),
+            "phnr_pt_uv": round(b_peak_v - trough_v, 2),
+            "trough_t_ms": round(trough_t, 1),
+            "b_peak_t_ms": round(b_peak_t, 1),
+            "baseline_uv": round(base, 2),
+            "fixed_ms": round(float(fixed_ms), 1)}
 
 
 def fs_from(time_ms) -> float:
@@ -355,7 +580,8 @@ def operator_adjusted_note(n_moved: int, n_total: int) -> str:
     return f", {int(n_moved)} of {int(n_total)} operator-adjusted" if n_moved else ""
 
 
-def metrics_from_waveforms(df, *, default_mode: str = "scotopic", marks: dict | None = None):
+def metrics_from_waveforms(df, *, default_mode: str = "scotopic", marks: dict | None = None,
+                           detector: str = "windowed"):
     """``erg_waveforms_long`` → a per-eye a/b metrics frame measured FROM the traces.
 
     One trace per (sample × condition × stimulus × intensity × eye) → one :func:`landmarks`
@@ -373,7 +599,10 @@ def metrics_from_waveforms(df, *, default_mode: str = "scotopic", marks: dict | 
     ``marks`` (docs/records/erg-manual-marks/spec.md) optionally carries operator-set a/b times keyed by the
     segment identity ``(condition, stimulus_type, intensity_group, eye)``; a matched segment is
     measured AT those times and its row carries ``a_source``/``b_source`` ∈ {auto, manual}. No
-    ``marks`` → byte-identical (every row ``auto``)."""
+    ``marks`` → byte-identical (every row ``auto``).
+
+    ``detector`` picks the a/b AUTO seed algorithm passed to :func:`landmarks` — ``windowed`` (default,
+    byte-identical) or the opt-in ``robust`` SavGol/prominence detector."""
     import pandas as pd
 
     # stimulus_type is a grouping key when present so the two modes' shared GroupN labels never merge.
@@ -398,7 +627,7 @@ def metrics_from_waveforms(df, *, default_mode: str = "scotopic", marks: dict | 
         rec = dict(zip(keys, kv if isinstance(kv, tuple) else (kv,)))
         manual = marks_for(marks, rec.get("condition"), rec.get("stimulus_type"),
                            rec.get("intensity_group"), rec.get("eye"))
-        lm = landmarks(t, y, fs=fs_from(t), mode=mode, manual=manual)
+        lm = landmarks(t, y, fs=fs_from(t), mode=mode, manual=manual, detector=detector)
         rec["a_wave_uv"] = lm["a_wave_uv"]
         rec["b_wave_uv"] = lm["b_wave_uv"]
         rec["a_source"] = lm["a_source"]
@@ -685,6 +914,48 @@ def flicker_landmarks(time_ms, voltage, hz: float, *, n_bins: int = 120,
         "n1_auto_ms": round(float(ph[auto_ni]), 1),
         "p1_auto_ms": round(float(ph[auto_pi]), 1),
     }
+
+
+def flicker_fundamental(time_ms, voltage, hz: float, fs: float | None = None, *,
+                        start_ms: float = 0.0) -> dict | None:
+    """Fundamental Fourier component of a steady-state flicker response at the flicker frequency.
+
+    Complements the phase-fold :func:`flicker_landmarks` N1→P1 (a time-domain trough-to-peak) with
+    the frequency-domain measure the flicker ERG is classically quantified by: the ``numpy.fft.rfft``
+    magnitude + phase at ``hz`` (the first-harmonic response). Uses samples at ``time_ms >=
+    start_ms``; ``fs`` is inferred from the time axis when not given; the DC term is removed so a
+    baseline offset does not bias the fundamental. Returns::
+
+        {"fundamental_hz": bin_freq,   # the rfft bin nearest hz (may differ from hz if the record is
+                                        #   not an integer number of cycles)
+         "magnitude_uv":  A,           # sinusoidal amplitude at hz  = 2·|X[k]| / N
+         "phase_deg":     φ,           # phase of that component (degrees, −180…180)
+         "phase_rad":     φ,           # …and radians
+         "target_hz":     hz}
+
+    None when ``hz`` ≤ 0 or there are too few post-onset samples to transform (never raises)."""
+    import numpy as np
+
+    if hz is None or float(hz) <= 0:
+        return None
+    t = np.asarray(time_ms, dtype=float)
+    v = np.asarray(voltage, dtype=float)
+    m = (t >= float(start_ms)) & np.isfinite(t) & np.isfinite(v)
+    t, v = t[m], v[m]
+    if v.size < 4:
+        return None
+    sr = float(fs) if fs else fs_from(t)
+    spec = np.fft.rfft(v - v.mean())  # drop DC so the fundamental isn't biased by a baseline offset
+    freqs = np.fft.rfftfreq(v.size, d=1.0 / sr)
+    k = int(np.argmin(np.abs(freqs - float(hz))))
+    comp = spec[k]
+    mag = 2.0 * float(np.abs(comp)) / v.size
+    phase = float(np.angle(comp))
+    return {"fundamental_hz": round(float(freqs[k]), 3),
+            "magnitude_uv": round(mag, 4),
+            "phase_deg": round(float(np.degrees(phase)), 2),
+            "phase_rad": round(phase, 4),
+            "target_hz": round(float(hz), 3)}
 
 
 def flicker_first_cycle_marks(time_ms, voltage, hz: float) -> dict | None:

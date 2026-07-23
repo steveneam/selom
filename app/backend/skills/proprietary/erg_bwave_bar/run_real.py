@@ -56,7 +56,11 @@ def run(data_path: str, params: dict) -> dict:
         # per-row stimulus_type wins inside metrics_from_waveforms; this default covers a plain
         # waveform CSV with no stimulus_type column (the user's adaptation/stimulus_type hint).
         default_mode = _erg.adaptation_mode(params.get("adaptation", "auto"), params.get("stimulus_type", ""))
-        df = _erg.metrics_from_waveforms(df, default_mode=default_mode, marks=manual_marks)
+        # a/b auto-seed detector: `windowed` (default, byte-identical) or the opt-in `robust` SavGol +
+        # prominence detector with a pre-stimulus noise gate.
+        ab_detector = str(params.get("ab_detector", "windowed")).strip().lower()
+        df = _erg.metrics_from_waveforms(df, default_mode=default_mode, marks=manual_marks,
+                                         detector=ab_detector)
         measured_from_traces = True
 
     for col in ("condition", "intensity_group", value_col):

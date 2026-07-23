@@ -26,7 +26,8 @@
     "scale_ms": { "type": "float", "default": 100.0, "min": 10.0, "max": 500.0 },
     "marks": { "type": "bool", "default": false },
     "mark_labels": { "type": "bool", "default": true },
-    "manual_marks": { "type": "str", "default": "" }
+    "manual_marks": { "type": "str", "default": "" },
+    "ab_detector": { "type": "str", "default": "windowed", "options": ["windowed", "robust"] }
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" },

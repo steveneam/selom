@@ -50,6 +50,9 @@ def run(data_path: str, params: dict) -> dict:
     # authoring surface: a per-panel mark is keyed by (condition, "", intensity_group, "") — empty
     # stimulus/eye, so it also drives the per-eye bar + intensity-response via the wildcard match.
     manual_marks = _erg.parse_manual_marks(params.get("manual_marks", ""))
+    # a/b auto-seed detector: `windowed` (default, byte-identical) or the opt-in `robust` SavGol +
+    # prominence detector with a pre-stimulus noise gate. Only changes the auto seed times/amplitudes.
+    ab_detector = str(params.get("ab_detector", "windowed")).strip().lower()
     # Show the a/b landmark dots on each panel (R4). Default off → the real figure is visually
     # unchanged; the editor flips this on to drag/confirm marks. The `mark_meta` (render-inert) is
     # emitted regardless so the Marks panel can list segments + auto times without the dots showing.
@@ -146,7 +149,8 @@ def run(data_path: str, params: dict) -> dict:
                               color, band_color, band_alpha, boundary, error_every, n)
                 n_seen.append(n)
                 # Measure the a/b table on the AVERAGED RAW trace (matches the mean line drawn).
-                lm = _erg.landmarks(ref_t, mean_raw, fs=_fs_from(ref_t), mode=metric_mode, manual=manual)
+                lm = _erg.landmarks(ref_t, mean_raw, fs=_fs_from(ref_t), mode=metric_mode,
+                                    manual=manual, detector=ab_detector)
             elif central == "none":
                 # No averaged trace — draw every replicate at equal weight (individual traces only).
                 ref_t, _, mean_raw, _, _, _, n = _aggregate(reps, error)
@@ -156,7 +160,8 @@ def run(data_path: str, params: dict) -> dict:
                                         for r in reps[1:]]
                 panel["name"] = f"{cond} {g} (n={n}, individual)"
                 n_seen.append(n)
-                lm = _erg.landmarks(ref_t, mean_raw, fs=_fs_from(ref_t), mode=metric_mode, manual=manual)  # table = cohort mean
+                lm = _erg.landmarks(ref_t, mean_raw, fs=_fs_from(ref_t), mode=metric_mode,
+                                    manual=manual, detector=ab_detector)  # table = cohort mean
             else:  # representative — the first replicate (single-eye → byte-identical to before)
                 t, raw_y, clean_y = reps[0]
                 panel["x"], panel["y"] = t, clean_y
@@ -164,7 +169,8 @@ def run(data_path: str, params: dict) -> dict:
                 n_seen.append(1)
                 # Measure on the RAW baseline-corrected trace (the validated metric), not the
                 # display-cleaned copy — the dual smooth is internal to landmarks().
-                lm = _erg.landmarks(t, raw_y, fs=_fs_from(t), mode=metric_mode, manual=manual)
+                lm = _erg.landmarks(t, raw_y, fs=_fs_from(t), mode=metric_mode, manual=manual,
+                                    detector=ab_detector)
             # Seed the a/b landmark marks for this cell (R4): `mark_meta` (always) carries the
             # segment identity + the auto/manual time + source for the Marks panel; the visual dots
             # (gated by `marks`) sit on the DRAWN trace at the landmark times.
