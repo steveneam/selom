@@ -1,202 +1,223 @@
-# Next-session plan — options + parallel workstreams
+# Next-session plan — phases, lanes, tracking, and the on-hold register
 
-_Written 2026-07-25 16:14 +1000 (Sydney) · 06:14 UTC, immediately after `main` fast-forwarded to
-`d950601` (the LAUNCH-CAMPAIGN merge, 20 commits, **unpushed**)._
+_Written 2026-07-25 16:14 +1000 (Sydney) · 06:14 UTC. Updated 16:32 +1000 with the owner's decision
+(**run Plan B + Plan A in parallel**), a trackable phase structure, and the on-hold triage._
 
-Backlog source of truth: `docs/milestone-review-2026-07-25/findings.md` (54 confirmed findings + a
-status ledger). This file is the *sequencing* decision, not a second copy of the findings.
+**How this file is reached:** `agent_handoff/CURRENT.md` → ▸ NEXT points here, and it is in the
+▸ READ FIRST list. A session that boots on `gogogo` lands on it without being told.
+
+**How this file is tracked:** every work item below has a stable **ID** (`L1-03`, `L2-01`, …) and a
+**Status** cell. The rule: *a fix and its status flip land in the SAME commit*, and the commit message
+names the ID. `docs/milestone-review-2026-07-25/findings.md` stays the finding-level truth (its
+Status ledger); this file tracks the *work*, which is not one-to-one with findings. At session start,
+mirror the open rows into harness tasks (`TaskCreate`) so in-session progress is visible; the durable
+record stays here, because harness tasks do not survive the session.
+
+Status vocabulary: `TODO` · `WIP` · `DONE <sha>` · `BLOCKED <on what>` · `DROPPED <why>`.
 
 ---
 
-## 1. What is actually left
+## Decision taken
 
-Honest accounting after the fix pass — the review's counts include items the annotation-layer gate
-made unreachable, so they must not be double-counted as open work.
+**Plan B (zero the review debt) + Plan A (make it reachable) run in parallel next session as isolated
+worktree lanes. Plan C (finish Pillar-2) is held for the session after, entered through a `spec`.**
+Owner-approved 2026-07-25. Rationale: B and A touch disjoint trees so they do not serialise; C needs
+design decisions and touches the provenance chokepoint, and the annotation flag means nothing is
+bleeding while it waits.
 
-### 1a. Open — backend correctness / honesty (8)
+---
 
-| # | Sev | What | Where |
+## Phase 0 — before any worktree is forked (sequential, blocking)
+
+| ID | Item | Owner | Status |
 |---|---|---|---|
-| A10 | HIGH | Gene-label selection went exact→substring, so a non-label column containing a gene token wins (same family as the blocker just fixed, gene half instead of the p-value half) | `engine/columns.py` GENE + the 6 forked `_pick`s |
-| A14 | MED | Multi-sample assembly zero-fills genes absent from a sample's reference — fabricated hard zero counts, no overlap verdict | `engine/assemble.py:208` |
-| A15 | MED | FACS gate bounds live in a transform space anchored to a data-dependent `t_top` that is never recorded → the same gate spec on a different file means different events | `skills/facs_gating/run_real.py:45,137-155` |
-| A16 | MED | FACS silently drops gates it cannot resolve — the population just vanishes from the table | `skills/facs_gating/run_real.py:220+`, `skills/_flow.py:parse_gates` |
-| A17 | MED | ERG oscillatory potentials report `0.0` amplitude for "not measurable" — conflates an unmeasurable trace with absent inner-retinal activity | `skills/_erg.py:347-390` |
-| A18 | MED | The opt-in robust a/b detector changes measured amplitudes but the methods text never says it was used | `companions/methods.py:599-631` |
-| A19 | MED | The `_pick` resolver is still forked verbatim into 6 runners; the drift guard cannot see a forked *matcher* (only forked vocab) | 6 × `skills/*/run_real.py` |
-| A21 | MED | `engine/assemble.py` re-declares the 10x detector + re-implements unit loading instead of using `engine/ingest`'s declared loader registry | `engine/assemble.py:54,95` |
+| P0-01 | **Push `main`** (21 commits, incl. the merge + this plan). Triggers the Vercel deploy. | **founder gate** | TODO |
+| P0-02 | Delete `campaign/parallel-lanes` — only after P0-01, so the work has a remote ref first | me | TODO |
+| P0-03 | **Freeze the one cross-lane contract**: `GET /cloud/providers → { providers: [{ id, label, kind, provider_config_key, enabled }] }`. Written into `docs/figure-editor-contract/`-style form before Lane 2 starts; no other lane may define or consume it. | me | TODO |
+| P0-04 | Confirm the lane mechanics with **thalon** (has run worktree lanes on this box repeatedly) | me | **DONE** — `docs/next-session-plan/lane-mechanics-from-thalon.md`, adopted in §Lane mechanics |
+| P0-05 | Approve (or reshape) the lane partition in §Lanes | **founder gate** | TODO |
+| P0-06 | **Icon decision (A30):** migrate to Phosphor, or record "lucide stays" as a decision so the finding stops recurring in every FE review | **founder gate** | TODO |
+| P0-07 | Triage the on-hold register (§On-hold) — several items are parked on a gate that no longer exists | **founder gate** | TODO |
+| P0-08 | **Build the one-command gate of record** — `scripts/verify.sh`: `hygiene-scan --all` + BE `pytest -m "not slow"` + `ruff check` + FE `tsc` + `eslint` + `vitest`, exit-code gated, **raw output**. Selom has no single verify command today, and the merge train needs one to run against each rebased result. Also the natural home for the `\| tail` fix below. | me | TODO |
+| P0-09 | **Memory-headroom check before forking N sessions** — measure one lane session's peak RSS, multiply by the lane count, compare to box RAM; confirm the tmux supervisor's `OOMPolicy` is `continue`, not `stop`. On thalon's box one 3.7 GiB lane killed **every** session on the box mid-wrap. | me | TODO |
 
-### 1b. Open — reachability / the FE↔BE seam (5)
+---
 
-| # | Sev | What | Where |
+## Lane 1 — Backend integrity sweep (Plan B §1–4)
+
+**Owns:** `app/backend/skills/**` · `app/backend/engine/{assemble,columns,vocab,ingest}.py` ·
+`app/backend/companions/methods.py` · tests in `app/backend/tests/test_{volcano,gsea,flow,erg,assemble}*.py`
+**Frozen (may extend, must not rename):** `resolve_significance` / `pick_significance` signatures
+(`b73bd9b`); the `layout.meta` honesty keys `significance`, `compensation_applied`.
+**Gate:** `pytest -m "not slow"` + `ruff check .` green, **and each fix verified against a real
+dataset** under `SELOM_DATASETS_DIR` — not a fixture.
+
+| ID | Finding | Work | Status |
 |---|---|---|---|
-| A20 | MED | Cloud provider registry forked FE↔BE: the FE hardcodes `comingSoon`, cannot track the backend's per-provider flags | `lib/cloud/providers.ts` ↔ `cloud/registry.py` |
-| A27 | MED | `/data/assemble-scrna` works and has **no way for a user to reach it** | `routers/data.py:153` (no FE surface) |
-| B14 · B16 | MED | Backend-stamped cloud-import provenance (`datasets.source`) is dropped by the FE dataset mapper — an imported dataset looks hand-dropped | `lib/cloud/api.ts:37`, `lib/projects/sync.ts:28-39` |
-| B15 | MED | Cloud import fabricates a `File` stand-in that becomes `lastFile` and can be POSTed as the run's actual data | `components/project/data-panel.tsx:256` |
-| B22 | LOW | Cloud "Import" button becomes an unlabelled spinner while busy | `components/intake/cloud-import-menu.tsx:131` |
+| L1-01 | A10 (HIGH) | Give `GENE` the same tier treatment the p-value half got: a non-label column containing a gene token must not win. Same shape as `b73bd9b`, gene half. | TODO |
+| L1-02 | A19 | Move the forked `_pick` out of 6 runners into `engine.columns` so the drift guard can see **one matcher**, not just one vocabulary. Do with L1-01 — same files. | TODO |
+| L1-03 | A14 | Assembly zero-fills genes absent from a sample's reference → fabricated hard zeros. Emit an honest gene-overlap verdict; do not silently invent counts. | TODO |
+| L1-04 | A21 | `engine/assemble.py` re-declares the 10x detector + re-implements unit loading → consult `engine/ingest`'s declared loader registry. Do with L1-03. | TODO |
+| L1-05 | A15 | FACS gate bounds live in a transform space anchored to a data-dependent `t_top` that is never recorded → record it in provenance so the same gate spec reproduces. | TODO |
+| L1-06 | A16 | FACS silently drops gates it cannot resolve → a verdict row, not a vanished population. Do with L1-05. | TODO |
+| L1-07 | A17 | ERG oscillatory potentials report `0.0` for "not measurable" → `None`/`not_measurable`, so unmeasurable ≠ absent inner-retinal activity. | TODO |
+| L1-08 | A18 | The opt-in robust a/b detector changes amplitudes without disclosure → disclose in methods via the same `layout.meta` channel the FACS/volcano fixes use. Do with L1-07. | TODO |
+| L1-09 | — | **ERG figure/table wiring** (was candidate lane (a), unblocked when FACS landed): OP · PhNR · flicker-FFT into the figure/table surfaces + `companions/methods.py`. The measurements shipped in `a84636c`; nothing surfaces them yet — a shipped-not-reachable item, so it belongs in this sweep. | TODO |
+| L1-10 | — | `test_ingest.py::test_ingest_h5ad_single_cell` (anndata ↔ pandas-3.0 h5ad write) has been red for the whole campaign, proven pre-existing. Fix it, or skip it with an honest reason + a pointer — a permanently-red gate trains everyone to ignore the gate. | TODO |
 
-Plus the three closed gates that make the feature dead even though **both OAuth connections are
-live and verified**: `SELOM_CLOUD_GOOGLE`/`_DROPBOX` absent from `app/backend/.env`, no endpoint
-reports per-provider state, FE literal says `comingSoon`.
+## Lane 2 — Cloud reachability across the FE↔BE seam (Plan A)
 
-### 1c. Open — FE polish, still user-reachable (4)
+**Owns:** `app/backend/routers/cloud.py` · `app/backend/cloud/**` · `app/backend/routers/data.py` ·
+`app/frontend/lib/cloud/**` · `app/frontend/components/intake/**` ·
+`app/frontend/lib/projects/sync.ts` · `app/frontend/components/project/data-panel.tsx` ·
+tests in `app/backend/tests/test_cloud*.py`
+**Frozen:** the P0-03 contract — this lane is its only implementer and consumer.
+**Gate:** a **real file imported from Google Drive AND Dropbox** into a project, with
+`datasets.source` visible in the UI; the MSW mock updated in the *same* change as the contract.
 
-A24 artboard hero clipped inside its own stage · A25 inert "coming soon" palette strip eats 64px of
-a height-constrained editor · B13 the palette strip asserts the colourway by colour alone and is
-`aria-hidden` · A30 icon glyphs collide across meanings, and new work continues on lucide against the
-stated Phosphor preference.
+| ID | Finding | Work | Status |
+|---|---|---|---|
+| L2-01 | A20 | `GET /cloud/providers` from `cloud/registry.py` + settings; the FE consumes it, static list survives only as an offline-dev fallback. Kills the FE↔BE fork. | TODO |
+| L2-02 | — | Enable `SELOM_CLOUD_GOOGLE` + `SELOM_CLOUD_DROPBOX` in `app/backend/.env` (gitignored). Without this the live OAuth is still refused — one of the three closed gates. | TODO |
+| L2-03 | B14 · B16 | Stop dropping backend-stamped `datasets.source` in the FE dataset mapper — a cloud-imported dataset currently looks hand-dropped. | TODO |
+| L2-04 | B15 | Kill the fabricated `File` stand-in that becomes `lastFile` and can be POSTed as the run's actual data. Import by reference. [[mock-fallback-never-fabricates-data]] | TODO |
+| L2-05 | A27 | A user-reachable surface for `/data/assemble-scrna` — it works and nobody can reach it. | TODO |
+| L2-06 | B22 | Label the "Import" busy state (currently an unlabelled spinner). | TODO |
+| L2-07 | — | swordfish: public host for the Nango **Connect UI** (`:3009`) if the FE wants the `@nangohq/frontend` widget rather than the direct-link flow. Asked 2026-07-25; **not blocking** — the direct flow works. | BLOCKED swordfish |
 
-### 1d. Gated, deliberately not open (≈20)
+## Lane 3 — FE editor polish, reachable surfaces only (Plan B §5)
 
-A9 · A12 · A13 · A23 · A29 · B1–B3 · B5–B8 · B10–B12 · B17–B21 · B23–B24 — all unreachable behind
-`NEXT_PUBLIC_ANNOTATION_LAYER=off`. They come back the moment the flag flips, so the flag must not be
-flipped except as part of Plan C.
+**Owns:** `app/frontend/components/figure/shell/{artboard-host,palette-strip}.tsx` ·
+`app/frontend/lib/ui/**` · the icon decision's mechanics
+**Must NOT touch:** `components/figure/{property-panel,figure-canvas}.tsx` or anything behind
+`NEXT_PUBLIC_ANNOTATION_LAYER` — that is Plan C's territory.
+**Gate:** `tsc` + `eslint` + `vitest`, **plus a real-app load at desktop widths** — these are layout
+claims and the review's render gate never reached a browser.
 
-### 1e. Carried over / external
+| ID | Finding | Work | Status |
+|---|---|---|---|
+| L3-01 | A24 | The artboard hero is clipped inside its own stage (`height: min(74vh,720px)` vs ~150px of new fixed chrome). | TODO |
+| L3-02 | A25 · B13 | The inert "coming soon" palette strip eats 64px of a height-constrained editor and asserts the colourway by colour alone, `aria-hidden`. Retire it or make it real + accessible. | TODO |
+| L3-03 | A30 | Execute P0-06's icon decision (Phosphor migration, or record lucide as the decision). | BLOCKED P0-06 |
+| L3-04 | §D | Observe the review's unverified layout predictions in a real browser at desktop widths and close or re-file them honestly. | TODO |
 
-- **Push `main`** (20 commits) — founder gate. Then delete `campaign/parallel-lanes`.
-- **swordfish:** asked for a public Connect-UI host (`:3009`); also asked them to confirm syd2's own
-  `NANGO_SERVER_URL` (the one check `deploy/nango/preflight.sh` must skip). Neither blocks anything.
-- **Public Selom backend on syd2** — needs a backend Dockerfile + GHCR image-CI (mine) + 5 data-plane
-  answers + an owner spend gate on any syd2 resize.
-- **OneDrive/Microsoft** — on hold by owner.
-- **Pre-existing unrelated failure:** `test_ingest.py::test_ingest_h5ad_single_cell` (anndata ↔
-  pandas-3.0 h5ad write). Not campaign work; worth its own small fix or an honest skip-with-reason.
+### Merge train
 
----
+`Lane 1` → `Lane 3` → `Lane 2`. Rationale: pure-backend first (no cross-lane contract), pure-FE
+presentational second (cannot conflict with Lane 1), seam-spanning last so it rebases onto both and
+its end-to-end gate runs against the final tree. Local merges autonomous; **each merge is followed by
+its own founder push** so a bad lane never rides in on another's push.
+Shared-ground rule: `app/backend/tests/**` is touched by two lanes → each adds tests only in its own
+named files listed above.
 
-## 2. Three plans
+### Lane mechanics — confirmed (P0-04 DONE)
 
-### Plan A — "Make it reachable" (product-facing)
+Confirmed 2026-07-25 against **thalon's lane experience** on this box (their Sprint-7/8 lanes plus the
+incidents that became their ratchets). Durable copy: `docs/next-session-plan/lane-mechanics-from-thalon.md`.
+Their verdict: this partition matches what works there almost exactly. What Selom adopts:
 
-Turn today's OAuth into a feature a user can actually use, and close the whole FE↔BE seam cluster.
+**Fork + drive.** One lane = one `git worktree` + one branch `agent/<bucket>/<slug>` + one `claude`
+session in the **shared tmux server** (not a terminal owned by an editor process, or the session dies
+with the editor). The kickoff is a **FILE the lane reads** — scope, contract pointer, definition of
+done, verify command — never chat history. This matters doubly here: **a worktree is a separate memory
+namespace**, so each kickoff must inline its landmines rather than assume recall.
+[[parallel-agent-lanes]]
 
-1. Backend: a `GET /cloud/providers` endpoint reporting each provider's declared state (id, label,
-   kind, `provider_config_key`, `enabled`) from `cloud/registry.py` + settings — **one source of
-   truth**, no FE literal.
-2. FE: `lib/cloud/providers.ts` becomes a typed *consumer* of that endpoint (keep a static fallback
-   for offline dev), so the Connect buttons reflect backend truth instead of a build-time constant.
-   Closes A20, and A26/B4/B9 stay closed for the right reason.
-3. Enable `SELOM_CLOUD_GOOGLE` + `SELOM_CLOUD_DROPBOX`, then drive a **real file** from Drive and
-   Dropbox into the intake pipeline end-to-end.
-4. Provenance through the seam: stop dropping `datasets.source` in the FE mapper (B14/B16), and kill
-   the fabricated `File` stand-in so a cloud-imported dataset is POSTed by reference, not by a
-   fake (B15). Label the busy state (B22).
-5. A user-reachable surface for `/data/assemble-scrna` (A27) — the multi-sample intake path.
+**Worktree dep prep is its own step, and it bites on Linux.** Node module *resolution* walks up to the
+main checkout, so a half-broken link set passes tests while tools needing workspace-nested deps
+(eslint) fail. Assert the link set at lane **setup**, never at merge time, and **never `npm install`
+inside a worktree**. Consequence for Lane 3: **dev servers may not run in a lane at all** (Turbopack
+fatals on out-of-root symlinks), so L3-04's real-browser check happens on the lead's main checkout
+*after* rebase — not in-lane. Plan it there.
 
-**Value:** the highest user-visible payoff on the board; converts finished plumbing into a feature.
-**Risk:** spans both lanes by nature, so it needs the endpoint contract frozen before FE work starts.
-**Size:** ~1 full session.
+**The frozen contract is the real tripwire — and it must be executable.** Disjointness comes from
+construction (the globs above) and the glob check at the train is only a backstop; nearly every
+"collision" they saw was **contract drift**, not a glob violation. So P0-03 is not a doc: the
+`/cloud/providers` shape ships with a **key-stability test pinned on main** before any lane forks. A
+lane that "improves" the shared surface then goes red *in its own run*, days before the train would
+catch it. A lane that genuinely needs a shared-surface change is a **re-plan**, never a wave-through.
+Free bonus: box-level git hooks are shared across worktrees (common `.git`), so our
+`hygiene-scan --staged` pre-commit fires in every lane automatically.
 
-### Plan B — "Zero the review debt" (integrity)
+**Merge train: strictly serial and LEAD-driven — a lane never merges itself.** For each lane in order:
+**rebase** onto current `main` (rebase, not merge — keeps history linear) → run the **full gate on the
+rebased result** → merge → next lane rebases onto the new `main`. The gate must run **at the train**,
+not only in-lane: lanes test against the `main` they forked from, and the rebased combination is what
+ships. Stale lane: **the lead rebases it**, not the lane session. Mechanical conflicts, resolve and
+continue; **contract-shaped conflicts mean the lane mis-consumed the freeze → send it back**, because
+hand-resolving semantic drift at the train is how wrong code ships with a green gate. Dead lane
+(crashed session): the **worktree survives** — inspect its `git status`/log/stash before redoing
+anything.
 
-Sweep every open backend correctness/honesty finding (§1a) plus the reachable FE polish (§1c).
-
-1. A10 + A19 together: give GENE the same tier treatment the p-value half just got, and move the
-   forked `_pick` into `engine.columns` so the drift guard can see one matcher. This is the natural
-   completion of `b73bd9b`.
-2. A14 + A21: honest gene-overlap verdict on assembly (and no fabricated zeros without one), and
-   assembly consults `engine/ingest`'s loader registry instead of re-declaring 10x detection.
-3. A15 + A16: record `t_top` in provenance so a gate spec reproduces; an unresolvable gate becomes a
-   verdict row, not a silent disappearance.
-4. A17 + A18: `None`/`not_measurable` instead of `0.0` for an unmeasurable OP, and the robust a/b
-   detector disclosed in the methods text (same `layout.meta` channel the FACS/volcano fixes now use).
-5. §1c polish: un-clip the artboard, retire or make honest the palette strip, and decide the icon
-   question (A30 — Phosphor migration or an explicit "lucide stays" record).
-
-**Value:** every remaining "the figure says X but the code did Y" risk goes to zero. No new surface.
-**Risk:** low — all of it has tests and real data to verify against.
-**Size:** ~1 session, and it parallelises cleanly (see §3).
-
-### Plan C — "Finish Pillar-2" (the gated layer)
-
-Build the annotation layer properly and flip the flag: a canvas selection model (click-to-select,
-Delete, arrow-nudge, row↔canvas linking), cascade offsets so repeat adds are visible, annotations
-carried through a re-run, bracket+stars moving as one object, and the **computed** `sig_brackets`
-path wired so stars carry a real p-value with provenance instead of hand-typed asterisks.
-
-**Value:** unlocks ~20 gated findings and the Illustrator-replacement promise.
-**Risk:** highest — it needs design decisions first (a spec, not just fixes), and the p-value path
-touches the provenance chokepoint.
-**Size:** 2–3 sessions. Wants `spec` → review → build, not a straight fix pass.
-
-### Recommendation
-
-**Run Plan B and Plan A as parallel lanes next session; hold Plan C for the session after, entered
-through a spec.** B and A are almost perfectly disjoint (B is `skills/**` + `engine/**` +
-`companions/**`; A is `routers/cloud.py` + `cloud/**` + the FE cloud/intake surfaces), so they do not
-serialise. C is the one that deserves undivided attention and a design pass, and the flag means
-nothing is bleeding while it waits.
-
----
-
-## 3. Parallel workstreams — isolated worktree lanes
-
-Per the standing rule: ≥2 disjoint contract-separated buckets → **one isolated `claude` session per
-worktree**, not an in-context fan-out (last attempt auto-compacted mid-sprint). Local merges
-autonomous; **push stays the founder gate**.
-
-### Lane 1 — BE integrity sweep (Plan B §1–4)
-
-- **Owns (globs):** `app/backend/skills/**` · `app/backend/engine/{assemble,columns,vocab,ingest}.py` ·
-  `app/backend/companions/methods.py` · `app/backend/tests/test_{volcano,gsea,flow,erg,assemble}*.py`
-- **Findings:** A10 · A14 · A15 · A16 · A17 · A18 · A19 · A21
-- **Frozen contract (must not change):** the `resolve_significance` / `pick_significance` signatures
-  landed in `b73bd9b`; the `layout.meta` honesty channel key names (`significance`,
-  `compensation_applied`) — Lane 1 may ADD keys, never rename these.
-- **Gate:** `pytest -m "not slow"` + `ruff check .` green; each fix verified against a real dataset in
-  `SELOM_DATASETS_DIR`, not a fixture.
-
-### Lane 2 — Cloud reachability across the seam (Plan A)
-
-- **Owns (globs):** `app/backend/routers/cloud.py` · `app/backend/cloud/**` ·
-  `app/backend/routers/data.py` (the assemble surface) · `app/frontend/lib/cloud/**` ·
-  `app/frontend/components/intake/**` · `app/frontend/lib/projects/sync.ts` ·
-  `app/frontend/components/project/data-panel.tsx` · `app/backend/tests/test_cloud*.py`
-- **Findings:** A20 · A27 · B14 · B15 · B16 · B22
-- **Frozen contract (I freeze this BEFORE the lane starts, and only this lane implements it):**
-  `GET /cloud/providers → { providers: [{ id, label, kind, provider_config_key, enabled }] }`.
-  The FE consumes it; the static list survives only as an offline-dev fallback.
-- **Gate:** a real file imported from Google Drive **and** Dropbox into a project, with
-  `datasets.source` visible in the UI; MSW mock updated in the same change (a contract change updates
-  its mock in the same move).
-
-### Lane 3 — FE editor polish (Plan B §5)
-
-- **Owns (globs):** `app/frontend/components/figure/shell/{artboard-host,palette-strip}.tsx` ·
-  `app/frontend/lib/ui/**` · the icon decision
-- **Findings:** A24 · A25 · B13 · A30
-- **Frozen contract:** none — presentational only. Must NOT touch
-  `components/figure/{property-panel,figure-canvas}.tsx` (Plan C's territory) or anything behind the
-  annotation flag.
-- **Gate:** `tsc` + `eslint` + `vitest`, **plus a real-app load at desktop widths** — this lane's
-  findings are layout claims and §D of the review was never observed in a browser.
-
-### Merge order + conflict rules
-
-1. **Lane 1** first — pure backend, no cross-lane contract.
-2. **Lane 3** second — pure frontend presentational, cannot conflict with Lane 1.
-3. **Lane 2** last — it spans the seam, so it rebases onto both and its end-to-end gate then runs
-   against the final tree.
-
-Overlap risks and their mitigations: `app/backend/tests/**` is shared ground → each lane adds tests
-only in its own named files listed above. `routers/data.py` is Lane 2's alone (Lane 1 touches
-`engine/assemble.py`, not the router). `companions/methods.py` is Lane 1's alone.
-
-### Owner steps (the only things a lane cannot do for itself)
-
-1. **Push `main`** now (20 commits) and delete `campaign/parallel-lanes` after.
-2. **Approve the lane partition** above (or reshape it) before any worktree is forked.
-3. **Icon call (A30):** migrate to Phosphor now, or record "lucide stays" as a decision so the
-   finding stops recurring in every FE review.
-4. **Push after each lane merge** (per-lane, so a bad lane never rides in on another's push).
-5. If Plan C is wanted sooner than the session after next, say so — it changes the sequencing above.
+**Approval boundary, stated explicitly** (thalon's protocol takes fresh approval per launch; ours is
+looser, so it must be written down): once **P0-05** approves the partition, forking the worktrees,
+building in them, and the local merges are all **autonomous**. **Each push is a separate founder
+gate.** Anything that would change a frozen contract, unpark an on-hold item, or add a fourth lane
+returns to the founder first.
 
 ---
 
-## 4. What this does NOT include
+### Two gotchas adopted from thalon's incidents
 
-The public Selom backend on syd2 (owner spend gate + 5 data-plane answers to swordfish), OneDrive,
-and Plan C's build. Also excluded: any flip of `NEXT_PUBLIC_ANNOTATION_LAYER` — that flag is the only
-thing keeping ~20 findings out of a user's figure.
+**1. The `| tail` swallow — we are already doing this.** Piping a gate through `tail`/`head`/`grep`
+returns the *pipe's* exit status, so the gate's failure code is lost and the failure summary can be
+cut off. It cost thalon two real incidents: a swallowed guard failure that let forbidden content reach
+`origin` (history rewrite required), and a red suite read as green at a session close. **Every gate run
+in this session was piped through `| tail`** — the failures were visible in the summary lines I read,
+so nothing was misreported here, but the exit code was not being checked and that is luck, not method.
+Fix: read gate output **raw**, or capture to a file and test `$?` *before* filtering. P0-08's
+`scripts/verify.sh` is the durable home; the habit is recorded in memory
+[[read-gate-output-raw-not-piped]]. This is the same principle CLAUDE.md's ratchet ladder already
+states ("gated on its exit code, never a `;`-chain that ignores failure") applied to how *I* run the
+gates, not just how CI does.
+
+**2. The fleet dies with one lane.** If the session supervisor's `OOMPolicy` is `stop`, one oversized
+lane takes down every agent session on the shared box — thalon lost the whole fleet mid-wrap to a
+3.7 GiB lane. That is P0-09, and it must be checked *before* forking three sessions, not after.
+
+## On-hold register — nothing here is forgotten
+
+Two homes exist and both were checked: **`docs/on-hold/README.md`** (the P6 parking lot, 17 items —
+"parked, not deleted"; leaving requires an owner decision naming the pillar it rejoins) and
+**`agent_handoff/on-hold/README.md`** (5 Docker/WSL-gated items). Neither is touched by the lanes
+above. Triage below is for **P0-07**.
+
+### ⚠ The gate on several items no longer exists
+
+Both registers park work behind *"ASK before Docker/WSL"* and *"needs a running Redis (Docker/WSL on
+Windows)"*. That premise is stale: the owner cleared Docker on this Linux VPS on 2026-07-23, Docker
+Engine v29.6 + Compose are installed, **and a Redis is already running on this box** (`selom-nango-redis`
+on `:6380`, stood up for Nango). So these items are no longer *infra-blocked* — several may still be
+correctly parked for a different reason (off-thesis breadth), but the recorded reason is wrong and
+should be restated so the register keeps meaning what it says. [[ask-before-docker-wsl]]
+
+| ID | Item | Recorded reason | Reality | Recommendation |
+|---|---|---|---|---|
+| OH-01 | arq + Redis job-status store | "needs a running Redis (Docker/WSL on Windows)" | Redis is running; Docker cleared | **Unpark candidate** — cheap now, and it makes cross-process job status visible (a real gap in `jobs/worker.py`) |
+| OH-02 | OmicVerse isolated worker | "pandas<3 conflict → must run out-of-process/containerised" | The *isolation* reason still holds; the *Docker* gate does not | Stays parked — but for the licence + thesis reasons (GPL-3, breadth), not infra. Restate. |
+| OH-03 | Community skill sandbox | container sandbox | Docker cleared; still v2 scope | Stays parked (off-thesis until the Skill Foundry community tier). Restate. |
+| OH-04 | Deploy image (B8) | the deployment Docker image | Docker cleared; this now overlaps the **public backend on syd2** work (Dockerfile + GHCR image-CI) | **Merge with the syd2 lane** rather than tracking twice |
+| OH-05 | BAM ingest | "needs large-file/async infra (ASK before Redis/Docker)" | Infra gate cleared | Owner call: unpark, or restate as "not needed by a current product goal" |
+| OH-06 | Accession AUTO-fetch (Slice 5 B2) | infra + owner chose the manual loop at s53 | Manual loop shipped; auto-fetch was a deliberate product decision, not an infra block | Stays parked — reason is sound. Revisit only if the manual loop proves slow. |
+| OH-07 | Journal style packs | export polish, not engine | `docs/journal-styles/spec.md` **already written** | Cheapest unpark on the board (spec exists) — good candidate once the lanes land |
+| OH-08 | Supabase / arq+Redis / Kaleido infra | ASK before Docker/WSL | Kaleido shipped 2026-06-15; Redis available | Split the row: Kaleido is DONE, Redis→OH-01, Supabase stays pre-launch |
+| OH-09 | Ask-Selom AI chat · Command-center C/B · ClawBio HOST · external skill audit · metabolomics_de · reference-atlas reproductions · pdf.js region-capture · gene-set messy lists · OSCA Gap E · pipeline flow animation · "Digitize this panel" · external-tool builds | off-thesis / post-spine / licence | unchanged | **Stay parked** — correctly reasoned, no action |
+| OH-10 | OneDrive/Microsoft cloud provider | owner on hold pending a machine that logs into Azure cleanly | unchanged | Stays parked. Lane 2 must keep its provider list flag-driven so OneDrive drops in without a code change. |
+| OH-11 | Public Selom backend on syd2 | needs Dockerfile + GHCR image-CI (mine) + 5 data-plane answers + owner spend gate | Docker cleared; the 5 answers are still owed to swordfish | Own lane, **after** next session. Fold OH-04 in. |
+| OH-12 | WS6 AWS deploy | owner chose "this box first, AWS later" | unchanged | Stays parked |
+
+### Register hygiene found while checking
+
+| ID | Item | Status |
+|---|---|---|
+| OH-13 | `agent_handoff/on-hold/README.md` still frames its gates as Windows Docker/WSL constraints; the box is Linux with Docker installed. Rewrite the "Why gated" column so the register states real reasons. | TODO |
+| OH-14 | Memory `[[selom-multisample-scrna-assemble]]` says "parked, on-hold P1" — it **shipped** in `11a115f`. Correct the memory (its remaining gap is the *UI*, which is L2-05). | TODO |
+| OH-15 | Two on-hold homes (`docs/on-hold/` = parking lot, `agent_handoff/on-hold/` = infra-gated) with overlapping rows (Redis, deploy image, BAM). Fold the infra register INTO the parking lot so there is one home, per the Ratchet's one-durable-home rule. | TODO |
+
+---
+
+## Explicitly out of scope next session
+
+Plan C's build (annotation layer) · any flip of `NEXT_PUBLIC_ANNOTATION_LAYER` · the syd2 public
+backend · OneDrive · everything in OH-09. If one of these becomes urgent, it displaces a lane rather
+than being added to one — three lanes is the size that fit last time without compaction.
