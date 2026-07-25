@@ -40,7 +40,7 @@ def run(data_path: str, params: dict) -> dict:
         raise ValueError("facs_gating: could not resolve x/y channels from the FCS")
 
     raw = fd.as_array().astype(float)                     # (n_events, n_channels), linear
-    comp, _compensated = _compensate(raw, fd, labels, params, np, flowutils)
+    comp, compensated = _compensate(raw, fd, labels, params, np, flowutils)
 
     t_top = float(max(1.0, float(np.nanmax(np.abs(comp)))))
     disp = _transform_all(comp, params, t_top, np, flowutils)  # transformed display + gate space
@@ -69,6 +69,14 @@ def run(data_path: str, params: dict) -> dict:
         layout["shapes"] = shapes
     if annos:
         layout["annotations"] = annos
+
+    # Declare what compensation ACTUALLY happened, so the auto-methods text states the outcome
+    # instead of restating the request. `compensate=auto` degrades to raw events whenever the FCS
+    # carries no $SPILLOVER, the spill string is malformed, or its detectors/shape do not match the
+    # channels (see _compensate) — claiming a spillover matrix was applied in that case is a
+    # printed-vs-computed lie (milestone review 2026-07-25, finding A6). Written always (not only on
+    # failure): a reader of the recorded figure can then tell compensated from uncompensated.
+    layout["meta"] = {**(layout.get("meta") or {}), "compensation_applied": bool(compensated)}
 
     rows = _gating_rows(gates, disp, comp, idx, xi, yi, np)
     spec = {"data": [trace], "layout": layout,

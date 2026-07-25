@@ -162,7 +162,7 @@ async def assemble_scrna_data(files: list[UploadFile] = File(...), obs_map: str 
     # /uploads/intake → confirm → parse/materialize_dataset path), where the standard run path takes
     # over. `obs_map` is an optional JSON object {sample key → {obs field: value}} (the confirmed
     # intake answers); omit it for a filename-only assembly (sample_id per file, no design overlay).
-    from engine import assemble
+    from engine import assemble, lineage
 
     if not files:
         raise RunError.bad_input(
@@ -184,6 +184,9 @@ async def assemble_scrna_data(files: list[UploadFile] = File(...), obs_map: str 
                 "obs_map must be a JSON object mapping a sample key to its obs fields.",
                 fix='e.g. {"GSM6061839_2niPE2-ANAI-3": {"line": "2niPE2", "condition": "iRPE"}}')
     paths = [_save_upload(f) for f in files]
+    # Parent refs by CONTENT SHA, captured before the `finally` deletes the temp uploads — the same
+    # capture /data/combine does, so the assembled cohort's lineage renders "assembled from {…}".
+    parent_refs = [lineage.source_parent(p, f.filename or "") for p, f in zip(paths, files)]
     adata = None
     try:
         adata = assemble.assemble_scrna(paths, obs_map=parsed_obs_map)
@@ -201,6 +204,19 @@ async def assemble_scrna_data(files: list[UploadFile] = File(...), obs_map: str 
             pathlib.Path(p).unlink(missing_ok=True)
     summary["filename"] = "assembled_scrna.h5ad"
     summary["n_files"] = len(files)
+    # D3 — record the assembled cohort like its /data/combine sibling. Without this the design that
+    # was materialized into obs (which sample carried which line/condition, and from which file) was
+    # unrecoverable once the temp uploads were deleted: the user re-uploads the .h5ad and it looks
+    # hand-made (milestone review 2026-07-25, finding A8). An AnnData records meta-only (shape +
+    # parents, no CSV) and lineage is fail-soft — a missing artifact never breaks the assembly.
+    art = lineage.materialize(
+        adata, kind=lineage.KIND_MATRIX, filename="assembled_scrna.h5ad", parents=parent_refs,
+        recipe_note=(f"assembled {len(files)} per-sample matrix file(s) into one AnnData"
+                     + (" with a filename-keyed obs design overlay" if parsed_obs_map else
+                        " (sample_id from filenames only, no design overlay)")))
+    if art is not None:
+        summary["artifact_id"] = art.artifact_id
+        summary["receipt"] = art.receipt
     return Response(
         content=h5ad_bytes, media_type="application/octet-stream",
         headers={"X-Assemble-Summary": json.dumps(summary),

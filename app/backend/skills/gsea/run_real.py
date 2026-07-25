@@ -32,7 +32,12 @@ from skills.gsea.run import _assemble
 # GSEA ranks by a signed fold-change OR a signed statistic. The fold-change half is the shared DE
 # vocabulary (single-sourced — no fork); RANK_EXTRA is gsea's own ranking-stat-only extras, composed
 # AFTER the FC synonyms so a fold-change column still wins when both are present.
-RANK_EXTRA = ("stat", "score", "t", "signed_rank", "metric")
+RANK_EXTRA = ("stat", "score", "signed_rank", "metric")
+# Tokens too SHORT to substring-match safely: a bare "t" (limma's moderated t) is a substring of
+# ordinary header words — on a real biomaRt/limma export it matched `entrezgene_id`, so a table with
+# no fold-change column ranked genes by their Entrez ID (milestone review 2026-07-25, finding A5).
+# These match the WHOLE lowered header only, and are tried last.
+RANK_EXACT = ("t", "b", "z", "wald")
 _MAX_PLOT = 800   # downsample the curve/metric to keep the spec light
 _MIN_SIZE = 5
 _MAX_SIZE = 2000
@@ -73,12 +78,23 @@ def _ranked(df, override=None):
     import pandas as pd
 
     cols = {str(c).strip().lower(): c for c in df.columns}
-    metric_col = override_column(override, "logFC", df.columns) or _pick(cols, DE_LOGFC_SYNONYMS + RANK_EXTRA)
+    metric_col = (override_column(override, "logFC", df.columns)
+                  or _pick(cols, DE_LOGFC_SYNONYMS + RANK_EXTRA)
+                  or next((orig for low, orig in cols.items() if low in RANK_EXACT), None))
     if metric_col is None:
         raise ValueError("gsea needs a ranking metric column (log2 fold-change or a signed statistic)")
     gene_col = override_column(override, "gene", df.columns) or _pick(cols, GENE)
     genes = (df[gene_col] if gene_col else df.index.to_series()).astype(str).str.upper()
     metric = pd.to_numeric(df[metric_col], errors="coerce")
+    # An honest verdict beats a garbage ranking: if the resolved column isn't really numeric (a gene
+    # id / label that matched a synonym), say which column failed instead of silently ranking on
+    # whatever coerced. GSEA on a handful of genes is meaningless anyway.
+    if int(metric.notna().sum()) < _MIN_SIZE:
+        raise ValueError(
+            f"gsea: the ranking column {metric_col!r} has fewer than {_MIN_SIZE} numeric values — "
+            "it does not look like a ranking metric. Map the ranking column explicitly "
+            "(log2 fold-change or a signed statistic such as limma's t)."
+        )
     sub = pd.DataFrame({"gene": genes, "metric": metric}).dropna(subset=["metric"])
     sub = sub.assign(_abs=sub["metric"].abs()).sort_values("_abs", ascending=False)
     sub = sub.drop_duplicates("gene", keep="first")

@@ -77,7 +77,9 @@ export function CloudImportMenu({
   async function connect(provider: CloudProvider) {
     setConnectNote(null);
     try {
-      // Scaffold: disabled until the owner's client IDs exist → this throws "coming soon".
+      // Reachable only for a provider whose `comingSoon` is false (the button is disabled
+      // otherwise); the backend still gates on its own per-provider settings flag and returns a
+      // clear error if that is off, which is what `connectNote` surfaces.
       await connectProvider(provider.providerConfigKey, `${projectId}:${provider.id}`);
     } catch (e) {
       setConnectNote(
@@ -145,7 +147,12 @@ export function CloudImportMenu({
 
           <div className="my-3 h-px bg-border" />
 
-          {/* OAuth providers — scaffolded (Connect present, no-ops until configured) */}
+          {/* OAuth providers. A provider whose `comingSoon` is set cannot succeed — its Connect
+              button is DISABLED and says so at the control, rather than looking live and failing
+              after the click (milestone review 2026-07-25, findings B4/B9). The flag is still an FE
+              literal that cannot track the backend's per-provider settings flags (finding A20) —
+              closing that fork needs a providers endpoint the FE reads, which lands with the cloud
+              import/export slice. */}
           <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Connect an account
           </p>
@@ -161,10 +168,17 @@ export function CloudImportMenu({
                     <Icon />
                   </span>
                   <span className="flex-1 text-sm text-foreground/85">{p.label}</span>
+                  {p.comingSoon && (
+                    <span className="rounded-full border border-border bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Soon
+                    </span>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
                     className="h-7 px-2.5 text-xs"
+                    disabled={p.comingSoon}
+                    title={p.comingSoon ? `${p.label} import is not enabled yet` : undefined}
                     onClick={() => void connect(p)}
                   >
                     Connect
@@ -178,7 +192,11 @@ export function CloudImportMenu({
               {connectNote}
             </p>
           )}
-          <p className="sr-only">{urlProvider.label} import is available now; other providers are coming soon.</p>
+          {OAUTH_PROVIDERS.some((p) => p.comingSoon) && (
+            <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+              {urlProvider.label} import works now. Account connections arrive with cloud import.
+            </p>
+          )}
         </div>
       )}
     </div>

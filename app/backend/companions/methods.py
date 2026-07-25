@@ -46,7 +46,11 @@ HARMONY = "Korsunsky, I. et al. Fast, sensitive and accurate integration of sing
 ENTREZ = "Sayers, E.W. et al. Database resources of the National Center for Biotechnology Information. Nucleic Acids Research 50, D20-D26 (2022)."
 ISCEV = "Robson, A.G. et al. ISCEV Standard for full-field clinical electroretinography (2022 update). Documenta Ophthalmologica 144, 165-177 (2022)."
 NAKA_RUSHTON = "Naka, K.I. & Rushton, W.A.H. S-potentials from luminosity units in the retina of fish (Cyprinidae). Journal of Physiology 185, 587-599 (1966)."
-FLOWKIT = "White, S. et al. FlowKit: A Python Toolkit for Integrated Manual and Automated Cytometry Analysis Workflows. Frontiers in Immunology 12, 768541 (2021)."
+# FlowIO + FlowUtils are the actual dependencies. There is deliberately NO FlowKit citation: the
+# high-level FlowKit toolkit pins pandas<3 and is not installed (RISKS #12) — citing it would credit
+# software that never ran (milestone review 2026-07-25, findings A7/A22/A28).
+FLOWIO = "White, S. et al. FlowIO: a pure-Python FCS file reader/writer. https://github.com/whitews/FlowIO (BSD-3-Clause)."
+FLOWUTILS = "White, S. et al. FlowUtils: numpy/C utilities for flow cytometry — compensation and GatingML transforms. https://github.com/whitews/FlowUtils (BSD-3-Clause)."
 LOGICLE = "Parks, D.R., Roederer, M. & Moore, W.A. A new 'Logicle' display method avoids deceptive effects of logarithmic scaling for low signals and compensated data. Cytometry Part A 69A, 541-551 (2006)."
 GATINGML = "Spidlen, J. et al. Gating-ML 2.0: International Society for Advancement of Cytometry (ISAC) standard for representing gating descriptions in flow cytometry. Cytometry Part A 87, 683-687 (2015)."
 
@@ -699,12 +703,25 @@ def _erg_flicker(p: dict):
 
 def _facs_gating(p: dict):
     comp = str(p.get("compensate", "auto")).strip().lower()
+    # `_compensation_applied` is the runner's recorded OUTCOME (run_real writes it into
+    # layout.meta; build_body lifts it). Absent — e.g. litsynth replaying from recorded params
+    # only — the requested mode is described without asserting it succeeded.
+    applied = p.get("_compensation_applied")
     if comp == "none":
         comp_txt = "no fluorescence compensation was applied"
+    elif applied is False:
+        comp_txt = (
+            "fluorescence compensation was requested but NOT applied — the file carried no usable "
+            "spillover matrix, so uncompensated events are shown"
+        )
     elif comp == "matrix":
-        comp_txt = "an operator-supplied spillover matrix was applied"
+        comp_txt = ("an operator-supplied spillover matrix was applied" if applied
+                    else "an operator-supplied spillover matrix was requested")
     else:
-        comp_txt = "the acquisition spillover matrix embedded in the FCS ($SPILLOVER) was applied where present"
+        comp_txt = ("the acquisition spillover matrix embedded in the FCS ($SPILLOVER) was applied"
+                    if applied else
+                    "the acquisition spillover matrix embedded in the FCS ($SPILLOVER) was applied "
+                    "where present")
 
     transform = str(p.get("transform", "logicle")).strip().lower()
     if transform == "arcsinh":
@@ -728,9 +745,9 @@ def _facs_gating(p: dict):
     gated = str(p.get("gates") or "").strip()
     gate_txt = (
         " A hierarchical gate tree (rectangle, polygon and quadrant gates defined in the "
-        "transformed display space) was applied with a GatingML-compliant gating strategy, and "
-        "each population's event count, frequency of parent, frequency of total, and median "
-        "fluorescence intensity were tabulated."
+        "transformed display space, following the Gating-ML 2.0 gate definitions) was evaluated by "
+        "Selom's own geometry implementation, and each population's event count, frequency of "
+        "parent, frequency of total, and median fluorescence intensity were tabulated."
         if gated else
         " Population statistics (event count, frequency of parent, frequency of total, and median "
         "fluorescence intensity) were tabulated for the ungated sample."
@@ -740,7 +757,7 @@ def _facs_gating(p: dict):
         f"transformed with FlowUtils; {comp_txt}, and fluorescence intensities were displayed on "
         f"{xform_txt}. Events are shown as {view}.{gate_txt}"
     )
-    return text, [FLOWKIT, *xform_cite, GATINGML]
+    return text, [FLOWIO, FLOWUTILS, *xform_cite, GATINGML]
 
 
 _TEMPLATES = {
@@ -806,8 +823,11 @@ def build_body(spec: SkillSpec, params: dict, figure: dict | None = None) -> tup
     Omitted (litsynth, replay from recorded params only) keeps the adjusted wording, as before.
     """
     resolved = resolved_params(spec, params)
-    if ((figure or {}).get("layout") or {}).get("meta", {}).get("significance") == "raw":
+    meta = ((figure or {}).get("layout") or {}).get("meta") or {}
+    if meta.get("significance") == "raw":
         resolved["_significance_adjusted"] = False
+    if "compensation_applied" in meta:
+        resolved["_compensation_applied"] = bool(meta["compensation_applied"])
     builder = _TEMPLATES.get(spec.id)
     return builder(resolved) if builder else _generic(spec, resolved)
 

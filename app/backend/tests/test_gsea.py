@@ -103,3 +103,38 @@ def test_gseapy_library_mode_table(tmp_path):
     target_row = next((r for r in table["rows"] if r[0] == target), None)
     assert target_row is not None, f"{target} should be among the tested sets"
     assert target_row[1] is not None and target_row[1] > 0, "top-loaded set should have positive NES"
+
+
+# --- ranking-metric resolution (milestone review 2026-07-25, finding A5) --------------------------
+
+def test_bare_t_never_substring_matches_a_gene_id_column():
+    """A table with no fold-change column must not rank on `entrezgene_id` because it contains 't'."""
+    import pandas as pd
+
+    from skills.gsea.run_real import _ranked
+
+    df = pd.DataFrame({
+        "GeneID": ["RHO", "ACTB", "GAPDH", "PDE6B", "RPGRIP1", "CRX"],
+        "entrezgene_id": [6010, 60, 2597, 5158, 57096, 1406],
+        "t": [8.1, -3.2, 0.4, 5.9, -6.7, 2.2],
+        "P.Value": [1e-9, 0.002, 0.7, 1e-5, 1e-7, 0.03],
+    })
+    ranked = _ranked(df, None)
+    # limma's moderated t is the ranking metric; the Entrez ids are not.
+    assert set(ranked["metric"]) == {8.1, -3.2, 0.4, 5.9, -6.7, 2.2}
+    assert ranked["metric"].iloc[0] == 8.1  # descending by signed metric
+
+
+def test_a_non_numeric_ranking_column_is_an_honest_error_not_a_garbage_ranking():
+    import pandas as pd
+    import pytest
+
+    from skills.gsea.run_real import _ranked
+
+    # `score` matches by substring but holds labels — coercion would leave nothing usable.
+    df = pd.DataFrame({
+        "gene": ["RHO", "ACTB", "GAPDH"],
+        "score_label": ["high", "low", "mid"],
+    })
+    with pytest.raises(ValueError, match="does not look like a ranking metric"):
+        _ranked(df, None)

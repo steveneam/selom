@@ -22,6 +22,25 @@ as a launch precondition. Nothing below is a backend blocker today.
   paid path; isolate or replace if non-commercial-only).
 - Output: a dependency license inventory with each package marked
   ship-clean / quarantine / replace.
+- **Nango — Elastic License 2.0 (non-OSI, source-available).** Verified at the
+  source on 2026-07-25 (`github.com/NangoHQ/nango` `LICENSE`); the npm packages
+  `@nangohq/frontend` / `@nangohq/types` (0.71.2) declare "SEE LICENSE IN LICENSE
+  FILE IN GIT REPOSITORY" and ship no license file of their own, so the repo's
+  ELv2 governs. Nango is on the shipped path in two places: the self-hosted
+  broker (`deploy/nango/`, image `nangohq/nango-server`) and the FE dependency.
+  **Assessment:** ELv2's operative restriction is *"You may not provide the
+  software to third parties as a hosted or managed service, where the service
+  provides users with access to any substantial set of the features or
+  functionality of the software."* Selom uses Nango **internally**, as its own
+  OAuth broker — users never get access to Nango's features, only to Selom's
+  cloud-import. That is permitted. It becomes a **blocker** only if Selom ever
+  exposes Nango itself (a connections dashboard, integration management, or the
+  Connect UI as a product surface). Two obligations that bind regardless:
+  **do not remove or obscure Nango's licensing/copyright notices**, and **do not
+  circumvent any license-key functionality**. Before launch: re-verify the
+  license (they have changed it before), confirm no Nango surface is exposed to
+  users, and record ELv2 in the dependency inventory rather than letting an SCA
+  scan flag it as an unknown-license surprise.
 - **LLM model license (AI gateway).** The live `gateway` path
   (`SELOM_AI_GATEWAY=gateway`) ships with whatever `ai_gateway_model` is set —
   default **`meta/llama-3.3-70b`**. The model is reached arms-length over the

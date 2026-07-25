@@ -97,3 +97,56 @@ def test_operator_compensation_matrix(fcs_path):
     figure, table = _run(fcs_path, {"x_channel": "FITC-A", "y_channel": "PE-A",
                                     "compensate": "matrix", "comp_matrix": comp})
     assert figure["data"] and table is not None
+
+
+# --- honest attribution + compensation outcome (milestone review 2026-07-25, A6/A7/A22/A28) ------
+
+def test_facs_methods_never_cite_flowkit_which_is_not_a_dependency():
+    """FlowKit pins pandas<3 and is deliberately NOT installed — citing it credits software that
+    never ran. The real dependencies (FlowIO, FlowUtils) must be the ones cited."""
+    import importlib.util
+
+    from companions import methods
+    from skills.registry import load_skill
+
+    assert importlib.util.find_spec("flowkit") is None, (
+        "flowkit is installed — this guard, the skill.json wording and RISKS #12 all assume it is not"
+    )
+    _text, cites = methods.build_body(load_skill("facs_gating"), {"gates": "rect x 0 1 y 0 1"})
+    joined = " ".join(cites)
+    assert "FlowKit" not in joined, f"FlowKit cited but not a dependency: {cites}"
+    assert "FlowIO" in joined and "FlowUtils" in joined
+    # The skill.json reference list must not attribute the compute to FlowKit either.
+    import json
+    import pathlib as _p
+
+    raw = json.loads((_p.Path(__file__).resolve().parents[1]
+                      / "skills/facs_gating/skill.json").read_text(encoding="utf-8"))
+    for ref in raw.get("references") or []:
+        blob = f"{ref.get('title', '')} {ref.get('note', '')}"
+        assert "FlowKit implements" not in blob, f"reference still credits FlowKit: {ref}"
+
+
+def test_facs_methods_state_the_compensation_OUTCOME_not_the_request():
+    """`compensate=auto` degrades to raw events when the FCS carries no usable $SPILLOVER. The prose
+    must say so rather than asserting a matrix was applied."""
+    from companions import methods
+    from skills.registry import load_skill
+
+    spec = load_skill("facs_gating")
+    params = {"compensate": "auto"}
+
+    applied, _ = methods.build_body(
+        spec, params, figure={"layout": {"meta": {"compensation_applied": True}}})
+    assert "($SPILLOVER) was applied" in applied
+    assert "NOT applied" not in applied
+
+    degraded, _ = methods.build_body(
+        spec, params, figure={"layout": {"meta": {"compensation_applied": False}}})
+    assert "NOT applied" in degraded
+    assert "uncompensated events are shown" in degraded
+
+    # A GatingML-conformance claim is not ours to make for clean-room geometry.
+    gated, _ = methods.build_body(spec, {"gates": "rect x 0 1 y 0 1"}, figure={"layout": {}})
+    assert "GatingML-compliant gating strategy" not in gated
+    assert "Selom's own geometry implementation" in gated
