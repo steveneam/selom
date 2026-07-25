@@ -175,6 +175,13 @@ def _value_at(t, sm, t_ms: float) -> tuple[float, float]:
     return float(t[i]), float(np.mean(sm[lo:hi]))
 
 
+# Whether the robust detector's pre-stimulus noise gate was cleared, or the windowed fallback fired
+# (A18). A fallback measurement is a real number that sat BELOW the noise gate — a reader must be
+# able to tell those apart from gate-clearing ones.
+GATE_CLEARED = "cleared"
+GATE_FALLBACK = "fallback"
+
+
 def _robust_auto_ab(t, arr, awin, bwin, fs, a_sm_ms, b_sm_ms):
     """Robust auto a-/b-wave seeds — the opt-in ``detector="robust"`` path for :func:`landmarks`.
 
@@ -186,7 +193,9 @@ def _robust_auto_ab(t, arr, awin, bwin, fs, a_sm_ms, b_sm_ms):
     Each falls back to the windowed argmax/argmin when nothing clears the gate (a flat/noise eye), so
     the peak-to-trough construction still reads near the noise floor. Returns the SAME five quantities
     the windowed path computes — ``(auto_a_t, auto_a_val, auto_b_trough, auto_b_t, auto_b_peak)`` — so
-    the caller's manual-override + return logic is shared verbatim between the two detectors."""
+    the caller's manual-override + return logic is shared verbatim between the two detectors, plus a
+    sixth: ``gate`` = ``{"a": "cleared"|"fallback", "b": …, "threshold_uv": …}``, so a reader can tell
+    which measurements cleared the noise gate and which came from the near-floor fallback (A18)."""
     import numpy as np
     from scipy.signal import find_peaks
 
@@ -212,8 +221,10 @@ def _robust_auto_ab(t, arr, awin, bwin, fs, a_sm_ms, b_sm_ms):
     gated = [p for p in peaks if seg_b[p] - base >= gate]
     if gated:
         bi = int(b_pos[max(gated, key=lambda p: seg_b[p])])
+        b_gate = GATE_CLEARED
     else:
         bi = int(b_pos[int(np.argmax(seg_b))])  # fallback: windowed-style argmax
+        b_gate = GATE_FALLBACK
     auto_b_t = float(t[bi])
     auto_b_peak = float(sm_b[bi])
 
@@ -230,13 +241,16 @@ def _robust_auto_ab(t, arr, awin, bwin, fs, a_sm_ms, b_sm_ms):
     gated_t = [q for q in troughs if base - seg_a[q] >= gate]
     if gated_t:
         ai = int(a_pos[min(gated_t, key=lambda q: seg_a[q])])
+        a_gate = GATE_CLEARED
     else:
         ai = int(a_pos[int(np.argmin(seg_a))])  # fallback: windowed-style argmin
+        a_gate = GATE_FALLBACK
     auto_a_t = float(t[ai])
     auto_a_val = float(sm_a[ai])
     # b subtracts from the a-window trough (ISCEV peak-to-trough), on the b-smoothed trace.
     auto_b_trough = float(np.min(sm_b[am]))
-    return auto_a_t, auto_a_val, auto_b_trough, auto_b_t, auto_b_peak
+    return (auto_a_t, auto_a_val, auto_b_trough, auto_b_t, auto_b_peak,
+            {"a": a_gate, "b": b_gate, "threshold_uv": round(gate, 3)})
 
 
 def landmarks(time_ms, y, fs: float = 5000.0, *, mode: str = "scotopic",
@@ -286,8 +300,10 @@ def landmarks(time_ms, y, fs: float = 5000.0, *, mode: str = "scotopic",
     # WOULD have placed each mark (`a_auto_t_ms`/`b_auto_t_ms`) alongside the operator's set time. The
     # `robust` detector (opt-in) swaps only these seeds for SavGol + prominence peak-picking with a
     # noise gate; the default `windowed` branch is the byte-identical legacy computation.
-    if str(detector or "windowed").lower() == "robust":
-        auto_a_t, auto_a_val, auto_b_trough, auto_b_t, auto_b_peak = _robust_auto_ab(
+    detector_name = "robust" if str(detector or "windowed").lower() == "robust" else "windowed"
+    gate = None
+    if detector_name == "robust":
+        auto_a_t, auto_a_val, auto_b_trough, auto_b_t, auto_b_peak, gate = _robust_auto_ab(
             t, arr, awin, bwin, fs, a_sm, b_sm)
     else:
         am = (t >= awin[0]) & (t <= awin[1])
@@ -334,7 +350,47 @@ def landmarks(time_ms, y, fs: float = 5000.0, *, mode: str = "scotopic",
         # regardless of any manual override — equal to a_t_ms/b_t_ms on the pure-auto path.
         "a_auto_t_ms": round(auto_a_t, 1),
         "b_auto_t_ms": round(auto_b_t, 1),
+        # WHICH detector produced those seeds, and (robust only) whether each mark cleared the
+        # pre-stimulus noise gate or came from the near-floor fallback. The robust path measures
+        # different amplitudes from the windowed one, so a published recipe that does not name it is
+        # not reproducible (A18); a `robust` figure's methods paragraph reads this.
+        "detector": detector_name,
+        **({"detector_gate": gate} if gate is not None else {}),
     }
+
+
+def detector_summary(landmark_results) -> dict | None:
+    """Figure-level a/b-detector disclosure from a set of :func:`landmarks` results, or ``None``.
+
+    ``None`` for the default windowed detector — it is exactly what the methods templates already
+    describe, so a windowed figure's ``layout.meta`` (and therefore its methods paragraph and its
+    golden) stays byte-identical. For ``robust`` it returns
+    ``{"name", "n_segments", "a_fallback", "b_fallback", "threshold_uv_max"}``: how many segments
+    were measured by the near-floor windowed fallback rather than by a gate-clearing deflection
+    (A18). One aggregator here rather than one per ERG runner.
+    """
+    robust = [lm for lm in landmark_results if lm and lm.get("detector") == "robust"]
+    if not robust:
+        return None
+    gates = [lm.get("detector_gate") or {} for lm in robust]
+    thresholds = [float(g.get("threshold_uv") or 0.0) for g in gates]
+    return {
+        "name": "robust",
+        "n_segments": len(robust),
+        "a_fallback": sum(1 for g in gates if g.get("a") == GATE_FALLBACK),
+        "b_fallback": sum(1 for g in gates if g.get("b") == GATE_FALLBACK),
+        "threshold_uv_max": round(max(thresholds), 3) if thresholds else 0.0,
+    }
+
+
+# --- "could not measure" is not "measured zero" (A17) ------------------------
+# Reserved reasons a measurement returns instead of a number. A 0.0 where the computation never ran
+# is a scientific claim the data does not back — for OPs specifically, ΣOP = 0 IS the reading that
+# indicates inner-retinal dysfunction.
+NOT_MEASURABLE_TRACE_TOO_SHORT = "trace_too_short"
+NOT_MEASURABLE_FILTER_FAILED = "filter_failed"
+NOT_MEASURABLE_WINDOW_TOO_SMALL = "window_too_small"
+NOT_MEASURABLE_BAND_UNAVAILABLE = "band_unavailable"
 
 
 # --- Oscillatory potentials (OPs) --------------------------------------------
@@ -358,39 +414,57 @@ def oscillatory_potentials(time_ms, y, fs: float = 5000.0, *, low_hz: float = 75
          "op_times_ms":      [t1, t2, …],      # implicit time of each OP peak
          "op_sum_uv":  ΣOP,                     # sum of the wavelet amplitudes
          "op_rms_uv":  RMS,                     # integrated RMS of the band-passed signal (TOP)
-         "n_ops":      k}                       # wavelets found (== len(op_amplitudes_uv))
+         "n_ops":      k,                       # wavelets found (== len(op_amplitudes_uv))
+         "measurable": True/False,              # did the band-pass actually run?
+         "reason":     None | why not}          # NOT_MEASURABLE_* when measurable is False
 
     ``window`` optionally restricts the analysis to ``(lo_ms, hi_ms)`` (peaks + RMS measured there);
     default = the whole trace. ``high_hz`` is clamped just under Nyquist for low sample rates.
-    Degrades honestly to an all-zero / empty result (never raises) when the trace is too short to
-    filter or carries no OP-band deflection — a plain slow b-wave with no wavelets reads ≈ 0."""
+
+    **Never-measured is not zero (A17).** This used to return ``op_sum_uv=0.0`` / ``op_rms_uv=0.0``
+    for three distinct situations — a trace too short to band-pass, a filter that could not run, and
+    a window with too few samples — all of which are "could not measure". A ΣOP of 0 is a scientific
+    CLAIM of zero oscillatory activity, the reading that indicates inner-retinal dysfunction, and a
+    group mean over eyes would silently absorb unmeasurable traces as zeros. Those cases now return
+    ``op_sum_uv``/``op_rms_uv`` of ``None`` with ``measurable=False`` and a ``reason``; ``0.0`` is
+    reserved for a trace that filtered successfully and carried no OP-band deflection (a plain slow
+    b-wave — a real, measured zero). Still never raises.
+
+    :func:`op_group_mean` is the honest aggregator over a set of these results."""
     import numpy as np
     from scipy.signal import butter, find_peaks, sosfiltfilt
 
     t = np.asarray(time_ms, dtype=float)
     arr = np.asarray(y, dtype=float)
     n = arr.size
-    empty = {"op_amplitudes_uv": [], "op_times_ms": [], "op_sum_uv": 0.0,
-             "op_rms_uv": 0.0, "n_ops": 0}
+
+    def _not_measurable(reason):
+        return {"op_amplitudes_uv": [], "op_times_ms": [], "op_sum_uv": None,
+                "op_rms_uv": None, "n_ops": 0, "measurable": False, "reason": reason}
+
     nyq = 0.5 * float(fs)
     hi = min(float(high_hz), nyq * 0.99)
     if n < 24 or nyq <= 0 or low_hz <= 0 or hi <= low_hz:
-        return empty
+        return _not_measurable(NOT_MEASURABLE_TRACE_TOO_SHORT if n < 24
+                               else NOT_MEASURABLE_BAND_UNAVAILABLE)
     sos = butter(int(order), [float(low_hz) / nyq, hi / nyq], btype="band", output="sos")
     try:
         band = sosfiltfilt(sos, arr)
     except ValueError:
-        return empty  # signal shorter than the filter padding → not measurable
+        # signal shorter than the filter padding → the band-pass never ran
+        return _not_measurable(NOT_MEASURABLE_FILTER_FAILED)
     wm = ((t >= float(window[0])) & (t <= float(window[1]))) if window is not None \
         else np.ones(t.shape, dtype=bool)
     if int(wm.sum()) < 5:
-        return empty
+        return _not_measurable(NOT_MEASURABLE_WINDOW_TOO_SMALL)
     tw, bw = t[wm], band[wm]
     rms = float(np.sqrt(np.mean(bw ** 2)))
     peaks, props = find_peaks(bw, prominence=1e-9)
     troughs, _ = find_peaks(-bw)
     if peaks.size == 0:
-        return {**empty, "op_rms_uv": round(rms, 3)}
+        # The band-pass RAN and found no wavelet: a real, measured zero (not "unknown").
+        return {"op_amplitudes_uv": [], "op_times_ms": [], "op_sum_uv": 0.0,
+                "op_rms_uv": round(rms, 3), "n_ops": 0, "measurable": True, "reason": None}
     # Keep the n_ops most prominent wavelets, then order them in time (OP1…OPk).
     keep = np.argsort(props["prominences"])[::-1][: max(1, int(n_ops))]
     sel = np.sort(peaks[keep])
@@ -405,7 +479,36 @@ def oscillatory_potentials(time_ms, y, fs: float = 5000.0, *, low_hz: float = 75
         times.append(round(float(tw[p]), 2))
     return {"op_amplitudes_uv": amps, "op_times_ms": times,
             "op_sum_uv": round(float(sum(amps)), 3), "op_rms_uv": round(rms, 3),
-            "n_ops": len(amps)}
+            "n_ops": len(amps), "measurable": True, "reason": None}
+
+
+# Human-readable labels for the not-measurable reasons — what a table cell or a methods sentence
+# says instead of a number, so "not measurable" never renders as 0.
+NOT_MEASURABLE_LABELS = {
+    NOT_MEASURABLE_TRACE_TOO_SHORT: "trace too short to band-pass",
+    NOT_MEASURABLE_FILTER_FAILED: "band-pass filter could not run on this trace",
+    NOT_MEASURABLE_WINDOW_TOO_SMALL: "analysis window carried too few samples",
+    NOT_MEASURABLE_BAND_UNAVAILABLE: "sample rate too low for the OP band",
+}
+
+
+def op_group_mean(results, key: str = "op_sum_uv") -> dict:
+    """Mean of an OP metric over a set of :func:`oscillatory_potentials` results — EXCLUDING the
+    unmeasurable ones, and saying how many it excluded.
+
+    The aggregation half of A17: a mean that treats "could not measure" as 0.0 silently drags a
+    group towards the reading that indicates inner-retinal dysfunction. Returns
+    ``{"mean", "n", "n_not_measurable", "reasons"}`` with ``mean=None`` when nothing was measurable
+    — an honest blank, never a fabricated zero.
+    """
+    vals = [r.get(key) for r in results if r and r.get("measurable") and r.get(key) is not None]
+    skipped = [r.get("reason") for r in results if r and not r.get("measurable")]
+    return {
+        "mean": (round(float(sum(vals)) / len(vals), 3) if vals else None),
+        "n": len(vals),
+        "n_not_measurable": len(skipped),
+        "reasons": sorted({r for r in skipped if r}),
+    }
 
 
 # --- Photopic negative response (PhNR) ---------------------------------------
@@ -632,6 +735,12 @@ def metrics_from_waveforms(df, *, default_mode: str = "scotopic", marks: dict | 
         rec["b_wave_uv"] = lm["b_wave_uv"]
         rec["a_source"] = lm["a_source"]
         rec["b_source"] = lm["b_source"]
+        # A18 — carry the detector + its per-segment noise-gate outcome through to the runner, which
+        # aggregates them with `detector_summary` into the figure's disclosure. Written ONLY under
+        # the opt-in `robust` detector, so the default frame keeps exactly the columns it had.
+        if lm.get("detector") == "robust":
+            rec["detector"] = lm["detector"]
+            rec["detector_gate"] = lm.get("detector_gate")
         for c in carry:
             vals = seg[c].dropna()
             rec[c] = vals.iloc[0] if not vals.empty else None

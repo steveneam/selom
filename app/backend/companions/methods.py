@@ -611,6 +611,45 @@ def _erg_adaptation(p: dict) -> str:
     return "photopic" if str(p.get("adaptation", "auto")).strip().lower() == "photopic" else "scotopic"
 
 
+def _erg_ab_detector(p: dict) -> str:
+    """The sentence that makes a ``robust``-detector measurement reproducible (A18).
+
+    ``ab_detector`` selects a materially DIFFERENT measurement: ``robust`` seeds the landmarks with
+    Savitzky-Golay smoothing plus prominence-gated peak picking behind a noise gate at 2 × 1.96 × SD
+    of the pre-stimulus baseline, falling back to the windowed extremum when nothing clears it — so
+    the a-/b-wave amplitudes and implicit times it produces differ from the default windowed path. A
+    reader given only the windowed construction cannot reproduce numbers made under ``robust``.
+
+    Returns "" for the default detector: the existing prose already describes it exactly, so every
+    windowed figure's methods paragraph stays byte-identical.
+    """
+    if str(p.get("ab_detector", "windowed")).strip().lower() != "robust":
+        return ""
+    txt = (
+        " Landmarks were seeded by the robust detector: the trace was smoothed with a second-order "
+        "Savitzky-Golay filter and the a-/b-wave were picked as prominence-gated extrema clearing a "
+        "noise gate of 2 x 1.96 x SD of the pre-stimulus baseline, falling back to the windowed "
+        "extremum when no deflection cleared that gate."
+    )
+    # Which measurements actually sat at the noise floor, when the runner recorded it
+    # (``layout.meta.ab_detector``, lifted by ``build_body``). Absent — a litsynth replay from
+    # recorded params only — the sentence stops at the construction rather than claiming an outcome.
+    d = p.get("_ab_detector")
+    if isinstance(d, dict) and d.get("n_segments"):
+        n = int(d["n_segments"])
+        fell = [(role, int(d.get(f"{role}_fallback") or 0)) for role in ("a", "b")]
+        named = [f"the {role}-wave in {k} of {n}" for role, k in fell if k]
+        if named:
+            joined = " and ".join(named)
+            txt += (f" {joined[0].upper()}{joined[1:]} measured segment(s) did not clear that gate and were "
+                    f"measured by the windowed fallback, i.e. at the noise floor "
+                    f"(gate {float(d.get('threshold_uv_max') or 0.0):g} uV).")
+        else:
+            txt += (f" All landmarks in all {n} measured segment(s) cleared that gate "
+                    f"(gate {float(d.get('threshold_uv_max') or 0.0):g} uV).")
+    return txt
+
+
 def _erg_traces(p: dict):
     filtered = str(p.get("filter", True)).lower() not in ("false", "0", "no")
     lp = float(p.get("lowpass_hz", 120.0) or 120.0)
@@ -632,7 +671,7 @@ def _erg_traces(p: dict):
             "light-adapted flashes; sweeps were averaged within each step and baseline-corrected to "
             f"the pre-stimulus mean. {display}the b-wave was measured from the cornea-negative "
             "trough to the following cornea-positive peak (the cone a-wave is small or absent under "
-            f"photopic conditions). {representative}"
+            f"photopic conditions).{_erg_ab_detector(p)} {representative}"
         )
         return text, [ISCEV]
     ladder = ", ".join(f"{v:g}" for v in _erg.INTENSITIES_LOG)
@@ -642,7 +681,7 @@ def _erg_traces(p: dict):
         f"(e.g. {ladder} log cd·s/m²); sweeps were averaged within each intensity and "
         f"baseline-corrected to the pre-stimulus mean. {display}the a-wave was measured from "
         "baseline to the initial cornea-negative trough and the b-wave from that trough to the "
-        f"following cornea-positive peak. {representative}"
+        f"following cornea-positive peak.{_erg_ab_detector(p)} {representative}"
     )
     return text, [ISCEV]
 
@@ -654,7 +693,7 @@ def _erg_bwave_bar(p: dict):
         "Each bar shows the group mean with the standard error of the mean, and every eye is overlaid "
         "as an individual data point. Amplitudes were measured as the trough-to-peak b-wave on "
         "baseline-corrected, intensity-averaged traces; cataractous or failed-acquisition eyes were "
-        "excluded."
+        f"excluded.{_erg_ab_detector(p)}"
     )
     return text, [ISCEV]
 
@@ -675,7 +714,7 @@ def _erg_intensity_response(p: dict):
         "condition with the Naka-Rushton function V = Vmax·Iⁿ/(Iⁿ + Kⁿ), where I is flash energy, "
         f"Vmax the saturated amplitude, K the semi-saturation intensity and n the slope; {slope_txt} "
         "by bounded non-linear least-squares regression (SciPy). Conditions whose response did not "
-        "support a saturating fit were left unfit."
+        f"support a saturating fit were left unfit.{_erg_ab_detector(p)}"
     )
     return text, [ISCEV, NAKA_RUSHTON, SCIPY]
 
@@ -882,6 +921,8 @@ def build_body(spec: SkillSpec, params: dict, figure: dict | None = None) -> tup
         resolved["_transform"] = meta["transform"]     # A15 — the resolved gate space
     if meta.get("gates_unresolved"):
         resolved["_gates_unresolved"] = list(meta["gates_unresolved"])  # A16 — populations not counted
+    if isinstance(meta.get("ab_detector"), dict):
+        resolved["_ab_detector"] = meta["ab_detector"]  # A18 — which ERG detector, and its gate
     builder = _TEMPLATES.get(spec.id)
     return builder(resolved) if builder else _generic(spec, resolved)
 

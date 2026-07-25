@@ -50,6 +50,7 @@ def run(data_path: str, params: dict) -> dict:
     # measure-from-traces path (device markers stay authoritative when a metrics table is supplied).
     manual_marks = _erg.parse_manual_marks(params.get("manual_marks", ""))
     measured_from_traces = False
+    ab_meta = None
     if value_col not in df.columns and {"time_ms", "voltage_uv"}.issubset(df.columns):
         # Cone-aware a/b: photopic (light-adapted) responses are faster, so the cone landmark
         # windows must measure them (the scotopic b-window would miss an early cone b-wave). The
@@ -61,6 +62,9 @@ def run(data_path: str, params: dict) -> dict:
         ab_detector = str(params.get("ab_detector", "windowed")).strip().lower()
         df = _erg.metrics_from_waveforms(df, default_mode=default_mode, marks=manual_marks,
                                          detector=ab_detector)
+        # A18 — the opt-in robust detector measures DIFFERENT amplitudes; the recipe must name it.
+        # None for the windowed default, so nothing is written and the figure stays byte-identical.
+        ab_meta = _erg.detector_summary(df.to_dict("records"))
         measured_from_traces = True
 
     for col in ("condition", "intensity_group", value_col):
@@ -139,6 +143,8 @@ def run(data_path: str, params: dict) -> dict:
         prov = _erg.operator_adjusted_note(n_manual, len(plotted))
     spec["table"] = table(["condition", "n (eyes)", f"mean {wave_label} ({unit})", f"{err_label} ({unit})"],
                           tbl_rows, title=f"ERG {wave_label} (mean ± {err_label}, {source}{prov})")
+    if ab_meta is not None:
+        spec["layout"].setdefault("meta", {})["ab_detector"] = ab_meta
     return spec
 
 

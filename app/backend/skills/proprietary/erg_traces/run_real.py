@@ -128,6 +128,7 @@ def run(data_path: str, params: dict) -> dict:
     # Per-run mark provenance (erg-manual-marks R6): one entry per a/b marker per cell, aggregating
     # the auto seed time, the finally-measured time, and whether the operator moved it.
     prov_log: list = []
+    lm_log: list = []   # every landmarks() result, for the a/b-detector disclosure (A18)
     for cond in order:
         cd = df[df["condition"] == cond]
         color = color_of[cond]
@@ -190,6 +191,7 @@ def run(data_path: str, params: dict) -> dict:
             panel["mark_meta"] = [a_meta, b_meta]
             prov_log.append(_erg.provenance_entry(seg, "a", lm["a_auto_t_ms"], lm["a_t_ms"], lm["a_source"]))
             prov_log.append(_erg.provenance_entry(seg, "b", lm["b_auto_t_ms"], lm["b_t_ms"], lm["b_source"]))
+            lm_log.append(lm)   # A18 — figure-level detector disclosure (robust only)
             if show_marks:
                 panel["markers"] = [
                     {"x": lm["a_t_ms"], "y": _y_at(panel["x"], panel["y"], lm["a_t_ms"]),
@@ -240,6 +242,11 @@ def run(data_path: str, params: dict) -> dict:
     n_moved = sum(1 for e in prov_log if e["moved"])
     if n_moved:
         spec["layout"].setdefault("meta", {}).setdefault("selom", {})["markProvenance"] = prov_log
+    # a/b-detector disclosure (A18): the opt-in `robust` detector measures DIFFERENT amplitudes from
+    # the windowed default, so the recipe must name it. None for `windowed` → byte-identical default.
+    ab_meta = _erg.detector_summary(lm_log)
+    if ab_meta is not None:
+        spec["layout"].setdefault("meta", {})["ab_detector"] = ab_meta
     spec["table"] = table(
         ["condition", "intensity (log cd·s/m²)", f"b-wave ({unit})", f"a-wave ({unit})",
          "b-wave t (ms)"],

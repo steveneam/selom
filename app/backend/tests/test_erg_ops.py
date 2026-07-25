@@ -62,10 +62,64 @@ def test_oscillatory_potentials_low_fs_clamps_and_short_is_empty():
     t, y = _trace(400.0, with_op=True, op_hz=90.0)
     ops = _erg.oscillatory_potentials(t, y, fs=400.0)
     assert isinstance(ops, dict) and "op_sum_uv" in ops
-    # Too few samples to filter → honest empty result (never raises).
+    # Too few samples to filter → NOT MEASURABLE (never raises, and never a fabricated 0.0).
     empty = _erg.oscillatory_potentials([0.0, 1.0, 2.0], [0.0, 1.0, 0.0], fs=2000.0)
-    assert empty == {"op_amplitudes_uv": [], "op_times_ms": [], "op_sum_uv": 0.0,
-                     "op_rms_uv": 0.0, "n_ops": 0}
+    assert empty == {"op_amplitudes_uv": [], "op_times_ms": [], "op_sum_uv": None,
+                     "op_rms_uv": None, "n_ops": 0, "measurable": False,
+                     "reason": _erg.NOT_MEASURABLE_TRACE_TOO_SHORT}
+
+
+# --- A17: "could not measure" is not "measured zero" -------------------------------------------
+# ΣOP = 0 is a scientific CLAIM of zero oscillatory activity — the reading that indicates
+# inner-retinal dysfunction. Three unmeasurable situations used to return exactly that number, and
+# a group mean over eyes would have absorbed them as zeros.
+
+def test_a_measured_zero_and_an_unmeasurable_trace_are_distinguishable():
+    t0, y0 = _trace(2000.0, with_op=False)
+    measured_zero = _erg.oscillatory_potentials(t0, y0, fs=2000.0)
+    unmeasurable = _erg.oscillatory_potentials([0.0, 1.0, 2.0], [0.0, 1.0, 0.0], fs=2000.0)
+
+    # the band-pass RAN on the plain b-wave: a real, tiny reading with measurable=True
+    assert measured_zero["measurable"] is True and measured_zero["reason"] is None
+    assert measured_zero["op_sum_uv"] is not None and measured_zero["op_rms_uv"] is not None
+    # it never ran on the 3-sample trace: no number is claimed at all
+    assert unmeasurable["measurable"] is False
+    assert unmeasurable["op_sum_uv"] is None and unmeasurable["op_rms_uv"] is None
+    assert unmeasurable["reason"] in _erg.NOT_MEASURABLE_LABELS
+
+
+def test_every_not_measurable_path_says_which_one():
+    t, y = _trace(2000.0, with_op=True)
+    # 1. trace too short to band-pass
+    assert (_erg.oscillatory_potentials(t[:8], y[:8], fs=2000.0)["reason"]
+            == _erg.NOT_MEASURABLE_TRACE_TOO_SHORT)
+    # 2. sample rate too low for the OP band (Nyquist below the 75 Hz lower edge)
+    assert (_erg.oscillatory_potentials(t, y, fs=100.0)["reason"]
+            == _erg.NOT_MEASURABLE_BAND_UNAVAILABLE)
+    # 3. an analysis window carrying fewer than 5 samples
+    assert (_erg.oscillatory_potentials(t, y, fs=2000.0, window=(50.0, 50.4))["reason"]
+            == _erg.NOT_MEASURABLE_WINDOW_TOO_SMALL)
+    # every reason renders as words, never as a bare token or a 0
+    for r in (_erg.NOT_MEASURABLE_TRACE_TOO_SHORT, _erg.NOT_MEASURABLE_FILTER_FAILED,
+              _erg.NOT_MEASURABLE_WINDOW_TOO_SMALL, _erg.NOT_MEASURABLE_BAND_UNAVAILABLE):
+        assert _erg.NOT_MEASURABLE_LABELS[r]
+
+
+def test_group_mean_excludes_unmeasurable_eyes_instead_of_absorbing_them_as_zero():
+    """The downstream half: a mean over eyes must not be dragged toward dysfunction by traces the
+    filter never ran on."""
+    t, y = _trace(2000.0, with_op=True)
+    real = _erg.oscillatory_potentials(t, y, fs=2000.0)
+    dead = _erg.oscillatory_potentials([0.0, 1.0, 2.0], [0.0, 1.0, 0.0], fs=2000.0)
+
+    g = _erg.op_group_mean([real, real, dead])
+    assert g["n"] == 2 and g["n_not_measurable"] == 1
+    assert g["mean"] == _approx(real["op_sum_uv"], rel=1e-6)   # NOT (2*ΣOP + 0)/3
+    assert g["reasons"] == [_erg.NOT_MEASURABLE_TRACE_TOO_SHORT]
+
+    # nothing measurable → an honest blank, never 0.0
+    none_at_all = _erg.op_group_mean([dead, dead])
+    assert none_at_all["mean"] is None and none_at_all["n"] == 0
 
 
 def _approx(v, rel=1e-3):

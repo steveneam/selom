@@ -79,6 +79,7 @@ def run(data_path: str, params: dict) -> dict:
     # intensity-response runs without a separate device-metrics CSV (closes the other half of the
     # materialize gap, mirroring erg_bwave_bar). Device markers win when a metrics table is supplied.
     measured_from_traces = False
+    ab_meta = None
     if value_col not in df.columns and {"time_ms", "voltage_uv"}.issubset(df.columns):
         # Cone-aware a/b (per-row stimulus_type wins; this default = the user's adaptation hint for a
         # plain waveform CSV) — photopic responses are faster, so they need the cone landmark windows.
@@ -89,6 +90,9 @@ def run(data_path: str, params: dict) -> dict:
         ab_detector = str(params.get("ab_detector", "windowed")).strip().lower()
         df = _erg.metrics_from_waveforms(df, default_mode=default_mode, marks=marks,
                                          detector=ab_detector)
+        # A18 — the opt-in robust detector measures DIFFERENT amplitudes; the recipe must name it.
+        # None for the windowed default, so nothing is written and the figure stays byte-identical.
+        ab_meta = _erg.detector_summary(df.to_dict("records"))
         measured_from_traces = True
 
     missing = (_REQUIRED | {value_col}) - set(df.columns)
@@ -159,4 +163,6 @@ def run(data_path: str, params: dict) -> dict:
     spec["table"] = table(
         ["condition", f"Vmax ({unit})", "log K (cd·s/m²)", "n", "R²"], tbl_rows,
         title="Naka-Rushton fit" + prov)
+    if ab_meta is not None:
+        spec["layout"].setdefault("meta", {})["ab_detector"] = ab_meta
     return spec
