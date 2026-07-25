@@ -37,8 +37,10 @@ import { applyDendrogramTips, hasDendrogram } from "@/lib/heatmap/dendrogram";
 import type { MarkRole } from "@/lib/erg/marks";
 import type { VolcanoThresholds } from "@/lib/volcano/thresholds";
 import { pointFromClick, type GeneLabelPoint } from "@/lib/volcano/labels";
+import { observeContainerResize, resizeGraphDiv } from "@/lib/figure/plot-resize";
 
-type GraphDiv = {
+/** Plotly's graph div: a real element, extended by plotly with an EventEmitter surface. */
+type GraphDiv = HTMLElement & {
   on?: (ev: string, cb: (e: unknown) => void) => void;
   removeListener?: (ev: string, cb: (e: unknown) => void) => void;
 };
@@ -420,6 +422,22 @@ export function FigureCanvas({
     dendroTipDisposeRef.current = null;
     gdRef.current = null;
   }, []);
+
+  // Reflow when the CONTAINER resizes, not just the window (W-1, lib/figure/plot-resize). Plotly's
+  // responsive mode only hears `window.resize`, so collapsing a rail grew the artboard by 208px and
+  // the plot by zero. Bound HERE — the one component every host renders (CanvasShell, the classic
+  // EditorWorkspace, /extract, the compare panes, the figure-data preview) — for the same reason
+  // `artboardFrame()` is shared: two hosts holding the same rule drift apart.
+  // Responsive figures only: a fixed-size figure's size is a property of the FIGURE (an ERG trace
+  // grid), so it keeps its declared size and the stage scrolls instead.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (fixed || !el) return;
+    return observeContainerResize(el, () => {
+      const gd = gdRef.current;
+      if (gd?.isConnected) void resizeGraphDiv(gd);
+    });
+  }, [fixed]);
 
   const config = useMemo(() => {
     // Zoom + pan stay as modebar buttons by default (a mode the user presses); a figure may drop

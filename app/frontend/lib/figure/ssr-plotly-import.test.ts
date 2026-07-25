@@ -43,6 +43,18 @@ function collectSources(dir: string, out: string[] = []): string[] {
 const BAD_IMPORT =
   /^import\s+(?!type\b)[^;]*?\bfrom\s*["'](?:plotly\.js|react-plotly\.js)[^"']*["']/gm;
 
+// The dynamic form — `import("plotly.js/…")` / `import("react-plotly.js")`. SSR-safe only while
+// it is never evaluated during a server render, which is a property of the CALL SITE, not of the
+// import. So the escape hatch is bounded by an allow-list of files rather than left open: a new
+// dynamic plotly import anywhere else fails here and has to be argued for on purpose.
+const DYNAMIC_IMPORT = /\bimport\(\s*["'](?:plotly\.js|react-plotly\.js)[^"']*["']\s*\)/g;
+const DYNAMIC_ALLOWED = [
+  // The canvas itself — `dynamic(() => import("react-plotly.js"), { ssr:false })`.
+  "components/figure/figure-canvas.tsx",
+  // The container-reflow helper (W-1) — imported inside a ResizeObserver callback, browser-only.
+  "lib/figure/plot-resize.ts",
+];
+
 describe("SSR-safe Plotly imports", () => {
   const files = SCAN_DIRS.flatMap((d) => collectSources(path.join(ROOT, d)));
 
@@ -58,6 +70,26 @@ describe("SSR-safe Plotly imports", () => {
       if (hits) offenders.push(`${path.relative(ROOT, file)} → ${hits.join(" | ")}`);
     }
     expect(offenders).toEqual([]);
+  });
+
+  it("confines dynamic plotly imports to the two files allowed to have them", () => {
+    const offenders: string[] = [];
+    for (const file of files) {
+      const rel = path.relative(ROOT, file).replace(/\\/g, "/");
+      if (DYNAMIC_ALLOWED.includes(rel)) continue;
+      const hits = fs.readFileSync(file, "utf8").match(DYNAMIC_IMPORT);
+      if (hits) offenders.push(`${rel} → ${hits.join(" | ")}`);
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("resolves the container-reflow helper's plotly lazily, never at module scope", () => {
+    const src = fs.readFileSync(path.join(ROOT, "lib", "figure", "plot-resize.ts"), "utf8");
+    // The import must sit inside a function body. A top-level `await import(…)` would be evaluated
+    // on the server the moment the module is pulled into a page's graph — the exact 500 the
+    // static-import rule above exists to prevent, reintroduced through the dynamic form.
+    expect(src).toMatch(/import\("plotly\.js\/dist\/plotly"\)/);
+    expect(src).not.toMatch(/^\s*(?:const|let|var|await|export)\b[^\n]*\bimport\(["']plotly/m);
   });
 
   it("FigureCanvas keeps plotly.js type-only and loads react-plotly.js via dynamic(ssr:false)", () => {

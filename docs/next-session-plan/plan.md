@@ -15,7 +15,9 @@ its status flip land in the SAME commit*, and the commit message names the ID. A
 mirror the open rows into harness tasks (`TaskCreate`); the durable record stays here, because
 harness tasks do not survive the session.
 
-Status vocabulary: `TODO` · `WIP` · `DONE <sha>` · `BLOCKED <on what>` · `DROPPED <why>`.
+Status vocabulary: `TODO` · `WIP` · `DONE <sha>` · `BLOCKED <on what>` · `DROPPED <why>`. A flip that
+lands in the same commit as its fix cannot carry that commit's own sha — write `DONE` and find it
+with `git log --grep=<ID>`, which is exactly why the commit message must name the ID.
 
 **Owner-directed: run this SEQUENTIALLY. No worktree lanes** (owner, 2026-07-25). Lane tooling stays
 ready (`scripts/worktree-setup.sh`, `scripts/lane-status.sh`) if a later sprint wants it.
@@ -69,16 +71,16 @@ flow branches on `mockMode`, the real branch is untested until a real run exerci
 Measured at 1280×800 on merged `main` with a real volcano
 (`agent_handoff/lane-wraps/lane3.md` §RESULTS · `e2e/browser-verify/remedy-sizing.spec.ts`):
 
-| state | artboard card | plotting area |
-|---|---|---|
-| as shipped | 266px | **90px** |
-| workrail collapsed | 474px (+208) | **90px (+0)** |
-| + a window-resize event | 474px | 295px (+205) |
+| state | artboard card | plotting area (before `W-1`) | plotting area (after `W-1`) |
+|---|---|---|---|
+| as shipped | 266px | **90px** | 90px |
+| workrail collapsed | 474px (+208) | **90px (+0)** | **294px (+204)** |
+| + a window-resize event | 474px | 295px (+205) | 294px (**+0** — nothing left to fix) |
 
-§D's own target is ~506px of plot. Two independent defects, and the second is invisible until the
-first is fixed.
+§D's own target is ~506px of plot. Two independent defects, and the second was invisible until the
+first was fixed. `W-1` is now fixed and its gate is green; the remaining 212px is `Q-1`/`W-2`.
 
-### `W-1` — a figure must reflow when its CONTAINER resizes · Status: `TODO`
+### `W-1` — a figure must reflow when its CONTAINER resizes · Status: `DONE`
 
 - **Goal.** When the artboard's container changes size without the window changing size, the figure
   re-lays-out to fill it.
@@ -108,8 +110,33 @@ first is fixed.
   nudge must add little or nothing. Then `scripts/verify.sh`.
 - **Source.** `af6f16e` · `e2e/browser-verify/remedy-sizing.spec.ts` · proposal §3.4.
 - **Out of scope.** Deciding which chrome yields space — that is `Q-1`/`W-2`.
+- **Shipped.** A `ResizeObserver` in `lib/figure/plot-resize.ts`, wired in `FigureCanvas` — the one
+  component every host renders, so the CanvasShell, the classic `EditorWorkspace`, `/extract`, the
+  compare panes and the figure-data preview all got it from one place. rAF-coalesced; the observer's
+  first callback and any no-change callback are ignored (a Plotly re-layout re-draws every trace and
+  churns a WebGL context, so firing on every callback would trade one defect for a subtler one).
+  Responsive figures only — a fixed-size figure keeps its declared size, and Plotly's own
+  `Plots.resize` early-returns there too, so the rule holds in two places.
+  **Measured, not reasoned:** +204px from the collapse alone, +0px from the nudge (table above).
+  `remedy-sizing.spec.ts` was upgraded from evidence to a **regression gate** — it now asserts both
+  halves, because "the plot grew" alone stays green on the nudge even if the container path dies.
+  Two guards extended in the same change: `ssr-plotly-import.test.ts` now bounds *dynamic* plotly
+  imports to an allow-list of two files and pins the new one's import to a function body (a top-level
+  `await import` would 500 every page — the static-import rule reintroduced through the dynamic
+  form), and `lib/figure/plot-resize.test.ts` pins the negative the browser can't cheaply prove.
+- **Not measured, and honest about it:** the fixed-size branch (an ERG trace grid keeps its declared
+  size) is held by an explicit `if (fixed) return` plus Plotly's own early return, but no browser run
+  exercised it — the harness fixture is a responsive volcano. `/extract` inherits the fix
+  structurally; **`V-1` measures it directly.**
 
-### `Q-1` — FOUNDER QUESTION: which fixed chrome yields, and how? · Status: `TODO — ask first`
+### `Q-1` — FOUNDER QUESTION: which fixed chrome yields, and how? · Status: `ANSWERED — spec owed`
+
+> **Owner, 2026-07-25: (a) make the inspector dock collapsible — with auto-collapse below a width
+> threshold — AND (b) zoom-to-fit + a zoom-% control.** Explicitly NOT (c) folding the tools rail
+> away (see `Q-2`) and NOT (d) accepting 1280 as degraded: **1280 stays a supported width**, so
+> `W-2`'s acceptance number is not being renegotiated downward. Recorded in
+> `agent_handoff/DECISIONS.md`. The spec at `docs/editor-room/spec.md` is still owed and still
+> pauses for review before any `W-2` code.
 
 - **Goal.** An owner decision on the layout model, before any code.
 - **Context.** Even with the workrail collapsed *and* `W-1` fixed, the plot reaches 295px against a
@@ -126,10 +153,19 @@ first is fixed.
   `docs/editor-room/spec.md` written and paused for review before implementation.
 - **Source.** proposal §3.3/§3.4 · lane3 §RESULTS.
 
-### `W-2` — give the figure room (implements `Q-1`) · Status: `BLOCKED on Q-1`
+### `W-2` — give the figure room (implements `Q-1`) · Status: `BLOCKED on the editor-room spec`
 
-- **Acceptance criteria.** At 1280×800 the plotting area reaches the ~506px §D assumed — or the owner
-  has explicitly accepted a lower number together with a stated supported-minimum width.
+- **Scope, now that `Q-1` is answered.** (1) a collapse control on the inspector dock + auto-collapse
+  below a width threshold; (2) zoom-to-fit + a zoom-% control in the top strip (today a static hint
+  line); (3) drop the inspector-dock "Edit a copy" duplicate while in there (`Q-2`.2). The tools
+  rail's 48px is **not** available — the owner kept it as a placeholder.
+- **The arithmetic to beat.** After `W-1`, 1280×800 gives the plot 294px with the workrail collapsed
+  and 90px without. The dock is 330px. Collapsing it is worth ~330px on top — which clears the 506px
+  target with the workrail expanded, so **the two collapses must not be required together**; the
+  spec should say which state is the default at 1280.
+- **Acceptance criteria.** At 1280×800 the plotting area reaches the ~506px §D assumed. The owner
+  declined "accept 1280 as degraded", so **1280 stays a supported width** and the target is not to be
+  renegotiated downward without a fresh decision.
 - **Verify.** `scripts/browser-verify.sh d5`. The `D-5 (also-confirm)` test currently FAILS at 90px
   and **is** the acceptance gate: it must go green, or its threshold must be changed deliberately, to
   the owner's number, with a comment saying whose decision it was.
@@ -199,17 +235,21 @@ first is fixed.
   ours. The direct-link flow works, so a *new* user cannot self-serve a connection until it lands.
   Do not wait on it — note it and proceed with the direct link.
 
-### `Q-2` — FOUNDER CALLS from the browser sweep · Status: `TODO — ask`
+### `Q-2` — FOUNDER CALLS from the browser sweep · Status: `ANSWERED`
 
-Two measured facts that are judgement calls, not defects. Put both to the owner; fix neither
-unilaterally.
+Two measured facts that were judgement calls, not defects. Both put to the owner 2026-07-25;
+recorded in `agent_handoff/DECISIONS.md`.
 
 1. **The tools rail ships as a one-button column** — 48px wide holding exactly one always-pressed
    `Select` button (`aria-pressed=true`), which is 48px of the 266px the hero gets at 1280. Same
    "fixed chrome must justify its pixels" question the palette strip failed, except this one is not
-   inert, just very thin. Folding it away is option (c) in `Q-1`.
+   inert, just very thin. → **KEEP as a placeholder** (owner): it signals the four-region model and
+   fills up when Track C's draw tools land. So the 48px is **not** available to `W-2`.
 2. **"Edit a copy" appears twice on one screen** for a frozen figure — once in the frozen command
-   cluster, once in the inspector dock. One action, two affordances.
+   cluster, once in the inspector dock. One action, two affordances. → **Keep the command-cluster
+   one, drop the inspector-dock duplicate** (owner). Note the reinforcing reason: the dock is the
+   panel `Q-1` makes collapsible, and an action must not vanish with a panel. **Do this inside
+   `W-2`**, which is already editing the dock — a separate pass would touch the same file twice.
 
 ---
 
