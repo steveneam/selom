@@ -211,7 +211,7 @@ should be restated so the register keeps meaning what it says. [[ask-before-dock
 | ID | Item | Status |
 |---|---|---|
 | OH-13 | `agent_handoff/on-hold/README.md` still frames its gates as Windows Docker/WSL constraints; the box is Linux with Docker installed. Rewrite the "Why gated" column so the register states real reasons. | TODO |
-| OH-14 | Memory `[[selom-multisample-scrna-assemble]]` says "parked, on-hold P1" — it **shipped** in `11a115f`. Correct the memory (its remaining gap is the *UI*, which is L2-05). | TODO |
+| OH-14 | Memory `[[selom-multisample-scrna-assemble]]` said "parked, on-hold P1" — it **shipped** in `11a115f`. | **DONE** 2026-07-25 — memory + index corrected to SHIPPED-not-reachable, pointing at L2-05 / L1-03 / L1-04 |
 | OH-15 | Two on-hold homes (`docs/on-hold/` = parking lot, `agent_handoff/on-hold/` = infra-gated) with overlapping rows (Redis, deploy image, BAM). Fold the infra register INTO the parking lot so there is one home, per the Ratchet's one-durable-home rule. | TODO |
 
 ---
