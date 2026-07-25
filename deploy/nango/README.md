@@ -10,6 +10,7 @@ URL/S3 import path needs no OAuth and works without any provider setup.
 cp .env.example .env          # then fill NANGO_ENCRYPTION_KEY (openssl rand -base64 32) + passwords
 sudo docker compose up -d
 curl -fsS http://localhost:3003/health        # -> {"result":"ok"}
+bash preflight.sh                             # exit-code gated; run after ANY proxy/hostname change
 ```
 
 Everything binds to `127.0.0.1` only — a reverse proxy is what exposes it publicly.
@@ -31,8 +32,15 @@ Nango builds the callback from `NANGO_SERVER_URL`:
 - **Production (behind a reverse proxy):** `https://<nango-public-domain>/oauth/callback`
 
 Set `NANGO_SERVER_URL` (and `NANGO_PUBLIC_SERVER_URL` / `NANGO_PUBLIC_CONNECT_URL`) to the public
-origin before going live, then register that `…/oauth/callback` in each provider's app console
-(Google Cloud, Azure AD, Dropbox). Add each integration in the Nango dashboard with its client
+origin **the moment a proxy lands in front of the stack**, recreate the server, and register that
+`…/oauth/callback` in each provider's app console (Google Cloud, Azure AD, Dropbox).
+
+> **Landmine (cost a session, 2026-07-25).** A stale `localhost` value here does **not** fail loudly.
+> The authorize step derives `redirect_uri` from the forwarded host, so the provider shows a perfect
+> consent screen — then the code **exchange** re-derives the callback from `NANGO_SERVER_URL` and the
+> provider rejects it (`redirect_uri_mismatch`). Symptom: a human who consents successfully, and
+> `GET /connections` still empty. `preflight.sh` checks 3 + 4 exist to catch exactly this; run it
+> before asking anyone to complete a consent. Add each integration in the Nango dashboard with its client
 id/secret; its integration id must match the `provider_config_key` in the backend registry
 (`app/backend/cloud/registry.py`): `google-drive`, `onedrive`, `dropbox`.
 
