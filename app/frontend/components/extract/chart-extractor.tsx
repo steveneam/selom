@@ -238,7 +238,12 @@ export function ChartExtractor({ origin }: { origin?: DigitizeOrigin } = {}) {
             </Button>
           </div>
         </div>
-        <div className="min-h-0 flex-1">
+        {/* `flex` is load-bearing, not decoration. EditorWorkspace's root is `flex min-h-0 flex-1`,
+            so it only gets a definite height when its PARENT is a flex container — which it is in
+            CanvasShell and was not here. Without it the artboard stage fell back to content height
+            (829px measured at 1280×800), overflowed this band, and painted the figure straight
+            through the Statistics table below and the inspector beside it (D-11, browser-verified). */}
+        <div className="flex min-h-0 flex-1">
           <EditorWorkspace store={store} />
         </div>
         <div className="shrink-0 border-t border-border bg-card/20 p-3">

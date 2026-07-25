@@ -157,7 +157,8 @@ Re-run them; do not re-reason them.
 | **D-3** | **PASS** | Popover bottom **622** ≤ shell bottom **776** — not clipped. Popover height 337px (§D estimated ~318px). |
 | **D-9** | **PASS** | AI panel at `left=920`, `z=40`; artboard right edge **895** → no overlap, so the artboard cannot poke through. A reachable close affordance is present. |
 | **D-10** | **PASS + a founder call** | A frozen figure sizes identically through the same `ArtboardHost`: `overflow=0`, `card = stageClient − 32` (444/412). **"Edit a copy" appears twice on one screen** (frozen command cluster *and* the inspector dock) — a duplicated affordance for a single action. |
-| **D-11** | **NOT RUN** | `/extract` needs manual canvas calibration (four reference-tick clicks + their values) before the editor renders — a contained next step now the harness exists, but it is not a selector fix. |
+| **D-11** | **RUN 2026-07-25 — found and FIXED a broken layout, then PASS** | Driven end to end on a real recovery (`e2e/browser-verify/d11-extract.spec.ts`: screenshot the real volcano's artboard card → drop it on `/extract` → four spread reference ticks + values → real backend recovery, "Recovered scatter (196 points)"). **The artboard never clipped — the whole editor overflowed its band.** `EditorWorkspace`'s root is `flex min-h-0 flex-1`, so it only takes a definite height when its PARENT is a flex container; `CanvasShell` gave it one, `chart-extractor.tsx` did not. The stage fell back to **content** height (829px in an 800px viewport) and painted the figure straight through the Statistics table below it and across the inspector beside it. **Every per-element number still read as a pass** (`overflow=0`, `matches=1`, floor clear) — only the screenshot and a band-vs-band comparison showed it. One class (`flex`) fixed it. |
+| **D-11** post-fix | **PASS, and the floor DOES engage here** | 1280×800: `stageClient=279`, `card=320`, `stageScroll=352`, **`overflow=73`** · 1440×900: `stageClient=379`, `card=347`, `overflow=0`. Nothing below the fold at either size; the Statistics band starts exactly where the stage ends. **This is the `min-h-[20rem]` (320px) floor engaging for the first time on a real screen** — `/extract` gives the stage only 279px at 1280×800, so the card is pinned at the floor and 73px scrolls. Reported, not filed as a regression: it is precisely the trade `L3-01` chose (scroll a too-short stage rather than collapse the card). **But it qualifies `D-5`'s "KEEP `min-h-[20rem]`" verdict** — that was measured on the shell, whose shortest stage is 402px. On `/extract` the floor is live, and the owner may want to judge 73px of scroll against a 279px card. |
 | **D-2**, D-1/D-6/D-7 flag-on | **NOT RUN — deferred Plan C** | Reachable with `ANNOTATION=on scripts/browser-verify.sh`; results file against the annotation remediation spec, never as shipped-and-fine. |
 | **D-8** | **NOT RUN** | Lane 2's cloud surface; unchanged from its own gate. |
 | **D-12** | **N/A** | Backend-only, no FE surface. |
@@ -236,6 +237,15 @@ the whole app to the error overlay.** Invisible to every prior gate because `dev
 - **Also:** §D asks whether `/extract` still looks deliberate after the gutter went `p-6 lg:p-10` →
   `p-3 lg:p-4` (the artboard no longer floats with breathing room on the dark stage). Unchanged by
   this lane — still worth an eyeball.
+
+> **✅ RUN 2026-07-25 — see the RESULTS table.** It is now an executable check
+> (`e2e/browser-verify/d11-extract.spec.ts`, `scripts/browser-verify.sh d11`), and it does NOT use
+> the MSW handler: it drives the real backend, generating its own panel image by screenshotting the
+> real volcano's artboard card so no binary is committed. **§D asked the wrong question and the check
+> answered a better one:** the artboard was never the thing clipping — the editor overflowed its band
+> and painted over the Statistics table. §D's framing ("does the artboard clip?") is exactly what the
+> per-element numbers reported, and they said PASS while the page was visibly broken. The lesson is
+> in the spec's own comment: measure the RELATIONSHIP between bands, not each band alone.
 
 ### D-1 · Inspector tab strip — the 6-tab case is now the worst case
 

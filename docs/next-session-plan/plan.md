@@ -182,7 +182,29 @@ first was fixed. `W-1` is now fixed and its gate is green; the remaining 212px i
 
 ## Track V — finish the verification sweep
 
-### `V-1` — D-11: the `/extract` editor, second host of the L3-01 fix · Status: `TODO`
+### `V-1` — D-11: the `/extract` editor, second host of the L3-01 fix · Status: `DONE`
+
+> **Run, and it found a broken surface.** `e2e/browser-verify/d11-extract.spec.ts` drives a real
+> recovery (`scripts/browser-verify.sh d11`), generating its own panel by screenshotting the real
+> volcano's artboard card — no committed binary, no MSW handler, real backend
+> ("Recovered scatter (196 points)").
+>
+> **The artboard was never what clipped.** `EditorWorkspace`'s root is `flex min-h-0 flex-1`, so it
+> takes a definite height only when its PARENT is a flex container. `CanvasShell` gave it one;
+> `chart-extractor.tsx` did not. The stage fell back to CONTENT height — **829px inside an 800px
+> viewport** — overflowed its band and painted the figure through the Statistics table below and the
+> inspector beside it. **Every per-element measurement still read PASS** (`overflow=0`, `matches=1`,
+> floor clear); only the screenshot and a band-vs-band comparison caught it. Fixed with one class.
+>
+> **Post-fix, the honest numbers:** 1280×800 → `stageClient=279`, `card=320`, **`overflow=73`**;
+> 1440×900 → `379`/`347`/`0`. Nothing below the fold; the Statistics band starts exactly where the
+> stage ends. ⚑ **The `min-h-[20rem]` floor engages here** — the first real screen where it does.
+> Reported, not filed: it is `L3-01`'s deliberate trade. **It qualifies `D-5`'s "keep the floor"
+> verdict**, which was measured on the shell (shortest stage 402px); on `/extract` the stage is 279px.
+> A founder call if the owner wants one — 73px of scroll vs a 279px card.
+>
+> The check now gates the overlap itself: the Statistics band must start at or below the stage's
+> bottom, and the stage must fit the viewport. That is the assertion no per-element number could make.
 
 - **Goal.** Run §D's D-11 in a real browser: does the artboard clip on `/extract`?
 - **Context.** The one reachable §D bullet still unrun. `/extract`'s stage is squeezed between a
