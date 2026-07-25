@@ -5,6 +5,30 @@ Run 2026-07-25 over the whole campaign branch as one milestone diff: **review-ga
 Status legend: **FIXED** (commit noted) · **OPEN** · **DECISION** (needs an owner call).
 
 
+## Status ledger — updated 2026-07-25 after the fix pass
+
+| Finding | Status | Where |
+|---|---|---|
+| **A1 + A2** (blocker) DE significance flipped to raw p while still claiming adjusted | **FIXED** | `b73bd9b` — adjusted-tier-first resolver. Verified on the real EYG_28 export **and** through the live API: 1008 plotted = ground truth; the raw-only path prints `-log10 raw p`, a `pvalue` column, no BH claim or citation, and a `raw_pvalues_only` QC warn that does not block |
+| **A3** (blocker) clicking a new annotation silently deletes it | **FIXED** | `b1a49e8` — every gene-label matcher skips `selom`-tagged items; reads stay index-true so patch paths cannot go off-by-N |
+| A4 downstream DE query sets filtered raw p at `fdr_threshold` | **FIXED** (same root as A1) | `b73bd9b` |
+| A5 GSEA ranking metric could resolve to a gene-id column (bare `t`) | **FIXED** | `1d2aa81` — short tokens match the whole header only, plus a numeric sanity check that names the failing column |
+| A6 FACS compensation claimed when it may have degraded to raw events | **FIXED** | `1d2aa81` — the runner declares the outcome in `layout.meta`; the prose states it |
+| A7 · A22 · A28 FACS attributed to FlowKit, which is not a dependency | **FIXED** | `1d2aa81` — cites FlowIO + FlowUtils; the gate claim no longer asserts GatingML conformance |
+| A8 `/data/assemble-scrna` recorded no lineage artifact | **FIXED** | `1d2aa81` — materializes the cohort, parents by content SHA, fail-soft |
+| A11 Nango Elastic License 2.0 unrecorded on the shipped path | **FIXED** | `1d2aa81` — verified at source, recorded in `LAUNCH-GATES.md` with the internal-use assessment and the two binding obligations |
+| A20 cloud provider registry forked FE↔BE | **DOCUMENTED, OPEN** | needs a providers endpoint the FE reads instead of a hardcoded literal — lands with the cloud import/export slice |
+| B4 · B9 Connect buttons looked live but could never succeed | **FIXED** | `1d2aa81` — disabled with a visible "Soon" chip instead of an sr-only note |
+| A9 · B1–B3 · B5–B8 · B10–B12 · B17–B24 annotation-layer debt | **GATED, NOT FIXED** | `b1a49e8` — `NEXT_PUBLIC_ANNOTATION_LAYER` off by default, so none of it is reachable. Fix it in the slice that adds a selection model, carry-through-re-run and the computed-p bracket path, then flip the flag |
+| A14–A19 · A21 · A23–A27 · B13–B16 remainder | **OPEN** | entries below; none are merge blockers |
+
+**Not verified visually.** No browser was drivable this session, so the §D layout predictions
+(the 7-column tab strip, the clipped artboard) remain *unobserved*. The tab strip is back to six
+columns by construction now that Annotate is gated, but that is code-reading, not a render. What
+*was* verified live: all five top-level routes load 200 with no SSR or runtime error markers, and
+both volcano paths (adjusted and raw-only) were driven end-to-end through a real backend on real
+data, confirming the honesty chain survives the theme layer.
+
 ## A. review-gauntlet — 30 confirmed (5 dropped as refuted)
 
 ### A1. [BLOCKER · repro-integrity] WS3.1 vocab convergence silently flips the significance axis from adjusted p to RAW p — while the axis, table and methods text still say "adjusted"
