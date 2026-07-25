@@ -236,7 +236,7 @@ export function FigureView({
           user's results; label it loudly, right above the artboard. */}
       <StubEngineBanner provenance={bundle?.provenance} />
       {/* The four-region canvas shell (Pillar-2 s0) — the artboard is the centre hero, the command
-          cluster frames the top, the inspector docks right, the tools rail + palette are placeholders. */}
+          cluster frames the top, the inspector docks right, the tools rail sits left. */}
       <CanvasShell
         command={command}
         store={figure}

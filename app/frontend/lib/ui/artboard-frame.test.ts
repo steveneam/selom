@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -47,7 +47,7 @@ describe("artboardFrame — the stage sizes the card (A24)", () => {
   });
 });
 
-describe("the figure shell's fixed chrome (A24)", () => {
+describe("the figure shell's fixed chrome (A24 · A25 · B13)", () => {
   it("sizes the artboard through the declared rule, never with a viewport-relative guess", () => {
     const src = readFileSync(HOST, "utf8");
     expect(src).toContain("artboardFrame");
@@ -58,4 +58,22 @@ describe("the figure shell's fixed chrome (A24)", () => {
     expect(JSON.stringify([artboardFrame(false), artboardFrame(true)])).not.toMatch(/\d\s*vh\b/);
   });
 
+  it("docks no inert 'coming soon' band around the artboard", () => {
+    // A25 · B13: the palette strip was permanent chrome that returned nothing for the ~34px it took
+    // out of an already-clipped artboard — aria-hidden, and hardcoded to Okabe–Ito no matter what
+    // `layout.colorway` said, so it asserted the WRONG palette as soon as Style swapped it. It was
+    // RETIRED, not restyled. A live palette board is welcome back in this dir; a placeholder that
+    // charges the hero its pixels is not — every band here has to earn them.
+    const offenders = readdirSync(SHELL)
+      .filter((f) => /\.tsx?$/.test(f))
+      // Comments are stripped first: the invariant is about what the shell RENDERS, so a comment
+      // recording WHY a band was retired must not read as the band coming back.
+      .filter((f) => /coming\s*soon/i.test(stripComments(readFileSync(join(SHELL, f), "utf8"))))
+      .sort();
+    expect(offenders).toEqual([]);
+  });
 });
+
+function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+}

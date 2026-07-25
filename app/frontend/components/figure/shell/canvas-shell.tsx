@@ -4,7 +4,6 @@ import { useState, type ReactNode } from "react";
 import { ArtboardHost } from "./artboard-host";
 import { CommandBar } from "./command-bar";
 import { InspectorDock, type EditorSkill } from "./inspector-dock";
-import { PaletteStrip } from "./palette-strip";
 import { ToolContextStrip } from "./tool-context-strip";
 import { ToolsRail } from "./tools-rail";
 import type { FigureStore } from "@/hooks/use-figure-store";
@@ -17,7 +16,13 @@ import type { GeneLabelPoint } from "@/lib/volcano/labels";
  *   • left   — the tools rail (Select live; the rest are placeholders)
  *   • centre — the artboard as the hero (ArtboardHost, min-w-0 so it never squeezes to nothing)
  *   • right  — the property inspector dock (InspectorDock, the existing tabbed inspector, as-is)
- *   • bottom — the palette strip (placeholder)
+ *
+ * There is deliberately NO bottom band. The inert palette strip that used to dock there was retired
+ * (A25 · B13): it was aria-hidden, hardcoded Okabe–Ito regardless of `layout.colorway` — so it made
+ * a confident WRONG claim about the figure the moment Style swapped the palette — and spent ~34px of
+ * an already-clipped artboard to say "coming soon". The real colourway swap lives in the inspector's
+ * Style tab. A LIVE palette board is welcome back; placeholder chrome that costs the hero its pixels
+ * is not (docs/integration-robustness/proposal.md §3.3).
  *
  * Pure composition over ONE store (owned by project-workspace) — it instantiates nothing and adds
  * no write path. The command cluster is a `command` slot so figure-view keeps its view-local state
@@ -76,7 +81,6 @@ export function CanvasShell({
           skill={skill}
         />
       </div>
-      <PaletteStrip />
     </div>
   );
 }
