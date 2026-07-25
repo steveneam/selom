@@ -137,6 +137,40 @@ territory** — file the result against Plan C's spec, do not close it as shippe
 
 ---
 
+## ✅ RESULTS — run in a real browser 2026-07-25, on merged `main`
+
+Run with **`scripts/browser-verify.sh`** (real backend `:8152` + real frontend `:3152` + the real
+EYG_28 DE export). **The checks are now EXECUTABLE and live in
+`app/frontend/e2e/browser-verify/*.spec.ts`** — this table is the record, the specs are the ratchet.
+Re-run them; do not re-reason them.
+
+| # | Verdict | The measured fact |
+|---|---|---|
+| **D-5** | **PASS — A24 is fixed** | `overflow=0` and `card = stageClient − 32` **exactly** (Δ0) at all three viewports. `stageClient` = **402 / 502 / 720**. x-axis title *and* legend both inside the stage. A24's signature (`card ≈ min(0.74×vh, 720)`) would have been 592/666/720 — it is not. |
+| **D-5** floor | **KEEP `min-h-[20rem]`** | The floor never engages: the shortest real stage is **402px**, 50px above the 352px engagement point. The wrap's arithmetic (~400px) was right. Do **not** lower it. |
+| **D-5** 88rem cap | **NOT EXERCISED — cap is unreachable** | The stage is only **938px** wide even at 1920×1080, so the `88rem` (1408px) cap never engages and centring could not be observed. It would need a ~2400px viewport. The card is flush (`gutters L0/R0`) because it fills the stage, not because it is centred. |
+| **D-5** legibility | **❌ FAIL — new finding, a WIDTH defect** | At 1280×800 the plotting area is **90px**, not the ~506px §D assumed. Chain: viewport 1280 → main 1024 → stage 298 → card 266 → **plot 90**. Fixed columns — sidebar 256 + workrail (`w-64`) 256 + tools rail 48 + inspector dock 330 = **890px, 70% of the viewport**. The hero gets 21%, the plotting area **7%**, and gene labels overlap into an unreadable cluster. Independent of `L3-01`, which is working exactly as specified. Legible at 1920 (718px of plot). Evidence: `test-results/browser-verify/d5-1280x800.png`. |
+| **D-4** | **PASS — the retirement held** | No band below the artboard row; zero "Palette board / coming soon" matches. Bands at 1280: **151px** command cluster + **30px** ToolContextStrip + **402px** artboard row. The CommandBar cluster wraps to **3 rows (74px)** at 1280 and is `shrink-0`, so that 74px is charged to the hero. The ToolContextStrip fits on **one** line — §D predicted this correctly. |
+| **D-1** | **PASS — §D's prediction DISPROVEN** | 6 tabs, dock 305px, every track **48px**; every label fits with **13–26px of slack** (`Legend` tightest at 35px in 48px). §D predicted `Legend` overflowing by ~4px and `Marks` by ~1px at 6 tabs — it does not. The flag-off case is fine. |
+| **D-7** | **PASS** | A volcano carries skill-emitted gene labels → **Marks is present** (Style · Axes · Legend · Data · Marks · Page). That is the transition §D cared about, and it behaves. |
+| **D-6** | **FOUNDER CALL (reported, not closed)** | The rail ships as a **48px column holding exactly one always-pressed button** (`Select`, `aria-pressed=true`). That is 48px of the 266px the hero gets at 1280 — the same §3.3 "fixed chrome must justify its pixels" question the palette strip failed. |
+| **D-3** | **PASS** | Popover bottom **622** ≤ shell bottom **776** — not clipped. Popover height 337px (§D estimated ~318px). |
+| **D-9** | **PASS** | AI panel at `left=920`, `z=40`; artboard right edge **895** → no overlap, so the artboard cannot poke through. A reachable close affordance is present. |
+| **D-10** | **PASS + a founder call** | A frozen figure sizes identically through the same `ArtboardHost`: `overflow=0`, `card = stageClient − 32` (444/412). **"Edit a copy" appears twice on one screen** (frozen command cluster *and* the inspector dock) — a duplicated affordance for a single action. |
+| **D-11** | **NOT RUN** | `/extract` needs manual canvas calibration (four reference-tick clicks + their values) before the editor renders — a contained next step now the harness exists, but it is not a selector fix. |
+| **D-2**, D-1/D-6/D-7 flag-on | **NOT RUN — deferred Plan C** | Reachable with `ANNOTATION=on scripts/browser-verify.sh`; results file against the annotation remediation spec, never as shipped-and-fine. |
+| **D-8** | **NOT RUN** | Lane 2's cloud surface; unchanged from its own gate. |
+| **D-12** | **N/A** | Backend-only, no FE surface. |
+
+**Also found while building the harness — a blocking crash on the primary flow, now fixed
+(`3e171e5`):** `datasets.qc` carries two different shapes and `fromApiDataset` cast whichever
+arrived into the FE's `QcReport`. The real upload path stores the *engine's* report (no
+`nObs`/`nVar`), every consumer formats `qc.nObs.toLocaleString()`, so **dropping any real file took
+the whole app to the error overlay.** Invisible to every prior gate because `dev:mock` skips
+`uploadDataset` entirely.
+
+---
+
 ### D-5 · The artboard is the hero — does it still clip? *(run this one first)*
 
 - **Load:** `/p/<id>`, a figure open, a **responsive** figure (volcano / UMAP / DEG bar — anything
