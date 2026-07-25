@@ -75,7 +75,16 @@ function SourceChip({ source, className }: { source: DatasetSource; className?: 
 
 export interface AnalyzeArgs {
   datasetId: string;
-  file: File;
+  /**
+   * This session's REAL bytes for the dataset, or `null` when they are not in hand.
+   *
+   * `null` is the load-bearing value (finding B15). It becomes the workspace's `lastFile`, which a
+   * run POSTs as the analysis input — so a placeholder here is not a harmless stand-in, it is
+   * fabricated data submitted as the user's real data. A run with `null` either goes through
+   * run-from-dataset_id (the bytes are in the object store) or halts and asks for a re-upload,
+   * which is the honest outcome. [[mock-fallback-never-fabricates-data]]
+   */
+  file: File | null;
   proposal: IntakeProposal | null;
   /** Optional design / sample sheet for bulk + time-course DE (item b). */
   designFile?: File | null;
@@ -84,10 +93,16 @@ export interface AnalyzeArgs {
 /** Active dataset being intaked (just uploaded, or chosen via "Analyze"). */
 interface Active {
   dataset: Dataset;
-  file: File;
-  /** True when `file` holds the real dropped bytes (so we can (re)classify it live); false for a
-   *  re-opened dataset whose bytes were lost — its persisted profile is shown read-only. */
-  real: boolean;
+  /**
+   * The dataset's real bytes if this session has them, else `null` — a re-opened dataset whose
+   * bytes were never in the browser, or a cloud import that landed server-side. `null` is also what
+   * makes the profile read-only: live re-classification needs bytes to send.
+   *
+   * There is deliberately no separate "is it real" flag. Two fields that must agree is how a
+   * fabricated `File` came to be marked not-real and then POSTed as the run's data anyway; with one
+   * field, "no bytes" cannot be spelled any other way.
+   */
+  file: File | null;
 }
 
 export function DataPanel({
@@ -173,7 +188,7 @@ export function DataPanel({
     // the figure can re-run this session.
     const reattach = reattachDatasetId ? datasets.find((d) => d.id === reattachDatasetId) : undefined;
     if (reattach) {
-      setActive({ dataset: reattach, file, real: true });
+      setActive({ dataset: reattach, file });
       setDisabledSteps(new Set());
       setOverride(undefined);
       projectStore.markDatasetUpdated(reattach.id);
@@ -194,7 +209,7 @@ export function DataPanel({
       if (dataset) dataset = projectStore.addUploadedDataset(dataset);
     }
     if (!dataset) dataset = projectStore.addDataset(projectId, file.name, modality);
-    setActive({ dataset, file, real: true });
+    setActive({ dataset, file });
     setDisabledSteps(new Set());
     setOverride(undefined);
     void runInspect(dataset, file, undefined, designFile);
@@ -219,7 +234,7 @@ export function DataPanel({
         return;
       }
       const dataset = projectStore.addDataset(projectId, result.file.name, detectModality(result.file.name));
-      setActive({ dataset, file: result.file, real: true });
+      setActive({ dataset, file: result.file });
       setDisabledSteps(new Set());
       setOverride(undefined);
       void runInspect(dataset, result.file, undefined, designFile);
@@ -229,14 +244,14 @@ export function DataPanel({
   // The user corrects the detected data type (the user-input layer). Needs the real bytes to
   // re-classify.
   function setDataType(code: DataTypeOverride) {
-    if (!active?.real) return;
+    if (!active?.file) return;
     setOverride(code);
     void runInspect(active.dataset, active.file, code, designFile);
   }
 
   // Clear an explicit override → re-inspect with no hint, falling back to the auto-detected type.
   function resetDataType() {
-    if (!active?.real) return;
+    if (!active?.file) return;
     setOverride(undefined);
     void runInspect(active.dataset, active.file, undefined, designFile);
   }
@@ -247,11 +262,11 @@ export function DataPanel({
   // effect, so re-inspect stays an explicit user action.
   function attachDesign(f: File) {
     setDesignFile(f);
-    if (active?.real) void runInspect(active.dataset, active.file, override, f);
+    if (active?.file) void runInspect(active.dataset, active.file, override, f);
   }
   function removeDesign() {
     setDesignFile(null);
-    if (active?.real) void runInspect(active.dataset, active.file, override, null);
+    if (active?.file) void runInspect(active.dataset, active.file, override, null);
   }
 
   // Consume a file handed over from the Overview drop. Guard with a ref so a given
@@ -267,18 +282,24 @@ export function DataPanel({
   }, [incomingFile]);
 
   function analyzeExisting(dataset: Dataset) {
-    // A re-opened dataset's real bytes are gone (only metadata persists) — synthesize a placeholder
-    // and mark it not-real, so its persisted profile shows read-only (no bogus re-classify of "mock").
-    setActive({ dataset, file: new File(["mock"], dataset.filename), real: false });
+    // A re-opened dataset's real bytes are gone (only metadata persists) → `null`, and its persisted
+    // profile shows read-only. It used to synthesize `new File(["mock"], …)` here, which then rode
+    // up as the workspace's `lastFile` and could be POSTed as the run's actual data — four bytes of
+    // the literal text "mock" submitted as the user's dataset (B15).
+    // Clicking the dataset you just dropped keeps this session's bytes; anything else genuinely has
+    // none.
+    setActive((a) => (a?.file && a.dataset.id === dataset.id ? { ...a, dataset } : { dataset, file: null }));
     setOverride(undefined);
   }
 
-  // A cloud import (URL/S3): the backend already streamed the bytes into the store AND ran the
-  // server-side parse (qc is stamped), so we add the server-authoritative dataset to the store and
-  // open it read-only — its bytes live server-side, so there's nothing to re-inspect locally.
+  // A cloud import: the backend already streamed the bytes into the object store AND ran the
+  // server-side parse (qc is stamped), so we add the server-authoritative dataset and open it
+  // read-only. IMPORT BY REFERENCE — `file: null`, never a stand-in. The bytes are in the store, so
+  // the run goes through run-from-dataset_id; fabricating `new File(["remote"], …)` here meant a
+  // six-byte placeholder could be POSTed as the imported file's contents (B15).
   function onCloudImported(dataset: Dataset) {
     const added = projectStore.addUploadedDataset(dataset);
-    setActive({ dataset: added, file: new File(["remote"], added.filename), real: false });
+    setActive({ dataset: added, file: null });
     setDisabledSteps(new Set());
     setOverride(undefined);
   }
@@ -473,7 +494,7 @@ export function DataPanel({
               qc={active.dataset.qc}
               modality={active.dataset.modality}
               inspecting={inspecting}
-              canOverride={active.real}
+              canOverride={active.file !== null}
               onSetDataType={setDataType}
               onResetDataType={resetDataType}
             />
