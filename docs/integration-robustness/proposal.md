@@ -16,13 +16,13 @@ would be easy to read that as "the product is 11% reachable" and panic. That rea
 the distinction matters for deciding what to build:
 
 **Those 31 gaps are almost entirely the Pillar-2 annotation/drawing layer** — brackets, text labels,
-draw tools, canvas selection. The owner **flagged that layer off** on 2026-07-25
-(`NEXT_PUBLIC_ANNOTATION_LAYER`, off by default) rather than finish it under merge pressure. So those
-gaps are not bleeding on users; they are correctly deferred behind Plan C's spec, and the flag is
-doing its job.
+draw tools, canvas selection. That layer is **deferred pending a proper plan** (owner intent, clarified
+2026-07-25): `NEXT_PUBLIC_ANNOTATION_LAYER` off by default is the *holding mechanism*, **not** a
+decision to shelve the work — a real plan for finishing it is owed, and the flag flips when that plan
+is executed. So those gaps are not bleeding on users, but they are not closed either: **the deliverable
+is the plan.**
 
-**The reachability debt on surfaces that ARE live is much narrower — and all of it is already in the
-approved lanes:**
+**The reachability debt on surfaces that ARE live:**
 
 | Shipped capability | Reachable? | Covered by |
 |---|---|---|
@@ -32,17 +32,37 @@ approved lanes:**
 | `datasets.source` provenance (backend-stamped) | **No** — dropped by the FE mapper, so a cloud import looks hand-dropped | Lane 2 (`L2-03`) |
 | Artboard / editor chrome | Partly — hero clipped, no collapse, no zoom-to-fit | Lane 3 (`L3-01`, `L3-02`, `L3-04`) |
 
-**So the plan is already pointed at the right work.** The gap is not *what* is scheduled — it is that
-**nothing structurally prevents this from recurring.** Every review re-discovers the same shape:
-something shipped, nobody can reach it, and it takes a token-heavy review pass to notice. That is the
-one genuinely missing piece, and it is §2.
+> **⚠ CORRECTION (2026-07-25, after §2 was built).** This section originally concluded *"all of it is
+> already in the approved lanes — the plan is already pointed at the right work."* **That was wrong, and
+> the ratchet in §2 disproved it within a minute of first running.** The table above is what a *review*
+> found. The mechanical sweep found **17 of 61 user-facing routes (28%) with no frontend call site** —
+> 8× more, including the entire **lit-synthesizer** (`/methods/compose`, `/citations/*` — shipped, zero
+> FE) and the entire **async job pipeline** (which means the just-unparked `OH-01` job-status store
+> would ship with no reader). Full list + IDs: **`docs/reachability/backlog.md`**.
+>
+> I am leaving the wrong conclusion visible rather than quietly editing it, because it is the whole
+> argument for §2: a careful review of the *scheduled* work told me the plan was well-pointed, and it
+> was not. Only the executable sweep knew.
+
+So the gap was **both** structural *and* larger than scheduled. Nothing prevented this recurring, and
+nobody had counted it. That is §2.
 
 ---
 
-## 2. The durable fix: a reachability ratchet (my top recommendation)
+## 2. The durable fix: a reachability ratchet — ✅ **BUILT 2026-07-25**
 
-**Recommendation: build this first, before any new feature.** It is small, and it is the difference
-between fixing this backlog and fixing the *class*.
+**Owner directed "build the reachability ratchet first, then fork the lanes." Done** —
+`app/backend/tests/test_reachability_guard.py`, green, 22 assertions. Backlog it produced:
+`docs/reachability/backlog.md`. The rest of this section is the original reasoning, which held up.
+
+**What it caught immediately, beyond the predicted set:** 17 of 61 user-facing paths unreachable (§1's
+correction box), **and three waivers I had guessed wrong** — I assumed `/export/cloud`,
+`/import/local-state` and `/uploads/local/{key:path}` were unreachable and the scan proved they are
+reached. The stale-waiver half corrected its own author on the first run, which is the best evidence
+it will correct a lane later.
+
+**Recommendation as written: build this first, before any new feature.** It is small, and it is the
+difference between fixing this backlog and fixing the *class*.
 
 "Shipped ≠ reachable" is already a recorded lesson ([[selom-shipped-not-reachable]]) whose stated
 remedy is "add a reachability guard test" — and that guard was never built. So the lesson lives only
@@ -84,7 +104,7 @@ Pairs naturally with Lane 3.
 
 ### 3.2 Re-run must not silently discard user work
 `rerunFigure` carries **only** gene labels; every other annotation is dropped with no warning on the
-Re-run button or the StaleBadge. Even with the annotation layer flagged off, this is the workflow's
+Re-run button or the StaleBadge. Even with the annotation layer deferred behind its flag, this is the workflow's
 sharpest edge: the user's own work vanishes on the most routine action in the product. **Robustness
 before features.** (Plan C territory, so it needs Plan C's spec — but it should be that spec's first
 slice, not its last.)

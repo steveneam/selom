@@ -37,7 +37,7 @@ Answered in **`docs/integration-robustness/proposal.md`** (a proposal, not yet a
 nothing in it is scheduled until the owner picks). Its three load-bearing conclusions:
 
 1. **The "31 of 35 user tasks have no affordance" headline is mostly the annotation layer the owner
-   just flagged off** — correctly deferred behind Plan C, not bleeding on users. The reachability debt
+   just deferred pending a proper plan** (owner intent, clarified 2026-07-25 — deferred, *not* shelved; a plan is owed). Not bleeding on users. The reachability debt
    on *live* surfaces is narrower (cloud · assemble-scrna · ERG measurements · `datasets.source` ·
    editor chrome) and **every item of it is already inside the approved lanes.** The plan is pointed
    at the right work.

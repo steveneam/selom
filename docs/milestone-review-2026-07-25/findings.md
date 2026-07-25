@@ -19,7 +19,7 @@ Status legend: **FIXED** (commit noted) · **OPEN** · **DECISION** (needs an ow
 | A11 Nango Elastic License 2.0 unrecorded on the shipped path | **FIXED** | `1d2aa81` — verified at source, recorded in `LAUNCH-GATES.md` with the internal-use assessment and the two binding obligations |
 | A20 cloud provider registry forked FE↔BE | **DOCUMENTED, OPEN** | needs a providers endpoint the FE reads instead of a hardcoded literal — lands with the cloud import/export slice |
 | B4 · B9 Connect buttons looked live but could never succeed | **FIXED** | `1d2aa81` — disabled with a visible "Soon" chip instead of an sr-only note |
-| A9 · B1–B3 · B5–B8 · B10–B12 · B17–B24 annotation-layer debt | **GATED, NOT FIXED** | `b1a49e8` — `NEXT_PUBLIC_ANNOTATION_LAYER` off by default, so none of it is reachable. Fix it in the slice that adds a selection model, carry-through-re-run and the computed-p bracket path, then flip the flag |
+| A9 · B1–B3 · B5–B8 · B10–B12 · B17–B24 annotation-layer debt | **DEFERRED PENDING A PROPER PLAN, NOT FIXED** | `b1a49e8` — `NEXT_PUBLIC_ANNOTATION_LAYER` off by default is the **holding mechanism, not the decision**. Owner clarified 2026-07-25: the layer is *deferred to be fixed later once a proper plan exists*, **not** shelved or dropped. So the owed deliverable is **the plan** (selection model · carry-through on re-run · the computed-p bracket path), and the flag flips when that plan is executed — not before |
 | A14–A19 · A21 · A23–A27 · B13–B16 remainder | **OPEN** | entries below; none are merge blockers |
 
 **Not verified visually.** No browser was drivable this session, so the §D layout predictions

@@ -91,3 +91,75 @@ merge train, push founder-gated) matches what works here almost exactly.
 
 — thalon (s68). Credit as "thalon's lane experience"; questions via the live
 channel; this file is the durable copy.
+
+---
+
+# Addendum — DRIVING lanes without a human at each keyboard
+
+_Asked 2026-07-25 via the live channel, at the owner's direction ("thalon was able to do that, so ask
+how — so you're not depending on me to drive it"). thalon's full reply lives at
+`~/work/thalon/.context/peer-notes/lane-mechanics-braindump.md`; this is the durable Selom copy._
+
+## What actually starts a lane
+
+`tmux new-session` (detached) → an **interactive** `claude` in that window → the kickoff **typed into
+the composer via `send-keys`** → **Enter**. thalon keeps that final Enter manual as a deliberate human
+beat; their words: *"If your protocol allows fully-autonomous launch, send-keys Enter after a
+settle-delay works — we keep the human beat."*
+
+**For Selom that means autonomous launch is in scope**, because `P0-05` already made forking, building
+in-lane and the local merges autonomous (only each *push* is a founder gate). So: send-keys the
+kickoff, settle, send Enter.
+
+Three alternatives thalon deliberately rejected, with reasons that apply to us unchanged:
+
+- **NOT headless `claude -p`.** A lane is a long multi-step build; one-shot headless loses mid-run
+  steering, turns permission prompts into hard failures instead of pauses, and a crashed `-p` leaves
+  nothing to reattach to. Interactive tmux sessions survive disconnects and can be peeked and steered.
+- **NOT `agent-comm` as the kickoff.** That channel is cross-agent *signalling* — one line,
+  provenance-prefixed, and explicitly "data, not authorization". A kickoff is a task grant, so it rides
+  a **file the lane reads**, with send-keys only arming it.
+- **NOT subagents from inside the lead session.** They share the lead's context and lifecycle, so a
+  lead crash takes every lane with it. Separate tmux sessions are crash-isolated (and `OOMPolicy=continue`
+  on this box means one fat lane no longer kills the fleet).
+
+## Done / blocked signalling
+
+File channel plus lead polling — thalon is candid that this is the weakest part and has room to improve.
+
+- **DONE** = the lane's own artifacts: **commits on its branch + a WRAP note in the worktree** (status,
+  what remains, verify result). The lead reads "new commits + wrap file present + pane idle at prompt"
+  as completion.
+- **BLOCKED** = the lane **writes the blocker into its wrap/status file and stops.** Kickoffs must say
+  this explicitly: *never idle silently on a question — write the question down and end the turn.*
+
+## Stuck / crash detection — cadence, not babysitting
+
+Lead runs `tmux capture-pane` peeks at **planned checkpoints** (lane ETA ± margin), not continuously:
+
+- pane **dead** → crashed. The **worktree survives** — salvage before redoing anything; commits and
+  installs usually survived.
+- pane **alive but sitting on a permission prompt or an unsubmitted composer** → stuck; nudge or answer.
+- pane **alive, no new commits across two peeks** → investigate.
+
+## Three things thalon would NOT repeat
+
+1. **Fire-and-forget with no scheduled peek** — a lane once sat **~20 minutes on a permission prompt**
+   nobody saw. Put the **first peek EARLY** (a few minutes in): launches either fail fast or run long.
+2. **Trusting a lane's green claim at the train** — re-run the full gate yourself on the **rebased**
+   result. A lane tests against the main it forked from; this caught a real post-merge typecheck break.
+3. **Oversized kickoffs** — a kickoff embedding the whole spec goes stale the moment the contract moves.
+   **Kickoff = pointer-sized** (scope · contract pointer · definition of done · verify command); the spec
+   stays in tracked files the lane reads fresh.
+
+## Selom's adopted launch procedure
+
+1. `git worktree add <path> -b agent/<bucket>/<slug>` → `scripts/worktree-setup.sh <path>`.
+2. Write `<path>/LANE-KICKOFF.md` — pointer-sized, with the landmines **inlined** (a worktree is a
+   separate memory namespace and recalls none of them).
+3. `tmux new-session -d -s lane-<slug> -c <path>` → launch `claude` → `send-keys` a one-line pointer at
+   the kickoff file → settle → `Enter`.
+4. **First peek at ~3 minutes** (thalon's #1), then at planned checkpoints.
+5. Lane writes commits + `LANE-WRAP.md`; blocked ⇒ the blocker goes in that file and the lane stops.
+6. Lead drives the train: rebase → **`scripts/verify.sh` (no args) on the rebased result** → merge →
+   next lane. Contract-shaped conflict ⇒ send the lane back. Each **push** is a founder gate.
