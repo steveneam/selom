@@ -52,7 +52,7 @@ Status: `TODO` · `WIP` (≤1 at a time) · `DONE — <sha>` · `BLOCKED — <wh
 | 11 | **WS3.3** | Param validation → drop the redundant gate | P2 | TODO | NEXT#1 (concrete) |
 | 12 | **WS4.1** | `routers/_run.py` contract-frozen decomposition | P3 | DEFERRED | NEW (only if WS2 forces it) |
 | 13 | **WS4.3** | FE undo history survives reload | P3 | DEFERRED | Lane-P / pillar-2 |
-| — | **WS5.1** | Slim `CURRENT.md` (archive old SESSIONS + strip commented tail) | P2 | TODO | CURRENT Housekeeping · prune_current_history.py |
+| — | **WS5.1** | Slim `CURRENT.md` (archive old SESSIONS + strip commented tail) | P2 | **OBSOLETE 2026-07-25** | The lean slot-based CURRENT format removed the growth mechanism this row existed for: LIVE/NEXT are overwritten in place and SESSIONS rows are one-liners, so nothing accumulates. `prune_current_history.py` swept `<!-- prior live-state -->` comments the format no longer creates (`--dry-run` found 0) and has been **deleted** rather than left to mislead. Keep it lean by WRITING it lean. |
 | — | **WS5.2** | Declare "solo mode" in the handoff protocol | P2 | TODO | agent_handoff/README.md |
 | — | **WS5.3** | Prune the docs load (consolidate ai-explain specs, stale banners) | P2 | TODO | repo-structure recs |
 | — | **WS5.4** | Mechanize cheap gaps (md link-check + docs-index test) | P3 | DEFERRED | NEW (optional) |
@@ -392,7 +392,7 @@ Persist `figureStore` history to localStorage. Minor UX. Rides a pillar-2 slice.
 
 ### WS5.1 — Slim `CURRENT.md` · P2 · Status: TODO
 417 lines, with paragraph-length "one-line" SESSIONS rows + ~40 lines of commented-out prior
-state (lines ~93–133). Home: CURRENT "Housekeeping" bullet; tool `prune_current_history.py`.
+state (lines ~93–133). Home: CURRENT "Housekeeping" bullet. _(2026-07-25: `prune_current_history.py` is deleted — it targeted a retired CURRENT.md shape and matched nothing. See the WS5.1 row.)_
 - **Definition of Done:** SESSIONS rows collapsed to true one-liners; prior-state comment
   blocks swept to `archive/`; CURRENT back under ~150 lines.
 - **Scope guard:** archive, never delete [[the-ratchet-durable-artifacts]]; keep ~2 sessions inline.

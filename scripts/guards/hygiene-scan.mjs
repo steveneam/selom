@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // hygiene-scan.mjs -- repo-hygiene ratchet scanner (eng-practices port, M-001).
 //
-// Flags four classes of defect over the tracked set (never the ignored tree):
+// Flags SIX classes of defect over the tracked set (never the ignored tree):
 //   1. merge-conflict markers  (repo-wide)   -- a `;`-chained rebase --continue can commit these
 //   2. forbidden tokens        (repo-wide)   -- leaked secrets/keys + a do-not-commit marker
 //   3. trailing-newline hygiene (board files) -- append-prone COORDINATION/CURRENT must end in one \n
@@ -15,6 +15,10 @@
 //        portability on the host move. Scoped to .py/.ts/.tsx/.js/.mjs/.json this pass; prose
 //        (docs/handoff) widening is a later change. A single letter NOT preceded by another letter,
 //        so URL schemes (`http:`, `data:`) never match.
+//   6. swallowed-gate          (scripts)    -- no tracked script may pipe a gate into tail/head/grep/wc:
+//        a pipeline returns the FILTER's exit code, so the gate's failure is discarded. Cost a peer box
+//        two incidents (forbidden content reaching origin behind a swallowed guard; a red suite read as
+//        green). Comment lines are skipped, so a script may still EXPLAIN the hazard.
 //
 // Ratchet-ladder note: this executable check replaces graphify's documentary wiring signal.
 // The patterns are ASSEMBLED FROM FRAGMENTS at runtime so this scanner passes its own scan.
@@ -65,6 +69,23 @@ const CI_REQUIRES = ['pull-' + 'requests: read', 'fetch-' + 'depth: 0'];
 const CODE_EXTS = new Set(['py', 'ts', 'tsx', 'js', 'mjs', 'json']);
 const DRIVE_PATH = new RegExp('(^|[^A-Za-z])' + '[A-Za-z]' + ':' + '[\\\\/]');
 
+// Swallowed-gate invariant (class 6): a tracked SCRIPT must never pipe a gate's output into
+// tail/head/grep/wc. A pipeline returns the LAST command's status, so the gate's failing exit code is
+// discarded and the failure summary can be truncated away with it. This is not theoretical -- it cost a
+// peer box two real incidents: a guard failure swallowed (forbidden content reached `origin`; history
+// rewrite required) and a red suite read as green at a session close. CLAUDE.md's ratchet ladder already
+// states the principle ("gated on its exit code, never a `;`-chain that ignores failure"); this makes it
+// executable for the scripts where it does damage.
+//
+// Scope is deliberately NARROW -- tracked scripts only, and COMMENT LINES ARE SKIPPED so a script that
+// *explains* the hazard (scripts/verify.sh does) is not flagged for describing it. Interactive shell use
+// is out of reach of any repo guard and stays a habit; see the memory note. Assembled from fragments so
+// this scanner passes its own scan.
+const SCRIPT_EXTS = new Set(['sh', 'mjs', 'yml', 'yaml']);
+const GATE_TOOLS = ['py' + 'test', 'ru' + 'ff', 'esl' + 'int', 'ts' + 'c', 'vi' + 'test',
+  'hygiene-' + 'scan', 'verify' + '.sh'];
+const SWALLOW = new RegExp('(' + GATE_TOOLS.join('|') + ')[^|;]*\\|\\s*(tail|head|grep|wc)\\b');
+
 // --- file list per mode ---------------------------------------------------------------
 function git(args) {
   return execFileSync('git', args, { cwd: process.cwd(), maxBuffer: 64 * 1024 * 1024 });
@@ -85,7 +106,7 @@ function readFileBytes(path) {
 
 const files = listFiles();
 const hits = [];
-const counts = { 'conflict-marker': 0, forbidden: 0, 'trailing-newline': 0, 'workflow-invariant': 0, 'drive-path': 0 };
+const counts = { 'conflict-marker': 0, forbidden: 0, 'trailing-newline': 0, 'workflow-invariant': 0, 'drive-path': 0, 'swallowed-gate': 0 };
 
 for (const path of files) {
   let buf;
@@ -101,6 +122,7 @@ for (const path of files) {
   const hasClose = text.includes(CLOSE);
   const ext = path.includes('.') ? path.slice(path.lastIndexOf('.') + 1).toLowerCase() : '';
   const isCode = CODE_EXTS.has(ext);
+  const isScript = SCRIPT_EXTS.has(ext) || path.startsWith('.githooks/') || path.startsWith('scripts/');
 
   lines.forEach((line, i) => {
     const ln = i + 1;
@@ -126,6 +148,11 @@ for (const path of files) {
     if (isCode && DRIVE_PATH.test(line)) {
       hits.push(`${path}:${ln}: [drive-path] absolute drive-letter path in tracked code`);
       counts['drive-path']++;
+    }
+    // 6. swallowed-gate (tracked scripts only; comments skipped -- explaining the hazard is fine)
+    if (isScript && !/^\s*(#|\/\/)/.test(line) && SWALLOW.test(line)) {
+      hits.push(`${path}:${ln}: [swallowed-gate] gate piped into tail/head/grep/wc -- the pipeline returns the FILTER's exit code, so the gate's failure is discarded. Run it raw, or capture to a file and test $? BEFORE filtering.`);
+      counts['swallowed-gate']++;
     }
   });
 
@@ -156,7 +183,7 @@ process.stdout.write(
   `\nhygiene-scan (${MODE}): scanned ${files.length} tracked file(s); ` +
     `conflict-marker=${counts['conflict-marker']} forbidden=${counts.forbidden} ` +
     `trailing-newline=${counts['trailing-newline']} workflow-invariant=${counts['workflow-invariant']} ` +
-    `drive-path=${counts['drive-path']} ` +
+    `drive-path=${counts['drive-path']} swallowed-gate=${counts['swallowed-gate']} ` +
     `=> ${hits.length} hit(s)\n`,
 );
 process.exit(hits.length > 0 ? 1 : 0);
