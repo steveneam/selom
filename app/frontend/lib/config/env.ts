@@ -18,3 +18,19 @@
  * passthrough so the real backend proxy is untouched.
  */
 export const apiMockingEnabled = process.env.NEXT_PUBLIC_API_MOCKING === "enabled";
+
+/**
+ * True when the hand-annotation layer (the Annotate inspector tab + the rail's draw tools) is
+ * exposed. **Off by default**, opt in with `NEXT_PUBLIC_ANNOTATION_LAYER=enabled`.
+ *
+ * Gated after the 2026-07-25 milestone review (`docs/milestone-review-2026-07-25/findings.md`, §B/§C):
+ * the layer's primitives are sound and unit-tested, but 31 of 35 user tasks have no affordance — no
+ * canvas selection model, a re-run silently destroys every annotation, repeat adds land
+ * pixel-identically, and hand-typed significance stars would export as an unattributed statistical
+ * claim. The engine-side computed significance brackets (`sig_brackets`, provenance-recorded) are
+ * NOT affected — they arrive in the figure spec and list under Marks either way.
+ *
+ * Flip this on in the slice that adds the selection model, carry-through-re-run, and the computed-p
+ * bracket path; the gate is what keeps a half-built claim surface out of a user's figure meanwhile.
+ */
+export const annotationLayerEnabled = process.env.NEXT_PUBLIC_ANNOTATION_LAYER === "enabled";

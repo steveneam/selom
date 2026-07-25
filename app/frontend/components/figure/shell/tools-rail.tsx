@@ -7,6 +7,7 @@ import type { FigureStore } from "@/hooks/use-figure-store";
 import type { FigureSpec } from "@/lib/figure/figure-spec";
 import type { Operation } from "@/lib/figure/patch";
 import { addArrowOps, addSigBracketOps, addTextLabelOps } from "@/lib/figure/annotations";
+import { annotationLayerEnabled } from "@/lib/config/env";
 
 type ToolDef = {
   icon: ComponentType<{ className?: string }>;
@@ -24,13 +25,21 @@ type ToolDef = {
  * figure. Shape (boxes/highlights) and Guide (alignment) are declared-but-disabled placeholders for a
  * later slice. The Annotate inspector tab is the richer surface (edit/show-hide/remove).
  */
-const TOOLS: ToolDef[] = [
-  { icon: MousePointer2, label: "Select", kind: "select" },
+// The three draw tools are behind `annotationLayerEnabled` (off by default — see lib/config/env.ts):
+// they commit real annotations, but the layer has no selection model and a re-run destroys them, so a
+// user could not undo or keep what they drew. With the flag off the rail is Select only, and the
+// declared-but-unbuilt Shape/Guide placeholders go with them rather than advertising an empty rail.
+const DRAW_TOOLS: ToolDef[] = [
   { icon: Asterisk, label: "Significance bracket", kind: "draw", build: addSigBracketOps },
   { icon: Type, label: "Text label", kind: "draw", build: addTextLabelOps },
   { icon: ArrowUpRight, label: "Arrow / callout", kind: "draw", build: addArrowOps },
   { icon: Square, label: "Shape", kind: "soon" },
   { icon: Ruler, label: "Guide", kind: "soon" },
+];
+
+const TOOLS: ToolDef[] = [
+  { icon: MousePointer2, label: "Select", kind: "select" },
+  ...(annotationLayerEnabled ? DRAW_TOOLS : []),
 ];
 
 /**

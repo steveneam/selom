@@ -9,13 +9,19 @@
  * coordinates from the per-point `customdata` the volcano stamps (`[gene, padj]`), so the table toggle
  * can place a label for a gene it only knows by name.
  *
- * The volcano draws no layout annotations of its own (its auto top-N labels are a `text` TRACE), so on
- * a volcano every `layout.annotations` entry IS a gene label and is identified by its `text` (the gene
- * symbol). `top_n` stays the auto-suggest seed; the amber `highlight` gene-set panel stays separate.
+ * A gene label is identified by its `text` (the gene symbol) — but NOT every `layout.annotations` entry
+ * is one: the annotation layer (Pillar-2) writes `selom`-tagged items into the same array. Every
+ * matcher here therefore skips Selom-tagged entries. Without that skip a hand-placed text label reading
+ * "RPGRIP1" made the Statistics table report that gene as labelled, and clicking the gene's point
+ * REMOVED the user's annotation instead of adding a label (milestone review 2026-07-25, blocker A3).
+ * Index-true reads stay index-true: `readAnnotations` returns the whole array so a
+ * `/layout/annotations/{idx}` patch path is never off by the number of filtered items.
+ * `top_n` stays the auto-suggest seed; the amber `highlight` gene-set panel stays separate.
  */
 
 import type { FigureSpec, PlotlyLayout, PlotlyTrace } from "@/lib/figure/figure-spec";
 import { remove, set, type Operation } from "@/lib/figure/patch";
+import { isSelomAnnotation } from "@/lib/figure/annotations";
 
 /** A plotted point that can carry a gene label: its data coordinates + the gene symbol. */
 export interface GeneLabelPoint {
@@ -69,22 +75,29 @@ export function findPoint(spec: FigureSpec | null | undefined, gene: string): Ge
   return gatherLabelablePoints(spec).find((p) => p.gene === gene) ?? null;
 }
 
-/** Read the current label annotations (on a volcano, every annotation is a gene label). */
+/** Read the raw annotation array — INDEX-TRUE (patch paths depend on it), Selom items included. */
 function readAnnotations(spec: FigureSpec | null | undefined): { text?: unknown }[] {
   const a = (spec?.layout as PlotlyLayout | undefined)?.annotations;
   return Array.isArray(a) ? (a as { text?: unknown }[]) : [];
 }
 
+/** Is this annotation a GENE LABEL for `gene` — i.e. carries that text and is not a Selom item? */
+function isGeneLabelFor(a: { text?: unknown } | undefined, gene: string): boolean {
+  return a?.text === gene && !isSelomAnnotation(a);
+}
+
 /** The set of currently-labelled gene symbols (the shared `label_genes` set), read from the annotations. */
 export function labeledGenes(spec: FigureSpec | null | undefined): Set<string> {
   const out = new Set<string>();
-  for (const a of readAnnotations(spec)) if (typeof a?.text === "string" && a.text) out.add(a.text);
+  for (const a of readAnnotations(spec)) {
+    if (typeof a?.text === "string" && a.text && !isSelomAnnotation(a)) out.add(a.text);
+  }
   return out;
 }
 
 /** Is this gene currently labelled? */
 export function isLabeled(spec: FigureSpec | null | undefined, gene: string): boolean {
-  return readAnnotations(spec).some((a) => a?.text === gene);
+  return readAnnotations(spec).some((a) => isGeneLabelFor(a, gene));
 }
 
 /**
@@ -122,7 +135,7 @@ function labelAnnotation(p: GeneLabelPoint): Record<string, unknown> {
  */
 export function toggleLabelOps(spec: FigureSpec, point: GeneLabelPoint): Operation[] {
   const annos = readAnnotations(spec);
-  const idx = annos.findIndex((a) => a?.text === point.gene);
+  const idx = annos.findIndex((a) => isGeneLabelFor(a, point.gene));
   if (idx >= 0) return [remove(`/layout/annotations/${idx}`)];
   const anno = labelAnnotation(point);
   // `set` = JSON-Patch add: on a missing/empty array, set the whole array; else append with `/-`.
@@ -132,7 +145,7 @@ export function toggleLabelOps(spec: FigureSpec, point: GeneLabelPoint): Operati
 /** Toggle a gene known only by symbol (the Statistics-table path): resolve its point, then toggle. */
 export function toggleGeneLabelOps(spec: FigureSpec, gene: string): Operation[] {
   if (isLabeled(spec, gene)) {
-    const idx = readAnnotations(spec).findIndex((a) => a?.text === gene);
+    const idx = readAnnotations(spec).findIndex((a) => isGeneLabelFor(a, gene));
     return idx >= 0 ? [remove(`/layout/annotations/${idx}`)] : [];
   }
   const point = findPoint(spec, gene);
@@ -147,7 +160,7 @@ export function pointFromClick(pt: unknown): GeneLabelPoint | null {
   return null;
 }
 
-/** A captured gene-label annotation (on a volcano every `layout.annotations` entry is one). */
+/** A captured gene-label annotation (Selom-tagged items are excluded — they are not gene labels). */
 export type LabelAnnotation = Record<string, unknown> & { text?: unknown };
 
 /**
@@ -155,7 +168,9 @@ export type LabelAnnotation = Record<string, unknown> & { text?: unknown };
  * dragged position + styling survive), filtered to those carrying a gene `text`. Pair with `carryLabels`.
  */
 export function captureLabels(spec: FigureSpec | null | undefined): LabelAnnotation[] {
-  return readAnnotations(spec).filter((a) => typeof a?.text === "string" && !!a.text) as LabelAnnotation[];
+  return readAnnotations(spec).filter(
+    (a) => typeof a?.text === "string" && !!a.text && !isSelomAnnotation(a),
+  ) as LabelAnnotation[];
 }
 
 /**

@@ -28,6 +28,7 @@ import { installPerfHook, recordRenderMs } from "@/lib/figure/perf";
 import { payloadWarnings } from "@/lib/figure/payload";
 import { relayoutToOps, restyleToOps } from "@/lib/figure/plotly-edits";
 import { remove } from "@/lib/figure/patch";
+import { isSelomAnnotation } from "@/lib/figure/annotations";
 import { wireMarkDrag, type Crosshair } from "./mark-drag";
 import { wireThresholdDrag } from "./threshold-drag";
 import { wireColorbarDrag } from "./colorbar-drag";
@@ -294,7 +295,16 @@ export function FigureCanvas({
         const { store: st, overlay: ov, geneLabels: gl } = liveRef.current;
         if (!st || ov || !gl) return;
         const idx = (e as { index?: number } | undefined)?.index;
-        if (typeof idx === "number" && idx >= 0) st.commit([remove(`/layout/annotations/${idx}`)]);
+        if (typeof idx === "number" && idx >= 0) {
+          // Click-to-delete applies to GENE LABELS only. A `selom`-tagged item (a hand-placed text
+          // label, an arrow, a significance bracket) shares this annotations array but is owned by the
+          // Annotate panel — deleting it here destroyed the user's annotation on first click, with the
+          // bracket's other half left behind (milestone review 2026-07-25, blocker A3).
+          const annos = (st.spec?.layout as { annotations?: unknown[] } | undefined)?.annotations;
+          const target = Array.isArray(annos) ? annos[idx] : undefined;
+          if (isSelomAnnotation(target)) return;
+          st.commit([remove(`/layout/annotations/${idx}`)]);
+        }
       },
     };
   }

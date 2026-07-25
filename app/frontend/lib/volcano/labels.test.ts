@@ -138,3 +138,44 @@ describe("volcano gene labels", () => {
     });
   });
 });
+
+describe("gene labels vs the Selom annotation layer (milestone review blocker A3)", () => {
+  const point = { x: 1.2, y: 4.5, gene: "RPGRIP1" };
+  const selomTextLabel = {
+    text: "RPGRIP1",
+    x: 0.02,
+    y: 0.98,
+    xref: "paper",
+    yref: "paper",
+    selom: { kind: "textLabel", id: "sel-1" },
+  };
+
+  it("does not report a gene as labelled because a hand-placed annotation shares its text", () => {
+    const spec = { data: [], layout: { annotations: [selomTextLabel] } } as unknown as FigureSpec;
+    expect(isLabeled(spec, "RPGRIP1")).toBe(false);
+    expect(labeledGenes(spec).has("RPGRIP1")).toBe(false);
+  });
+
+  it("ADDS a gene label rather than removing the user's annotation of the same text", () => {
+    const spec = { data: [], layout: { annotations: [selomTextLabel] } } as unknown as FigureSpec;
+    const ops = toggleLabelOps(spec, point);
+    expect(ops).toHaveLength(1);
+    expect(ops[0].op).toBe("add"); // append, NOT a remove of index 0
+    expect(ops[0].path).toBe("/layout/annotations/-");
+  });
+
+  it("removes the real gene label at its TRUE index when a Selom item precedes it", () => {
+    const geneLabel = { text: "RPGRIP1", x: 1.2, y: 4.5 };
+    const spec = {
+      data: [],
+      layout: { annotations: [selomTextLabel, geneLabel] },
+    } as unknown as FigureSpec;
+    const ops = toggleLabelOps(spec, point);
+    expect(ops).toEqual([{ op: "remove", path: "/layout/annotations/1" }]);
+  });
+
+  it("does not carry a Selom annotation across a re-run as if it were a gene label", () => {
+    const spec = { data: [], layout: { annotations: [selomTextLabel] } } as unknown as FigureSpec;
+    expect(captureLabels(spec)).toEqual([]);
+  });
+});

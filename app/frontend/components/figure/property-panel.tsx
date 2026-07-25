@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import type { FigureStore } from "@/hooks/use-figure-store";
 import { deriveFigureModel, seriesForTrace } from "@/lib/figure/figure-model";
 import { nonSelomAnnotationItems } from "@/lib/figure/annotations";
+import { annotationLayerEnabled } from "@/lib/config/env";
 import { StylePanel } from "./panels/style-panel";
 import { AxesPanel } from "./panels/axes-panel";
 import { LegendPanel } from "./panels/legend-panel";
@@ -69,11 +70,18 @@ export function PropertyPanel({
     );
   }
 
+  // The hand-annotation tab is behind `annotationLayerEnabled` (off by default) until the layer has a
+  // selection model and survives a re-run — see lib/config/env.ts. Dropping it also returns the tab
+  // strip to 6 columns, which is what it was laid out for.
   const annotateTab = { value: "annotate", label: "Annotate", icon: Asterisk } as const;
   const pageTab = { value: "page", label: "Page", icon: FileText } as const;
-  const tabs = hasMarks
-    ? [...BASE_TABS, annotateTab, { value: "marks", label: "Marks", icon: Shapes }, pageTab]
-    : [...BASE_TABS, annotateTab, pageTab];
+  const marksTab = { value: "marks", label: "Marks", icon: Shapes } as const;
+  const tabs = [
+    ...BASE_TABS,
+    ...(annotationLayerEnabled ? [annotateTab] : []),
+    ...(hasMarks ? [marksTab] : []),
+    pageTab,
+  ];
 
   return (
     <Tabs value={tab} onValueChange={setTab} className="flex h-full min-h-0 flex-col">
@@ -122,11 +130,13 @@ export function PropertyPanel({
               <DataPanel store={store} spec={spec} model={model} focusedSeriesKey={focusedSeriesKey} />
             </PaneBoundary>
           </TabsContent>
-          <TabsContent value="annotate">
-            <PaneBoundary label="annotate" resetKeys={[spec]}>
-              <AnnotationsPanel store={store} spec={spec} />
-            </PaneBoundary>
-          </TabsContent>
+          {annotationLayerEnabled && (
+            <TabsContent value="annotate">
+              <PaneBoundary label="annotate" resetKeys={[spec]}>
+                <AnnotationsPanel store={store} spec={spec} />
+              </PaneBoundary>
+            </TabsContent>
+          )}
           {hasMarks && (
             <TabsContent value="marks">
               <PaneBoundary label="marks" resetKeys={[spec]}>
