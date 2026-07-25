@@ -46,6 +46,37 @@ function fromApiDatasetSource(v: unknown): DatasetSource | undefined {
   };
 }
 
+/**
+ * QC off the wire (`datasets.qc`) — a free-form JSON column holding TWO different shapes.
+ *
+ * `POST /datasets` (the metadata-only twin) stores the FE's own {@link QcReport}, so a round-trip
+ * gives back exactly what was sent. But the real upload path stores something else entirely:
+ * `uploads/service.py::materialize_dataset` stamps the ENGINE's QcReport
+ * (`{ran, ok, flags, stats, blocked}`), which has no `nObs`/`nVar` at all. Two same-named types,
+ * one column.
+ *
+ * The mapper used to `as`-cast the column straight into `Dataset["qc"]`, which told TypeScript the
+ * engine's shape had the fields it does not. The result was a hard runtime crash on Selom's PRIMARY
+ * flow — drop a file → `uploadDataset` → `addUploadedDataset` → the workrail renders `DatasetRow`
+ * → `dataset.qc.nObs.toLocaleString()` → *Cannot read properties of undefined*, and the whole app
+ * goes to the error overlay (same call in `data-panel.tsx`). It never showed up in testing because
+ * `dev:mock` skips `uploadDataset` entirely (`if (!mockMode)`), so the mock only ever produced the
+ * client shape [[verify-on-real-data-not-mock]] [[mock-must-mirror-backend-contract]].
+ *
+ * So: adopt the column only when it really is the FE's report. The engine's is not a lesser version
+ * of it — it is a different record, and the FE's arrives moments later from `/data/inspect` via
+ * `qcFromInspect` (`updateDatasetProfile`). Dropping it means the rail reads the plain modality for
+ * a beat instead of dying.
+ */
+function fromApiDatasetQc(v: unknown): Dataset["qc"] {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
+  const r = v as Record<string, unknown>;
+  // `nObs`/`nVar` are what every consumer formats, and they are required on the FE type — so they
+  // are the honest discriminator between the two shapes.
+  if (typeof r.nObs !== "number" || typeof r.nVar !== "number") return undefined;
+  return v as Dataset["qc"];
+}
+
 export function fromApiDataset(r: Record<string, unknown>): Dataset {
   return {
     id: r.id as string, projectId: r.project_id as string, filename: (r.filename as string) || "data",
@@ -55,7 +86,7 @@ export function fromApiDataset(r: Record<string, unknown>): Dataset {
     // the real intake flow → runs use run-from-dataset_id. A metadata-only `addDataset` row is `ready`
     // with NO key → false. Recomputed on every reconcile, so it stays correct across reload.
     uploaded: r.status === "ready" && Boolean(r.upload_s3_key || r.parquet_s3_key),
-    qc: (r.qc as Dataset["qc"]) || undefined,
+    qc: fromApiDatasetQc(r.qc),
     source: fromApiDatasetSource(r.source),
     createdAt: ms(r.created_at),
   };

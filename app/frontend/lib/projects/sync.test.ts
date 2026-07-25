@@ -52,3 +52,47 @@ describe("fromApiDataset — cloud-import provenance survives the boundary", () 
     expect(d.source).toEqual({ provider: "dropbox", ref: "", fetchedAt: undefined });
   });
 });
+
+/**
+ * `datasets.qc` carries TWO different shapes, and the mapper used to `as`-cast whichever arrived
+ * into the FE's `QcReport`.
+ *
+ * Captured live from a real upload of a real EYG_28 DE export against a real backend (2026-07-25):
+ * `POST /uploads/{id}/parse` returns `qc = {ran, ok, flags, stats, blocked}` — the ENGINE's report,
+ * with no `nObs`/`nVar`. Every consumer then calls `qc.nObs.toLocaleString()` (`workrail.tsx`
+ * DatasetRow, `data-panel.tsx`), so the cast turned Selom's primary flow — drop a file — into a
+ * *Cannot read properties of undefined* crash that took the whole app to the error overlay.
+ *
+ * It survived every gate because `dev:mock` skips `uploadDataset` (`if (!mockMode)`), so no mock
+ * run ever produced the engine shape. That is the standing lesson, now executable
+ * [[verify-on-real-data-not-mock]].
+ */
+describe("fromApiDataset — a foreign qc shape must not reach the formatters", () => {
+  /** Verbatim from the live `POST /uploads/{dataset_id}/parse` response. */
+  const ENGINE_QC = { ran: true, ok: true, flags: [], stats: {}, blocked: false };
+
+  it("drops the engine's QcReport — it has no nObs/nVar to format", () => {
+    const d = fromApiDataset({ ...READY_IMPORT, qc: ENGINE_QC });
+    expect(d.qc).toBeUndefined();
+  });
+
+  it("the dropped shape would otherwise crash the exact call the UI makes", () => {
+    const d = fromApiDataset({ ...READY_IMPORT, qc: ENGINE_QC });
+    // `workrail.tsx` DatasetRow / `data-panel.tsx` both do `qc.nObs.toLocaleString()` behind a
+    // truthiness check on `qc` alone. Undefined keeps them on the `: dataset.modality` branch.
+    expect(() => (d.qc ? d.qc.nObs.toLocaleString() : "modality")).not.toThrow();
+  });
+
+  it("keeps the FE's own QcReport, which round-trips through POST /datasets", () => {
+    const clientQc = { detectedModality: "bulk RNA-seq", nObs: 16760, nVar: 9 };
+    const d = fromApiDataset({ ...READY_IMPORT, qc: clientQc });
+    expect(d.qc?.nObs).toBe(16760);
+    expect(d.qc?.nVar).toBe(9);
+  });
+
+  it("discards anything else the free-form column may hold", () => {
+    for (const qc of [null, {}, [], "qc", 7, { nObs: 10 }, { nObs: "10", nVar: "9" }]) {
+      expect(fromApiDataset({ ...READY_IMPORT, qc }).qc).toBeUndefined();
+    }
+  });
+});
