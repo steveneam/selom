@@ -64,11 +64,18 @@ id/secret; its integration id must match the `provider_config_key` in the backen
 
 ## Wiring Selom to Nango
 
-Set these on the Selom backend (they default to off/empty, so nothing changes until you do):
+Set these in **`<repo root>/.env`** — the file `app/backend/config.py` actually loads
+(pydantic-settings `env_file`). **Not `app/backend/.env`**: that file stages the raw OAuth client
+ids/secrets for pasting into Nango's dashboard and is never read by Selom, so a setting parked there
+looks configured and does nothing. `SELOM_NANGO_BASE_URL` in particular falls back to the DEAD local
+default and the server talks to a corpse while `preflight.sh` goes green against the live broker.
+One home per setting; `app/backend/tests/test_cloud_env_home.py` fails if the two drift apart.
+
+They default to off/empty, so nothing changes until you set them:
 
 ```
-SELOM_NANGO_BASE_URL=http://localhost:3003
-SELOM_NANGO_SECRET_KEY=<Nango secret key from the dashboard>
+SELOM_NANGO_BASE_URL=https://nango.swordfish.cfd   # the LIVE broker; :3003 is the dead dev copy
+SELOM_NANGO_SECRET_KEY=<Nango secret key from THAT instance's dashboard>
 SELOM_CLOUD_GOOGLE=true         # flip per provider once its client ids exist in Nango
 SELOM_CLOUD_ONEDRIVE=true
 SELOM_CLOUD_DROPBOX=true

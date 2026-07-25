@@ -18,7 +18,12 @@ set -uo pipefail
 
 CONTAINER=selom-nango-server
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-BACKEND_ENV="$REPO_ROOT/app/backend/.env"
+# The env file the BACKEND actually loads (app/backend/config.py: pydantic-settings
+# env_file = <repo root>/.env). It used to read app/backend/.env, which the backend never loads —
+# so this script could pass against the live broker while the server itself was still pointed at the
+# dead 127.0.0.1:3003 default. One home per setting; locked by
+# app/backend/tests/test_cloud_env_home.py.
+BACKEND_ENV="$REPO_ROOT/.env"
 fails=0; skips=0
 ok()   { printf '  ok   %s\n' "$1"; }
 skip() { printf '  SKIP %s\n' "$1"; skips=$((skips + 1)); }
