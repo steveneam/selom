@@ -2,6 +2,7 @@
 
 import { FigureCanvas } from "@/components/figure/figure-canvas";
 import { PaneBoundary } from "@/components/ui/error-boundary";
+import { artboardFrame } from "@/lib/ui/artboard-frame";
 import { cn } from "@/lib/ui/cn";
 import type { FigureStore } from "@/hooks/use-figure-store";
 import type { MarkRole } from "@/lib/erg/marks";
@@ -35,14 +36,21 @@ export function ArtboardHost({
 }) {
   const spec = store.spec;
   if (!spec) return null;
-  const fixed = typeof spec.layout.width === "number";
+  // ONE sizing rule, declared and unit-tested in lib/ui/artboard-frame (A24): a responsive figure is
+  // sized BY this stage — it cannot ask for more room than the shell's bands left it — while a
+  // fixed-size figure keeps its declared size and scrolls from the top.
+  const frame = artboardFrame(typeof spec.layout.width === "number");
 
   return (
-    // Top-align (not center): a tall figure overflows the scroll region, and centering would push
-    // its top out of view AND make it unreachable by scrolling. A slim dark gutter (p-3 lg:p-4, not
-    // p-6 lg:p-10) keeps the artboard the hero at 1280 — the workrail + inspector already claim a lot
-    // of the row, so the figure gets every remaining pixel; the white card's own p-3 keeps breathing room.
-    <div className="relative flex min-w-0 flex-1 items-start justify-center overflow-auto p-3 lg:p-4">
+    // A slim dark gutter (p-3 lg:p-4, not p-6 lg:p-10) keeps the artboard the hero at 1280 — the
+    // workrail + inspector already claim a lot of the row, so the figure gets every remaining pixel;
+    // the white card's own p-3 keeps breathing room.
+    <div
+      className={cn(
+        "relative flex min-w-0 flex-1 justify-center overflow-auto p-3 lg:p-4",
+        frame.alignClass,
+      )}
+    >
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
@@ -54,14 +62,10 @@ export function ArtboardHost({
       <div
         className={cn(
           "relative flex rounded-xl border border-border bg-artboard p-3 shadow-2xl ring-1 ring-black/5",
+          frame.cardClass,
           elevated && "z-[45]",
         )}
-        style={
-          // Fill the available width (so collapsing the side rails gives the figure more room
-          // instead of opening a dark gap), capped so it never stretches absurdly wide on an
-          // ultra-wide monitor; still centered on the dark stage when it does cap.
-          fixed ? undefined : { width: "100%", maxWidth: "88rem", height: "min(74vh, 720px)" }
-        }
+        style={frame.cardStyle}
       >
         <div className="min-h-0 min-w-0 flex-1">
           {/* Isolated (Task B1): a render throw in Plotly / a bespoke drag plug-in shows a fallback

@@ -135,7 +135,7 @@ after rebase — plan them there, not in-lane.
 
 | ID | Finding | Work | Status |
 |---|---|---|---|
-| L3-01 | A24 | The artboard hero is clipped inside its own stage (`height: min(74vh,720px)` vs ~150px of new fixed chrome). | TODO |
+| L3-01 | A24 | The artboard hero is clipped inside its own stage (`height: min(74vh,720px)` vs ~150px of new fixed chrome). | **DONE** — the stage sizes the card now (`items-stretch`, no inline height); the rule is one pure `artboardFrame(fixed)` in `app/frontend/lib/ui/artboard-frame.ts` that BOTH hosts consult, so CanvasShell and the classic EditorWorkspace cannot drift. Ratcheted by `lib/ui/artboard-frame.test.ts` (proven red when the `min(74vh,720px)` height is restored) — a browser gate was unavailable in-lane, so the invariant is executable instead. Browser confirmation is `D-5` in `LANE-WRAP.md`. |
 | L3-02 | A25 · B13 | The inert "coming soon" palette strip eats 64px of a height-constrained editor and asserts the colourway by colour alone, `aria-hidden`. Retire it or make it real + accessible. | TODO |
 | L3-03 | A30 | Execute P0-06's icon decision (Phosphor migration, or record lucide as the decision). | **DROPPED** — P0-06 decided **lucide stays**, recorded as binding DECISIONS #12. There is nothing to implement: the decision *is* the deliverable, and it closes A30 permanently. Lane 3 does no icon work. |
 | L3-04 | §D | Observe the review's unverified layout predictions in a real browser at desktop widths and close or re-file them honestly. | TODO |
