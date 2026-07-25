@@ -35,12 +35,23 @@ Set `NANGO_SERVER_URL` (and `NANGO_PUBLIC_SERVER_URL` / `NANGO_PUBLIC_CONNECT_UR
 origin **the moment a proxy lands in front of the stack**, recreate the server, and register that
 `…/oauth/callback` in each provider's app console (Google Cloud, Azure AD, Dropbox).
 
-> **Landmine (cost a session, 2026-07-25).** A stale `localhost` value here does **not** fail loudly.
-> The authorize step derives `redirect_uri` from the forwarded host, so the provider shows a perfect
-> consent screen — then the code **exchange** re-derives the callback from `NANGO_SERVER_URL` and the
-> provider rejects it (`redirect_uri_mismatch`). Symptom: a human who consents successfully, and
-> `GET /connections` still empty. `preflight.sh` checks 3 + 4 exist to catch exactly this; run it
-> before asking anyone to complete a consent. Add each integration in the Nango dashboard with its client
+> **TWO INSTANCES — read this before diagnosing anything (2026-07-25).**
+> - **LIVE:** `https://nango.swordfish.cfd`, swordfish-provisioned **on syd2**. Holds the real
+>   integrations and the owner's connections; `SELOM_NANGO_BASE_URL` points here.
+> - **DEV:** this compose stack, `127.0.0.1:3003` on **syd4** — a separate instance with its own
+>   Postgres and its own secret key. It shares nothing with the live one.
+>
+> Confusing them cost a diagnosis: a stale `localhost` origin was found and "fixed" on the dev copy
+> and reported as the cause of a live OAuth failure. The tell is one command —
+> Selom's secret key returns `unknown_account` on the instance it doesn't belong to. That is
+> `preflight.sh` check 2; the container-level checks **skip** unless the key authenticates both at
+> `BASE` and on the local container's own port, because a container's `NANGO_SERVER_URL` is a *claim*.
+>
+> The stale-origin hazard is still real, just not what happened here: with a proxy in front, authorize
+> derives `redirect_uri` from the forwarded host and the consent screen looks perfect, then the code
+> **exchange** re-derives the callback from `NANGO_SERVER_URL` and the provider rejects it — breaking
+> *after* a human consents, with no connection persisted. Run `bash preflight.sh [BASE]` before asking
+> anyone to complete a consent. Add each integration in the Nango dashboard with its client
 id/secret; its integration id must match the `provider_config_key` in the backend registry
 (`app/backend/cloud/registry.py`): `google-drive`, `onedrive`, `dropbox`.
 
