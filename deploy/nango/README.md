@@ -6,6 +6,13 @@ URL/S3 import path needs no OAuth and works without any provider setup.
 
 ## Run
 
+> **This stack is STOPPED as of 2026-07-25** (owner-approved cleanup). It is the syd4 **dev copy** and
+> nothing uses it — Selom's backend talks to swordfish's live broker on syd2. Its containers and
+> volumes are intact; restart with `sudo docker compose -f deploy/nango/docker-compose.yaml start`
+> (~500 MB on a shared box, so only start it when you actually need a local broker). With it down,
+> `preflight.sh` correctly reports `SKIP no local selom-nango-server` and still verifies the live
+> instance — a skip, not a pass.
+
 ```bash
 cp .env.example .env          # then fill NANGO_ENCRYPTION_KEY (openssl rand -base64 32) + passwords
 sudo docker compose up -d
