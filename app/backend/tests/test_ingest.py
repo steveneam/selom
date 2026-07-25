@@ -69,10 +69,19 @@ def test_ingest_xlsx_named_sheet(tmp_path):
 def test_ingest_h5ad_single_cell(tmp_path):
     ad = pytest.importorskip("anndata")
     pytest.importorskip("h5py")
-    # pandas-3 indices materialize as nullable StringArray; opt in to writing them (env quirk,
-    # write-side only — the ingest/read path under test is unaffected).
-    ad.settings.allow_write_nullable_strings = True
-    adata = ad.AnnData(RNG.poisson(1.0, size=(10, 5)).astype("float32"))
+    pd = pytest.importorskip("pandas")
+    # An AnnData built with no obs/var gets auto-generated indices, which pandas-3 materializes as
+    # arrow-backed strings that anndata 0.12.6 has no h5ad writer for (it raises on key '_index').
+    # `allow_write_nullable_strings` does not cover that case. Name the indices explicitly as
+    # object dtype — the repo idiom (test_cepo.py) and what `assemble._prepare_for_write` does for
+    # the production write path. Write-side fixture setup only; the ingest/read path under test is
+    # what real scanpy-written h5ad files exercise.
+    X = RNG.poisson(1.0, size=(10, 5)).astype("float32")
+    adata = ad.AnnData(
+        X,
+        obs=pd.DataFrame(index=pd.Index([f"c{i}" for i in range(X.shape[0])], dtype=object)),
+        var=pd.DataFrame(index=pd.Index([f"g{j}" for j in range(X.shape[1])], dtype=object)),
+    )
     p = tmp_path / "cells.h5ad"
     adata.write_h5ad(p)
     db = ingest(p)

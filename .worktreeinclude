@@ -13,5 +13,9 @@
 # NOT copied, on purpose:
 #   app/backend/dev.db — dev runs on a local SQLite seam, so each worktree gets
 #     its own fresh DB (free isolation). Never share one dev DB across lanes.
-#   node_modules/ · .venv/ — gitignored but too large to copy; each worktree
-#     installs its own (npm install --legacy-peer-deps / uv sync). See COORDINATION.md.
+#   node_modules/ · .venv/ — gitignored and far too large to copy. A worktree does NOT
+#     install its own: scripts/worktree-setup.sh SYMLINKS the main checkout's copies in,
+#     and app/frontend/scripts/guard-worktree-install.mjs refuses `npm install` inside a
+#     worktree precisely because it would write through that link and clobber the main
+#     tree (and every other lane). Consequence: both dep sets are SHARED — a lane that
+#     needs a new dependency stops and re-plans, it does not install one.

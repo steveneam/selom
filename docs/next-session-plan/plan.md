@@ -33,12 +33,13 @@ bleeding while it waits.
 |---|---|---|---|
 | P0-01 | **Push `main`** — the merge + the review backlog + this plan. Count is whatever `git rev-list --count origin/main..main` says (do not trust a number written here). Triggers the Vercel deploy. | **founder gate** | TODO |
 | P0-02 | Delete `campaign/parallel-lanes` — only after P0-01, so the work has a remote ref first | me | TODO |
-| P0-03 | **Freeze the one cross-lane contract**: `GET /cloud/providers → { providers: [{ id, label, kind, provider_config_key, enabled }] }`. Written into `docs/figure-editor-contract/`-style form before Lane 2 starts; no other lane may define or consume it. | me | TODO |
+| P0-03 | **Freeze the one cross-lane contract**: `GET /cloud/providers → { providers: [{ id, label, kind, provider_config_key, enabled }] }`. Written into `docs/figure-editor-contract/`-style form before Lane 2 starts; no other lane may define or consume it. | me | **DONE** — executable freeze `app/backend/tests/test_contract_cloud_providers.py` (10 assertions, verified to FAIL on a renamed FE key, an added BE key, and a leaked secret); declarations `app/backend/cloud/contract.py` + `app/frontend/lib/cloud/contract.ts`; `registry.list_providers()` makes menu order server-owned; doc `docs/cloud-providers-contract/spec.md`. Guard filename sits **outside** Lane 2's `test_cloud*.py` glob, so editing the freeze is a visible scope breach. Route-conformance test is dormant behind a skip naming `L2-01` and self-activates. |
 | P0-04 | Confirm the lane mechanics with **thalon** (has run worktree lanes on this box repeatedly) | me | **DONE** — `docs/next-session-plan/lane-mechanics-from-thalon.md`, adopted in §Lane mechanics |
 | P0-05 | Approve (or reshape) the lane partition in §Lanes | **founder gate** | TODO |
 | P0-06 | **Icon decision (A30):** migrate to Phosphor, or record "lucide stays" as a decision so the finding stops recurring in every FE review | **founder gate** | TODO |
 | P0-07 | Triage the on-hold register (§On-hold) — several items are parked on a gate that no longer exists | **founder gate** | TODO |
-| P0-08 | **Build the one-command gate of record** — `scripts/verify.sh`: `hygiene-scan --all` + BE `pytest -m "not slow"` + `ruff check` + FE `tsc` + `eslint` + `vitest`, exit-code gated, **raw output**. Selom has no single verify command today, and the merge train needs one to run against each rebased result. Also the natural home for the `\| tail` fix below. | me | TODO |
+| P0-08 | **Build the one-command gate of record** — `scripts/verify.sh`: `hygiene-scan --all` + BE `pytest -m "not slow"` + `ruff check` + FE `tsc` + `eslint` + `vitest`, exit-code gated, **raw output**. Selom has no single verify command today, and the merge train needs one to run against each rebased result. Also the natural home for the `\| tail` fix below. | me | **DONE** — `scripts/verify.sh`, **7** gates (added `fe-build`, which CI has and this list omitted: it is the only gate that catches SSR/integration breaks, so a train without it can merge a broken app green [[full-app-smoke-test-before-handoff]]). Raw output, per-gate exit code, runs all gates then a ledger + non-zero exit; fails CLOSED on a missing tool; reports NOT-RUN as `SKIP`, never folded into a pass. **Whole gate is 70s on main** (`-n 2`). Flags `--fast` / `--be` / `--fe` / `--force-build` / `--list`. |
+| P0-10 | **Lane provisioning did not exist on Linux — NOT in the original plan, found while building P0-08.** The only worktree provisioner was `scripts/worktree-setup.ps1`: PowerShell, NTFS junctions, `.venv\Scripts\python.exe`, `cmd /c rmdir`. The box is Linux, so **no lane could have been forked with working deps.** Ported to `scripts/worktree-setup.sh` (symlinks, `bin/python`, gitignore-subset `.worktreeinclude` copy, toolchain assertion at setup, main-tree file-count ratchet, landmines printed for inlining into a kickoff). **Validated end-to-end** on a real throwaway worktree: provisioned, gates run, torn down, main tree byte-count unchanged (39713 → 39713). Also corrected `.worktreeinclude`, which told you each worktree "installs its own" node_modules — the exact thing `guard-worktree-install.mjs` refuses. | me | **DONE** |
 | P0-09 | **Headroom check before forking 3 sessions — mostly already answered.** Confirmed on syd4 today: `agent-tmux.service` has `OOMPolicy=continue` (so thalon's fleet-killer mode is mitigated here), 6 vCPU / 15.99 GB with ~9.1 GB available, and five live agent sessions cost **~1.9 GB combined** — agents are cheap; a Next dev server is 1.4 GB and a browser ~1.5 GB. thalon's **measured** figure is **~2.26 GiB/lane** with 4 concurrent + lead fitting post-resize, and they have **retired stagger-launches** in favour of **staggering the SUITE RUNS** (reconciled via eamos 2026-07-25). Remaining action: **cap per-lane test parallelism at `-n 2`, not `-n auto`** — the real ceiling is CPU oversubscription (3 lanes x 6 workers on 6 vCPU), not RAM. | me | **DONE** (measured) — carry the `-n 2` cap into each lane's kickoff |
 
 ---
@@ -63,7 +64,7 @@ dataset** under `SELOM_DATASETS_DIR` — not a fixture.
 | L1-07 | A17 | ERG oscillatory potentials report `0.0` for "not measurable" → `None`/`not_measurable`, so unmeasurable ≠ absent inner-retinal activity. | TODO |
 | L1-08 | A18 | The opt-in robust a/b detector changes amplitudes without disclosure → disclose in methods via the same `layout.meta` channel the FACS/volcano fixes use. Do with L1-07. | TODO |
 | L1-09 | — | **ERG figure/table wiring** (was candidate lane (a), unblocked when FACS landed): OP · PhNR · flicker-FFT into the figure/table surfaces + `companions/methods.py`. The measurements shipped in `a84636c`; nothing surfaces them yet — a shipped-not-reachable item, so it belongs in this sweep. | TODO |
-| L1-10 | — | `test_ingest.py::test_ingest_h5ad_single_cell` (anndata ↔ pandas-3.0 h5ad write) has been red for the whole campaign, proven pre-existing. Fix it, or skip it with an honest reason + a pointer — a permanently-red gate trains everyone to ignore the gate. | TODO |
+| L1-10 | — | `test_ingest.py::test_ingest_h5ad_single_cell` (anndata ↔ pandas-3.0 h5ad write) has been red for the whole campaign, proven pre-existing. Fix it, or skip it with an honest reason + a pointer — a permanently-red gate trains everyone to ignore the gate. | **DONE — pulled into Phase 0, no longer Lane 1's.** Fixed, not skipped. Root cause: the test built its fixture as `ad.AnnData(X)` with no obs/var, so anndata auto-generated indices that pandas-3 materializes as arrow-backed strings its h5ad writer has no method for (it raised on key `_index`); `allow_write_nullable_strings` does not cover that case. Fixture now names both indices `dtype=object` — the idiom already proven in `test_cepo.py` and the same coercion `assemble._prepare_for_write` does for the **production** write path, which was already correct. Write-side fixture only; the read path under test is unaffected. Done here because P0-08's gate of record is worthless while it is red on a clean tree. |
 
 ## Lane 2 — Cloud reachability across the FE↔BE seam (Plan A)
 
@@ -91,8 +92,14 @@ tests in `app/backend/tests/test_cloud*.py`
 `app/frontend/lib/ui/**` · the icon decision's mechanics
 **Must NOT touch:** `components/figure/{property-panel,figure-canvas}.tsx` or anything behind
 `NEXT_PUBLIC_ANNOTATION_LAYER` — that is Plan C's territory.
-**Gate:** `tsc` + `eslint` + `vitest`, **plus a real-app load at desktop widths** — these are layout
-claims and the review's render gate never reached a browser.
+**Gate:** in-lane `scripts/verify.sh --fe` (hygiene + eslint + tsc + vitest — all three **measured to
+resolve correctly** through the shared `node_modules` symlink), **plus a real-app load at desktop
+widths** — these are layout claims and the review's render gate never reached a browser.
+**Measured constraint (P0-10):** `fe-build` **cannot run in a lane** — Turbopack rejects the
+out-of-root symlink (`Symlink node_modules is invalid, it points out of the filesystem root`).
+`verify.sh` detects the worktree and reports it as `SKIP` with that reason rather than a misleading
+`FAIL`. So **`fe-build` and the browser check are both merge-train steps on the lead's main checkout**,
+after rebase — plan them there, not in-lane.
 
 | ID | Finding | Work | Status |
 |---|---|---|---|
@@ -107,6 +114,11 @@ claims and the review's render gate never reached a browser.
 presentational second (cannot conflict with Lane 1), seam-spanning last so it rebases onto both and
 its end-to-end gate runs against the final tree. Local merges autonomous; **each merge is followed by
 its own founder push** so a bad lane never rides in on another's push.
+
+**The gate at each train step is `scripts/verify.sh` (no arguments) on the lead's main checkout** —
+the full 7-gate run, ~70s, including the `fe-build` that no lane could run. Run it on the *rebased*
+result before the merge, never only in-lane: lanes test against the `main` they forked from, and the
+rebased combination is what ships.
 Shared-ground rule: `app/backend/tests/**` is touched by two lanes → each adds tests only in its own
 named files listed above.
 
@@ -126,9 +138,19 @@ namespace**, so each kickoff must inline its landmines rather than assume recall
 **Worktree dep prep is its own step, and it bites on Linux.** Node module *resolution* walks up to the
 main checkout, so a half-broken link set passes tests while tools needing workspace-nested deps
 (eslint) fail. Assert the link set at lane **setup**, never at merge time, and **never `npm install`
-inside a worktree**. Consequence for Lane 3: **dev servers may not run in a lane at all** (Turbopack
-fatals on out-of-root symlinks), so L3-04's real-browser check happens on the lead's main checkout
-*after* rebase — not in-lane. Plan it there.
+inside a worktree**. `scripts/worktree-setup.sh` (P0-10) does both: it links and then *asserts* that
+`next` and the `eslint` binary actually resolve through the link, failing the provisioning rather than
+handing over a lane that breaks hours later at the train.
+
+**Now measured rather than predicted** (P0-10, on a real throwaway worktree on this box): `eslint`,
+`tsc` and `vitest` **all pass in a lane** — better than feared. What genuinely cannot run is anything
+Turbopack drives: **`next build` and `next dev` both fatal** on the out-of-root symlink
+(`Symlink node_modules is invalid, it points out of the filesystem root`). So the consequence for
+Lane 3 is narrower but firmer than written above: its lint/type/unit gate runs in-lane, while
+**`fe-build` *and* L3-04's real-browser check are merge-train steps on the lead's main checkout** after
+rebase. A **shared** hazard the ported script also surfaces: the BE `.venv` is symlinked too, and
+`uv run` auto-syncs — so a lane that edits `pyproject.toml`/`uv.lock` mutates **every** lane's
+interpreter. A lane needing a new BE dep stops and re-plans; it does not sync the shared venv.
 
 **The frozen contract is the real tripwire — and it must be executable.** Disjointness comes from
 construction (the globs above) and the glob check at the train is only a backstop; nearly every

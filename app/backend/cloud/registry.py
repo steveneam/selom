@@ -48,6 +48,16 @@ def get_provider(provider_id: str) -> Provider | None:
     return _PROVIDERS.get(provider_id)
 
 
+def list_providers() -> list[Provider]:
+    """Every registered provider, in declaration order.
+
+    Declaration order IS the FE's menu order — it crosses the wire via ``GET /cloud/providers`` and
+    the client renders it as given rather than re-sorting (``cloud.contract``). Returns a new list so
+    a caller cannot mutate the registry.
+    """
+    return list(_PROVIDERS.values())
+
+
 def get_connector(provider_id: str) -> CloudConnector | None:
     return _CONNECTORS.get(provider_id)
 
