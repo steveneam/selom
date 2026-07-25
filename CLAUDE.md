@@ -113,7 +113,7 @@ Pipelines (run end-to-end, the same way each time): **Design loop** = forcing-Qs
 
 ## Notes
 
-- This repo runs on **Opus 4.8** (xhigh effort) — owner-directed 2026-06-13, pinned in `.claude/settings.json` (`model=claude-opus-4-8`, `effortLevel=xhigh`); superseded the prior Fable 5 default.
+- This repo runs on **Opus 5** (xhigh effort) — owner-directed 2026-07-25, pinned in `.claude/settings.json` (`model=claude-opus-5`, `effortLevel=xhigh`); superseded the prior Opus 4.8 pin (2026-06-13), which itself superseded the earlier Fable 5 default.
 - Commercial/licensing gates are **deferred** — build now, gate before launch (see `LAUNCH-GATES.md`).
 - At a **frontend milestone** — or on a requested FE audit/review — run **`fe-review`** (the FE peer
   of `review-gauntlet`: the V·R·D·A·R·N mutation lens + a G1 user-task walkthrough + a G2
