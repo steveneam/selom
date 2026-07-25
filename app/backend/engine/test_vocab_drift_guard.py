@@ -16,11 +16,13 @@ Two halves, one invariant — *the DE / metabolomics synonym vocabulary has exac
    were converged onto this primitive by restructure WS3.1, so the allow-list is now empty — any new
    fork anywhere fails the test with a pointer at the primitive.
 
-3. **The six DE runners single-source the GENE vocabulary (identity).** Each ``skills/*/run_real.py``
-   that reads a gene-label column binds its module-level ``GENE`` to :data:`engine.columns.GENE` (the
-   same object), so a future gene-fork (re-declaring ``_GENE_COLS`` and dropping the import) fails the
-   identity check — the gene half of the same single-source invariant the FC/p-value halves already
-   hold.
+3. **The six DE runners single-source the RESOLVER, not just the vocabulary (identity + AST).** WS3.1
+   converged the vocabulary and left the MATCHER forked into six byte-identical ``_pick`` copies, so
+   one runner could silently diverge (exact vs substring, a different tie-break, a dropped override)
+   with every guard above still green — finding A19. Each runner now binds ``resolve`` to
+   :func:`engine.columns.resolve` (identity), and a second AST scan fails on any ``skills/**``
+   function shaped like a re-forked matcher (a membership test nested two levels deep in iteration
+   over its own parameters).
 
 Co-located in ``engine/`` (not ``tests/``) because the parallel-sprint ENG lane owns
 ``app/backend/engine/**`` and must not touch ``tests/``; the backend has no ``testpaths`` restriction,
@@ -45,8 +47,9 @@ KNOWN_OUT_OF_LANE_FORKS: frozenset[str] = frozenset()
 # The one allowed engine-side definition.
 PRIMITIVE_REL = "engine/vocab.py"
 
-# The six DE runners that read the shared column vocabulary — converged by WS3.1. Each binds a
-# module-level ``GENE`` to :data:`engine.columns.GENE`; the identity test below locks that.
+# The six DE runners that read the shared column vocabulary — converged by WS3.1 (vocabulary) and by
+# A19 (the resolver). Each binds a module-level ``resolve`` to :func:`engine.columns.resolve`; the
+# identity test below locks that.
 DE_RUNNER_MODULES = (
     "skills.volcano.run_real",
     "skills.enrichment.run_real",
@@ -166,21 +169,188 @@ def test_significance_selection_prefers_the_adjusted_tier():
     assert vocab.METABOLOMICS_TOKENS == ("m/z", "hmdb", "metabolite", "kegg c")
 
 
-# --- 1b. the six DE runners single-source the GENE vocabulary (identity) -------------------
+# --- 1b. the six DE runners single-source the RESOLVER (identity) --------------------------
 
-def test_de_runners_share_the_gene_vocabulary_by_identity():
-    """Every converged DE runner reads the SAME gene-label synonym object the engine exports — so the
-    gene half no longer forks (the FC/p-value halves are AST-scanned + engine-identity-locked above).
-    A future gene-fork (a runner re-declaring its own ``_GENE_COLS`` and dropping the import) rebinds
-    or drops this name and fails here, with a pointer at the one home."""
+def test_de_runners_share_the_column_resolver_by_identity():
+    """Every converged DE runner resolves columns through the SAME function the engine exports.
+
+    The vocabulary halves above cannot see a forked *matcher*: six byte-identical ``_pick`` copies
+    consumed the one shared vocabulary and every guard stayed green while any one of them could
+    diverge (A19). A runner that reintroduces its own picker rebinds or drops this name and fails
+    here, with a pointer at the one home.
+    """
     import importlib
 
     for mod_name in DE_RUNNER_MODULES:
         mod = importlib.import_module(mod_name)
-        assert getattr(mod, "GENE", None) is columns.GENE, (
-            f"{mod_name} must read the shared gene vocabulary — bind `GENE` to "
-            f"engine.columns.GENE (`from engine.columns import GENE`), never a local copy."
+        assert getattr(mod, "resolve", None) is columns.resolve, (
+            f"{mod_name} must resolve columns through the shared resolver — bind `resolve` to "
+            f"engine.columns.resolve (`from engine.columns import resolve`), never a local picker."
         )
+
+
+# --- 1c. no runner re-forks the MATCHER (AST scan of skills/**) ----------------------------
+# The deleted fork's shape, and the shape any re-fork wears whether written as nested ``for`` loops,
+# a ``for`` around a comprehension, or one comprehension with two ``for`` clauses::
+#
+#     for syn in synonyms:                 # iterates a PARAMETER
+#         for low, orig in cols.items():   # iterates a PARAMETER
+#             if syn in low:               # both operands are ITERATION TARGETS
+#                 return orig
+#
+# All three conditions are required, which is what keeps the scan quiet on ordinary skill code:
+# nesting depth >= 2, both operands of the membership test bound as iteration targets, and at least
+# one of those iterations reading a parameter of the function. Ordinary lookups (``m in pos``,
+# ``sym in adata.var_names``, ``c in _erg.CONDITION_ORDER``) fail one of them and are not flagged, and
+# neither is the single-level exact lookup in ``skills/sankey/run_real.py::_pick`` — resolving a
+# fixed source/target/value literal is a different question from DE role resolution.
+
+SKILLS_REL = "skills"
+
+
+def _iter_root(node: ast.AST) -> str | None:
+    """The name an iterable expression reads: ``cols`` for ``cols``, ``cols.items()``, ``cols.keys()``."""
+    if isinstance(node, ast.Call):
+        node = node.func
+    if isinstance(node, ast.Attribute):
+        node = node.value
+    return node.id if isinstance(node, ast.Name) else None
+
+
+def _target_names(target: ast.AST) -> set[str]:
+    return {n.id for n in ast.walk(target) if isinstance(n, ast.Name)}
+
+
+def _forks_the_matcher(fn: ast.AST, params: set[str]) -> bool:
+    """True if ``fn`` contains a ``_pick``-shaped column match (see the note above)."""
+    hit = False
+
+    def walk(node: ast.AST, depth: int, bound: dict[str, str | None]) -> None:
+        nonlocal hit
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.Compare) and any(
+                isinstance(op, (ast.In, ast.NotIn)) for op in child.ops
+            ):
+                operands = [child.left, *child.comparators]
+                names = [o.id for o in operands if isinstance(o, ast.Name)]
+                if (depth >= 2 and len(names) == len(operands) >= 2
+                        and all(n in bound for n in names)
+                        and any(bound[n] in params for n in names)):
+                    hit = True
+            if isinstance(child, ast.For):
+                walk(child, depth + 1,
+                     {**bound, **dict.fromkeys(_target_names(child.target), _iter_root(child.iter))})
+            elif isinstance(child, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+                inner = dict(bound)
+                for gen in child.generators:
+                    inner.update(dict.fromkeys(_target_names(gen.target), _iter_root(gen.iter)))
+                walk(child, depth + len(child.generators), inner)
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue  # a nested def is scored on its own
+            else:
+                walk(child, depth, bound)
+
+    walk(fn, 0, {})
+    return hit
+
+
+def _forked_matchers(path: Path) -> list[str]:
+    """Names of ``_pick``-shaped column matchers defined in ``path`` (see the note above)."""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+    except SyntaxError:
+        return []
+    out = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        params = {a.arg for a in node.args.args} | {a.arg for a in node.args.kwonlyargs}
+        if len(params) >= 2 and _forks_the_matcher(node, params):
+            out.append(node.name)
+    return out
+
+
+# The three spellings of the deleted fork, verbatim + the two rewrites a re-fork would most plausibly
+# reach for. A guard that has never been shown to go red is not a ratchet, so the detector is proven
+# against them here rather than by a one-off manual check.
+_REFORK_SPELLINGS = (
+    "nested for",
+    """
+def _pick(cols, synonyms):
+    for syn in synonyms:
+        for low, orig in cols.items():
+            if syn in low:
+                return orig
+    return None
+""",
+    "for + genexp",
+    """
+def _pick(cols, synonyms):
+    for syn in synonyms:
+        hit = next((orig for low, orig in cols.items() if syn in low), None)
+        if hit is not None:
+            return hit
+    return None
+""",
+    "one comprehension, two for clauses",
+    """
+def _pick(cols, synonyms):
+    return next((orig for syn in synonyms for low, orig in cols.items() if syn in low), None)
+""",
+)
+
+
+def test_the_refork_detector_actually_fires():
+    for label, src in zip(_REFORK_SPELLINGS[::2], _REFORK_SPELLINGS[1::2]):
+        fn = ast.parse(src).body[0]
+        params = {a.arg for a in fn.args.args}
+        assert _forks_the_matcher(fn, params), f"the detector no longer catches a re-fork ({label})"
+
+
+def test_the_refork_detector_leaves_ordinary_skill_code_alone():
+    # The shapes that made a naive "nested iteration + membership test" scan unusable: one operand is
+    # not an iteration target, or neither iteration reads a parameter.
+    quiet = """
+def upset_spec(intersections, sets):
+    pos = {s: i for i, s in enumerate(sets)}
+    for cid, it in zip(sets, intersections):
+        for m in it["members"]:
+            if m in pos:
+                yield cid, m
+
+def _two_group_columns(columns, design):
+    for col in columns:
+        for s in [str(c) for c in columns]:
+            if s in design.index:
+                return col
+    return None
+"""
+    tree = ast.parse(quiet)
+    for fn in tree.body:
+        params = {a.arg for a in fn.args.args}
+        assert not _forks_the_matcher(fn, params), f"{fn.name} must not be flagged"
+
+
+def test_no_runner_re_forks_the_column_matcher():
+    root = _backend_root()
+    offenders: list[str] = []
+    for dirpath, dirnames, filenames in os.walk(root / SKILLS_REL):
+        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+        for name in filenames:
+            if not name.endswith(".py"):
+                continue
+            path = Path(dirpath) / name
+            rel = path.relative_to(root).as_posix()
+            offenders += [f"{rel}::{fn}" for fn in _forked_matchers(path)]
+
+    assert not offenders, (
+        "A column matcher has re-forked under skills/** — the failure mode A19 named (one shared "
+        "vocabulary, six forked matchers, every vocabulary guard still green):\n  "
+        + "\n  ".join(sorted(offenders))
+        + "\n\nResolve through the one resolver instead:\n"
+        "  from engine.columns import normalize, resolve\n"
+        "  col = resolve('gene' | 'logFC' | 'pval', df.columns, params.get('_column_override'))\n"
+    )
 
 
 # --- 2. no second copy forks (AST scan) ---------------------------------------------------

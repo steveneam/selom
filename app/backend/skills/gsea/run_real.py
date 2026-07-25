@@ -25,13 +25,13 @@ Shares the three-panel figure with the stub via ``run._assemble``.
 import re
 from importlib.util import find_spec
 
-from engine.columns import GENE, override_column
-from engine.vocab import DE_LOGFC_SYNONYMS
+from engine.columns import normalize, resolve
 from skills.gsea.run import _assemble
 
 # GSEA ranks by a signed fold-change OR a signed statistic. The fold-change half is the shared DE
-# vocabulary (single-sourced — no fork); RANK_EXTRA is gsea's own ranking-stat-only extras, composed
-# AFTER the FC synonyms so a fold-change column still wins when both are present.
+# vocabulary (reached through ``resolve("logFC", …)`` — single-sourced, no fork); RANK_EXTRA is
+# gsea's own ranking-stat-only extras, passed as ``extra=`` so they are scanned AFTER the FC
+# synonyms and a fold-change column still wins when both are present.
 RANK_EXTRA = ("stat", "score", "signed_rank", "metric")
 # Tokens too SHORT to substring-match safely: a bare "t" (limma's moderated t) is a substring of
 # ordinary header words — on a real biomaRt/limma export it matched `entrezgene_id`, so a table with
@@ -77,13 +77,13 @@ def _ranked(df, override=None):
     (the AI map_columns action / a hand-set map) wins over synonym auto-detection, same as volcano."""
     import pandas as pd
 
-    cols = {str(c).strip().lower(): c for c in df.columns}
-    metric_col = (override_column(override, "logFC", df.columns)
-                  or _pick(cols, DE_LOGFC_SYNONYMS + RANK_EXTRA)
+    cols = normalize(df.columns)
+    metric_col = (resolve("logFC", df.columns, override, extra=RANK_EXTRA, cols=cols)
                   or next((orig for low, orig in cols.items() if low in RANK_EXACT), None))
     if metric_col is None:
         raise ValueError("gsea needs a ranking metric column (log2 fold-change or a signed statistic)")
-    gene_col = override_column(override, "gene", df.columns) or _pick(cols, GENE)
+    # Gene label: EXACT tier first (A10) — a gene-ish annotation/count column is not the label.
+    gene_col = resolve("gene", df.columns, override, cols=cols)
     genes = (df[gene_col] if gene_col else df.index.to_series()).astype(str).str.upper()
     metric = pd.to_numeric(df[metric_col], errors="coerce")
     # An honest verdict beats a garbage ranking: if the resolved column isn't really numeric (a gene
@@ -346,13 +346,3 @@ def _sig(v, digits=3):
 def _parse_panel(raw) -> set:
     return {tok.upper() for tok in re.split(r"[,\s]+", str(raw or "").strip()) if tok}
 
-
-def _pick(cols: dict, synonyms) -> str | None:
-    """First column whose lower/stripped name CONTAINS a synonym (synonyms in priority order).
-    Substring match, single-sourced from :mod:`engine.vocab` / :mod:`engine.columns` — the same
-    header semantics the engine's D1 gate uses, so no forked vocabulary (restructure WS3.1)."""
-    for syn in synonyms:
-        for low, orig in cols.items():
-            if syn in low:
-                return orig
-    return None

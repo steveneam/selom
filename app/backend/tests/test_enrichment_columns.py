@@ -3,18 +3,16 @@
 Mirrors the volcano fix: real DE tables name the gene column `GeneID` etc., so the
 query-gene column must be found explicitly (not only via the first-column fallback).
 
-Post-WS3.1: the runner reads the single-source gene vocabulary (``engine.columns.GENE``) by
-*substring* (the same header semantics as the engine's D1 gate), via the runner's own ``_pick``.
+Post-A19 the runner has no picker of its own — it calls ``engine.columns.resolve`` like every
+other DE runner, so gene selection is EXACT-tier first (A10) and cannot drift per skill.
 """
 
-from engine.columns import GENE
-from skills.enrichment.run_real import _pick
+from engine.columns import resolve
 
 
 def _detect(columns):
-    # the same detection the runner uses: substring match against the shared GENE vocabulary.
-    cols = {str(c).strip().lower(): c for c in columns}
-    return _pick(cols, GENE)
+    # the same call the runner makes.
+    return resolve("gene", columns)
 
 
 def test_detects_geneid_from_real_de_table():
@@ -30,3 +28,10 @@ def test_detects_common_symbol_variants():
 
 def test_no_gene_column_returns_none():
     assert _detect(["foo", "bar", "logFC"]) is None
+
+
+def test_annotation_column_is_not_a_gene_label():
+    # A10, mirrored here because enrichment derives its QUERY SET from this column: a biotype
+    # annotation would turn the query into {"protein_coding", "lncRNA"} and score nothing real.
+    assert _detect(["gene_biotype", "logFC", "FDR"]) is None
+    assert _detect(["gene_biotype", "external_gene_name", "logFC"]) == "external_gene_name"

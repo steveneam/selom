@@ -7,8 +7,7 @@ frame index). Emits the same spec shape as the stub via ``run._assemble``.
 
 import math
 
-from engine.columns import GENE, override_column, resolve_significance
-from engine.vocab import DE_LOGFC_SYNONYMS
+from engine.columns import normalize, resolve, resolve_significance
 from skills.volcano.run import _assemble
 
 
@@ -17,19 +16,23 @@ def run(data_path: str, params: dict) -> dict:
     import pandas as pd
 
     df = pd.read_csv(data_path)
-    cols = {str(c).strip().lower(): c for c in df.columns}
-    # User column-override (the AI map_columns action / a hand-set override): a mapped, EXISTING
-    # column wins over synonym auto-detection, so a non-standard-named fold-change/significance/gene
-    # column the shared synonym sets miss is still read. Recorded in provenance → reproduces with no AI.
+    cols = normalize(df.columns)
+    # One resolver for every role (engine.columns.resolve): it owns the normalization, the user
+    # column-override (the AI map_columns action / a hand-set override — a mapped, EXISTING column
+    # wins over auto-detection, and is recorded in provenance so the run reproduces with no AI), and
+    # the role's selection order.
     ov = params.get("_column_override")
-    fc_col = override_column(ov, "logFC", df.columns) or _pick(cols, DE_LOGFC_SYNONYMS)
+    fc_col = resolve("logFC", df.columns, ov, cols=cols)
     # Significance: ADJUSTED tier first (engine.columns.resolve_significance). `p_adjusted` is False
     # only when the table carries no corrected column at all — then the y-axis title and the table's
     # column name say "raw p" instead of claiming a Benjamini-Hochberg value the data doesn't hold.
     p_col, p_adjusted = resolve_significance(ov, df.columns, cols)
     if fc_col is None or p_col is None:
         raise ValueError("volcano needs a log2 fold-change column and a p-value column")
-    gene_col = override_column(ov, "gene", df.columns) or _pick(cols, GENE)
+    # Gene label: EXACT tier first (A10) — a gene-ish column that is an annotation or a count
+    # (`gene_biotype`, `n_features`) is NOT the row label, so this resolves to None and the labels
+    # come from the frame index rather than from a biotype string.
+    gene_col = resolve("gene", df.columns, ov, cols=cols)
     # Always a Series (positional-aligned with the row arrays below) so the .iloc / .str reads later
     # work whether the labels come from a gene column or the frame index — a bare Index has no .iloc.
     genes = df[gene_col].astype(str) if gene_col else pd.Series(df.index.astype(str))
@@ -87,18 +90,3 @@ def _parse_panel(raw) -> set[str]:
     import re
 
     return {tok.upper() for tok in re.split(r"[,\s]+", str(raw or "").strip()) if tok}
-
-
-def _pick(cols: dict, synonyms) -> str | None:
-    """First column whose lower/stripped name CONTAINS a synonym (synonyms in priority order).
-
-    Substring match, single-sourced from :mod:`engine.vocab` / :mod:`engine.columns` — the same
-    header semantics the engine's D1 data-contract gate and role resolver use, so a header the gate
-    recognizes as a fold-change / significance / gene column is the same one the runner reads (no
-    forked vocabulary — restructure WS3.1). ``cols`` is ``{lower-stripped: original}`` in column
-    order, so a tie between two synonym-matching columns resolves to the earlier column."""
-    for syn in synonyms:
-        for low, orig in cols.items():
-            if syn in low:
-                return orig
-    return None

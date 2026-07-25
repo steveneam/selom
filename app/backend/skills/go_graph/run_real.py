@@ -12,8 +12,7 @@ import json
 import math
 import pathlib
 
-from engine.columns import GENE, override_column, resolve_significance
-from engine.vocab import DE_LOGFC_SYNONYMS
+from engine.columns import normalize, resolve, resolve_significance
 from skills.go_graph.run import nodelink_spec
 
 
@@ -21,30 +20,21 @@ def _load_dag() -> dict:
     return json.loads((pathlib.Path(__file__).parent / "go_dag.json").read_text())
 
 
-def _pick(cols: dict, synonyms) -> str | None:
-    """First column whose lower/stripped name CONTAINS a synonym (synonyms in priority order).
-    Substring match, single-sourced from :mod:`engine.vocab` / :mod:`engine.columns` — the same
-    header semantics the engine's D1 gate uses, so no forked vocabulary (restructure WS3.1)."""
-    for syn in synonyms:
-        for low, orig in cols.items():
-            if syn in low:
-                return orig
-    return None
-
-
 def _query_genes(pd, data_path: str, params: dict, background: set) -> set:
     """Query set from a gene list or full DE table — filter to significant rows when an
     FDR column is present, else use every gene (same contract as the enrichment skill)."""
     df = pd.read_csv(data_path)
-    cols = {str(c).strip().lower(): c for c in df.columns}
+    cols = normalize(df.columns)
     ov = params.get("_column_override")
-    gene_col = override_column(ov, "gene", df.columns) or _pick(cols, GENE)
+    # One shared resolver (engine.columns.resolve): normalization + override + the role's selection
+    # order, gene exact-tier-first so an annotation/count column is never read as the label (A10).
+    gene_col = resolve("gene", df.columns, ov, cols=cols)
     # Significance: ADJUSTED tier first (engine.columns.resolve_significance) — the query set is
     # defined on the corrected value. This skill draws no p-axis of its own, so the raw-p
     # fallback is surfaced to the user by the `raw_pvalues_only` QC flag (engine/qc.py) rather
     # than a claim here; the tier is deliberately not re-stated.
     fdr_col, _tier_adjusted = resolve_significance(ov, df.columns, cols)
-    fc_col = override_column(ov, "logFC", df.columns) or _pick(cols, DE_LOGFC_SYNONYMS)
+    fc_col = resolve("logFC", df.columns, ov, cols=cols)
     sub = df
     if fdr_col is not None:
         sub = sub[pd.to_numeric(sub[fdr_col], errors="coerce") <= float(params.get("fdr_threshold", 0.05))]
