@@ -31,7 +31,7 @@ bleeding while it waits.
 
 | ID | Item | Owner | Status |
 |---|---|---|---|
-| P0-01 | **Push `main`** (21 commits, incl. the merge + this plan). Triggers the Vercel deploy. | **founder gate** | TODO |
+| P0-01 | **Push `main`** — the merge + the review backlog + this plan. Count is whatever `git rev-list --count origin/main..main` says (do not trust a number written here). Triggers the Vercel deploy. | **founder gate** | TODO |
 | P0-02 | Delete `campaign/parallel-lanes` — only after P0-01, so the work has a remote ref first | me | TODO |
 | P0-03 | **Freeze the one cross-lane contract**: `GET /cloud/providers → { providers: [{ id, label, kind, provider_config_key, enabled }] }`. Written into `docs/figure-editor-contract/`-style form before Lane 2 starts; no other lane may define or consume it. | me | TODO |
 | P0-04 | Confirm the lane mechanics with **thalon** (has run worktree lanes on this box repeatedly) | me | **DONE** — `docs/next-session-plan/lane-mechanics-from-thalon.md`, adopted in §Lane mechanics |
