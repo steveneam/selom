@@ -80,15 +80,22 @@ def freq_spec(cond_series, *, unit="µV", factor=1.0, title="Flicker N1→P1 vs 
     return {"data": data, "layout": layout}
 
 
-def flicker_table(rows, unit="µV", *, source="Selom", provenance=""):
-    """Per (condition × frequency) N1/P1 table. ``rows`` = ``[cond, hz, n1p1, p1_ms, n]``.
+def flicker_table(rows, unit="µV", *, source="Selom", provenance="", fourier_unit=""):
+    """Per (condition × frequency) N1/P1 table. ``rows`` = ``[cond, hz, n1p1, p1_ms, n]``, plus
+    ``[magnitude, phase_deg, fundamental_hz]`` when the Fourier columns are on.
     ``source`` notes whether the metric came from the device markers or Selom's re-derivation;
     ``provenance`` (erg-manual-marks R6) optionally appends an operator-adjusted count to the
-    caption (empty → byte-identical title)."""
+    caption (empty → byte-identical title).
+
+    ``fourier_unit`` (empty = off) adds the FUNDAMENTAL Fourier component at the flicker frequency
+    — the frequency-domain measure the flicker ERG is classically quantified by, alongside the
+    time-domain N1→P1. Empty by default, so the columns and the caption stay byte-identical."""
     title = f"Flicker N1→P1 ({source}-measured{provenance})"
-    return table([
-        "condition", "frequency (Hz)", f"N1→P1 ({unit})", "P1 implicit (ms)", "n (eyes)",
-    ], rows, title=title)
+    cols = ["condition", "frequency (Hz)", f"N1→P1 ({unit})", "P1 implicit (ms)", "n (eyes)"]
+    if fourier_unit:
+        title = f"Flicker N1→P1 + Fourier fundamental ({source}-measured{provenance})"
+        cols += [f"fundamental ({fourier_unit})", "phase (°)", "measured at (Hz)"]
+    return table(cols, rows, title=title)
 
 
 # ---- stub ------------------------------------------------------------------------------

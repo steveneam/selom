@@ -57,6 +57,8 @@ def run(data_path: str, params: dict) -> dict:
     lowpass = float(params.get("lowpass_hz", 120.0))
     show_marks = to_bool(params.get("marks", True))  # N1/P1 dots on each waveform panel (M3)
     show_labels = to_bool(params.get("mark_labels", True))  # pinned N1/P1 labels (figure-data-capabilities §6)
+    # Fourier fundamental columns (L1-09). Default OFF → table + golden byte-identical.
+    show_fourier = to_bool(params.get("fourier", False))
     # Operator-set N1/P1 marks (docs/records/erg-manual-marks/spec.md) — applied only on the Selom
     # re-derivation path (device markers stay authoritative when the feed carries them). Keyed by
     # (condition, flicker_hz, eye); the grid aggregates over eyes, so the seed/lookup uses empty eye.
@@ -169,7 +171,14 @@ def run(data_path: str, params: dict) -> dict:
                      "uv": n1p1, "label": lab},
                 ]
             metric[(cond, f)] = n1p1
-            tbl_rows.append([cond, (float(f) if has_hz else f), n1p1, p1_ms, n_eyes])
+            # Fourier fundamental (L1-09): the frequency-domain measure the flicker ERG is
+            # classically quantified by. It shipped in `a84636c` with no surface — this is that
+            # surface. Default OFF, so the table + golden are byte-identical unless asked for; and
+            # it is measured on the RAW trace, not the display-cleaned copy, because the low-pass
+            # would attenuate the very component being reported.
+            fund = (_erg.flicker_fundamental(t, y_raw, float(f)) if (show_fourier and has_hz)
+                    else None)
+            tbl_rows.append([cond, (float(f) if has_hz else f), n1p1, p1_ms, n_eyes, fund])
 
     if not panels:
         raise ValueError("erg_flicker: no flicker panels built from input")
@@ -183,12 +192,15 @@ def run(data_path: str, params: dict) -> dict:
                 m["y"] = m["y"] * factor
 
     table_rows = [[c, hz, _erg.disp_round(v, factor) if v is not None else "—",
-                   (p1 if p1 is not None else "—"), n]
-                  for c, hz, v, p1, n in tbl_rows]
+                   (p1 if p1 is not None else "—"), n,
+                   *(([_erg.disp_round(fd["magnitude_uv"], factor), fd["phase_deg"],
+                       fd["fundamental_hz"]] if fd else ["—", "—", "—"]) if show_fourier else [])]
+                  for c, hz, v, p1, n, fd in tbl_rows]
     source = "device" if used_device else "Selom"  # honest provenance (R-honesty-1 / R-flicker-3)
     # Manual-marks provenance (erg-manual-marks R6) — caption-level operator-adjusted count (both
     # views) + the per-marker log on meta.selom.markProvenance. Empty/absent with no manual marks.
     provenance = _erg.operator_adjusted_note(n_manual, n_selom)
+    fourier_unit = unit if show_fourier else ""
     has_moved = any(e["moved"] for e in prov_log)
 
     if view == "summary":
@@ -205,7 +217,8 @@ def run(data_path: str, params: dict) -> dict:
             raise ValueError("erg_flicker: no N1→P1 amplitudes to plot for the summary view.")
         spec = freq_spec(cond_series, unit=unit, factor=factor,
                          title="Flicker N1–P1 vs frequency")
-        spec["table"] = flicker_table(table_rows, unit, source=source, provenance=provenance)
+        spec["table"] = flicker_table(table_rows, unit, source=source, provenance=provenance,
+                                      fourier_unit=fourier_unit)
         if has_moved:
             spec.setdefault("layout", {}).setdefault("meta", {}).setdefault(
                 "selom", {})["markProvenance"] = prov_log
@@ -215,7 +228,8 @@ def run(data_path: str, params: dict) -> dict:
     spec = flicker_grid(panels, nrows=len(freqs), ncols=len(order),
                         row_labels=row_labels, col_labels=col_labels,
                         params=params, unit=unit, factor=factor, title=title)
-    spec["table"] = flicker_table(table_rows, unit, source=source, provenance=provenance)
+    spec["table"] = flicker_table(table_rows, unit, source=source, provenance=provenance,
+                                  fourier_unit=fourier_unit)
     if has_moved:
         spec["layout"].setdefault("meta", {}).setdefault("selom", {})["markProvenance"] = prov_log
     return jsonable(spec)

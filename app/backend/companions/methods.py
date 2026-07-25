@@ -650,6 +650,42 @@ def _erg_ab_detector(p: dict) -> str:
     return txt
 
 
+def _erg_inner_retinal(p: dict) -> str:
+    """The OP / PhNR sentences for the trace-grid methods (L1-09).
+
+    Both metrics are opt-in, so the default paragraph is unchanged. Where the runner recorded a
+    group summary (``layout.meta.oscillatory_potentials``), the prose states how many segments were
+    EXCLUDED as not measurable — a mean that quietly absorbed them as zeros would be the A17 defect
+    wearing a methods-paragraph disguise.
+    """
+    txt = ""
+    if _truthy(p.get("oscillatory_potentials")):
+        txt += (
+            " Oscillatory potentials were extracted from the same baseline-corrected traces with a "
+            "zero-phase 75-300 Hz Butterworth band-pass (the ISCEV OP band, upper edge clamped below "
+            "Nyquist), each wavelet measured from its peak to the preceding trough; the summed "
+            "amplitude and the integrated RMS of the band-passed signal are reported. Traces too "
+            "short to filter, or with too few samples in the analysis window, are reported as not "
+            "measurable rather than as zero, and are excluded from group means."
+        )
+        g = p.get("_op_group")
+        if isinstance(g, dict) and g.get("n_not_measurable"):
+            txt += (f" {int(g['n_not_measurable'])} of "
+                    f"{int(g['n_not_measurable']) + int(g.get('n') or 0)} segment(s) were not "
+                    f"measurable and were excluded.")
+    if _truthy(p.get("phnr")):
+        txt += (
+            " The photopic negative response was measured on the same traces as the amplitude from "
+            "the pre-stimulus baseline to the negative trough following the b-wave peak, with its "
+            "implicit time reported; a trace with no post-b-wave segment is reported as not measured."
+        )
+    return txt
+
+
+def _truthy(v) -> bool:
+    return str(v).strip().lower() not in ("", "false", "0", "no", "none")
+
+
 def _erg_traces(p: dict):
     filtered = str(p.get("filter", True)).lower() not in ("false", "0", "no")
     lp = float(p.get("lowpass_hz", 120.0) or 120.0)
@@ -671,7 +707,7 @@ def _erg_traces(p: dict):
             "light-adapted flashes; sweeps were averaged within each step and baseline-corrected to "
             f"the pre-stimulus mean. {display}the b-wave was measured from the cornea-negative "
             "trough to the following cornea-positive peak (the cone a-wave is small or absent under "
-            f"photopic conditions).{_erg_ab_detector(p)} {representative}"
+            f"photopic conditions).{_erg_ab_detector(p)}{_erg_inner_retinal(p)} {representative}"
         )
         return text, [ISCEV]
     ladder = ", ".join(f"{v:g}" for v in _erg.INTENSITIES_LOG)
@@ -681,7 +717,7 @@ def _erg_traces(p: dict):
         f"(e.g. {ladder} log cd·s/m²); sweeps were averaged within each intensity and "
         f"baseline-corrected to the pre-stimulus mean. {display}the a-wave was measured from "
         "baseline to the initial cornea-negative trough and the b-wave from that trough to the "
-        f"following cornea-positive peak.{_erg_ab_detector(p)} {representative}"
+        f"following cornea-positive peak.{_erg_ab_detector(p)}{_erg_inner_retinal(p)} {representative}"
     )
     return text, [ISCEV]
 
@@ -719,6 +755,19 @@ def _erg_intensity_response(p: dict):
     return text, [ISCEV, NAKA_RUSHTON, SCIPY]
 
 
+def _erg_flicker_fourier(p: dict) -> str:
+    """The Fourier-fundamental sentence for the flicker methods (L1-09) — opt-in, so the default
+    paragraph is unchanged."""
+    if not _truthy(p.get("fourier")):
+        return ""
+    return (
+        " In addition to the time-domain N1-P1, the fundamental Fourier component at the flicker "
+        "frequency was measured on the unfiltered averaged sweep by discrete Fourier transform "
+        "(DC removed), and its amplitude (2|X|/N) and phase are reported at the transform bin "
+        "nearest the stimulus frequency."
+    )
+
+
 def _erg_flicker(p: dict):
     filtered = str(p.get("filter", True)).lower() not in ("false", "0", "no")
     lp = float(p.get("lowpass_hz", 120.0) or 120.0)
@@ -735,7 +784,7 @@ def _erg_flicker(p: dict):
         "cycle. The steady-state waveform is shown per condition; where more than one flicker "
         "frequency was recorded, N1–P1 amplitude is also plotted against frequency. No a-/b-wave or "
         "saturating intensity-response model is applied, as the flicker response is a periodic "
-        f"steady-state measure rather than a flash transient.{display}"
+        f"steady-state measure rather than a flash transient.{_erg_flicker_fourier(p)}{display}"
     )
     return text, [ISCEV]
 
@@ -923,6 +972,8 @@ def build_body(spec: SkillSpec, params: dict, figure: dict | None = None) -> tup
         resolved["_gates_unresolved"] = list(meta["gates_unresolved"])  # A16 — populations not counted
     if isinstance(meta.get("ab_detector"), dict):
         resolved["_ab_detector"] = meta["ab_detector"]  # A18 — which ERG detector, and its gate
+    if isinstance(meta.get("oscillatory_potentials"), dict):
+        resolved["_op_group"] = meta["oscillatory_potentials"]  # L1-09 — OP segments excluded
     builder = _TEMPLATES.get(spec.id)
     return builder(resolved) if builder else _generic(spec, resolved)
 

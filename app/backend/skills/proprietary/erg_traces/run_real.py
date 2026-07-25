@@ -60,6 +60,12 @@ def run(data_path: str, params: dict) -> dict:
     # Pinned a/b labels on the dots (figure-data-capabilities §6). Default on; a clean export can
     # hide them (legend-only) without removing the dots.
     show_labels = to_bool(params.get("mark_labels", True))
+    # Inner-retinal metrics (L1-09). The measurements shipped in `a84636c` with no surface at all —
+    # shipped-not-reachable. Both default OFF, so the figure, its table and its golden are unchanged
+    # unless asked for; each adds columns to the ALREADY-ATTACHED statistics table (no new output).
+    # An unmeasurable segment renders its REASON, never a 0 (A17).
+    show_ops = to_bool(params.get("oscillatory_potentials", False))
+    show_phnr = to_bool(params.get("phnr", False))
     # Central tendency: `representative` (one exemplar trace per condition×intensity — the
     # back-compatible default), `mean` (average the n eye/animal recordings at each time), or `none`
     # (no averaged trace — draw every replicate at equal weight: "individual traces only").
@@ -129,6 +135,7 @@ def run(data_path: str, params: dict) -> dict:
     # the auto seed time, the finally-measured time, and whether the operator moved it.
     prov_log: list = []
     lm_log: list = []   # every landmarks() result, for the a/b-detector disclosure (A18)
+    ops_log: list = []  # every oscillatory_potentials() result, for the group summary (L1-09)
     for cond in order:
         cd = df[df["condition"] == cond]
         color = color_of[cond]
@@ -152,6 +159,7 @@ def run(data_path: str, params: dict) -> dict:
                 # Measure the a/b table on the AVERAGED RAW trace (matches the mean line drawn).
                 lm = _erg.landmarks(ref_t, mean_raw, fs=_fs_from(ref_t), mode=metric_mode,
                                     manual=manual, detector=ab_detector)
+                measure_t, measure_y = ref_t, mean_raw
             elif central == "none":
                 # No averaged trace — draw every replicate at equal weight (individual traces only).
                 ref_t, _, mean_raw, _, _, _, n = _aggregate(reps, error)
@@ -163,6 +171,7 @@ def run(data_path: str, params: dict) -> dict:
                 n_seen.append(n)
                 lm = _erg.landmarks(ref_t, mean_raw, fs=_fs_from(ref_t), mode=metric_mode,
                                     manual=manual, detector=ab_detector)  # table = cohort mean
+                measure_t, measure_y = ref_t, mean_raw
             else:  # representative — the first replicate (single-eye → byte-identical to before)
                 t, raw_y, clean_y = reps[0]
                 panel["x"], panel["y"] = t, clean_y
@@ -172,6 +181,7 @@ def run(data_path: str, params: dict) -> dict:
                 # display-cleaned copy — the dual smooth is internal to landmarks().
                 lm = _erg.landmarks(t, raw_y, fs=_fs_from(t), mode=metric_mode, manual=manual,
                                     detector=ab_detector)
+                measure_t, measure_y = t, raw_y
             # Seed the a/b landmark marks for this cell (R4): `mark_meta` (always) carries the
             # segment identity + the auto/manual time + source for the Marks panel; the visual dots
             # (gated by `marks`) sit on the DRAWN trace at the landmark times.
@@ -203,8 +213,12 @@ def run(data_path: str, params: dict) -> dict:
                 ]
             peak_uv = max(peak_uv, max((abs(v) for v in panel["y"]), default=0.0))
             panels.append(panel)
-            tbl_rows.append([cond, ig_log.get(g, str(g)), lm["b_wave_uv"],
-                             lm["a_wave_uv"], lm["b_t_ms"]])
+            row = [cond, ig_log.get(g, str(g)), lm["b_wave_uv"], lm["a_wave_uv"], lm["b_t_ms"]]
+            # Measured on the SAME raw baseline-corrected trace the a/b came from, so every column
+            # in a row describes one recording.
+            extra = _inner_retinal(measure_t, measure_y, show_ops, show_phnr, metric_mode)
+            ops_log.append(extra.pop("_ops", None))
+            tbl_rows.append(row + extra["cells"])
 
     if not panels:
         raise ValueError("erg_traces: no panels built from input")
@@ -247,13 +261,53 @@ def run(data_path: str, params: dict) -> dict:
     ab_meta = _erg.detector_summary(lm_log)
     if ab_meta is not None:
         spec["layout"].setdefault("meta", {})["ab_detector"] = ab_meta
+    cols = ["condition", "intensity (log cd·s/m²)", f"b-wave ({unit})", f"a-wave ({unit})",
+            "b-wave t (ms)"] + _inner_retinal_columns(show_ops, show_phnr, unit)
     spec["table"] = table(
-        ["condition", "intensity (log cd·s/m²)", f"b-wave ({unit})", f"a-wave ({unit})",
-         "b-wave t (ms)"],
-        [[c, ig, _erg.disp_round(b, factor), _erg.disp_round(a, factor), bt]
-         for c, ig, b, a, bt in tbl_rows],
+        cols,
+        [[c, ig, _erg.disp_round(b, factor), _erg.disp_round(a, factor), bt, *rest]
+         for c, ig, b, a, bt, *rest in tbl_rows],
         title=tbl_title + _erg.operator_adjusted_note(n_moved, len(prov_log)))
+    # Group-level OP summary (A17's aggregation half): how many segments were NOT measurable, so a
+    # reader of the recorded figure knows the mean excluded them rather than absorbing them as 0.
+    ops_seen = [o for o in ops_log if o is not None]
+    if ops_seen:
+        spec["layout"].setdefault("meta", {})["oscillatory_potentials"] = _erg.op_group_mean(ops_seen)
     return jsonable(spec)
+
+
+def _inner_retinal_columns(show_ops: bool, show_phnr: bool, unit: str) -> list:
+    """The extra statistics-table columns the OP / PhNR metrics add (empty when both are off)."""
+    cols = []
+    if show_ops:
+        cols += [f"ΣOP ({unit})", f"OP RMS ({unit})", "OPs (n)"]
+    if show_phnr:
+        cols += [f"PhNR BT ({unit})", "PhNR trough t (ms)"]
+    return cols
+
+
+def _inner_retinal(t, y, show_ops: bool, show_phnr: bool, mode: str) -> dict:
+    """``{"cells": [...], "_ops": <result|None>}`` for one recording.
+
+    OPs are the ISCEV 75-300 Hz wavelets (inner-retinal); PhNR is the slow negative wave after the
+    photopic b-wave (retinal-ganglion-cell function). Neither is claimed when it could not be
+    measured: an unmeasurable OP result renders its REASON in the cell (never a 0, which would BE
+    the dysfunction reading — A17), and an unmeasurable PhNR renders "—"."""
+    cells, ops = [], None
+    if show_ops:
+        ops = _erg.oscillatory_potentials(t, y, fs=_fs_from(t))
+        if ops["measurable"]:
+            cells += [ops["op_sum_uv"], ops["op_rms_uv"], ops["n_ops"]]
+        else:
+            label = _erg.NOT_MEASURABLE_LABELS[ops["reason"]]
+            cells += [label, label, "—"]
+    if show_phnr:
+        # The PhNR is a PHOTOPIC measure; the cone b-window is the right anchor for its trough.
+        phnr = _erg.photopic_negative_response(
+            t, y, fs=_fs_from(t),
+            b_window_ms=(12.0, 80.0) if mode == "photopic" else (40.0, 120.0))
+        cells += ([phnr["phnr_bt_uv"], phnr["trough_t_ms"]] if phnr else ["—", "—"])
+    return {"cells": cells, "_ops": ops}
 
 
 def _grp_key(v):

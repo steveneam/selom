@@ -17,7 +17,8 @@
     "display_unit": { "type": "str", "default": "uV", "options": ["auto", "nV", "uV", "mV", "V"] },
     "scale_uv": { "type": "float", "default": 20.0, "min": 1.0, "max": 500.0 },
     "scale_ms": { "type": "float", "default": 50.0, "min": 5.0, "max": 300.0 },
-    "manual_marks": { "type": "str", "default": "" }
+    "manual_marks": { "type": "str", "default": "" },
+    "fourier": { "type": "bool", "default": false }
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" },
