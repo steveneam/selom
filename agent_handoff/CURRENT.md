@@ -27,6 +27,7 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
+| **EDITOR-ROOM** | 2026-07-25 | `main` `92d6f2e..f98bdbd` (**6 unpushed**) | **Worked the board top to bottom: `W-1` · `Q-1`/`Q-2` · `V-1` · `W-2` · `V-2` all DONE, browser-verify 14/14 and `verify.sh` 7/7.** **The 1280 width defect is fixed — the plotting area went 90px → 571px**, and every checked width clears §D's 506px target (1280→571, 1440→727, 1920→718), which turned the long-red `D-5 (also-confirm)` gate green. `W-1` first: a figure never reflowed when its CONTAINER resized (only the window), so collapsing a rail bought the plot **zero** pixels and every other remedy was invisible. Then the inspector dock got a collapse control + a tab-icon spine, both rails auto-collapse on a narrow viewport, and zoom/Fit landed in the strip that was an inert hint line. **Three findings the browser produced that no gate could:** `/extract`'s editor **overflowed its band and painted the figure through the Statistics table** while every per-element number read PASS (`EditorWorkspace` needs a flex parent; `CanvasShell` gave it one, `chart-extractor` did not) · the **OAuth cloud-import path was unreachable in the UI** — the menu's loader cancelled its own connections request, so no provider ever showed an import form · and the spec's own 1280 threshold was **wrong**, since at 1440 the plot was 247px, *worse than a collapsed 1280*. **⚑ FOUNDER DECISION OWED: Selom cannot see files the user already has** — Drive is `drive.file`-scoped and Dropbox is an App Folder, so it reads only what it created, and the menu's "copy the share link" hint is impossible to follow. Options + recommendation in `docs/cloud-providers-contract/spec.md` §Scope. |
 | **BROWSER-VERIFY** | 2026-07-25 | `main` `ff9705d..b0fc61b` (**pushed**) | **Built the browser-verify harness and answered the §D list in a real browser.** `scripts/browser-verify.sh` boots a real backend + frontend and drives the one path that opens the editor (new project → real EYG_28 CSV → the engine's recommended skill); checks are specs, not scripts. **It found a blocking crash on the primary flow before running a single check** — `datasets.qc` holds two shapes and the mapper cast whichever arrived into the FE's `QcReport`, so **dropping any real file took the whole app to the error overlay**; invisible to every gate because `dev:mock` skips the upload path. **D-5: A24 confirmed FIXED** (`overflow=0`, `card = stageClient − 32` exactly at 1280/1440/1920); keep the `min-h-[20rem]` floor; the `88rem` cap is unreachable. **NEW FINDING: the hero is starved of WIDTH at 1280** — 90px of plotting area, not §D's assumed 506, because fixed columns take 70% of the viewport. D-4/D-1/D-7/D-3/D-9/D-10 all PASS (§D's "Legend overflows" prediction disproven); 2 founder calls. Gate 7/7. |
 | **SPRINT-2-MERGED** | 2026-07-25 | `main` `ba0de8c..698381d` | **Phase 0 done → 3 lanes forked, driven and MERGED in one session.** Owner cleared all four founder gates; `main` pushed (`60df628..dddf5d6`) and `campaign/parallel-lanes` deleted. Built the missing groundwork: **`scripts/verify.sh`** (first single gate of record — 7 gates at CI parity incl. the `fe-build` the plan omitted, ~70s) · **`scripts/worktree-setup.sh`** (lane provisioning was **PowerShell-only**, so no lane could have been forked on Linux) · the **frozen `GET /cloud/providers`** contract · **the reachability ratchet**, which found **17 of 61 routes with no FE call site** where the whole milestone review had found 2. Then **launched and drove all three lanes autonomously** (thalon's tmux procedure — the owner no longer drives) and ran the merge train `L1→L3→L2` myself: 16 lane commits, full gate **7/7 green on every rebased result**. Lane 2 found the sprint's worst bug: **`config.py` never read `app/backend/.env`**, so the server pointed at the dead `localhost:3003` while `preflight.sh` validated the live broker **from the same unread file** — a green guard checking a file the server never read. Reachability **17 → 16**. Also wrote the **annotation-layer remediation spec** (the owed plan) and recorded the icon decision + on-hold triage. |
 | **REVIEW-MERGE** | 2026-07-25 | `main` `60df628..bee9e66` (**22 unpushed**) | Milestone review of the whole campaign branch (`review-gauntlet` 30 confirmed / 3 blockers + `fe-review` 24 confirmed, 31 of 35 user tasks with no affordance) → fix pass → **owner approved → `main` FF-merged**, gates re-run on merged main. **Both blockers fixed:** WS3.1 had flipped DE significance from adjusted p to RAW p across 5 runners while the axis/table/methods still said "adjusted" (`b73bd9b`, 2835 vs 1008 significant genes on the real EYG_28 export; the guard test had been inverted to bless it) · a gene-label click deleted the user's annotation (`b1a49e8`). HIGH honesty set fixed (`1d2aa81`): FACS cites FlowIO+FlowUtils not the absent FlowKit + states the real compensation outcome · assemble records lineage · GSEA's bare `t` no longer matches `entrezgene_id` · Nango ELv2 recorded. **Annotation layer DEFERRED pending a proper plan** (owner intent, clarified 2026-07-25 — *not* shelved: the flag `NEXT_PUBLIC_ANNOTATION_LAYER` is the holding mechanism while a real plan is written, and ~20 findings are parked with it, owed a plan not a flag flip). **Google Drive + Dropbox cloud connections now LIVE + verified** end-to-end. |
@@ -35,7 +36,42 @@
 | **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
 | older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · BROWSER-VERIFY · 2026-07-25 21:20 +1000 (Sydney) · branch `main` `ff9705d..b0fc61b` (**pushed to origin/main**, 0 ahead) · Claude (FE+BE, solo, lead)
+## ▸ LIVE · EDITOR-ROOM · 2026-07-25 23:18 +1000 (Sydney) · branch `main` `92d6f2e..f98bdbd` (**6 unpushed — owner pushes**) · Claude (FE+BE, solo, lead)
+
+- **The whole board is worked: `W-1` · `Q-1`/`Q-2` · `V-1` · `W-2` · `V-2` all `DONE`.** Gates:
+  **`scripts/verify.sh` 7/7** and **`scripts/browser-verify.sh` 14/14** — the first time the browser
+  suite has been all-green, including the `D-5 (also-confirm)` gate that was deliberately red since
+  it was written. Statuses + full detail live in `docs/next-session-plan/plan.md`; don't re-narrate.
+- **The 1280 width defect is FIXED: 90px of plotting area → 571px**, and every checked width clears
+  §D's 506px target (1280→**571**, 1440→**727**, 1920→**718**). Two changes did it: `W-1` made a
+  figure reflow when its **container** resizes (before, collapsing a rail bought the plot *zero*
+  pixels, so every other width remedy was invisible), and `W-2` gave the inspector dock a collapse
+  control + tab-icon spine, auto-collapsed both rails on a narrow viewport, and put zoom/Fit in the
+  strip that used to be an inert hint line.
+- **⚑ FOUNDER DECISION OWED — Selom cannot see files the user already has.** Google's connection is
+  `drive.file`-scoped ("only files you use with this app") and Dropbox's is an App Folder, so Selom
+  reads **only what it created**. The menu's own hint — "Open the file in Drive → Share → Copy link"
+  — describes a file it has no permission to read. `POST /export/cloud` is a stub for both OAuth
+  providers, so export→re-import is not a workaround either. Options, trade-offs and a
+  recommendation (**Google Picker** over broadening to the *restricted* `drive.readonly` scope, which
+  carries an annual CASA assessment) are in `docs/cloud-providers-contract/spec.md` §Scope.
+- **Three defects only a browser could find, each behind green gates.** `/extract`'s editor
+  **overflowed its band and painted the figure through the Statistics table** — every per-element
+  number still read PASS (`overflow=0`, `matches=1`); `EditorWorkspace` takes a definite height only
+  from a flex parent, which `CanvasShell` gave it and `chart-extractor` did not. The **OAuth
+  cloud-import path was unreachable in the UI**: the menu's loader listed `providers` as a dependency
+  *and* as its guard, so setting it cancelled the in-flight connections request and no provider ever
+  rendered an import form. And the editor-room spec's own **1280 threshold was wrong** — at 1440 the
+  plot was 247px, *worse than a collapsed 1280* — so it is now derived from the target (1700).
+- **The cloud round trip is verified end-to-end** against the live broker: a real CSV imported from
+  **Google Drive** and **Dropbox** through the real UI, each landing with a source chip naming its
+  provider and reference. The two seeded test files have been **deleted** from both accounts.
+- **Harness got stronger, not just used:** a `warm-routes` globalSetup (a cold `next dev` compile was
+  being charged to whichever check ran first — three false timeouts in three different checks), and
+  `d5` now asserts the target at **every** viewport it measures, which is what would have caught the
+  1440 hole immediately.
+
+## ▸ PRIOR · BROWSER-VERIFY · 2026-07-25 21:20 +1000 (Sydney) · branch `main` `ff9705d..b0fc61b` (**pushed to origin/main**, 0 ahead) · Claude (FE+BE, solo, lead)
 
 - **The harness exists and the §D list is answered.** `scripts/browser-verify.sh` boots a real
   backend (`:8152`, SQLite in the corpus dir) + a real frontend (`:3152`) and drives the ONLY path
@@ -64,7 +100,7 @@
   error, everything looks clickable, nothing works); and the harness **must reset its own store each
   run** or reconcile drags every prior figure spec in and blows the timeout.
 
-## ▸ PRIOR · SPRINT-2-MERGED · 2026-07-25 19:46 +1000 (Sydney) · branch `main` · Claude (FE+BE, solo, lead)
+## ▸ EARLIER · SPRINT-2-MERGED · 2026-07-25 19:46 +1000 (Sydney) · branch `main` · Claude (FE+BE, solo, lead)
 
 - **State: Sprint 2 is MERGED AND PUSHED.** `main` is linear and all three lanes landed via a lead-driven train (`L1 → L3 → L2`), **full `scripts/verify.sh` 7/7 green on each rebased result**. Pushed to `origin/main` 2026-07-25 (owner-authorized), which triggered the Vercel deploy. Worktrees removed, `agent/*` branches deleted, tmux sessions killed, dev servers stopped, tree clean. Always read the live count from `git rev-list --count origin/main..main`; never trust a literal here.
 - **Lanes are fully torn down** — 3 worktrees removed, 3 `agent/*` branches deleted (all merged), 3 tmux sessions killed, main tree verified intact (39713 files, `.venv` present: `rm` does **not** follow the dep symlinks on Linux). **Lesson worth keeping: an idle Claude Code composer redisplays its last SUBMITTED message DIMMED (`ESC[2m`).** I read that as parked draft text in all three lanes and held teardown for it; the composers were empty. Check for the dim code before believing a pane has unsent input.
@@ -74,7 +110,24 @@
 - **Annotation layer: the owed plan EXISTS** — `docs/pillar-2-direct-manipulation/annotation-remediation-spec.md`. It is **deferred pending a proper plan, NOT shelved**; §6 states the exact flag-flip condition. Owner decisions in it: typed stars **allowed but marked `unverified`**; selection goes **full direct-manipulation**.
 - **selom-data IS here** at `/home/deploy/migration/selom-migration-staging/selom-data/` → export `SELOM_DATASETS_DIR` or real-data tests silently skip (`verify.sh` warns).
 
-## ▸ NEXT  — **the board is `docs/next-session-plan/plan.md`. Start at `W-1`.**
+## ▸ NEXT  — **the board is `docs/next-session-plan/plan.md`. Tracks W and V are DONE; start at Track R (`R-02`).**
+
+> **Board state after EDITOR-ROOM:** `W-1` `W-2` `Q-1` `Q-2` `V-1` `V-2` are all **`DONE`**. The
+> remaining order is the board's own: **Track R** (reachability, `R-02` first because it is a
+> *precondition* for `OH-01`, not a consequence) → **Track C** (annotation, C1→C4, spec exists) →
+> **Track O** as the owner reacts. The standing approval from 2026-07-25 still covers them.
+>
+> **Two things want the owner before code:**
+> 1. **The cloud scope decision** (`docs/cloud-providers-contract/spec.md` §Scope) — Selom can only
+>    read files it created, so the import feature is nearly useless as shipped. Recommendation:
+>    the Google Picker, not a broader scope.
+> 2. **6 commits are unpushed** — the owner pushes.
+>
+> Smaller, already-recorded: `/extract`'s stage is 279px at 1280×800, so the `min-h-[20rem]` floor
+> engages there and 73px scrolls — reported, not filed, but it qualifies `D-5`'s "keep the floor"
+> verdict, which was measured on the shell where the shortest stage is 402px.
+
+<details><summary>Superseded — the original W-1-first instruction (kept for provenance)</summary>
 
 > **⚑ THE WHOLE BOARD IS OWNER-APPROVED TO EXECUTE — owner, 2026-07-25: *"we do all those next
 > session on gogogo"*.** So on `gogogo`: open the board and start `W-1`. Do **not** re-present the
@@ -101,6 +154,8 @@ pointer so there is one place to update, not two.
   **`W-2`**, **`V-2`** (cloud round-trip + D-8), then **Track R** (reachability, 15 rows, `R-02`
   first because it is a *precondition* for `OH-01`), then **Track C** (annotation C1→C4, spec
   exists), then **Track O** as the owner reacts.
+
+</details>
 
 **Still true and not to be redone:** the full-app smoke on merged `main` (10 routes × 2 desktop
 viewports, all 200, zero page errors) and `bash deploy/nango/preflight.sh` passing against the live
