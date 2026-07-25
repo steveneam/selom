@@ -60,7 +60,7 @@ def _stub_figure(params: dict) -> dict:
                                           "Flow cytometry — gated density (stub)", "logicle")}
 
     # One rectangle gate over the lower-left blob.
-    gates = _flow.parse_gates(
+    gates, _dropped = _flow.parse_gates(
         {"gates": [{"id": "P1", "type": "rect", "x": _X_LABEL, "y": _Y_LABEL,
                     "x_min": 0.20, "x_max": 0.52, "y_min": 0.20, "y_max": 0.52,
                     "label": "P1"}]},

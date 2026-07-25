@@ -81,48 +81,91 @@ def _num(v):
     return f if math.isfinite(f) else None
 
 
+# A16 — why a gate the operator DEFINED did not produce a population. The operator supplied the
+# gate explicitly, so its disappearance from the table is a wrong result presented as a complete
+# one: nothing distinguished "this population was 0 events" from "this gate never ran". Every drop
+# now carries one of these reasons all the way into the population table's `status` column.
+GATE_STATUS_OK = "ok"
+DROP_NOT_AN_OBJECT = "not_a_gate_object"
+DROP_NO_GEOMETRY = "no_geometry"
+DROP_TOO_FEW_VERTICES = "fewer_than_3_vertices"
+DROP_NON_FINITE_SPLIT = "non_finite_split"
+DROP_UNKNOWN_TYPE = "unknown_type"
+DROP_CHANNEL_NOT_IN_FCS = "channel_not_in_fcs"
+DROP_PARENT_UNRESOLVED = "parent_unresolved"
+
+_DROP_FIX = {
+    DROP_NOT_AN_OBJECT: "each entry in `gates` must be a JSON object.",
+    DROP_NO_GEOMETRY: "a rectangle gate needs at least one of x_min / x_max / y_min / y_max.",
+    DROP_TOO_FEW_VERTICES: "a polygon gate needs at least 3 finite [x, y] vertices.",
+    DROP_NON_FINITE_SPLIT: "a quadrant gate needs finite x_split and y_split values.",
+    DROP_UNKNOWN_TYPE: "`type` must be one of rect / polygon / quadrant.",
+    DROP_CHANNEL_NOT_IN_FCS: "name a channel the FCS actually carries (check the PnN detector names).",
+    DROP_PARENT_UNRESOLVED: "resolve the parent gate first — a child of an unresolved gate cannot "
+                            "be counted, and counting it against ALL events would be a wrong number.",
+}
+
+
+def drop_reason_fix(reason):
+    """The one-line, actionable fix for a gate-drop reason (see :data:`GATE_STATUS_OK` siblings)."""
+    return _DROP_FIX.get(reason, "check the gate definition.")
+
+
 def parse_gates(raw, default_x=None, default_y=None):
-    """Parse the ``gates`` JSON-string param → an ordered list of normalized gate dicts.
+    """Parse the ``gates`` JSON-string param → ``(gates, dropped)``.
 
     Travels like ERG's ``manual_marks`` — a JSON string (or an already-parsed
     ``dict``/``list``). Accepts either a bare list of gate objects or ``{"gates": [...]}``.
     Bounds are in **transformed display space** (the same coordinates the plot is drawn
-    in). Tolerant: a malformed or geometry-less entry is dropped, never raised. Each
-    output gate is ``{"id", "type", "parent", "x", "y", "label", ...geometry}`` where
+    in). Each output gate is ``{"id", "type", "parent", "x", "y", "label", ...geometry}`` where
     ``type`` is one of ``rect`` / ``polygon`` / ``quadrant`` and channels default to the
     plotted ``(default_x, default_y)`` when omitted.
+
+    Still tolerant — a malformed or geometry-less entry never raises — but no longer SILENT
+    (A16): every dropped entry is returned in ``dropped`` as
+    ``{"id", "label", "reason", "fix"}`` so the caller can put a verdict row in the population
+    table instead of letting the population vanish.
     """
+    dropped: list[dict] = []
+
+    def _drop(gid, label, reason):
+        dropped.append({"id": gid, "label": label or gid, "reason": reason,
+                        "fix": drop_reason_fix(reason)})
+
     if not raw:
-        return []
+        return [], dropped
     obj = raw
     if isinstance(raw, str):
         try:
             obj = json.loads(raw)
         except (TypeError, ValueError):
-            return []
+            return [], dropped
     if isinstance(obj, dict):
         obj = obj.get("gates", [])
     if not isinstance(obj, list):
-        return []
+        return [], dropped
 
     out: list[dict] = []
     for i, item in enumerate(obj):
+        gid = str((item.get("id") if isinstance(item, dict) else None) or f"P{i + 1}")
         if not isinstance(item, dict):
+            _drop(gid, gid, DROP_NOT_AN_OBJECT)
             continue
         kind = str(item.get("type", "rect")).strip().lower()
-        gid = str(item.get("id") or f"P{i + 1}")
+        label = str(item.get("label") or gid)
         base = {
             "id": gid,
             "parent": (str(item["parent"]) if item.get("parent") not in (None, "") else None),
             "x": item.get("x") or default_x,
             "y": item.get("y") or default_y,
-            "label": str(item.get("label") or gid),
+            "label": label,
         }
         if kind in _RECT:
             g = {**base, "type": "rect", "x_min": _num(item.get("x_min")),
                  "x_max": _num(item.get("x_max")), "y_min": _num(item.get("y_min")),
                  "y_max": _num(item.get("y_max"))}
             if g["x_min"] is None and g["x_max"] is None and g["y_min"] is None and g["y_max"] is None:
+                _drop(gid, label, DROP_NO_GEOMETRY)
                 continue
             out.append(g)
         elif kind in _POLY:
@@ -133,14 +176,18 @@ def parse_gates(raw, default_x=None, default_y=None):
                     if vx is not None and vy is not None:
                         verts.append((vx, vy))
             if len(verts) < 3:
+                _drop(gid, label, DROP_TOO_FEW_VERTICES)
                 continue
             out.append({**base, "type": "polygon", "vertices": verts})
         elif kind in _QUAD:
             xs, ys = _num(item.get("x_split")), _num(item.get("y_split"))
             if xs is None or ys is None:
+                _drop(gid, label, DROP_NON_FINITE_SPLIT)
                 continue
             out.append({**base, "type": "quadrant", "x_split": xs, "y_split": ys})
-    return out
+        else:
+            _drop(gid, label, DROP_UNKNOWN_TYPE)
+    return out, dropped
 
 
 # ---- plotly trace builders --------------------------------------------------
@@ -273,18 +320,24 @@ def _r(v):
 
 
 def population_table(rows, x_label, y_label, title="Population statistics"):
-    """A StatsTable of the gate tree: count, % parent, % total, and median MFI (x, y).
+    """A StatsTable of the gate tree: count, % parent, % total, median MFI (x, y), and status.
 
     ``rows`` is an ordered list of dicts with keys ``population``, ``parent``, ``count``,
-    ``pct_parent``, ``pct_total``, ``mfi_x``, ``mfi_y`` (MFI values may be ``None``).
+    ``pct_parent``, ``pct_total``, ``mfi_x``, ``mfi_y`` (MFI values may be ``None``), plus an
+    optional ``status``.
+
+    ``status`` is the A16 verdict column and it is the reason a row may carry ``count=None``: an
+    unresolved gate gets a ROW saying why it could not be counted, instead of vanishing from a
+    table whose counts ARE the result. It is appended last so a reader (and the FE's column
+    handling) sees the same leading columns as before.
     """
     columns = ["population", "parent", "count", "% parent", "% total",
-               f"median {x_label}", f"median {y_label}"]
+               f"median {x_label}", f"median {y_label}", "status"]
     out = []
     for r in rows:
         out.append([
             r.get("population"), r.get("parent") or "—", r.get("count"),
             _r(r.get("pct_parent")), _r(r.get("pct_total")),
-            _r(r.get("mfi_x")), _r(r.get("mfi_y")),
+            _r(r.get("mfi_x")), _r(r.get("mfi_y")), r.get("status") or GATE_STATUS_OK,
         ])
     return table(columns, out, title=title)

@@ -15,6 +15,7 @@
     "compensate": { "type": "str", "default": "auto", "options": ["auto", "none", "matrix"] },
     "comp_matrix": { "type": "str", "default": "" },
     "transform": { "type": "str", "default": "logicle", "options": ["logicle", "arcsinh", "log", "linear"] },
+    "transform_t": { "type": "float", "default": 0.0, "min": 0.0, "max": 16777216.0 },
     "cofactor": { "type": "float", "default": 150.0, "min": 1.0, "max": 100000.0 },
     "bins": { "type": "int", "default": 256, "min": 16, "max": 1024 },
     "max_events": { "type": "int", "default": 50000, "min": 1000, "max": 500000 },

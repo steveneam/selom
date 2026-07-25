@@ -701,6 +701,55 @@ def _erg_flicker(p: dict):
     return text, [ISCEV]
 
 
+def _facs_transform_space(p: dict) -> str:
+    """The clause that makes the gate space reproducible (A15).
+
+    Gate bounds travel in transformed display space, so the transform's resolved top-of-scale
+    ``t`` (and where it came from) is part of the recipe: without it a reader cannot recompute the
+    population counts, and a gate drawn on one export is not portable. ``_transform`` is the
+    runner's recorded OUTCOME (``layout.meta.transform``, lifted by ``build_body``); absent — a
+    litsynth replay from recorded params only — the clause is omitted rather than guessed.
+    """
+    xf = p.get("_transform")
+    if not isinstance(xf, dict):
+        return ""
+    if xf.get("t_source") == "not_applicable":
+        return ""  # arcsinh is anchored to `cofactor`, already stated
+    ts = sorted({float(v) for v in (xf.get("t_per_channel") or {}).values()})
+    if not ts:
+        return ""
+    t_txt = f"{ts[0]:g}" if len(ts) == 1 else "per channel (" + ", ".join(f"{t:g}" for t in ts) + ")"
+    src = {
+        "param": "pinned by the operator",
+        "fcs_pnr": "taken from each channel's $PnR range keyword in the FCS",
+        "default": "the standard 18-bit top of scale (the FCS declared no usable $PnR range)",
+        "fcs_pnr+default": ("taken from each channel's $PnR range keyword in the FCS, falling back "
+                            "to the standard 18-bit top of scale for "
+                            + ", ".join(str(c) for c in (xf.get("t_default_channels") or []))),
+    }.get(str(xf.get("t_source")), str(xf.get("t_source")))
+    shape = ""
+    if xf.get("name") == "logicle":
+        shape = f", m = {float(xf.get('m', 4.5)):g}, w = {float(xf.get('w', 0.5)):g}, a = {float(xf.get('a', 0.0)):g}"
+    elif xf.get("name") == "log":
+        shape = f", m = {float(xf.get('m', 4.5)):g}"
+    return f" (top of scale T = {t_txt}, {src}{shape})"
+
+
+def _facs_unresolved_gates(p: dict) -> str:
+    """State the populations that were DEFINED but not counted (A16).
+
+    A gate the operator supplied that could not be evaluated used to vanish from the table, so a
+    missing row read as a complete result. The table now carries a verdict row per unresolved gate;
+    the methods prose must say the same thing, or the printed recipe over-claims what was measured.
+    """
+    unresolved = p.get("_gates_unresolved")
+    if not unresolved:
+        return ""
+    named = "; ".join(f"{g.get('population')} ({g.get('reason')})" for g in unresolved)
+    return (f" {len(unresolved)} defined gate(s) could NOT be evaluated and are reported in the "
+            f"population table with no count rather than omitted: {named}.")
+
+
 def _facs_gating(p: dict):
     comp = str(p.get("compensate", "auto")).strip().lower()
     # `_compensation_applied` is the runner's recorded OUTCOME (run_real writes it into
@@ -736,6 +785,7 @@ def _facs_gating(p: dict):
     else:
         xform_txt = "the Logicle (bi-exponential) display transform"
         xform_cite = [LOGICLE]
+    xform_txt += _facs_transform_space(p)
 
     views = {"density": "a two-dimensional density plot", "contour": "a two-dimensional density-contour plot",
              "histogram": "a single-parameter histogram",
@@ -755,7 +805,7 @@ def _facs_gating(p: dict):
     text = (
         "Flow-cytometry standard (FCS) event data were read with FlowIO and compensated and "
         f"transformed with FlowUtils; {comp_txt}, and fluorescence intensities were displayed on "
-        f"{xform_txt}. Events are shown as {view}.{gate_txt}"
+        f"{xform_txt}. Events are shown as {view}.{gate_txt}{_facs_unresolved_gates(p)}"
     )
     return text, [FLOWIO, FLOWUTILS, *xform_cite, GATINGML]
 
@@ -828,6 +878,10 @@ def build_body(spec: SkillSpec, params: dict, figure: dict | None = None) -> tup
         resolved["_significance_adjusted"] = False
     if "compensation_applied" in meta:
         resolved["_compensation_applied"] = bool(meta["compensation_applied"])
+    if isinstance(meta.get("transform"), dict):
+        resolved["_transform"] = meta["transform"]     # A15 — the resolved gate space
+    if meta.get("gates_unresolved"):
+        resolved["_gates_unresolved"] = list(meta["gates_unresolved"])  # A16 — populations not counted
     builder = _TEMPLATES.get(spec.id)
     return builder(resolved) if builder else _generic(spec, resolved)
 

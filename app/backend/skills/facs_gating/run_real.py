@@ -42,8 +42,8 @@ def run(data_path: str, params: dict) -> dict:
     raw = fd.as_array().astype(float)                     # (n_events, n_channels), linear
     comp, compensated = _compensate(raw, fd, labels, params, np, flowutils)
 
-    t_top = float(max(1.0, float(np.nanmax(np.abs(comp)))))
-    disp = _transform_all(comp, params, t_top, np, flowutils)  # transformed display + gate space
+    ts, xform_meta = _resolve_transform(fd, labels, params)
+    disp = _transform_all(comp, params, ts, np, flowutils)  # transformed display + gate space
 
     idx = {lab: i for i, lab in enumerate(labels)}
     xi, yi = idx[x_label], idx[y_label]
@@ -63,7 +63,7 @@ def run(data_path: str, params: dict) -> dict:
     title = f"Flow cytometry — {plot} ({x_label} × {y_label})"
     layout = _flow.figure_layout(plot, x_label, y_label, title, _xform_name(params))
 
-    gates = _flow.parse_gates(params.get("gates", ""), x_label, y_label)
+    gates, dropped = _flow.parse_gates(params.get("gates", ""), x_label, y_label)
     shapes, annos = _flow.gate_shapes(gates, x_label, y_label)
     if shapes:
         layout["shapes"] = shapes
@@ -76,13 +76,35 @@ def run(data_path: str, params: dict) -> dict:
     # channels (see _compensate) — claiming a spillover matrix was applied in that case is a
     # printed-vs-computed lie (milestone review 2026-07-25, finding A6). Written always (not only on
     # failure): a reader of the recorded figure can then tell compensated from uncompensated.
-    layout["meta"] = {**(layout.get("meta") or {}), "compensation_applied": bool(compensated)}
+    #
+    # `transform` is the same honesty channel for the GATE SPACE (A15): the resolved per-channel t
+    # and where it came from. Gate bounds travel in transformed display space, so without the
+    # resolved t the numbers in the table cannot be recomputed or audited, and a gate drawn on one
+    # export is not portable to a re-acquisition of the same panel.
+    layout["meta"] = {**(layout.get("meta") or {}),
+                      "compensation_applied": bool(compensated),
+                      "transform": xform_meta}
 
     rows = _gating_rows(gates, disp, comp, idx, xi, yi, np)
+    rows += _dropped_rows(dropped)
+    # A16: any gate that PARSED but could not be evaluated (a channel the FCS doesn't carry) is
+    # already carried as a verdict row by _gating_rows. Nothing the operator defined vanishes.
+    unresolved = [r for r in rows if r.get("status") not in (None, _flow.GATE_STATUS_OK)]
+    if unresolved:
+        layout["meta"]["gates_unresolved"] = [
+            {"population": r["population"], "reason": r["status"]} for r in unresolved]
+
     spec = {"data": [trace], "layout": layout,
             "table": _flow.population_table(rows, x_label, y_label,
                                             title="Population statistics")}
     return jsonable(spec)
+
+
+def _dropped_rows(dropped):
+    """A verdict ROW per gate the parser dropped — never a vanished population (A16)."""
+    return [{"population": d["label"], "parent": None, "count": None,
+             "pct_parent": None, "pct_total": None, "mfi_x": None, "mfi_y": None,
+             "status": d["reason"]} for d in dropped]
 
 
 # ---- channels ---------------------------------------------------------------
@@ -142,25 +164,117 @@ def _xform_name(params):
     return mode if mode in ("logicle", "arcsinh", "log", "linear") else "logicle"
 
 
-def _transform_all(comp, params, t_top, np, flowutils):
-    """Transform EVERY channel into display space with the chosen GatingML transform, so a
-    gate on any channel is compared in the same space the plot is drawn in. Uses the same
-    single ``t_top`` (global max abs) FlowKit's per-run transform used, so gate bounds keep
-    their meaning across engines."""
+# The GatingML transform's ``t`` (the top of scale) used to be derived from the DATA:
+# ``t_top = max(1, max|comp|)``, one scalar for every channel. Gate bounds travel in transformed
+# display space, so the meaning of a saved gate depended on an extremum of the specific event array
+# — one saturating event shifted the whole transform and therefore every count, %-parent and MFI in
+# the table — and the resolved value was never recorded, so the numbers could not be recomputed or
+# audited and a gate was not portable to a re-acquisition of the same panel (A15). The docstring's
+# claim that this was "the same single t_top FlowKit's per-run transform used" was also wrong:
+# FlowKit derives ``t`` from the FCS ``$PnR`` range keyword, PER CHANNEL.
+#
+# So ``t`` is now anchored to METADATA, resolved in this order and always recorded:
+#   1. the explicit ``transform_t`` param (> 0)  — an operator pinning the gate space,
+#   2. each channel's ``$PnR`` from the FCS      — what the acquisition itself declares,
+#   3. _DEFAULT_T                                — a fixed, reproducible 18-bit top of scale.
+# None of the three depends on the events, so the same gate spec reproduces on a re-acquisition.
+_DEFAULT_T = 262144.0   # 2^18 — the standard top of scale for an 18-bit acquisition
+_LOGICLE_M, _LOGICLE_W, _LOGICLE_A = 4.5, 0.5, 0.0
+_LOG_M = 4.5
+_ASINH_M = 4.0
+
+
+def _pnr_by_channel(fd, labels):
+    """``$PnR`` (the acquisition's declared top of scale) per channel index, or ``None``.
+
+    ``flowio.FlowData.channels`` is ``{index-as-string: {pnn, pns, pne, png, pnr}}`` — 1-based,
+    matching the FCS ``$Pn`` numbering.
+    """
+    chans = getattr(fd, "channels", None) or {}
+    out = [None] * len(labels)
+    for key, spec in chans.items():
+        try:
+            i = int(key) - 1
+            r = float((spec or {}).get("pnr"))
+        except (TypeError, ValueError):
+            continue
+        if 0 <= i < len(labels) and math.isfinite(r) and r > 0:
+            out[i] = r
+    return out
+
+
+def _resolve_transform(fd, labels, params):
+    """``(t_per_channel, provenance)`` — the transform's resolved parameters + where they came from.
+
+    ``provenance`` is what ``layout.meta['transform']`` carries, so a reader of the recorded figure
+    can reconstruct the gate space exactly: the transform name, the per-channel ``t`` and its
+    source, and the shape parameters (``m``/``w``/``a``, or ``cofactor`` for arcsinh).
+    """
     mode = _xform_name(params)
-    ci = list(range(comp.shape[1]))
+    n = len(labels)
+    try:
+        pinned = float(params.get("transform_t", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        pinned = 0.0
+
+    if pinned > 0:
+        ts, source, fallback = [pinned] * n, "param", []
+    else:
+        pnr = _pnr_by_channel(fd, labels)
+        ts = [r if r is not None else _DEFAULT_T for r in pnr]
+        fallback = [str(labels[i]) for i, r in enumerate(pnr) if r is None]
+        source = ("fcs_pnr" if not fallback
+                  else "default" if len(fallback) == n else "fcs_pnr+default")
+
+    meta = {
+        "name": mode,
+        "t_source": source,
+        "t_per_channel": {str(lab): float(t) for lab, t in zip(labels, ts)},
+        "t_default_channels": fallback,
+        "t_default": _DEFAULT_T,
+    }
+    if mode == "arcsinh":
+        # The arcsinh path is anchored to `cofactor`, not to t — say so rather than record a t the
+        # computation never used.
+        meta["t_source"] = "not_applicable"
+        meta["t_per_channel"] = {}
+        meta["t_default_channels"] = []
+        meta["cofactor"] = float(params.get("cofactor", 150.0) or 150.0)
+        meta["m"] = _ASINH_M
+    elif mode == "logicle":
+        meta["m"], meta["w"], meta["a"] = _LOGICLE_M, _LOGICLE_W, _LOGICLE_A
+    elif mode == "log":
+        meta["m"] = _LOG_M
+    return ts, meta
+
+
+def _transform_all(comp, params, ts, np, flowutils):
+    """Transform EVERY channel into display space with the chosen GatingML transform, so a gate on
+    any channel is compared in the same space the plot is drawn in.
+
+    ``ts`` is the per-channel top of scale from :func:`_resolve_transform`. Channels sharing one
+    ``t`` (the common case — one acquisition, one ``$PnR``) are transformed in a single call, so
+    this is the same work the single-``t_top`` version did."""
+    mode = _xform_name(params)
     data = comp.astype(float, copy=True)
-    if mode == "linear":
-        return data / t_top
     if mode == "arcsinh":
         # GatingML asinh with param_t = cofactor·sinh(m·ln10) reduces to the biologist's
-        # normalized cofactor arcsinh, asinh(x / cofactor) / (m·ln10).
+        # normalized cofactor arcsinh, asinh(x / cofactor) / (m·ln10). No `t` involved.
         cofactor = float(params.get("cofactor", 150.0) or 150.0)
-        m = 4.0
-        return flowutils.transforms.asinh(data, ci, cofactor * math.sinh(m * _LN10), m, 0.0)
-    if mode == "log":
-        return flowutils.transforms.log(data, ci, t_top, 4.5)
-    return flowutils.transforms.logicle(data, ci, t=t_top, m=4.5, w=0.5, a=0.0)
+        return flowutils.transforms.asinh(data, list(range(comp.shape[1])),
+                                          cofactor * math.sinh(_ASINH_M * _LN10), _ASINH_M, 0.0)
+    groups: dict[float, list[int]] = {}
+    for i, t in enumerate(ts[: comp.shape[1]]):
+        groups.setdefault(float(t), []).append(i)
+    for t, ci in groups.items():
+        if mode == "linear":
+            data[:, ci] = data[:, ci] / t
+        elif mode == "log":
+            data = flowutils.transforms.log(data, ci, t, _LOG_M)
+        else:
+            data = flowutils.transforms.logicle(data, ci, t=t, m=_LOGICLE_M,
+                                                w=_LOGICLE_W, a=_LOGICLE_A)
+    return data
 
 
 def _subsample_idx(n, cap, np):
@@ -198,7 +312,13 @@ def _kde_density(xd, yd, np):
 def _gating_rows(gates, disp, comp, idx, xi, yi, np):
     """Population rows from a clean-room gate-tree walk, prefixed with the root
     (All events). Gate membership is evaluated over ALL events in transformed display
-    space; MFI = median of the COMPENSATED events for the plotted x/y channels."""
+    space; MFI = median of the COMPENSATED events for the plotted x/y channels.
+
+    A gate that cannot be evaluated gets a ROW with ``count=None`` and a ``status`` naming why,
+    never a silent ``continue`` (A16). Two silent drops lived here: a gate naming a channel the FCS
+    does not carry, and an unrecognized ``type`` — and, worse, an unresolved PARENT fell back to
+    ``all_mask``/``total``, so a child's %-parent was silently computed against ALL events. An
+    unresolved gate's descendants are now marked unresolved too."""
     total = int(disp.shape[0])
 
     def _median(mask, col):
@@ -217,14 +337,29 @@ def _gating_rows(gates, disp, comp, idx, xi, yi, np):
     by_id = {g["id"]: g for g in gates}
     masks: dict = {}   # gate / quadrant id -> boolean membership over all events
     counts: dict = {}
+    unresolved: dict = {}  # gate id -> the reason it (or its ancestor) could not be evaluated
+
+    def _unresolved_row(g, reason):
+        unresolved[g["id"]] = reason
+        plabel = by_id[g["parent"]]["label"] if g.get("parent") in by_id else "All events"
+        return {"population": g["label"], "parent": plabel, "count": None,
+                "pct_parent": None, "pct_total": None, "mfi_x": None, "mfi_y": None,
+                "status": reason}
+
     # Parents before children so every nested gate resolves against its parent's mask.
     for g in sorted(gates, key=lambda g: _depth(g, by_id)):
         parent = g.get("parent")
+        # An unresolved ancestor makes this gate uncountable. Falling back to the root mask would
+        # report a %-parent against ALL events — a wrong number presented as a right one.
+        if parent in unresolved:
+            rows.append(_unresolved_row(g, _flow.DROP_PARENT_UNRESOLVED))
+            continue
         pmask = masks.get(parent, all_mask) if parent else all_mask
         pcount = counts.get(parent, total) if parent else total
         plabel = by_id[parent]["label"] if parent in by_id else "All events"
         cxi, cyi = idx.get(g.get("x")), idx.get(g.get("y"))
         if cxi is None or cyi is None:
+            rows.append(_unresolved_row(g, _flow.DROP_CHANNEL_NOT_IN_FCS))
             continue
         gx, gy = disp[:, cxi], disp[:, cyi]
 
@@ -247,6 +382,7 @@ def _gating_rows(gates, disp, comp, idx, xi, yi, np):
         elif g["type"] == "polygon":
             m = _poly_mask(gx, gy, g["vertices"], np) & pmask
         else:
+            rows.append(_unresolved_row(g, _flow.DROP_UNKNOWN_TYPE))
             continue
         c = int(m.sum())
         masks[g["id"]], counts[g["id"]] = m, c
