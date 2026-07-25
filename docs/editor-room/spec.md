@@ -3,8 +3,10 @@
 _Written 2026-07-25 21:45 +1000 (Sydney) · implements owner decision **#13** (`agent_handoff/DECISIONS.md`),
 which answered board questions `Q-1` and `Q-2`. Scopes **`W-2`** in `docs/next-session-plan/plan.md`._
 
-**Status: `D-2` ANSWERED by the owner 2026-07-25 — option (a), auto-collapse both rails at ≤1280.
-`W-2` is cleared to build to this spec.**
+**Status: BUILT 2026-07-25.** `D-2` answered by the owner — option (a), auto-collapse both rails on a
+narrow viewport. Shipped and browser-verified: the plotting area at 1280×800 went **90px → 571px**,
+and every checked width clears the ~506px target (1280 → 571, 1440 → 727, 1920 → 718). One decision
+changed under measurement during the build — the threshold, see the ⚑ under `D-3`.
 
 ## What
 
@@ -181,12 +183,23 @@ requirement the owner has already refused to relax. *Reversible:* yes — it is 
 > expands to it) is therefore not a nicety — it is what keeps the one-click cost honest, so it ships
 > with the collapse, not after it.
 
-**D-3 — The threshold is 1280, and it is a viewport-width rule.** Below/at 1280 auto-collapse
-applies; above it, nothing is collapsed by default (at 1440 the figure is already comfortable, and at
-1920 the stage is 938px). *Assumption:* Selom is desktop-only, so there is no mobile breakpoint to
-reconcile ([[selom-desktop-only]]). *Alternative:* trigger on measured stage width rather than
-viewport width — more precise, but it makes the rule depend on the very layout it changes (a feedback
-loop). Rejected for v1.
+**D-3 — The threshold is a viewport-width rule.** *Assumption:* Selom is desktop-only, so there is no
+mobile breakpoint to reconcile ([[selom-desktop-only]]). *Alternative:* trigger on measured stage
+width rather than viewport width — more precise, but it makes the rule depend on the very layout it
+changes (a feedback loop). Rejected for v1.
+
+> **⚑ CORRECTED DURING BUILD — the number is 1700, not 1280.** This spec first proposed 1280 on the
+> stated assumption that "at 1440 the figure is already comfortable". A browser disproved that the
+> moment `W-2` was wired: with both rails expanded the fixed chrome measures **1193px**, so 1440
+> leaves the plotting area **247px** — *worse than the 571px a collapsed 1280 delivers.* A 1280
+> threshold therefore shipped the one result no user forgives: **widen the window, and the figure
+> gets smaller.**
+>
+> So the threshold is derived from the target rather than from the width the complaint arrived on:
+> `506 + 1193 ≈ 1699` → **1700**. Measured after the change: 1280 → **571px**, 1440 → **727px**,
+> 1920 → **718px**; every checked width clears the target. `browser-verify d5` now asserts the target
+> at **every** viewport it measures, not just 1280 — asserting only the reported width is exactly how
+> the 1440 hole opened.
 
 **D-4 — Dock state is view-local, not persisted.** It resets per editor mount. *Alternative:*
 persist per user in `localStorage`. Deferred: persisting a collapsed inspector risks a user who

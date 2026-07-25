@@ -110,6 +110,16 @@ test("D-10 — the frozen / read-only inspector", async ({ editor }) => {
 test("D-1 / D-7 — the inspector tab strip at its real worst case", async ({ editor }) => {
   await editor.viewport(1280, 800);
 
+  // Since `W-2` the dock ARRIVES collapsed at ≤1700 (owner decision #13) — the editor's room budget.
+  // The tab strip's worst case is a property of the EXPANDED dock, so open it first. Doing this
+  // through the spine's own control is deliberate: if the collapsed dock ever stopped offering a way
+  // back, this check would fail here rather than quietly measuring nothing.
+  const expand = editor.page.getByRole("button", { name: "Expand inspector" });
+  if (await expand.count()) {
+    await expand.click();
+    await editor.page.waitForTimeout(300);
+  }
+
   const tabs = await editor.page.evaluate(() => {
     const list = document.querySelector('[role="tablist"]');
     if (!list) return null;
@@ -220,11 +230,22 @@ test("D-9 — the AI panel overlay vs the inspector dock", async ({ editor }) =>
     const pr = panel.getBoundingClientRect();
     const ar = art?.getBoundingClientRect();
     const z = (el: Element | null) => (el ? getComputedStyle(el).zIndex : null);
+    // What actually paints at the panel's centre. Since `W-2` the artboard legitimately extends
+    // UNDER the panel (the dock collapsed, so the hero is wider), which makes a geometric overlap
+    // test meaningless — an overlay is SUPPOSED to overlap. The defect D-9 cares about is the
+    // artboard poking THROUGH, and only hit-testing can tell the two apart.
+    const probe = document.elementFromPoint(
+      Math.round(pr.left + pr.width / 2),
+      Math.round(pr.top + pr.height / 2),
+    );
     return {
       panel: { left: Math.round(pr.left), width: Math.round(pr.width), z: z(panel) },
       artboardZ: z(art?.closest("[class*='z-']") ?? null),
       artboardRight: ar ? Math.round(ar.right) : null,
       overlaps: ar ? ar.right > pr.left : null,
+      /** True when the panel (or something inside it) is what the user actually sees there. */
+      panelOnTop: !!probe && (panel === probe || panel.contains(probe)),
+      topmost: probe ? probe.tagName + "." + String(probe.className).slice(0, 30) : null,
     };
   });
 
@@ -238,10 +259,19 @@ test("D-9 — the AI panel overlay vs the inspector dock", async ({ editor }) =>
     "the AI panel has no reachable close affordance",
   ).toBeGreaterThan(0);
 
-  // (c) the artboard is z-[45] and the panel z-40 — confirm the artboard does not poke through.
+  // (c) the artboard must not poke THROUGH the panel.
+  //
+  // This used to assert the artboard's right edge never reached the panel's left edge, which held
+  // only because the 330px inspector dock kept the hero narrow. `W-2` collapses that dock, so the
+  // artboard now legitimately extends under the panel — and an overlay overlapping content is the
+  // whole point of an overlay, not a defect. The question was always "what does the user SEE
+  // there?", so it is hit-tested now: the panel must own the pixels it covers, whatever the
+  // geometry underneath. Verified visually first (test-results/browser-verify/d9-ai-panel-*.png):
+  // the figure is cleanly cut off at the panel's edge.
   expect(
-    geo!.overlaps,
-    `the artboard (right edge ${geo!.artboardRight}) reaches under the AI panel (left ${geo!.panel.left}) ` +
-      `— with artboard z=${geo!.artboardZ} above the panel z=${geo!.panel.z} it would poke through`,
-  ).toBe(false);
+    geo!.panelOnTop,
+    `the AI panel does NOT own the pixels at its own centre — topmost element there is ` +
+      `${geo!.topmost}. The artboard (right edge ${geo!.artboardRight}, z=${geo!.artboardZ}) is ` +
+      `poking through the panel (left ${geo!.panel.left}, z=${geo!.panel.z}).`,
+  ).toBe(true);
 });

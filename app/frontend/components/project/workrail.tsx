@@ -20,6 +20,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/ui/cn";
+import { useAutoCollapse } from "@/hooks/use-auto-collapse";
 import { StaleBadge } from "./stale-badge";
 import { getSkill } from "@/lib/catalog/seed";
 import { datasetChipName, datasetDisplayName } from "@/lib/lineage/family";
@@ -114,7 +115,12 @@ export function Workrail({
   /** Open the compare view for a version family (the figure ids that share a parent). */
   onCompareFamily: (figureIds: string[]) => void;
 }) {
-  const [collapsed, setCollapsed] = React.useState(false);
+  // On the FIGURE stage the rail is navigation standing beside the subject, so at ≤1280 it yields
+  // and the editor arrives with it collapsed (`W-2`, owner decision #13). Measured: collapsing it
+  // buys the plotting area 204px, and the ~506px target is unreachable at 1280 without both this
+  // and the inspector dock. Every other stage keeps the plain manual toggle it always had, and one
+  // user toggle here ends the automatic behaviour for the session.
+  const [collapsed, setCollapsed] = useAutoCollapse(view === "figure");
   // Which sections / families are collapsed (default: all expanded — predictable).
   const [closedSections, setClosedSections] = React.useState<Set<string>>(() => new Set());
   const [closedFamilies, setClosedFamilies] = React.useState<Set<string>>(() => new Set());

@@ -30,20 +30,45 @@ export type ArtboardFrame = {
   /** Card sizing classes — the floor + cap that bracket a stretched card. */
   cardClass: string | undefined;
   /** Inline card sizing. Carries NO height: the stage owns the vertical axis. */
-  cardStyle: { width: string; maxWidth: string } | undefined;
+  cardStyle: {
+    width?: string;
+    maxWidth?: string;
+    transform?: string;
+    transformOrigin?: string;
+  } | undefined;
 };
 
-export function artboardFrame(fixed: boolean): ArtboardFrame {
+/**
+ * @param fixed  the figure declares a numeric `layout.width` (an ERG trace grid, a multi-panel).
+ * @param zoom   the RESOLVED zoom scale (1 = 1:1). A magnification of the rendered card, applied as
+ *               a transform so it changes no layout box and writes nothing to the spec — the sizing
+ *               rule above is untouched by it, and `layout.width` stays the user's export size.
+ *               It lives here rather than in either host for the same reason everything else does:
+ *               the CanvasShell and the classic EditorWorkspace must not be able to disagree.
+ */
+export function artboardFrame(fixed: boolean, zoom = 1): ArtboardFrame {
+  // `top center` keeps a magnified figure anchored where the eye already is and lets the stage
+  // scroll DOWN into the rest of it; scaling from the centre would push its top out of scroll reach,
+  // the same trap the fixed branch's `items-start` exists to avoid.
+  const scale =
+    Number.isFinite(zoom) && zoom > 0 && Math.abs(zoom - 1) > 1e-9
+      ? { transform: `scale(${zoom})`, transformOrigin: "top center" }
+      : {};
+
   if (fixed) {
     // Declared size wins: top-align so a tall figure overflows downward and stays scrollable
     // (centring would push its top out of view AND out of scroll reach).
-    return { alignClass: "items-start", cardClass: undefined, cardStyle: undefined };
+    return {
+      alignClass: "items-start",
+      cardClass: undefined,
+      cardStyle: Object.keys(scale).length ? scale : undefined,
+    };
   }
   return {
     alignClass: "items-stretch",
     cardClass: "min-h-[20rem] max-h-[56rem]",
     // Fill the available width (so collapsing the side rails gives the figure more room instead of
     // opening a dark gap), capped so it never stretches absurdly wide on an ultra-wide monitor.
-    cardStyle: { width: "100%", maxWidth: "88rem" },
+    cardStyle: { width: "100%", maxWidth: "88rem", ...scale },
   };
 }

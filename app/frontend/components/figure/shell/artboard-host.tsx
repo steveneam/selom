@@ -1,8 +1,11 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { FigureCanvas } from "@/components/figure/figure-canvas";
 import { PaneBoundary } from "@/components/ui/error-boundary";
 import { artboardFrame } from "@/lib/ui/artboard-frame";
+import { fitScale, type Zoom } from "@/lib/ui/editor-room";
+import { observeContainerResize } from "@/lib/figure/plot-resize";
 import { cn } from "@/lib/ui/cn";
 import type { FigureStore } from "@/hooks/use-figure-store";
 import type { MarkRole } from "@/lib/erg/marks";
@@ -18,11 +21,19 @@ export function ArtboardHost({
   store,
   elevated = false,
   readOnly = false,
+  zoom = 1,
+  onZoomResolved,
   onSelectTrace,
   onMarkMove,
   onToggleLabel,
 }: {
   store: FigureStore;
+  /** Magnification of the rendered card, or `"fit"` — resolved here, since only this component can
+   *  measure the stage the figure has to fit into. */
+  zoom?: Zoom;
+  /** The scale actually applied, reported back so the toolbar can show a truthful percentage
+   *  instead of the word "fit" (spec R5: the control must never claim a zoom it is not at). */
+  onZoomResolved?: (scale: number) => void;
   /** During export the artboard is the subject — lift it above the scrim (z-45), below the popover. */
   elevated?: boolean;
   /** Frozen "paper" version (Pillar 1, S3): render the figure but bind no edit gestures (Decision D6). */
@@ -35,17 +46,47 @@ export function ArtboardHost({
   onToggleLabel?: (point: GeneLabelPoint) => void;
 }) {
   const spec = store.spec;
+  const fixed = typeof spec?.layout.width === "number";
+  const declaredW = typeof spec?.layout.width === "number" ? spec.layout.width : 0;
+  const declaredH = typeof spec?.layout.height === "number" ? spec.layout.height : 0;
+
+  // "Fit" resolves against the LIVE stage, so it is measured rather than assumed, and re-measured
+  // whenever the stage changes size — which now happens without a window resize, since a rail can
+  // collapse underneath it (W-1). A responsive figure is sized BY the stage, so its fit is exactly
+  // 1 and this settles there immediately.
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const [fitted, setFitted] = useState(1);
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const measure = () => {
+      if (!fixed) {
+        setFitted(1);
+        return;
+      }
+      setFitted(fitScale({ width: el.clientWidth, height: el.clientHeight }, { width: declaredW, height: declaredH }));
+    };
+    measure();
+    return observeContainerResize(el, measure);
+  }, [fixed, declaredW, declaredH]);
+
+  const resolvedZoom = zoom === "fit" ? fitted : zoom;
+  useEffect(() => {
+    onZoomResolved?.(resolvedZoom);
+  }, [resolvedZoom, onZoomResolved]);
+
   if (!spec) return null;
   // ONE sizing rule, declared and unit-tested in lib/ui/artboard-frame (A24): a responsive figure is
   // sized BY this stage — it cannot ask for more room than the shell's bands left it — while a
   // fixed-size figure keeps its declared size and scrolls from the top.
-  const frame = artboardFrame(typeof spec.layout.width === "number");
+  const frame = artboardFrame(fixed, resolvedZoom);
 
   return (
     // A slim dark gutter (p-3 lg:p-4, not p-6 lg:p-10) keeps the artboard the hero at 1280 — the
     // workrail + inspector already claim a lot of the row, so the figure gets every remaining pixel;
     // the white card's own p-3 keeps breathing room.
     <div
+      ref={stageRef}
       className={cn(
         "relative flex min-w-0 flex-1 justify-center overflow-auto p-3 lg:p-4",
         frame.alignClass,

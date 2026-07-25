@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { ArtboardHost } from "./shell/artboard-host";
 import { InspectorDock, type EditorSkill } from "./shell/inspector-dock";
+import { DEFAULT_INSPECTOR_TAB } from "./inspector-tabs";
+import { useAutoCollapse } from "@/hooks/use-auto-collapse";
 import type { FigureStore } from "@/hooks/use-figure-store";
 import type { MarkRole } from "@/lib/erg/marks";
 import type { GeneLabelPoint } from "@/lib/volcano/labels";
@@ -41,6 +43,10 @@ export function EditorWorkspace({
   // Click-to-select (P3 §3.4): the artboard reports a clicked trace; the inspector focuses its
   // series. A monotonic nonce makes re-clicking the SAME trace re-trigger the focus effect.
   const [selection, setSelection] = useState<{ trace: number; nonce: number } | null>(null);
+  // Same room budget as the shell (`W-2`) — this host is `/extract`'s editor, whose stage is the
+  // shortest in the app (279px at 1280×800, measured in D-11), so it needs the dock to yield most.
+  const [dockCollapsed, setDockCollapsed] = useAutoCollapse(true);
+  const [inspectorTab, setInspectorTab] = useState(DEFAULT_INSPECTOR_TAB);
 
   if (!store.spec) return null;
 
@@ -60,6 +66,10 @@ export function EditorWorkspace({
         readOnly={readOnly}
         onEditCopy={onEditCopy}
         skill={skill}
+        collapsed={dockCollapsed}
+        onCollapsedChange={setDockCollapsed}
+        tab={inspectorTab}
+        onTabChange={setInspectorTab}
       />
     </div>
   );

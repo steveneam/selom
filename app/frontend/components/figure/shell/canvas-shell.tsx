@@ -6,6 +6,9 @@ import { CommandBar } from "./command-bar";
 import { InspectorDock, type EditorSkill } from "./inspector-dock";
 import { ToolContextStrip } from "./tool-context-strip";
 import { ToolsRail } from "./tools-rail";
+import { DEFAULT_INSPECTOR_TAB } from "@/components/figure/inspector-tabs";
+import { DEFAULT_ZOOM, type Zoom } from "@/lib/ui/editor-room";
+import { useAutoCollapse } from "@/hooks/use-auto-collapse";
 import type { FigureStore } from "@/hooks/use-figure-store";
 import type { MarkRole } from "@/lib/erg/marks";
 import type { GeneLabelPoint } from "@/lib/volcano/labels";
@@ -57,11 +60,28 @@ export function CanvasShell({
   // series. A monotonic nonce makes re-clicking the SAME trace re-fire the focus effect. This is
   // view-local UI state, not figure state — no second store is created.
   const [selection, setSelection] = useState<{ trace: number; nonce: number } | null>(null);
+  // The inspector dock's room budget (`W-2`, decision #13): at ≤1280 the editor ARRIVES with the
+  // dock collapsed, because that is the only way the plotting area clears its ~506px target on a
+  // 1280 laptop. The user's own toggle wins from the moment they make one.
+  const [dockCollapsed, setDockCollapsed] = useAutoCollapse(true);
+  // Lifted so the collapsed spine can expand straight into a chosen tab.
+  const [inspectorTab, setInspectorTab] = useState(DEFAULT_INSPECTOR_TAB);
+  // View-local zoom (spec R6: never figure state, so it makes no undo entry and survives no export).
+  // Keyed by the spec so a new figure opens at Fit rather than inheriting the last figure's 400%.
+  const [zoom, setZoom] = useState<Zoom>(DEFAULT_ZOOM);
+  const [resolvedZoom, setResolvedZoom] = useState(1);
+  // React's documented "adjust state when a prop changes" pattern — a render-phase reset, not an
+  // effect, so the new figure's first paint is already at Fit instead of flashing the old zoom.
+  const [zoomedSpec, setZoomedSpec] = useState(store.spec);
+  if (zoomedSpec !== store.spec) {
+    setZoomedSpec(store.spec);
+    if (zoom !== DEFAULT_ZOOM) setZoom(DEFAULT_ZOOM);
+  }
 
   return (
     <div className="flex min-h-[520px] min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background">
       <CommandBar>{command}</CommandBar>
-      <ToolContextStrip />
+      <ToolContextStrip zoom={zoom} resolvedZoom={resolvedZoom} onZoomChange={setZoom} />
       <div className="flex min-h-0 flex-1">
         {/* Draw tools commit to the store; a frozen ("paper") figure gets no store → they disable. */}
         <ToolsRail store={readOnly ? undefined : store} />
@@ -69,6 +89,8 @@ export function CanvasShell({
           store={store}
           elevated={elevated}
           readOnly={readOnly}
+          zoom={zoom}
+          onZoomResolved={setResolvedZoom}
           onSelectTrace={(trace) => setSelection((s) => ({ trace, nonce: (s?.nonce ?? 0) + 1 }))}
           onMarkMove={onMarkMove}
           onToggleLabel={onToggleLabel}
@@ -79,6 +101,10 @@ export function CanvasShell({
           readOnly={readOnly}
           onEditCopy={onEditCopy}
           skill={skill}
+          collapsed={dockCollapsed}
+          onCollapsedChange={setDockCollapsed}
+          tab={inspectorTab}
+          onTabChange={setInspectorTab}
         />
       </div>
     </div>

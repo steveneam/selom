@@ -20,6 +20,16 @@ import { expect, test } from "./fixtures";
 test("remedy sizing — what collapsing the existing rail buys the hero at 1280", async ({ editor }) => {
   await editor.viewport(1280, 800);
 
+  // Since `W-2` the workrail ARRIVES collapsed at ≤1700 (owner decision #13), so "collapse it and
+  // measure the gain" has to start by expanding it. That is not a workaround — driving both
+  // directions is strictly better evidence, because it proves the rail's own control still round
+  // trips AND that the reflow follows it either way.
+  const expandRail = editor.page.getByRole("button", { name: "Expand rail" });
+  if (await expandRail.count()) {
+    await expandRail.click();
+    await editor.page.waitForTimeout(600);
+  }
+
   const before = await editor.horizontalChrome();
 
   await editor.page.getByRole("button", { name: "Collapse rail" }).click();

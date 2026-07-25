@@ -139,10 +139,12 @@ test("D-5 (also-confirm) — the figure is legible at 1280", async ({ editor }) 
 
   const report: string[] = [];
   let widest = 0;
+  const perViewport: { label: string; plot: number }[] = [];
   for (const vp of VIEWPORTS) {
     await editor.viewport(vp.width, vp.height);
     const m = await editor.horizontalChrome();
     widest = Math.max(widest, m.plotArea ?? 0);
+    perViewport.push({ label: `${vp.width}×${vp.height}`, plot: m.plotArea ?? 0 });
     report.push(
       `  ${vp.width}×${vp.height}  main=${m.main}  stage=${m.stage}  card=${m.card}  ` +
         `plotArea=${m.plotArea}  ` +
@@ -150,6 +152,20 @@ test("D-5 (also-confirm) — the figure is legible at 1280", async ({ editor }) 
     );
   }
   console.log("\n[D-5 also-confirm] horizontal chrome\n" + report.join("\n") + "\n");
+
+  // EVERY checked width, not just 1280. Asserting only the width the complaint came from is how
+  // `W-2` first shipped a 1280 threshold that left 1440 at 247px — worse than a collapsed 1280 —
+  // so that a user widening their window watched the figure shrink. The requirement was never
+  // "1280 works", it is "the figure gets its room at every supported width".
+  const starved = perViewport.filter((v) => v.plot < EXPECTED_PLOT_W);
+  expect(
+    starved,
+    `these viewports give the plotting area less than §D's ${EXPECTED_PLOT_W}px:\n` +
+      `${starved.map((v) => `    ${v.label} → ${v.plot}px`).join("\n")}\n` +
+      `  all measured: ${perViewport.map((v) => `${v.label}=${v.plot}px`).join(", ")}\n` +
+      `  A width that is WIDER but gives LESS plot means the auto-collapse threshold ` +
+      `(lib/ui/editor-room.ts) is below that width.`,
+  ).toEqual([]);
 
   await editor.viewport(1280, 800);
   const c = await editor.horizontalChrome();

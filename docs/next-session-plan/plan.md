@@ -153,7 +153,37 @@ first was fixed. `W-1` is now fixed and its gate is green; the remaining 212px i
   `docs/editor-room/spec.md` written and paused for review before implementation.
 - **Source.** proposal §3.3/§3.4 · lane3 §RESULTS.
 
-### `W-2` — give the figure room (implements `Q-1`) · Status: `TODO — spec written + decided`
+### `W-2` — give the figure room (implements `Q-1`) · Status: `DONE`
+
+> **The 1280 width defect is fixed: the plotting area went 90px → 571px, measured in a browser.**
+> Every checked width now clears §D's 506px target — 1280 → **571**, 1440 → **727**, 1920 → **718** —
+> and `browser-verify` is **11/11 green**, including the `D-5 (also-confirm)` gate that had been red
+> since it was written.
+>
+> Shipped, to `docs/editor-room/spec.md`: a collapse control on the inspector dock, collapsing to a
+> spine of its own tab icons (click one → expands to that tab) · auto-collapse of both rails on a
+> narrow viewport, via one shared predicate in `lib/ui/editor-room.ts`, with the user's own toggle
+> winning for the session · zoom in/out/Fit + a truthful % readout in the tool-context strip, which
+> was an inert hint line · the inspector-dock "Edit a copy" duplicate dropped (`Q-2`.2).
+>
+> **⚑ The spec's threshold was wrong and measurement corrected it: 1280 → 1700.** At 1280 the spec
+> assumed 1440 was "already comfortable". It is not — with both rails expanded, fixed chrome eats
+> 1193px, so 1440 gave the plot **247px, worse than a collapsed 1280 (571px)**. A 1280 threshold
+> meant *widening the window shrank the figure*. The threshold is now derived from the target
+> (`506 + 1193 ≈ 1699`), and the `d5` gate asserts the target at **every** viewport it measures —
+> asserting only 1280 is precisely how the 1440 hole opened.
+>
+> **Three existing checks encoded the OLD arrival state and were corrected, not weakened:** D-1/D-7
+> now expands the dock before measuring its tab strip; `remedy-sizing` drives expand→collapse (better
+> evidence — it proves the control round-trips *and* that the reflow follows either way); D-9 stopped
+> asserting the artboard never reaches under the AI panel — with the dock collapsed it legitimately
+> does, and an overlay is *supposed* to overlap — and now hit-tests that the panel owns the pixels it
+> covers, which is the defect it always meant to catch.
+>
+> **Not measured, and honest about it:** zoom's headline case is a FIXED-size figure (an ERG trace
+> grid declares 960×640) fitting a stage narrower than itself. The harness fixture is a responsive
+> volcano, so that path is held by `fitScale`'s unit tests and the `artboardFrame` contract, **not**
+> by a browser. An ERG run would close it.
 
 > `docs/editor-room/spec.md` is written and its one owner call (`D-2`) is answered: **auto-collapse
 > BOTH the workrail and the inspector dock at ≤1280.** Build to the spec.
