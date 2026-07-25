@@ -40,21 +40,51 @@ Operational rules (both modes):
 
 ## Active sprint
 
-**Lead:** Claude (main tree `D:/selom`)   ·   **Sprint 1** — **MERGED 2026-07-04.** All 3 lanes landed on local `main` (eng `7b50038` → erg `889bfb2` →
-fig `5d940f0`); integrated gates green (FE tsc·eslint 0·vitest 510 / BE ruff·pytest 1212·1skip); **awaiting owner push.**   ·   **Full plan + kickoff prompts:**
-`docs/parallel-sprint-1/plan.md`. Sprint-1 slices add no new shared type → freezes are "don't break these APIs"
-declarations (see the plan). **Merge model (owner-chosen): DELEGATED train** (Thalon-validated, Sprint 0). Branch
-protection deferred; the lead runs the whole train autonomously to **local** `main` — per lane in merge-order:
-rebase → CI/gates green → scope-leak check (`git diff --name-only main...<lane>` vs the lane's glob) → review →
-merge → board message. **Push stays the owner's gate** (nothing reaches origin/Vercel without the owner; owner
-inspects local `main` + messages post-hoc, then pushes). Any conflict **outside the board** = a partition leak →
-stop, don't resolve blindly. No merge on red.
+**Lead:** Claude (main tree `/home/deploy/work/selom`, Linux syd4)   ·   **Sprint 2 — LIVE, launched 2026-07-25 17:46 +1000.**
+Three lanes forked and running autonomously. Owner approved the partition (plan `P0-05`), which makes forking,
+building in-lane and the **local** merges autonomous; **each push remains a founder gate.**
+**Entry point:** `docs/next-session-plan/plan.md` (Phase 0 complete — every row DONE).
 
-| lane | owner | owns (glob) | branch | status | depends-on | merge-order |
-|------|-------|-------------|--------|--------|------------|-------------|
-| ENG | `D:/selom-eng` (BE `:8011`) | `app/backend/engine/**` · `reproduction/**` · `companions/**` | agent/eng/consistency | **merged** `7b50038` — vocab primitive + drift guard + WS2.7/2.8 | — | 1 |
-| ERG | `D:/selom-erg` (BE `:8012` · FE `:3002`) | `skills/{_erg,_iwx,_celeris,_tracegrid}.py` · `skills/proprietary/erg_*/**` · `lib/erg/**` + carve-outs `components/project/marks-editor.tsx` · `components/figure/mark-drag.ts` | agent/erg/marks-v2 | **merged** `889bfb2` — manual-marks v2 (R6 provenance + R7 blinding) | — | 2 |
-| FIG | `D:/selom-fig` (FE `:3003`) | `app/frontend/lib/figure/**` · `components/figure/**` **minus** `mark-drag.ts` | agent/fig/gridlines | **merged** `5d940f0` — axis gridline controls (Pillar-2 Slice 1) | — | 3 |
+**How they were launched (thalon's procedure, addendum in `docs/next-session-plan/lane-mechanics-from-thalon.md`):**
+`git worktree add` → `scripts/worktree-setup.sh` (Linux symlink provisioner) → a pointer-sized
+`LANE-KICKOFF.md` in each worktree with the landmines **inlined** (a worktree is a separate memory namespace) →
+`tmux new-session -d` + interactive `claude` → `send-keys` kickoff → settle → Enter. Deliberately **not**
+`claude -p` (loses steering; permission prompts become failures), **not** `agent-comm` as the kickoff (that is
+signalling, not a task grant), **not** lead-subagents (a lead crash would take every lane). Lanes inherit
+`bypassPermissions` + Opus 5 xhigh from tracked `.claude/settings.json`, so the permission-prompt hang that cost
+thalon ~20 minutes cannot occur here.
+
+**Driving:** lead peeks with `tmux capture-pane -p -t lane-lN` at **planned checkpoints, first one EARLY** —
+never continuously. Pane dead ⇒ crashed (**the worktree survives — salvage commits/setup before redoing**);
+pane alive on an unsubmitted composer ⇒ stuck; pane alive with no new commits across two peeks ⇒ investigate.
+**DONE** = new commits + `LANE-WRAP.md` present + pane idle. **BLOCKED** = the lane writes the blocker into
+`LANE-WRAP.md` and stops (kickoffs forbid idling silently on a question).
+
+| lane | worktree | owns (glob) | branch | rows | status | merge-order |
+|------|----------|-------------|--------|------|--------|-------------|
+| L1 backend integrity | `/home/deploy/work/selom-lane1` | `app/backend/skills/**` · `engine/{assemble,columns,vocab,ingest}.py` · `companions/methods.py` · `tests/test_{volcano,gsea,flow,erg,assemble}*.py` | `agent/backend-integrity/l1` | `L1-01`…`L1-09` (9) | **in_progress** | 1 |
+| L2 cloud reachability | `/home/deploy/work/selom-lane2` | `routers/cloud.py` · `cloud/**` · `routers/data.py` · `lib/cloud/**` · `components/intake/**` · `lib/projects/sync.ts` · `components/project/data-panel.tsx` · `tests/test_cloud*.py` | `agent/cloud-reachability/l2` | `L2-01`…`L2-06` (6) | **in_progress** | 3 |
+| L3 FE editor polish | `/home/deploy/work/selom-lane3` | `components/figure/shell/{artboard-host,palette-strip}.tsx` · `lib/ui/**` | `agent/fe-polish/l3` | `L3-01`·`L3-02`·`L3-04` (3) | **in_progress** | 2 |
+
+**Merge order `L1 → L3 → L2`** — pure-backend first (no cross-lane contract), pure-FE presentational second
+(cannot conflict with L1), seam-spanning last so it rebases onto both and its end-to-end gate runs on the final
+tree.
+
+**Frozen cross-lane contract (the ONE shared surface):** `GET /cloud/providers` —
+`docs/cloud-providers-contract/spec.md`, guarded by `app/backend/tests/test_contract_cloud_providers.py`, which
+sits **outside** L2's glob so editing the freeze is a visible scope breach. **L2 is its only implementer and
+consumer.** A lane that needs the shape changed **re-plans**; it does not widen the freeze.
+
+**Two ratchets are pinned OUTSIDE every lane's glob and must not be edited** (one exception): the contract guard
+above, and `app/backend/tests/test_reachability_guard.py`. The exception: **L2 must DELETE its own reachability
+waivers** (`/cloud/providers`, `/data/assemble-scrna`) in the same commit that wires each surface — the guard
+fails on a stale waiver, so shrinking that list is enforced, not optional.
+
+**Gate of record — `scripts/verify.sh`** (7 gates, ~70s, raw + exit-code gated; never pipe it through `| tail`).
+In-lane: `--fast` (or `--be` / `--fe --fast`) with `SELOM_PYTEST_WORKERS=2`, never `auto` — 3 lanes × 6 workers
+on 6 vCPU oversubscribes. **At the train: the FULL `scripts/verify.sh` on the REBASED result**, on the lead's
+main checkout — `fe-build` and any real-browser check **cannot run in a worktree** (measured: Turbopack rejects
+the out-of-root `node_modules` symlink), so they are train-only steps.
 
 Status vocab: `pending · in_progress · blocked:<what> · review · merged`.
 **One writer per row** — the lead owns assignments + merge-order; each owner writes only
