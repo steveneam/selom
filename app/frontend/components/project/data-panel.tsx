@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Database, FileSpreadsheet, Plus, ShieldAlert, X } from "lucide-react";
+import { CloudDownload, Database, FileSpreadsheet, Plus, ShieldAlert, X } from "lucide-react";
 import { IntakeQuestionnaire } from "@/components/intake/intake-questionnaire";
 import { CloudImportMenu } from "@/components/intake/cloud-import-menu";
 import { Dropzone } from "./dropzone";
@@ -19,11 +19,12 @@ import { datasetDisplayName } from "@/lib/lineage/family";
 import { detectModality, proposeForModality, proposeFromQc, type IntakeAnswers, type IntakeProposal } from "@/lib/intake/mock";
 import { combineData, inspectData, modalityFromKind, qcFromInspect, type DataTypeOverride } from "@/lib/intake/inspect";
 import { designRunParams, timeCourseDesignFile, type DesignChoice } from "@/lib/intake/design";
+import { providerLabel } from "@/lib/cloud/providers";
 import { uploadDataset } from "@/lib/uploads/api";
 import { apiMockingEnabled } from "@/lib/config/env";
 import { projectStore } from "@/lib/projects/store";
 import type { AiActionDelta } from "@/lib/ai/types";
-import type { Dataset } from "@/lib/projects/types";
+import type { Dataset, DatasetSource } from "@/lib/projects/types";
 
 /** Inject the confirmed experimental design (the questionnaire's confirm-card) into the proposal's
  *  DE step — the `deg` runner reads these params directly (reference/treatment/condition_col/…) and
@@ -46,6 +47,30 @@ function withDesign(
         : s,
     ),
   };
+}
+
+/**
+ * Cloud-import provenance, shown wherever a dataset is (findings B14 · B16). Without it an imported
+ * file is pixel-identical to one dragged off the desktop, so "where did this data come from?" — the
+ * question the whole reproduction thesis rests on — has no answer in the UI even though the server
+ * stamped one. `title` carries the exact reference; the chip stays short so it fits a dense row.
+ */
+function SourceChip({ source, className }: { source: DatasetSource; className?: string }) {
+  const label = providerLabel(source.provider);
+  const when = source.fetchedAt ? new Date(source.fetchedAt) : null;
+  const stamp = when && !Number.isNaN(when.getTime()) ? ` on ${when.toLocaleDateString()}` : "";
+  return (
+    <span
+      className={cn(
+        "inline-flex max-w-full items-center gap-1 rounded-md border border-stage-data/40 bg-[color-mix(in_oklab,var(--stage-data)_10%,transparent)] px-1.5 py-0.5 text-[10px] font-medium text-stage-data",
+        className,
+      )}
+      title={`Imported from ${label}${stamp}${source.ref ? ` — ${source.ref}` : ""}`}
+    >
+      <CloudDownload aria-hidden className="size-3 shrink-0" />
+      <span className="truncate">Imported · {label}</span>
+    </span>
+  );
 }
 
 export interface AnalyzeArgs {
@@ -375,7 +400,10 @@ export function DataPanel({
                     <Database />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground">{datasetDisplayName(d)}</p>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <p className="truncate text-sm font-medium text-foreground">{datasetDisplayName(d)}</p>
+                      {d.source && <SourceChip source={d.source} className="shrink-0" />}
+                    </div>
                     <p className="tabular text-xs text-muted-foreground">
                       {d.label ? `${d.filename} · ` : ""}
                       {/* A2 fix: a dataset with no real qc yet ever shows an honest in-flight/failed
@@ -424,6 +452,23 @@ export function DataPanel({
       <div>
         {active ? (
           <Card className="space-y-5 p-5">
+            {/* Provenance first: what this data IS comes before what it looks like. A locally
+                dropped file has no `source` and shows nothing here. */}
+            {active.dataset.source && (
+              <div className="flex items-start gap-2 rounded-lg border border-stage-data/40 bg-[color-mix(in_oklab,var(--stage-data)_8%,transparent)] px-3 py-2">
+                <CloudDownload aria-hidden className="mt-0.5 size-4 shrink-0 text-stage-data" />
+                <div className="min-w-0 text-xs">
+                  <p className="font-medium text-foreground">
+                    Imported from {providerLabel(active.dataset.source.provider)}
+                  </p>
+                  {active.dataset.source.ref && (
+                    <p className="truncate text-muted-foreground" title={active.dataset.source.ref}>
+                      {active.dataset.source.ref}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
             <DataTypeStrip
               qc={active.dataset.qc}
               modality={active.dataset.modality}

@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { api } from "@/lib/api/client";
 import { WriteQueue, type SyncStatus } from "@/lib/api/write-queue";
-import type { Dataset, Figure, GeneSet, Modality, Project, ProjectState, SkillInstall } from "./types";
+import type { Dataset, DatasetSource, Figure, GeneSet, Modality, Project, ProjectState, SkillInstall } from "./types";
 
 /**
  * The API-sync layer behind `projectStore` (sub-spec §2/§3): the shared write queue, the snake↔camel
@@ -25,6 +25,27 @@ export function fromApiProject(r: Record<string, unknown>): Project {
            createdAt: ms(r.created_at) };
 }
 
+/**
+ * Cloud-import provenance off the wire (`datasets.source`, stamped by `routers/cloud.py`).
+ *
+ * The mapper used to drop this field entirely, so a dataset streamed in from Google Drive arrived in
+ * the FE indistinguishable from one dragged off the desktop — the provenance existed in the database
+ * and died at the boundary (findings B14 · B16). Defensive because `source` is a free-form JSON
+ * column: anything without a `provider` is not provenance and is discarded rather than rendered as a
+ * half-empty chip.
+ */
+function fromApiDatasetSource(v: unknown): DatasetSource | undefined {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
+  const r = v as Record<string, unknown>;
+  const provider = typeof r.provider === "string" ? r.provider.trim() : "";
+  if (!provider) return undefined;
+  return {
+    provider,
+    ref: typeof r.ref === "string" ? r.ref : "",
+    fetchedAt: typeof r.fetched_at === "string" ? r.fetched_at : undefined,
+  };
+}
+
 export function fromApiDataset(r: Record<string, unknown>): Dataset {
   return {
     id: r.id as string, projectId: r.project_id as string, filename: (r.filename as string) || "data",
@@ -34,7 +55,9 @@ export function fromApiDataset(r: Record<string, unknown>): Dataset {
     // the real intake flow → runs use run-from-dataset_id. A metadata-only `addDataset` row is `ready`
     // with NO key → false. Recomputed on every reconcile, so it stays correct across reload.
     uploaded: r.status === "ready" && Boolean(r.upload_s3_key || r.parquet_s3_key),
-    qc: (r.qc as Dataset["qc"]) || undefined, createdAt: ms(r.created_at),
+    qc: (r.qc as Dataset["qc"]) || undefined,
+    source: fromApiDatasetSource(r.source),
+    createdAt: ms(r.created_at),
   };
 }
 

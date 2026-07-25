@@ -74,6 +74,25 @@ export interface QcReport {
   varLabel?: string;
 }
 
+/**
+ * Where an imported dataset came from — the backend stamps this on `datasets.source` when a file is
+ * streamed in from a cloud provider (`routers/cloud.py` → `repo.set_source`). Absent for a locally
+ * dropped file, which is exactly the difference the UI has to show: without it a cloud-imported
+ * dataset renders identically to a hand-dropped one, so its provenance is lost the moment it lands
+ * (findings B14 · B16).
+ *
+ * SERVER-authoritative — mapped in `fromApiDataset`, refreshed on every reconcile, never invented by
+ * the client.
+ */
+export interface DatasetSource {
+  /** Backend registry provider id: "url" | "google" | "onedrive" | "dropbox". */
+  provider: string;
+  /** The reference the import ran against — a URL / s3:// URI, or a provider file id/path. */
+  ref: string;
+  /** ISO timestamp of the fetch, as stamped by the server. */
+  fetchedAt?: string;
+}
+
 /** One uploaded file. Maps to `datasets`. */
 export interface Dataset {
   id: string;
@@ -102,6 +121,9 @@ export interface Dataset {
    *  stand-in: an in-flight or failed inspect is tracked separately via `inspectState`, so the UI
    *  can render an honest "Inspecting…" / "Couldn't inspect this file" instead of guessed dims. */
   qc?: QcReport;
+  /** Cloud-import provenance stamped by the server (`datasets.source`); absent for a dropped file.
+   *  Rendered on the dataset so an imported file never looks hand-dropped. */
+  source?: DatasetSource;
   /** Whether a live `/data/inspect` is in flight ("pending") or has definitively failed ("failed")
    *  for this dataset. Undefined once `qc` is set (a success clears it) or before any inspect has
    *  run. Client-only UI state — not synced to the backend, not preserved across a server reconcile

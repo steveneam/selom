@@ -37,3 +37,16 @@ export const FALLBACK_CLOUD_PROVIDERS: CloudProvider[] = [
   { id: "onedrive", label: "OneDrive", kind: "oauth", providerConfigKey: "onedrive", enabled: false },
   { id: "dropbox", label: "Dropbox", kind: "oauth", providerConfigKey: "dropbox", enabled: false },
 ];
+
+/**
+ * A display name for a provider id that arrives on a stamped `datasets.source` — used to say
+ * "Imported from Google Drive" instead of "google" on a dataset that is already in hand.
+ *
+ * COSMETIC ONLY, and that is the whole distinction: what the contract makes server-owned is provider
+ * *state* (`enabled`) and menu *order*, never a display string. An unknown id renders as itself
+ * rather than being hidden or renamed — an honest "imported from `boxnet`" beats a dataset that
+ * looks hand-dropped, which is the bug (B14/B16).
+ */
+export function providerLabel(id: string): string {
+  return FALLBACK_CLOUD_PROVIDERS.find((p) => p.id === id)?.label ?? id;
+}
