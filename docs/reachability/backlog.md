@@ -52,8 +52,16 @@ reached. The stale-waiver half worked before the ink was dry.
 | **R-06** | `/reproduction-runs/{run_id}/events` | The reproduction **progress stream** has no consumer, so a run shows no live progress. The non-streaming sibling *is* reached, so this is a progress-visibility gap, not a dead feature. | Subscribe to the stream from the reproduction view. Same shape as R-02. |
 | **R-07** | `/workspace` | The workspace **root** collection is unused — the FE fetches the two child collections directly. Most likely genuinely redundant. | **Resolve, don't defer:** delete the route, or use it. Leaving it ambiguous is the cost. |
 
-Plus two already tracked in the lane plan: `/cloud/providers` (`L2-01`, contract frozen ahead of the
-route) and `/data/assemble-scrna` (`L2-05`, the example that motivated the guard).
+Two more were tracked in the lane plan and are now **CLOSED** — their waivers are gone, which is the
+only proof that counts:
+
+- `/cloud/providers` (`L2-01`) — route implemented through the frozen contract, consumed by the
+  cloud-import menu, which no longer keeps a provider table of its own.
+- `/data/assemble-scrna` (`L2-05`) — the example that motivated this guard. A multi-file drop of a
+  per-sample 10x/`.h5ad` deposit now assembles into one single-cell cohort
+  (`lib/intake/assemble.ts`), the sibling of the ERG `/data/combine` path.
+
+**17 → 15.**
 
 ## How this backlog gets worked
 

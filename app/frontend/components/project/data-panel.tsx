@@ -18,6 +18,7 @@ import { getSkill } from "@/lib/catalog/seed";
 import { datasetDisplayName } from "@/lib/lineage/family";
 import { detectModality, proposeForModality, proposeFromQc, type IntakeAnswers, type IntakeProposal } from "@/lib/intake/mock";
 import { combineData, inspectData, modalityFromKind, qcFromInspect, type DataTypeOverride } from "@/lib/intake/inspect";
+import { assembleScrna, looksLikeScrnaDeposit } from "@/lib/intake/assemble";
 import { designRunParams, timeCourseDesignFile, type DesignChoice } from "@/lib/intake/design";
 import { providerLabel } from "@/lib/cloud/providers";
 import { uploadDataset } from "@/lib/uploads/api";
@@ -136,9 +137,12 @@ export function DataPanel({
   const [inspecting, setInspecting] = React.useState(false);
   // The real byte-upload handshake (WS2.1) is in flight for a freshly dropped file.
   const [uploading, setUploading] = React.useState(false);
-  // Multi-file combine (C6) is in flight; or its error.
+  // Multi-file combine (C6) is in flight; or its error (shared with the scRNA assemble below).
   const [combining, setCombining] = React.useState(false);
   const [combineError, setCombineError] = React.useState<string | null>(null);
+  // Multi-file scRNA cohort assembly (L2-05) is in flight; and what it produced.
+  const [assembling, setAssembling] = React.useState(false);
+  const [assembleNote, setAssembleNote] = React.useState<string | null>(null);
   // dev:mock has no upload/run-dataset handlers → skip the byte-upload handshake (WS2.1) and keep the
   // metadata-only + multipart mock path. Real backend (the verify target) runs the full loop.
   const mockMode = apiMockingEnabled;
@@ -215,15 +219,39 @@ export function DataPanel({
     void runInspect(dataset, file, undefined, designFile);
   }
 
-  // Drop SEVERAL files → combine them into one multi-condition dataset (C6): each file is a
-  // condition (its own `condition` column, e.g. C57/Rd10, else its stem). A single file falls
-  // through to the normal ingest path. Fail-soft: a backend error surfaces a note, no dataset made.
+  // Drop SEVERAL files → one dataset. Two shapes, and the drop itself says which:
+  //   · a per-sample scRNA deposit (10x triplets / several .h5ad) → POST /data/assemble-scrna,
+  //     which concatenates them into ONE AnnData with sample_id materialized into obs (L2-05);
+  //   · anything else → the ERG multi-condition combine (C6), one file per condition.
+  // A single file falls through to the normal ingest path. Fail-soft in both directions: a backend
+  // error surfaces a note naming the shape that was attempted, and no dataset is made.
   function combineFiles(files: File[]) {
     if (files.length <= 1) {
       if (files[0]) void ingest(files[0]);
       return;
     }
     setCombineError(null);
+    if (looksLikeScrnaDeposit(files)) {
+      setAssembling(true);
+      void assembleScrna(files).then((result) => {
+        setAssembling(false);
+        if (!result) {
+          setCombineError(
+            "Couldn't assemble those files into a cohort — a single-cell deposit needs a complete 10x triplet " +
+              "(matrix + barcodes + features, optionally .gz) per sample, or one .h5ad per sample.",
+          );
+          return;
+        }
+        setAssembleNote(
+          `Assembled ${result.summary.n_samples} sample${result.summary.n_samples === 1 ? "" : "s"} · ` +
+            `${result.summary.n_cells.toLocaleString()} cells × ${result.summary.n_genes.toLocaleString()} genes.`,
+        );
+        // The assembled cohort is a normal .h5ad from here: the ordinary ingest path uploads it, so
+        // it survives reload re-runnable, and inspects it like any dropped file.
+        void ingest(result.file);
+      });
+      return;
+    }
     setCombining(true);
     void combineData(files).then((result) => {
       setCombining(false);
@@ -316,19 +344,19 @@ export function DataPanel({
             onFile={(f) => void ingest(f)}
             onFiles={combineFiles}
             multiple
-            accept=".h5ad,.csv,.tsv,.txt,.mzML,.iwxdata"
+            accept=".h5ad,.csv,.tsv,.txt,.mzML,.iwxdata,.mtx,.gz"
             title={reattachDatasetId ? "Re-upload this dataset's file" : "Drop your data here"}
-            hint="or click to browse — drop several ERG recordings to combine them into one cohort"
-            formats=".h5ad · .csv · .tsv · .txt · .mzML · .iwxdata"
+            hint="or click to browse — drop several ERG recordings to combine them into one cohort, or a per-sample single-cell deposit (10x triplets / .h5ad) to assemble one"
+            formats=".h5ad · .csv · .tsv · .txt · .mzML · .iwxdata · 10x .mtx/.tsv(.gz)"
           />
         ) : (
           <Dropzone
             onFile={(f) => void ingest(f)}
             onFiles={combineFiles}
             multiple
-            accept=".h5ad,.csv,.tsv,.txt,.mzML,.iwxdata"
-            title={reattachDatasetId ? "Re-upload this dataset's file" : "Add or combine datasets"}
-            hint="Drop one file, or several ERG recordings to combine into one cohort"
+            accept=".h5ad,.csv,.tsv,.txt,.mzML,.iwxdata,.mtx,.gz"
+            title={reattachDatasetId ? "Re-upload this dataset's file" : "Add, combine or assemble datasets"}
+            hint="Drop one file · several ERG recordings to combine into a cohort · a per-sample 10x/.h5ad deposit to assemble into one single-cell cohort"
             icon={Plus}
             variant="secondary"
           />
@@ -345,6 +373,16 @@ export function DataPanel({
         {combining && (
           <p className="text-xs text-muted-foreground" role="status">
             Combining files into one cohort…
+          </p>
+        )}
+        {assembling && (
+          <p className="text-xs text-muted-foreground" role="status">
+            Assembling per-sample matrices into one single-cell cohort…
+          </p>
+        )}
+        {assembleNote && !assembling && (
+          <p className="rounded-md border border-stage-data/40 bg-[color-mix(in_oklab,var(--stage-data)_8%,transparent)] px-3 py-2 text-xs text-foreground/85">
+            {assembleNote}
           </p>
         )}
         {combineError && (

@@ -95,11 +95,6 @@ INFRA_PATHS = {
 #: Backlog + reasoning: ``docs/reachability/backlog.md``. Every ``R-xx`` below was found BY THIS GUARD
 #: on its first run, not by a review — 17 unreachable paths against a review that had surfaced 2.
 WAIVERS: dict[str, tuple[str, str]] = {
-    "/data/assemble-scrna": (
-        "L2-05",
-        "Shipped working in 11a115f with no FE surface — the example that motivated this guard. "
-        "Lane 2 builds the surface.",
-    ),
     # ---- R-01 lit-synthesizer: backend shipped, zero FE ------------------------------------------
     "/methods/compose": (
         "R-01",

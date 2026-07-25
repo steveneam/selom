@@ -198,6 +198,44 @@ export const handlers = [
       headers: { "Content-Type": "text/csv", "X-Combine-Summary": JSON.stringify(summary) },
     });
   }),
+  // scRNA cohort assembly (L2-05): per-sample 10x triplets / .h5ad → one AnnData. The mock cannot
+  // build an h5ad, so it returns opaque bytes plus a shape-correct X-Assemble-Summary header — this
+  // proves the WIRE (header parsing, the File hand-off into ingest), never the assembly itself,
+  // which is verified against the live backend on a real deposit
+  // ([[selom-mock-is-wire-only-verify-real]]).
+  http.post("/api/data/assemble-scrna", async ({ request }) => {
+    let names: string[] = [];
+    try {
+      const fd = await request.formData();
+      names = fd.getAll("files").filter((f): f is File => f instanceof File).map((f) => f.name);
+    } catch {
+      /* no body — fall through to an empty deposit */
+    }
+    // One "sample" per triplet prefix / .h5ad stem, mirroring engine/assemble.py's grouping.
+    const samples = Array.from(
+      new Set(
+        names.map((n) =>
+          n.replace(/_?(matrix\.mtx|barcodes\.tsv|features\.tsv|genes\.tsv)(\.gz)?$/i, "").replace(/\.h5ad$/i, ""),
+        ),
+      ),
+    );
+    const summary = {
+      filename: "assembled_scrna.h5ad",
+      n_files: names.length,
+      n_cells: samples.length * 1000,
+      n_genes: 20000,
+      n_samples: samples.length,
+      samples,
+      obs_columns: ["sample_id", "sample"],
+      per_sample_n: Object.fromEntries(samples.map((s) => [s, 1000])),
+    };
+    return new HttpResponse(new Blob([new Uint8Array([0x89, 0x48, 0x44, 0x46])]), {
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "X-Assemble-Summary": JSON.stringify(summary),
+      },
+    });
+  }),
   http.post("/api/skills/:skillId/run", async ({ params, request }) => {
     // A real upload would parse `matrix`; the stub is input-independent by design,
     // so we return the canned figure (same as the backend stub run.py) plus a
