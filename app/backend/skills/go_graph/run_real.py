@@ -12,8 +12,8 @@ import json
 import math
 import pathlib
 
-from engine.columns import GENE, override_column
-from engine.vocab import DE_LOGFC_SYNONYMS, DE_PVAL_SYNONYMS
+from engine.columns import GENE, override_column, resolve_significance
+from engine.vocab import DE_LOGFC_SYNONYMS
 from skills.go_graph.run import nodelink_spec
 
 
@@ -39,7 +39,11 @@ def _query_genes(pd, data_path: str, params: dict, background: set) -> set:
     cols = {str(c).strip().lower(): c for c in df.columns}
     ov = params.get("_column_override")
     gene_col = override_column(ov, "gene", df.columns) or _pick(cols, GENE)
-    fdr_col = override_column(ov, "pval", df.columns) or _pick(cols, DE_PVAL_SYNONYMS)
+    # Significance: ADJUSTED tier first (engine.columns.resolve_significance) — the query set is
+    # defined on the corrected value. This skill draws no p-axis of its own, so the raw-p
+    # fallback is surfaced to the user by the `raw_pvalues_only` QC flag (engine/qc.py) rather
+    # than a claim here; the tier is deliberately not re-stated.
+    fdr_col, _tier_adjusted = resolve_significance(ov, df.columns, cols)
     fc_col = override_column(ov, "logFC", df.columns) or _pick(cols, DE_LOGFC_SYNONYMS)
     sub = df
     if fdr_col is not None:

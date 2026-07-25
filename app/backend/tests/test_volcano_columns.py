@@ -9,8 +9,8 @@ fold-change / significance, ``engine.columns.GENE`` for the gene label) by *subs
 header semantics the engine's D1 data-contract gate uses — via the runner's own ``_pick``.
 """
 
-from engine.columns import GENE
-from engine.vocab import DE_LOGFC_SYNONYMS, DE_PVAL_SYNONYMS
+from engine.columns import GENE, pick_significance
+from engine.vocab import DE_LOGFC_SYNONYMS
 from skills.volcano.run_real import _pick
 
 
@@ -23,12 +23,12 @@ def test_picks_geneid_from_limma_header():
     cols = _cols("GeneID", "ensembl_gene_id", "entrezgene_id", "logFC", "AveExpr", "t", "P.Value", "B", "FDR")
     assert _pick(cols, GENE) == "GeneID"
     assert _pick(cols, DE_LOGFC_SYNONYMS) == "logFC"
-    # Significance now follows the shared vocabulary order (``engine.vocab.DE_PVAL_SYNONYMS``):
-    # ``padj`` first (DESeq2's adjusted p), then the raw ``p.value``/``pvalue`` variants BEFORE
-    # ``fdr``. So a limma table carrying both P.Value and FDR resolves to the raw P.Value — the SAME
-    # column the engine's D1/D2 resolver picks (no runner<->engine split). This is a deliberate WS3.1
-    # convergence, not the old FDR-first fork.
-    assert _pick(cols, DE_PVAL_SYNONYMS) == "P.Value"
+    # FDR preferred over raw P.Value. Restored after WS3.1 (7440f56) inverted it: pointing selection
+    # at the PRESENCE union made the raw token win for every non-DESeq2 convention, so a limma
+    # volcano plotted + thresholded uncorrected p on an axis labelled "adjusted" (429 "significant"
+    # genes vs 14 on the real EYG_28 export). Selection now goes through the adjusted-tier-first
+    # resolver, and the flag it returns is what labels the axis/table.
+    assert pick_significance(cols) == ("FDR", True)
 
 
 def test_prefers_external_gene_name_over_composite_geneid():
@@ -39,7 +39,32 @@ def test_prefers_external_gene_name_over_composite_geneid():
                  "entrezgene_id", "logFC", "AveExpr", "t", "PValue", "B", "FDR")
     assert _pick(cols, GENE) == "external_gene_name"
     assert _pick(cols, DE_LOGFC_SYNONYMS) == "logFC"
-    assert _pick(cols, DE_PVAL_SYNONYMS) == "PValue"  # raw p before FDR (shared-vocabulary order)
+    assert pick_significance(cols) == ("FDR", True)  # edgeR/limma FDR, never the raw PValue
+
+
+def test_significance_tier_per_de_tool_convention():
+    """Every DE convention must resolve to its ADJUSTED column, and report that it is adjusted.
+
+    One case per tool because the WS3.1 regression was invisible tool-by-tool: only DESeq2 ('padj')
+    was unaffected, so a DESeq2-only test passed while limma/edgeR/scanpy/Seurat silently flipped.
+    """
+    assert pick_significance(_cols("gene", "log2FoldChange", "pvalue", "padj")) == ("padj", True)
+    assert pick_significance(_cols("gene", "logFC", "PValue", "FDR")) == ("FDR", True)
+    assert pick_significance(_cols("gene", "logFC", "P.Value", "adj.P.Val")) == ("adj.P.Val", True)
+    # scanpy: the raw token 'pval' substring-matches the ADJUSTED header 'pvals_adj', which is why a
+    # single ordered union can never be safe — the adjusted tier must be exhausted first.
+    assert pick_significance(_cols("names", "logfoldchanges", "pvals", "pvals_adj")) == ("pvals_adj", True)
+    assert pick_significance(_cols("gene", "avg_log2FC", "p_val", "p_val_adj")) == ("p_val_adj", True)
+    assert pick_significance(_cols("feature", "logFC", "qvalue")) == ("qvalue", True)
+
+
+def test_raw_only_table_resolves_raw_and_says_so():
+    # A legitimate fallback — a table with no corrected column still plots, but `adjusted` is False
+    # so the axis title, the table column name and QC report a raw p instead of implying BH.
+    assert pick_significance(_cols("gene", "logFC", "P.Value")) == ("P.Value", False)
+    assert pick_significance(_cols("gene", "logFC")) == (None, False)
+    # An adjusted header the adjusted tier has no token for is still not called raw.
+    assert pick_significance(_cols("gene", "logFC", "p_value_adjusted")) == ("p_value_adjusted", True)
 
 
 def test_gene_vocabulary_is_single_sourced_across_skills():
@@ -96,3 +121,27 @@ def test_no_labels_omits_annotations_key():
     # A label-less figure (the stub) stays byte-identical to its golden — no empty annotations key.
     spec = _assemble(([], [], []), ([], [], []), ([], [], []), labels=[], fc_t=1.0, y_cut=1.3, title="t")
     assert "annotations" not in spec["layout"]
+
+
+def test_methods_text_drops_the_bh_claim_when_only_raw_p_was_available():
+    """The prose must not out-claim the data: no corrected column -> no Benjamini-Hochberg sentence.
+
+    The runner declares the fallback in ``layout.meta.significance`` (written only in that case, so
+    every adjusted figure stays byte-identical to its golden) and the methods builder reads it.
+    """
+    from companions import methods
+    from skills.registry import load_skill
+
+    spec = load_skill("volcano")
+    params = {"fc_threshold": 1.0, "fdr_threshold": 0.05, "top_n": 10}
+
+    adjusted_text, adjusted_cites = methods.build_body(spec, params, figure={"layout": {}})
+    assert "Benjamini-Hochberg" in adjusted_text
+    assert "FDR <= 0.05" in adjusted_text
+
+    raw_text, raw_cites = methods.build_body(
+        spec, params, figure={"layout": {"meta": {"significance": "raw"}}})
+    assert "Benjamini-Hochberg" not in raw_text
+    assert "RAW (uncorrected)" in raw_text
+    assert "does not control the false-discovery rate" in raw_text
+    assert raw_cites == [] and adjusted_cites  # no BH citation for an uncorrected figure

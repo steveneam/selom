@@ -143,9 +143,26 @@ def test_vocabulary_values_are_stable():
     assert vocab.DE_LOGFC_SYNONYMS == (
         "log2foldchange", "logfoldchange", "logfc", "log2fc", "avg_log2fc", "log fold change",
     )
-    assert vocab.DE_PVAL_SYNONYMS == (
-        "padj", "pvalue", "p_val", "p.value", "pval", "adj.p.val", "fdr", "qvalue",
+    # Significance is TIERED: adjusted-for-multiple-testing first, raw p second, and the union is a
+    # presence set only. WS3.1 (7440f56) pointed runner SELECTION at the union and the raw token won
+    # for every non-DESeq2 convention — a raw p plotted on an axis labelled "adjusted". The tiers,
+    # their order, and the union's derivation are all pinned so that cannot recur silently.
+    assert vocab.DE_PADJ_SYNONYMS == (
+        "padj", "p_val_adj", "pvals_adj", "adj.p.val", "adj.pval", "fdr", "qvalue", "q.value",
     )
+    assert vocab.DE_PVAL_RAW_SYNONYMS == ("pvalue", "p_val", "p.value", "pval")
+    assert vocab.DE_PVAL_SYNONYMS == vocab.DE_PADJ_SYNONYMS + vocab.DE_PVAL_RAW_SYNONYMS
+
+
+def test_significance_selection_prefers_the_adjusted_tier():
+    """The behavioural half of the pin: no ordering of the presence union may be used for selection.
+
+    A guard on the tuples alone would still pass if a runner scanned the union in order, so assert
+    the resolver's OUTCOME on the header that exposed the regression (limma: both P.Value and FDR).
+    """
+    cols = {"logfc": "logFC", "p.value": "P.Value", "fdr": "FDR"}
+    assert columns.pick_significance(cols) == ("FDR", True)
+    assert columns.pick_significance({"logfc": "logFC", "p.value": "P.Value"}) == ("P.Value", False)
     assert vocab.METABOLOMICS_TOKENS == ("m/z", "hmdb", "metabolite", "kegg c")
 
 

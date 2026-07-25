@@ -172,7 +172,24 @@ def _qc_de_columns(df: Any, np: Any) -> list[QCFlag]:
             flags.append(_flag(QC_INFO, "nan_pvalues",
                                f"{n_nan} gene(s) have NaN in '{pcol}'.",
                                "Usually independent-filtered by the DE test — expected."))
+        # An honest verdict, not a silent substitution: with no multiple-testing-corrected column the
+        # runners fall back to the raw p (engine.columns.pick_significance -> adjusted=False), so the
+        # `fdr_threshold` filter is thresholding UNCORRECTED values. Say it here, once, for every
+        # skill that reads a DE table — a raw p at 0.05 admits far more genes than an FDR at 0.05.
+        if not _has_adjusted_significance(lower):
+            flags.append(_flag(QC_WARN, "raw_pvalues_only",
+                               f"No multiple-testing-corrected column — '{pcol}' is a raw p-value.",
+                               "Thresholds apply to uncorrected p; figures and methods will say "
+                               "'raw p', not FDR. Re-export with an adjusted column for an "
+                               "FDR-based cutoff."))
     return flags
+
+
+def _has_adjusted_significance(lower: dict) -> bool:
+    """True if any header reads as adjusted-for-multiple-testing (the tier the runners prefer)."""
+    from engine.columns import is_adjusted_column
+
+    return any(is_adjusted_column(low) for low in lower)
 
 
 # --- AnnData payloads -------------------------------------------------------------------

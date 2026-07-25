@@ -85,7 +85,13 @@ def test_template_references_only_declared_params(module, skill_id):
     renamed/removed param in the ``skill.json`` can't leave the prose quoting a stale name."""
     refs = _template_refs(_MODULES[module], skill_id)
     declared = set(load_skill(skill_id).param_spec)
-    stale = sorted(refs - declared)
+    # ``_``-prefixed keys are NOT user config and have no param_spec entry by design: they are facts
+    # resolved at run time from the data and injected by ``build_body`` (e.g.
+    # ``_significance_adjusted`` — whether the DE table carried a multiple-testing-corrected column,
+    # which decides if the prose may claim Benjamini-Hochberg). They cannot go stale against a
+    # skill.json rename, which is what this guard protects; the reserved prefix keeps them out of
+    # ``resolved_params``' recorded config too.
+    stale = sorted(r for r in refs - declared if not r.startswith("_"))
     assert not stale, (
         f"{module}.py template for {skill_id!r} references param(s) {stale} absent from its "
         f"param_spec {sorted(declared)} — the prose would quote a default/wrong value. Rename "

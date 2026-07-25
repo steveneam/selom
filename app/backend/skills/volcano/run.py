@@ -73,7 +73,7 @@ def _label_annotation(x, y, gene, color="#0f172a", border="rgba(148,163,184,0.5)
     }
 
 
-def _assemble(up, down, ns, labels, fc_t, y_cut, title, highlight=None) -> dict:
+def _assemble(up, down, ns, labels, fc_t, y_cut, title, highlight=None, adjusted: bool = True) -> dict:
     """Build the volcano spec from up/down/ns ``(x, y, customdata)`` triples + optional
     label/highlight points.
 
@@ -131,11 +131,20 @@ def _assemble(up, down, ns, labels, fc_t, y_cut, title, highlight=None) -> dict:
     layout = {
         "title": {"text": title},
         "xaxis": {"title": {"text": "log2 fold-change"}},
-        "yaxis": {"title": {"text": "-log10 adjusted p"}},
+        # The y-axis names the value that was ACTUALLY plotted. ``adjusted`` defaults True (the stub
+        # and every table carrying a corrected column); a DE table with only a raw p-value column
+        # resolves False and the axis says so rather than implying BH correction.
+        "yaxis": {"title": {"text": f"-log10 {'adjusted' if adjusted else 'raw'} p"}},
         "shapes": shapes,
     }
     # Omit an empty annotations key so a label-less figure (the stub / proteomics without top-N)
     # stays byte-identical to its golden.
     if annotations:
         layout["annotations"] = annotations
+    # Declared machine-readable marker for the raw-p fallback, so the auto-methods text can drop its
+    # Benjamini-Hochberg claim without re-deriving anything or parsing the axis title. Written ONLY
+    # when the significance is uncorrected, so every adjusted figure (incl. every golden) is
+    # byte-identical to before. Read by companions.methods.build_body.
+    if not adjusted:
+        layout["meta"] = {"significance": "raw"}
     return {"data": data, "layout": layout}

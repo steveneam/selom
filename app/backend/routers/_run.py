@@ -327,7 +327,7 @@ async def _execute_skill_run(
         return {
             "figure": figure,                            # Plotly JSON -> frontend
             "provenance": provenance.build(spec, path, filename, params, actions=ai_actions),
-            "methods": methods.build(spec, params),
+            "methods": methods.build(spec, params, figure=figure),
             "figure_legend": legends.build(spec, params, figure=figure, table=table),
             "guardrails": guardrails.build(spec, path, params),
             "table": table,                              # Statistics node (Pillar 1) | None

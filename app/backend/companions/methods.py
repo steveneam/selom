@@ -170,13 +170,24 @@ def _deg(p: dict):
 
 
 def _volcano(p: dict):
+    # Honest about which significance value was actually plotted: the source DE table may carry only
+    # a raw p-value, in which case claiming BH correction would be a printed-vs-computed lie.
+    if p.get("_significance_adjusted", True):
+        text = (
+            "Differential-expression results were displayed as a volcano plot of -log10 adjusted "
+            f"p-value against log2 fold change. Genes with |log2FC| >= {p['fc_threshold']} and FDR <= "
+            f"{p['fdr_threshold']} were highlighted, and the top {p['top_n']} by significance were labelled. "
+            "Adjusted p-values reflect Benjamini-Hochberg correction."
+        )
+        return text, [BH]
     text = (
-        "Differential-expression results were displayed as a volcano plot of -log10 adjusted "
-        f"p-value against log2 fold change. Genes with |log2FC| >= {p['fc_threshold']} and FDR <= "
+        "Differential-expression results were displayed as a volcano plot of -log10 RAW (uncorrected) "
+        f"p-value against log2 fold change. Genes with |log2FC| >= {p['fc_threshold']} and raw p <= "
         f"{p['fdr_threshold']} were highlighted, and the top {p['top_n']} by significance were labelled. "
-        "Adjusted p-values reflect Benjamini-Hochberg correction."
+        "The source table carried no multiple-testing-corrected column, so no correction was applied "
+        "and this threshold does not control the false-discovery rate."
     )
-    return text, [BH]
+    return text, []
 
 
 def _heatmap(p: dict):
@@ -781,20 +792,30 @@ def attribution(spec: SkillSpec) -> str:
     return f"Analysis was performed using Selom (skill '{spec.id}' v{spec.version})."
 
 
-def build_body(spec: SkillSpec, params: dict) -> tuple[str, list[str]]:
+def build_body(spec: SkillSpec, params: dict, figure: dict | None = None) -> tuple[str, list[str]]:
     """Methods prose + citations for one skill, WITHOUT the trailing Selom attribution.
 
     This is the reusable unit the multi-skill synthesizer (``litsynth``) stitches together:
     one attribution sentence belongs at the end of a whole Methods section, not after every
     paragraph. ``build`` wraps this for the single-figure case, so its output is unchanged.
+
+    ``figure`` is the spec the runner actually produced, when available. Params alone cannot say
+    whether the significance values were corrected for multiple testing — that is resolved from the
+    data's headers at run time — so a runner that fell back to a RAW p-value declares it in
+    ``layout.meta.significance`` and the prose drops its Benjamini-Hochberg claim accordingly.
+    Omitted (litsynth, replay from recorded params only) keeps the adjusted wording, as before.
     """
     resolved = resolved_params(spec, params)
+    if ((figure or {}).get("layout") or {}).get("meta", {}).get("significance") == "raw":
+        resolved["_significance_adjusted"] = False
     builder = _TEMPLATES.get(spec.id)
     return builder(resolved) if builder else _generic(spec, resolved)
 
 
-def build(spec: SkillSpec, params: dict) -> dict:
-    """Methods paragraph + citations for one figure, from its resolved parameters."""
-    text, citations = build_body(spec, params)
+def build(spec: SkillSpec, params: dict, figure: dict | None = None) -> dict:
+    """Methods paragraph + citations for one figure, from its resolved parameters (+ the produced
+    figure, when the prose must not out-claim what the runner actually computed — see ``build_body``).
+    """
+    text, citations = build_body(spec, params, figure=figure)
     text += f" {attribution(spec)}"
     return {"text": text, "citations": citations}

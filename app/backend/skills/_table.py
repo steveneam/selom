@@ -42,10 +42,15 @@ def _sig(x: float, digits: int = 3) -> float:
 
 
 def de_table(genes, log2fc, padj, fc_t: float = 1.0, fdr_t: float = 0.05,
-             max_rows: int = 300, title: str = "Differential expression") -> dict:
-    """A differential-expression table (gene · log2FC · padj · direction), most
+             max_rows: int = 300, title: str = "Differential expression",
+             adjusted: bool = True) -> dict:
+    """A differential-expression table (gene · log2FC · padj|pvalue · direction), most
     significant first, capped to ``max_rows`` (the title notes truncation). ``genes``
     is a positionally-indexable sequence aligned with the ``log2fc``/``padj`` arrays.
+
+    ``adjusted`` names the significance column honestly: ``padj`` when the values are corrected for
+    multiple testing (the default and the usual case), ``pvalue`` when the source table carried only
+    a raw p-value — a column headed ``padj`` holding uncorrected values is a printed-vs-computed lie.
     """
     import numpy as np
 
@@ -67,6 +72,7 @@ def de_table(genes, log2fc, padj, fc_t: float = 1.0, fdr_t: float = 0.05,
         if len(rows) >= max_rows:
             break
     total = int(np.isfinite(lfc).sum())
+    sig_label = "padj" if adjusted else "pvalue"
     if total > len(rows):
-        title = f"{title} (top {len(rows)} of {total} by adjusted p)"
-    return table(["gene", "log2FC", "padj", "direction"], rows, title)
+        title = f"{title} (top {len(rows)} of {total} by {'adjusted' if adjusted else 'raw'} p)"
+    return table(["gene", "log2FC", sig_label, "direction"], rows, title)

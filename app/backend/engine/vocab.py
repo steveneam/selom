@@ -24,12 +24,31 @@ DE_LOGFC_SYNONYMS: tuple[str, ...] = (
     "log2foldchange", "logfoldchange", "logfc", "log2fc", "avg_log2fc", "log fold change",
 )
 
-# A significance column: an adjusted or raw p-value / FDR / q-value.
-DE_PVAL_SYNONYMS: tuple[str, ...] = (
-    "padj", "pvalue", "p_val", "p.value", "pval", "adj.p.val", "fdr", "qvalue",
+# A significance column, ADJUSTED for multiple testing (DESeq2 ``padj``, limma ``adj.P.Val``,
+# edgeR ``FDR``, scanpy ``pvals_adj``, Seurat ``p_val_adj``, a ``qvalue``). This tier is tried FIRST
+# at selection time — a volcano's y-axis, the ``fdr_threshold`` filter and every "significant genes"
+# query set are defined on the adjusted value, so a table carrying both must resolve here.
+DE_PADJ_SYNONYMS: tuple[str, ...] = (
+    "padj", "p_val_adj", "pvals_adj", "adj.p.val", "adj.pval", "fdr", "qvalue", "q.value",
 )
+
+# A RAW, uncorrected p-value column. A legitimate *fallback* when a table carries no adjusted column
+# — never a substitute for one, and never silently labelled "adjusted": selection returns which tier
+# it came from so the axis title, the table column name, the methods sentence and QC can say so.
+DE_PVAL_RAW_SYNONYMS: tuple[str, ...] = ("pvalue", "p_val", "p.value", "pval")
+
+# A significance column of EITHER kind — the PRESENCE union ("does this frame carry a significance
+# column at all?"), which is what the D1 schema gate, the D2 usability gate, QC and the compat scorer
+# ask. Order here is presence-only and must not be read as selection priority: substring matching
+# makes "pval" match "pvals_adj", so an ordered scan of this union picks a raw column over an
+# adjusted one. **SELECTION goes through :func:`engine.columns.resolve_significance`** (adjusted tier
+# first, with the tier reported back). Enforced by engine/test_vocab_drift_guard.py.
+DE_PVAL_SYNONYMS: tuple[str, ...] = DE_PADJ_SYNONYMS + DE_PVAL_RAW_SYNONYMS
 
 # Metabolomics feature labels (m/z values or database tokens) — a conservative, honest signal.
 METABOLOMICS_TOKENS: tuple[str, ...] = ("m/z", "hmdb", "metabolite", "kegg c")
 
-__all__ = ["DE_LOGFC_SYNONYMS", "DE_PVAL_SYNONYMS", "METABOLOMICS_TOKENS"]
+__all__ = [
+    "DE_LOGFC_SYNONYMS", "DE_PADJ_SYNONYMS", "DE_PVAL_RAW_SYNONYMS", "DE_PVAL_SYNONYMS",
+    "METABOLOMICS_TOKENS",
+]

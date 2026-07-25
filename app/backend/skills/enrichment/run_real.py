@@ -8,8 +8,8 @@ Input: a CSV carrying a gene column (e.g. a DE gene list). The background is the
 union of all genes across the bundled sets. Emits the dotplot spec in ``run``.
 """
 
-from engine.columns import GENE, override_column
-from engine.vocab import DE_LOGFC_SYNONYMS, DE_PVAL_SYNONYMS
+from engine.columns import GENE, override_column, resolve_significance
+from engine.vocab import DE_LOGFC_SYNONYMS
 from skills.enrichment.run import dotplot_spec, dotplot_split_spec
 
 # The ``gene_sets`` param selects which license-clean library the ORA scores against
@@ -37,7 +37,11 @@ def run(data_path: str, params: dict) -> dict:
     gene_col = override_column(ov, "gene", df.columns) or _pick(cols, GENE)
     # If the input is a full DE table (has an FDR column), derive the query from the
     # SIGNIFICANT rows; a bare/pre-filtered gene list (no FDR column) is used as-is.
-    fdr_col = override_column(ov, "pval", df.columns) or _pick(cols, DE_PVAL_SYNONYMS)
+    # Significance: ADJUSTED tier first (engine.columns.resolve_significance) — the query set is
+    # defined on the corrected value. This skill draws no p-axis of its own, so the raw-p
+    # fallback is surfaced to the user by the `raw_pvalues_only` QC flag (engine/qc.py) rather
+    # than a claim here; the tier is deliberately not re-stated.
+    fdr_col, _tier_adjusted = resolve_significance(ov, df.columns, cols)
     fc_col = override_column(ov, "logFC", df.columns) or _pick(cols, DE_LOGFC_SYNONYMS)
     sub = df
     if fdr_col is not None:

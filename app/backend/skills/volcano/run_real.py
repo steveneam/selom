@@ -7,8 +7,8 @@ frame index). Emits the same spec shape as the stub via ``run._assemble``.
 
 import math
 
-from engine.columns import GENE, override_column
-from engine.vocab import DE_LOGFC_SYNONYMS, DE_PVAL_SYNONYMS
+from engine.columns import GENE, override_column, resolve_significance
+from engine.vocab import DE_LOGFC_SYNONYMS
 from skills.volcano.run import _assemble
 
 
@@ -23,9 +23,12 @@ def run(data_path: str, params: dict) -> dict:
     # column the shared synonym sets miss is still read. Recorded in provenance → reproduces with no AI.
     ov = params.get("_column_override")
     fc_col = override_column(ov, "logFC", df.columns) or _pick(cols, DE_LOGFC_SYNONYMS)
-    p_col = override_column(ov, "pval", df.columns) or _pick(cols, DE_PVAL_SYNONYMS)
+    # Significance: ADJUSTED tier first (engine.columns.resolve_significance). `p_adjusted` is False
+    # only when the table carries no corrected column at all — then the y-axis title and the table's
+    # column name say "raw p" instead of claiming a Benjamini-Hochberg value the data doesn't hold.
+    p_col, p_adjusted = resolve_significance(ov, df.columns, cols)
     if fc_col is None or p_col is None:
-        raise ValueError("volcano needs a log2 fold-change column and an adjusted-p column")
+        raise ValueError("volcano needs a log2 fold-change column and a p-value column")
     gene_col = override_column(ov, "gene", df.columns) or _pick(cols, GENE)
     # Always a Series (positional-aligned with the row arrays below) so the .iloc / .str reads later
     # work whether the labels come from a gene column or the frame index — a bare Index has no .iloc.
@@ -69,12 +72,13 @@ def run(data_path: str, params: dict) -> dict:
             if str(gene_upper.iloc[i]) in panel:
                 highlight.append((round(float(lfc[i]), 4), round(float(nlp[i]), 4), str(genes.iloc[i])))
 
-    spec = _assemble(up, down, ns, labels, fc_t, y_cut, "Volcano plot", highlight=highlight)
+    spec = _assemble(up, down, ns, labels, fc_t, y_cut, "Volcano plot", highlight=highlight,
+                     adjusted=p_adjusted)
     # Statistics node (Pillar 1): the full DE table the figure was drawn from — the
     # figure keeps only the plotted points + top-N labels, so this carries the real values.
     from skills._table import de_table
 
-    spec["table"] = de_table(list(genes), lfc, padj, fc_t=fc_t, fdr_t=fdr_t)
+    spec["table"] = de_table(list(genes), lfc, padj, fc_t=fc_t, fdr_t=fdr_t, adjusted=p_adjusted)
     return spec
 
 
