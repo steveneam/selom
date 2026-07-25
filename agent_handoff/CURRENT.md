@@ -44,7 +44,15 @@
 - **Annotation layer: the owed plan EXISTS** — `docs/pillar-2-direct-manipulation/annotation-remediation-spec.md`. It is **deferred pending a proper plan, NOT shelved**; §6 states the exact flag-flip condition. Owner decisions in it: typed stars **allowed but marked `unverified`**; selection goes **full direct-manipulation**.
 - **selom-data IS here** at `/home/deploy/migration/selom-migration-staging/selom-data/` → export `SELOM_DATASETS_DIR` or real-data tests silently skip (`verify.sh` warns).
 
-## ▸ NEXT  — **owner-directed 2026-07-25: "push, then d5, then real ui and anything you couldn't confirm — do these next session."** Push is DONE. Everything below is the next session's job, in this order.
+## ▸ NEXT  — **owner-directed 2026-07-25. RUN IT SEQUENTIALLY — no worktree lanes next session.**
+
+The owner asked whether anything else needs doing and then directed: *"you can work on it sequentially next session."* So **do NOT fork lanes** — work the list below in order, in this checkout. (Lane tooling stays ready if a later sprint wants it: `scripts/worktree-setup.sh` to provision, `scripts/lane-status.sh` to drive/tear down.)
+
+**Completeness audit ran 2026-07-25 — the list below is believed COMPLETE, and it found two gaps now closed:**
+1. **`A23` was uncaptured by any lane or plan** — the inspector tab strip overflows at seven tabs (measured: 40.7px cells vs a 42.8px label, `whitespace-nowrap` with no `truncate`, so it spills into its neighbours). It is invisible **only** because Annotate is gated off, so it returns the instant the flag flips. Now a **blocking item on the annotation spec's flag-flip condition (§6)**, folded into `C1` because its own suggested fix — fold the annotation layer into the Marks tab — is the same fix as C1's "one object must not live in two tabs".
+2. **`docs/milestone-review-2026-07-25/findings.md` had two contradictory statuses.** Its ledger was updated by the fix pass; the 43 per-finding `Status: OPEN` lines never were, and many are demonstrably fixed. The doc now says at the top that **the ledger is the only authoritative status** — deliberately not reconciled line-by-line, because that would create a second thing to keep in sync, which is the defect.
+
+Everything below is the next session's job, in this order.
 
 ### ① D-5 via a REAL UI RUN — the top item, and the blocker is already solved on paper
 
@@ -75,7 +83,7 @@
 **`R-02` first**, because it is a **precondition** for the unparked `OH-01` (arq + Redis job status), not a consequence: nothing in the FE polls a job, so that store would ship with **no reader**. Then `R-01`+`R-03` (largest user-visible loss, heavy overlap — the entire lit-synthesizer is shipped with zero FE), `R-04` (gates the proposal's `F1`), and `R-07` is a five-minute delete-or-use decision.
 
 ### ④ Then the annotation layer — `docs/pillar-2-direct-manipulation/annotation-remediation-spec.md`
-Slices **C1 → C2 → C3 → C4**. `C1` first: it is the integrity defect *and* the cheapest, because it mostly **deletes** code (the server already computes stars from real data). Height-sensitive checks wait for ① — Lane 3 changed the artboard.
+Slices **C1 → C2 → C3 → C4**. `C1` first: it is the integrity defect *and* the cheapest, because it mostly **deletes** code (the server already computes stars from real data). §6 lists the flag-flip condition, which now includes **`A23`** (the seven-tab overflow the flag currently masks). Height-sensitive checks wait for ① — Lane 3 changed the artboard.
 
 ### ⑤ Still awaiting owner reaction
 `docs/integration-robustness/proposal.md` — 4 proposed features, explicitly **no new analysis skills** (the constraint is reachability, not breadth). Plus the two unparked items (`OH-01` arq+Redis — sequence with `R-02`; `OH-07` journal style packs — the vehicle for `F3`).

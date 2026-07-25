@@ -112,6 +112,10 @@ Cheapest and highest-value, because the machinery exists and this slice largely 
 3. **Tag server-computed brackets** with `selom: { kind:"sigBracket", verified:true, … }` so both paths
    list in **one** place, and make the Marks text editor **refuse** to edit the text of a `verified`
    item (D3's silent-retype hole).
+   **This is also the fix for `A23`** — see §6. D3 says one object must not live in two tabs; `A23` says a
+   seventh tab does not fit. Both are answered by folding the annotation layer **into the Marks tab**
+   ("things drawn on the figure" is one category), which keeps the strip at six and gives brackets a
+   single home. Do it as one change; solving them separately produces two half-fixes.
 4. **Delete the client geometry path for brackets entirely** — no `bracketGeometry`, no `+12%`, no
    clipping (D2). The server positions and stacks; the client renders what it is given.
 
@@ -178,6 +182,12 @@ One missing primitive causes most of the remaining gaps: **there is no canvas se
   experience than the current flagged-off state).
 - **C4 may trail** behind the flip — decoration gaps degrade the experience but make no false claims
   and lose no work.
+- **`A23` is resolved** (blocking). The inspector tab strip overflows at seven tabs — MEASURED at
+  1512×1050: cells drop to 40.7px while the "Annotate" label is 42.8px, and `TabsTrigger` sets
+  `whitespace-nowrap` with no `truncate`, so the label spills out of its pill into its neighbours. It is
+  invisible **only** because Annotate is gated off, so **flipping this flag re-creates it.** Fixed by
+  C1.3's fold-into-Marks (preferred, keeps the strip at six), or by clipping + a shorter label. A flag
+  flip that reintroduces a known measured layout break is not a ship.
 - A **real-browser pass at desktop widths** on the lead's main checkout (Selom is desktop-only), run
   *after* Lane 3's artboard changes land — see §9.
 - `fe-review` (V·R·D·A·R·N) run at the milestone, conducting `impeccable` for the 5.1 marker.

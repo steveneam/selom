@@ -5,6 +5,17 @@ Run 2026-07-25 over the whole campaign branch as one milestone diff: **review-ga
 Status legend: **FIXED** (commit noted) · **OPEN** · **DECISION** (needs an owner call).
 
 
+> ## ⚠ READ THIS BEFORE THE ENTRIES BELOW
+>
+> **The Status ledger immediately below is the ONLY authoritative status in this document.** The
+> per-finding `- **Status:** OPEN` lines further down were written when each finding was filed and were
+> **never updated** by the fix pass or by the three lanes — 43 of them still say OPEN, and many are
+> demonstrably FIXED (see the ledger). They are kept because the surrounding evidence, measurements and
+> suggested fixes are still useful, but **do not read a per-entry Status line as current.**
+>
+> Noted 2026-07-25 rather than hand-reconciled: reconciling 43 lines would create a second thing to keep
+> in sync, which is the defect. One home wins — the ledger.
+
 ## Status ledger — updated 2026-07-25 after the fix pass
 
 | Finding | Status | Where |
@@ -190,7 +201,12 @@ data, confirming the honesty chain survives the theme layer.
 - **Where:** `/home/deploy/work/selom/app/frontend/components/figure/property-panel.tsx:72-95`
 - **What:** Annotate is added unconditionally, so figures that also have Marks (a scale bar, or any skill-emitted label — heatmap, ERG trace grid, violin with unit labels) render 7 grid cells inside the fixed 330px dock. MEASURED at 1512×1050: tablist clientWidth 305px; at 6 tabs each cell is 48px and the 'Annotate' label is 42.8px wide, leaving 3px gutters where the trigger's `px-2.5` asks for 10px; at 7 tabs (simulated by cloning a trigger and setting `repeat(7, minmax(0,1fr))` on the real list) cells drop to 40.7px and the same label measures 42.8px → gutters of −1.1px per side, i.e. the label spills out of its own pill into the 2px gap and butts against its neighbours. `TabsTrigger` sets `whitespace-nowrap` with no `truncate`/`overflow-hidden`, so the text overflows rather than clipping.
 - **Fix:** Either shorten the label (e.g. 'Notes'/'Anno') and add `truncate`/`overflow-hidden` to the label span so it clips instead of spilling, or switch to icon-only triggers with the name in an accessible tooltip once `tabs.length > 6`. A cleaner structural option: put the annotation layer INSIDE the Marks tab (both are 'things drawn on the figure') and keep the strip at six.
-- **Status:** OPEN
+- **Status:** **OPEN — masked, not fixed.** The 7th tab only disappears because Annotate is gated off, so
+  this returns the instant `NEXT_PUBLIC_ANNOTATION_LAYER` flips. It is therefore a **blocking item on the
+  annotation remediation plan** (`docs/pillar-2-direct-manipulation/annotation-remediation-spec.md` §6),
+  and its own suggested structural fix — put the annotation layer INSIDE the Marks tab, since both are
+  "things drawn on the figure" — is the SAME fix as that spec's `C1`, which already has to stop one
+  object living in two tabs. Do them as one change, not two.
 
 ### A24. [MEDIUM · design] The artboard hero is clipped inside its own stage
 
