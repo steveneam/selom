@@ -61,7 +61,13 @@ only proof that counts:
   per-sample 10x/`.h5ad` deposit now assembles into one single-cell cohort
   (`lib/intake/assemble.ts`), the sibling of the ERG `/data/combine` path.
 
-**17 → 15.**
+**17 → 16** — verified at the merge train, not taken on report.
+
+_Arithmetic correction (lead, at the train): Lane 2's wrap claimed 17 → 15 because it deleted **two**
+waivers. Only one of them, `/data/assemble-scrna`, was among the measured 17 — `/cloud/providers` was a
+**pre-declared** waiver for a route that did not exist yet, so `_user_facing_paths()` never counted it as
+unreachable and removing it cannot reduce the count. Both closures are real; the delta is one. Recorded
+because a backlog that overstates its own progress is the thing this document exists to prevent._
 
 ## How this backlog gets worked
 
