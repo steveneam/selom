@@ -268,7 +268,44 @@ first was fixed. `W-1` is now fixed and its gate is green; the remaining 212px i
   editor. The MSW handler at `mocks/handlers.ts:119` is acceptable **only** if it is the sole way to
   reach the editor, and if it is used, the result must say so.
 
-### `V-2` — the cloud round-trip, end to end (+ D-8) · Status: `TODO`
+### `V-2` — the cloud round-trip, end to end (+ D-8) · Status: `DONE — with two findings that outrank it`
+
+> **The round trip works, browser-verified on the live broker.** A real CSV imported from **Google
+> Drive** and from **Dropbox** through the real UI, each landing as a dataset whose source chip names
+> its provider and its reference:
+> `Imported from Google Drive on 7/25/2026 — 182IIQA4ufOIDv3VRoIvyi4EfA-CSXPq2` ·
+> `Imported from Dropbox on 7/25/2026 — /selom-cloud-roundtrip-EYG28-DE.csv`.
+> `e2e/browser-verify/cloud-import.spec.ts`; `deploy/nango/preflight.sh` passes with both
+> connections refreshing.
+>
+> **⚑ FINDING 1 — the OAuth cloud-import path was UNREACHABLE in the UI, and now is not.**
+> `CloudImportMenu`'s loader guarded on `providers` *and* listed it as a dependency, so
+> `setProviders(list)` re-ran the effect and its cleanup set `live = false` **before** the connections
+> request resolved. Every setter on that path was gated off, so `connections` stayed `null` for good:
+> each provider rendered with no "Connected" chip, **no import form**, and no error to explain it.
+> Deterministic, not a race — the providers fetch always resolves first. Every backend gate was green
+> throughout; `/cloud/connections` returns both accounts correctly. Only driving the UI found it.
+>
+> **⚑ FINDING 2 — FOUNDER DECISION OWED: Selom cannot see files the user already has.** Google's
+> connection carries the **`drive.file`** scope — "only the specific files you use with this app" —
+> so Selom can read *only what it created*. Dropbox's is an **App Folder**, the same limitation
+> (its visible root held exactly the one file we put there). **The menu's own hint text is therefore
+> impossible to follow:** "Open the file in Drive → Share → Copy link; the id is the `/d/<id>/`
+> segment" describes a file Selom has no permission to read. Owner-raised, 2026-07-25: *"not all
+> files brought on by the user will be originally created by Selom"* — correct, and it makes the
+> feature nearly useless as shipped. Options in `docs/cloud-providers-contract/spec.md` §Scope.
+>
+> Corollary: **`POST /export/cloud` is a stub for both OAuth providers** (`push_from_store` raises
+> "not available yet"), so the export→re-import workaround cannot be done in-product either. The
+> round trip above was verified by seeding each account through the broker, which is what Selom's own
+> export would have done.
+>
+> **D-8, all four sub-checks at 1280×800:** (a) the URL placeholder **fits** — 207px in 268px, no
+> ellipsis · (b) the popover covers **neither** the drop-zone above nor the rows below · (c) the
+> trigger reads as a **peer** of the drop-zone (top 336 against a drop-zone spanning 138–316) ·
+> (d) it ran **40px past the fold** once the connected state actually rendered, cutting a provider's
+> import form — **fixed** by clamping the popover to the space below its trigger and scrolling
+> inside, so it adapts instead of trusting a constant. No "coming soon" copy remains (A20 holds).
 
 - **Goal.** Import a real file from **Google Drive AND Dropbox** through the UI and confirm
   `datasets.source` is visible on the resulting dataset.

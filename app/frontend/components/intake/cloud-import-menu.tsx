@@ -69,10 +69,21 @@ export function CloudImportMenu({
 
   // Load the server's menu the first time it's opened (not on mount — this sits on the Data tab of
   // every project and the list is only needed once the popover is actually shown).
+  // The guard is a REF, not `providers`, and `providers` is not a dependency. It used to be both,
+  // which made this effect cancel itself halfway: `setProviders(list)` changed the dep, React ran
+  // the cleanup (`live = false`), and the connections request — still in flight one line below —
+  // landed with every setter gated off. `connections` stayed `null` forever, so every OAuth
+  // provider rendered with no "Connected" chip, no import form, and no error to explain why.
+  // Deterministic, not a race: the providers fetch always resolves first. It made the whole OAuth
+  // cloud-import path unreachable in the UI while every backend gate stayed green
+  // (V-2, browser-verified 2026-07-25).
+  const loadedRef = React.useRef(false);
   React.useEffect(() => {
-    if (!open || providers) return;
+    if (!open || loadedRef.current) return;
+    loadedRef.current = true;
     let live = true;
     void (async () => {
+      let ok = true;
       try {
         const list = await fetchCloudProviders();
         if (!live) return;
@@ -82,6 +93,7 @@ export function CloudImportMenu({
         if (!live) return;
         setProviders(FALLBACK_CLOUD_PROVIDERS);
         setDegraded(true);
+        ok = false;
       }
       try {
         const conns = await fetchCloudConnections();
@@ -96,13 +108,39 @@ export function CloudImportMenu({
           setConnectionsError(
             e instanceof Error ? e.message : "Couldn't check which accounts are connected.",
           );
+          ok = false;
         }
       }
+      // A load that failed — or was abandoned because the menu closed mid-flight — must be
+      // retryable, or the degraded banner's "Reopen this menu once you're back online" is a lie
+      // and a menu closed while loading stays on "Loading import options…" forever.
+      if (!ok || !live) loadedRef.current = false;
     })();
     return () => {
       live = false;
     };
-  }, [open, providers]);
+  }, [open]);
+
+  // Keep the popover inside the viewport. It opens BELOW a trigger that already sits well down the
+  // Data stage, so at 1280×800 with both accounts connected it ran 40px past the fold and the part
+  // that got cut was the bottom row — a provider's import form (measured, D-8). The menu grew into
+  // that when the connected state started rendering at all, which is exactly the sort of thing a
+  // fixed max-height would have missed: the constraint is the space BELOW the trigger, not a
+  // constant. Clamp to what is actually there and scroll inside.
+  const [maxH, setMaxH] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const measure = () => {
+      const el = ref.current;
+      if (!el) return;
+      const bottom = el.getBoundingClientRect().bottom;
+      // 8px for the trigger gap (mt-2), 12px of breathing room at the viewport edge.
+      setMaxH(Math.max(200, Math.round(window.innerHeight - bottom - 20)));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [open]);
 
   // Close on outside click / Escape while open.
   React.useEffect(() => {
@@ -167,7 +205,8 @@ export function CloudImportMenu({
         <div
           role="dialog"
           aria-label="Import from cloud"
-          className="absolute left-0 z-50 mt-2 w-96 origin-top-left rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl ring-1 ring-border motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95"
+          style={maxH ? { maxHeight: maxH } : undefined}
+          className="absolute left-0 z-50 mt-2 w-96 origin-top-left overflow-y-auto rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl ring-1 ring-border motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95"
         >
           {!providers ? (
             <p className="flex items-center gap-2 py-2 text-xs text-muted-foreground" role="status">

@@ -70,3 +70,46 @@ own dict is still caught.
 Also still closed (both `L2-02`, and neither is a code change): `SELOM_CLOUD_GOOGLE` and
 `SELOM_CLOUD_DROPBOX` are absent from `app/backend/.env`, so `enabled` will report `false` for both
 until they are set — correctly, since the flags are what gate the OAuth path server-side.
+
+## ⚑ Scope — Selom cannot see files the user already has (open founder decision, 2026-07-25)
+
+Measured against the live broker while verifying `V-2`. **Both providers are sandboxed to files
+Selom itself created**, so an account full of the user's own data looks empty to us:
+
+| provider | granted access | what Selom can read |
+|---|---|---|
+| Google Drive | scope **`drive.file`** | only files the app **created**, or that the user picked through Google's own Picker |
+| Dropbox | **App Folder** | only Selom's own folder — its visible root held exactly the one file we had just written |
+
+**This makes the shipped affordance impossible to follow.** `cloud-import-menu.tsx` tells the user:
+*"Open the file in Drive → Share → Copy link; the id is the `/d/<id>/` segment."* Under `drive.file`
+that id names a file Selom has no permission to read, so the import cannot succeed — the instruction
+describes a flow the grant forbids. Owner-raised the same day: *"not all files brought on by the user
+will be originally created by Selom"*. Exactly so, and it is the normal case.
+
+Compounding it: **`POST /export/cloud` is a stub for both OAuth providers** — `push_from_store`
+raises "export is not available yet" in `cloud/connectors/google.py` and `cloud/connectors/dropbox.py`
+(only the URL/S3 destination works). So the natural workaround — export a dataset to the account,
+which Selom would then own and be able to read back — is not available either.
+
+### The options, and the trade that decides it
+
+1. **Google Picker (recommended).** The designed companion to `drive.file`: the user chooses the file
+   in Google's own dialog, which grants the app access to *that* file. Keeps least-privilege, and it
+   is the flow Google intends. Cost: a Picker integration in the FE plus an API key, and a Dropbox
+   Chooser for parity.
+2. **Broaden the scopes** — `drive.readonly` and full-Dropbox. The pasted-id flow starts working with
+   no FE work. But `drive.readonly` is a Google **restricted** scope: production use requires a
+   third-party CASA security assessment, renewed annually, at real cost — and it asks the user for
+   their entire Drive to read one CSV.
+3. **Implement export first**, then lean on export→re-import. Narrow, and it only helps data that
+   originated in Selom — it does not solve bringing a user's existing file in, which is the point.
+
+**Recommendation: (1).** It is the only option that both works for a file Selom did not create and
+keeps the consent proportionate; (2) trades a launch gate and a much larger privacy ask for saved
+build time. Either way this is a founder decision, not a lane call — it changes what users must
+consent to.
+
+_Verified 2026-07-25 against `nango.swordfish.cfd`: both connections refresh, `/cloud/connections`
+returns both accounts, and a real CSV imported end-to-end from each provider once a file the app
+owned was present. The limitation is the grant, not the plumbing._

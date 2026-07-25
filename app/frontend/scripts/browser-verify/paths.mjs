@@ -62,6 +62,23 @@ export const FIXTURE_CSV =
 export const ANNOTATION_LAYER = process.env.NEXT_PUBLIC_ANNOTATION_LAYER || "";
 
 /**
+ * Cloud round-trip references (`V-2`) — a file the connected account holds, per provider.
+ *
+ * They must be SUPPLIED rather than discovered, because both providers are sandboxed to files Selom
+ * itself created: Google's connection carries the `drive.file` scope ("only the specific files you
+ * use with this app") and Dropbox's is an App Folder. Listing either account therefore returns
+ * nothing of the user's own data, so there is no reference for the harness to find.
+ *
+ *   SELOM_BV_GDRIVE_REF   a Drive file id Selom can read (one it created)
+ *   SELOM_BV_DROPBOX_REF  a path inside Selom's Dropbox App Folder, e.g. /file.csv
+ *
+ * Unset → the import legs skip loudly and D-8 still runs. They live here, not in the spec, because
+ * `lib/structure.guard.test.ts` keeps every env read out of app code and in one harness home.
+ */
+export const GDRIVE_REF = process.env.SELOM_BV_GDRIVE_REF || "";
+export const DROPBOX_REF = process.env.SELOM_BV_DROPBOX_REF || "";
+
+/**
  * Resolve a Chromium binary. The bare `playwright` package resolves a build that is not installed on
  * this box, so an explicit path is needed — but hardcoding one makes the harness host-specific. So:
  * an explicit override, else the newest downloaded ms-playwright build, else let Playwright try.

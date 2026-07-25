@@ -69,8 +69,14 @@ test("D-11 — the /extract editor's artboard, measured on a real recovery", asy
   await expect(extract).toBeEnabled();
   await extract.click();
 
-  // The result stage: the amber vision-grade strip, then the real editor beneath it.
-  await expect(page.getByText(/Vision-grade/i)).toBeVisible({ timeout: 120_000 });
+  // The result stage, gated on something ONLY it has. "Vision-grade" copy appears on the drop stage
+  // and the calibration stage too, so waiting for that let a slow recovery slip through and measure
+  // the CALIBRATION artboard instead — which still reports matches=1 and a real card, so every
+  // geometry assertion passed while the numbers described the wrong screen. "Recover another" exists
+  // only once a recovery has actually landed.
+  await expect(page.getByRole("button", { name: /Recover another/i })).toBeVisible({
+    timeout: 180_000,
+  });
   await expect(page.locator(".bg-artboard")).toBeVisible();
 
   // 5. Measure, with D-5's snippet verbatim — the point is comparability with every other surface.
@@ -122,10 +128,13 @@ test("D-11 — the /extract editor's artboard, measured on a real recovery", asy
       // editable figure" instead (which sits at the TOP and reads as a false pass). The result view
       // stacks three bands — vision-grade strip · editor · Statistics — so the stats band is the
       // last child of the column the stage lives in.
+      // Anchored on <main>, not on computed flex properties. A "first flex-column ancestor with 3+
+      // children" heuristic was tried and is too clever: it depends on styles this very change
+      // edits, so it broke as soon as the editor's chrome moved. The result view is the app shell's
+      // <main> child, always — walk up until the parent IS <main>.
       let column: HTMLElement | null = null;
-      for (let n = stage?.parentElement; n && n !== document.body; n = n.parentElement) {
-        const cs = getComputedStyle(n);
-        if (cs.display === "flex" && cs.flexDirection === "column" && n.children.length >= 3) {
+      for (let n = stage; n && n !== document.body; n = n.parentElement) {
+        if (n.parentElement?.tagName === "MAIN") {
           column = n;
           break;
         }

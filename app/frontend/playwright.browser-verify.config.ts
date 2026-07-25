@@ -41,6 +41,9 @@ assertPreconditions();
 
 export default defineConfig({
   testDir: "./e2e/browser-verify",
+  // Compile the driven routes once, before the first check, so a cold `next dev` compile is not
+  // charged to whichever test happens to run first (it has produced three false timeouts).
+  globalSetup: "./scripts/browser-verify/warm-routes.mjs",
   // A real run = upload 2.4MB + inspect + skill execution + Plotly render, behind a cold `next dev`
   // compile on first hit. Generous on purpose: a timeout here reads as a fake failure.
   timeout: 180_000,
