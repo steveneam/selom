@@ -1,20 +1,30 @@
-# Selom — On Hold (Docker / WSL-gated work)
+# Selom — On Hold  →  MOVED
 
-Deferred work that depends on **Docker or WSL**. Owner directive (2026-06-13): **ask before
-any Docker/WSL work** (memory `ask-before-docker-wsl`). These are parked here so they're
-**not forgotten** — pick each up, with the owner's go-ahead, when its trigger arrives.
-Non-Docker work proceeds normally. When an item is started, drop a per-item scope note in
-this folder before building.
+**This register was folded into `docs/on-hold/README.md` on 2026-07-25 (plan `OH-15`).**
+That file is now the single home for every parked item. Do not add rows here.
 
-| # | Item | What it is | Why gated | Belongs to | Resume when |
-|---|---|---|---|---|---|
-| 1 | ~~**Kaleido journal export**~~ ✅ **DONE 2026-06-15 — NO Docker needed** | B4 journal-preset PNG/SVG/PDF export via Kaleido | ~~needs Docker + system Chromium~~ — **gating was wrong for the feature**: Kaleido v1 drives the *already-installed* Chrome over CDP (pure-Python, no container at runtime). Built + verified native on Windows (`POST /figures/export`, all 3 formats live). The Linux **deploy image** still needs a browser (`apt-get chromium`) — that's the only Docker touch, and it's B8, not this feature. | **B4** (done) | — |
-| 2 | **arq Redis job-status store** | Redis-backed `JobStore` so cross-process (arq) job *status*/errors are visible, not just success (`jobs/worker.py` caveat) | needs a running **Redis** (Docker/WSL on Windows) | B3 hardening → B7 | infra is stood up |
-| 3 | **OmicVerse isolated worker** | 2nd Verified engine + the prime Skill-Foundry source (~1000 `ov.*` fns ≈ SkillSpec runners) | `pandas<3` conflict (RISKS #9) → must run out-of-process / containerised | B2 follow-up → **B9** | scoping the isolated env (Docker / its MCP server) |
-| 4 | **Deploy image** | Render CPU + Modal GPU + Vercel; AGPL SCA scan (hard gate) | the deployment **Docker image** | **B8** launch | Stage 3 launch |
-| 5 | **Community skill sandbox** | Docker + mamba images + network policy for community-tier skills | container sandbox (design §6.5 E) | **B9** (v2, deferred) | Skill Foundry community tier |
+## Why it moved
 
-**Not gated (so NOT here):** R2 object storage (cloud config, not Docker); all the current
-P1 breadth work (`deg`/`enrichment` modes, `pathway`/`go-graph` skills run via HTTP APIs).
+Two on-hold registers existed with overlapping rows (Redis, deploy image, BAM), which breaks the
+Ratchet's one-durable-home rule: two homes means one of them is silently wrong, and there is no way
+to tell which. Everything here was migrated with its reason **restated**, not copied.
 
-_Filed 2026-06-13 · Claude (acting FE+BE), owner-directed. Cross-ref: `CURRENT.md`, `RISKS.md` #2/#9, `docs/build-charter.md` B4/B8/B9._
+## Why its premise was stale
+
+This file gated work behind *"ask before any Docker/WSL work"* — a **Windows-era** constraint. The
+owner cleared Docker on this Linux box on 2026-07-23 (Engine v29.6 + Compose, stood up for Nango),
+and a Redis has been running on `:6380` since. So **no row here was actually infra-blocked any
+more**, and several had never been: their real reason was off-thesis breadth or an open product
+question, wearing an infra excuse. [[ask-before-docker-wsl]]
+
+## Where its five rows went
+
+| Was | Now |
+|---|---|
+| 1 · Kaleido journal export | **DONE 2026-06-15** — its gate had been wrong from the start (Kaleido v1 needs no container at runtime). Recorded under *Graduated*. |
+| 2 · arq Redis job-status store | **UNPARKED 2026-07-25** at the Phase 0 founder gate — executes locked decision #6. Recorded under *Graduated*; queued for the sprint after the 3-lane partition. |
+| 3 · OmicVerse isolated worker | Still parked, **reason restated**: GPL-3.0 licence + off-thesis breadth. The `pandas<3` isolation need is real; Docker was never the blocker. |
+| 4 · Deploy image | Still parked, **reason restated**: no longer infra-gated, and it now overlaps the public-backend-on-syd2 work — tracked there, once. |
+| 5 · Community skill sandbox | Still parked, **reason restated**: v2 scope. The Skill Foundry community tier does not exist yet. |
+
+_Superseded 2026-07-25. Original filed 2026-06-13, owner-directed._

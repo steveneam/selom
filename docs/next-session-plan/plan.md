@@ -27,17 +27,49 @@ bleeding while it waits.
 
 ---
 
+## Owner directive — 2026-07-25, at the Phase 0 gate
+
+Alongside the on-hold triage the owner asked for two further things, verbatim: *"any more features or
+things that you think selom could benefit from, as well as integration the current features and layout
+and workflow and make sure it's tight and robust."*
+
+Answered in **`docs/integration-robustness/proposal.md`** (a proposal, not yet a plan of record —
+nothing in it is scheduled until the owner picks). Its three load-bearing conclusions:
+
+1. **The "31 of 35 user tasks have no affordance" headline is mostly the annotation layer the owner
+   just flagged off** — correctly deferred behind Plan C, not bleeding on users. The reachability debt
+   on *live* surfaces is narrower (cloud · assemble-scrna · ERG measurements · `datasets.source` ·
+   editor chrome) and **every item of it is already inside the approved lanes.** The plan is pointed
+   at the right work.
+2. **What is missing is structural, not scheduled.** Nothing stops "shipped but unreachable" from
+   recurring — each review re-discovers it at gauntlet cost. The proposal's top recommendation is a
+   **reachability ratchet**: enumerate user-facing backend capabilities, assert each is either reached
+   by a declared FE surface or explicitly waived with a reason + tracking ID, exit-code gated. It must
+   ship **green**, with waivers for today's known set, each lane removing its own waiver as it lands —
+   a guard that starts red is the trap `L1-10` just was. Note this is the remedy
+   [[selom-shipped-not-reachable]] already named and that was never built, so today it survives only
+   in memory, the weakest rung of the ladder.
+3. **Features are gated behind that.** Four proposed (run-history/version-diff · cross-panel
+   consistency audit · one-click regenerate-at-journal-spec, which is what makes the just-unparked
+   `OH-07` worth doing · reachability dashboard). **No new analysis skills** — the constraint is
+   reachability, not breadth, and adding skills while five shipped capabilities have no UI makes the
+   ratio worse.
+
+Sequencing recommendation: the 3 lanes → the ratchet (ideally *before* the lanes) → §3 layout/workflow
+with Lane 3 → the unparked pair → Plan C's spec **led by** "re-run must not silently discard user
+work" → the reproducibility features.
+
 ## Phase 0 — before any worktree is forked (sequential, blocking)
 
 | ID | Item | Owner | Status |
 |---|---|---|---|
-| P0-01 | **Push `main`** — the merge + the review backlog + this plan. Count is whatever `git rev-list --count origin/main..main` says (do not trust a number written here). Triggers the Vercel deploy. | **founder gate** | TODO |
-| P0-02 | Delete `campaign/parallel-lanes` — only after P0-01, so the work has a remote ref first | me | TODO |
+| P0-01 | **Push `main`** — the merge + the review backlog + this plan. Count is whatever `git rev-list --count origin/main..main` says (do not trust a number written here). Triggers the Vercel deploy. | **founder gate** | **DONE** 2026-07-25 17:2x +1000 — owner authorized at the Phase 0 gate; pushed `60df628..dddf5d6` (27 commits). Vercel deploy triggered. |
+| P0-02 | Delete `campaign/parallel-lanes` — only after P0-01, so the work has a remote ref first | me | **DONE** — verified contained in `main` (`merge-base --is-ancestor`) then deleted with the safe `-d`, after the push. Was `d950601`. |
 | P0-03 | **Freeze the one cross-lane contract**: `GET /cloud/providers → { providers: [{ id, label, kind, provider_config_key, enabled }] }`. Written into `docs/figure-editor-contract/`-style form before Lane 2 starts; no other lane may define or consume it. | me | **DONE** — executable freeze `app/backend/tests/test_contract_cloud_providers.py` (10 assertions, verified to FAIL on a renamed FE key, an added BE key, and a leaked secret); declarations `app/backend/cloud/contract.py` + `app/frontend/lib/cloud/contract.ts`; `registry.list_providers()` makes menu order server-owned; doc `docs/cloud-providers-contract/spec.md`. Guard filename sits **outside** Lane 2's `test_cloud*.py` glob, so editing the freeze is a visible scope breach. Route-conformance test is dormant behind a skip naming `L2-01` and self-activates. |
 | P0-04 | Confirm the lane mechanics with **thalon** (has run worktree lanes on this box repeatedly) | me | **DONE** — `docs/next-session-plan/lane-mechanics-from-thalon.md`, adopted in §Lane mechanics |
-| P0-05 | Approve (or reshape) the lane partition in §Lanes | **founder gate** | TODO |
-| P0-06 | **Icon decision (A30):** migrate to Phosphor, or record "lucide stays" as a decision so the finding stops recurring in every FE review | **founder gate** | TODO |
-| P0-07 | Triage the on-hold register (§On-hold) — several items are parked on a gate that no longer exists | **founder gate** | TODO |
+| P0-05 | Approve (or reshape) the lane partition in §Lanes | **founder gate** | **DONE** — owner **approved the 3-lane partition as planned** 2026-07-25. Forking, building in-lane and the local merges are now autonomous; **each push stays a separate founder gate.** |
+| P0-06 | **Icon decision (A30):** migrate to Phosphor, or record "lucide stays" as a decision so the finding stops recurring in every FE review | **founder gate** | **DONE** — owner chose **"lucide stays; Phosphor not adopted"**. Recorded as binding **DECISIONS #12** (the durable home), so the finding cannot recur. `L3-03` is consequently **DROPPED** rather than implemented — no icon churn in Lane 3. |
+| P0-07 | Triage the on-hold register (§On-hold) — several items are parked on a gate that no longer exists | **founder gate** | **DONE** — owner **unparked OH-01** (arq + Redis job-status, which executes locked decision #6) and **OH-07** (journal style packs, spec already written); both queued for the sprint **after** the 3 lanes, in no lane. Everything still parked had its reason **restated** (`OH-13`) and both registers were folded into one home (`OH-15`). Owner also issued a **broader directive** — see §Owner directive below. |
 | P0-08 | **Build the one-command gate of record** — `scripts/verify.sh`: `hygiene-scan --all` + BE `pytest -m "not slow"` + `ruff check` + FE `tsc` + `eslint` + `vitest`, exit-code gated, **raw output**. Selom has no single verify command today, and the merge train needs one to run against each rebased result. Also the natural home for the `\| tail` fix below. | me | **DONE** — `scripts/verify.sh`, **7** gates (added `fe-build`, which CI has and this list omitted: it is the only gate that catches SSR/integration breaks, so a train without it can merge a broken app green [[full-app-smoke-test-before-handoff]]). Raw output, per-gate exit code, runs all gates then a ledger + non-zero exit; fails CLOSED on a missing tool; reports NOT-RUN as `SKIP`, never folded into a pass. **Whole gate is 70s on main** (`-n 2`). Flags `--fast` / `--be` / `--fe` / `--force-build` / `--list`. |
 | P0-10 | **Lane provisioning did not exist on Linux — NOT in the original plan, found while building P0-08.** The only worktree provisioner was `scripts/worktree-setup.ps1`: PowerShell, NTFS junctions, `.venv\Scripts\python.exe`, `cmd /c rmdir`. The box is Linux, so **no lane could have been forked with working deps.** Ported to `scripts/worktree-setup.sh` (symlinks, `bin/python`, gitignore-subset `.worktreeinclude` copy, toolchain assertion at setup, main-tree file-count ratchet, landmines printed for inlining into a kickoff). **Validated end-to-end** on a real throwaway worktree: provisioned, gates run, torn down, main tree byte-count unchanged (39713 → 39713). Also corrected `.worktreeinclude`, which told you each worktree "installs its own" node_modules — the exact thing `guard-worktree-install.mjs` refuses. | me | **DONE** |
 | P0-09 | **Headroom check before forking 3 sessions — mostly already answered.** Confirmed on syd4 today: `agent-tmux.service` has `OOMPolicy=continue` (so thalon's fleet-killer mode is mitigated here), 6 vCPU / 15.99 GB with ~9.1 GB available, and five live agent sessions cost **~1.9 GB combined** — agents are cheap; a Next dev server is 1.4 GB and a browser ~1.5 GB. thalon's **measured** figure is **~2.26 GiB/lane** with 4 concurrent + lead fitting post-resize, and they have **retired stagger-launches** in favour of **staggering the SUITE RUNS** (reconciled via eamos 2026-07-25). Remaining action: **cap per-lane test parallelism at `-n 2`, not `-n auto`** — the real ceiling is CPU oversubscription (3 lanes x 6 workers on 6 vCPU), not RAM. | me | **DONE** (measured) — carry the `-n 2` cap into each lane's kickoff |
@@ -105,7 +137,7 @@ after rebase — plan them there, not in-lane.
 |---|---|---|---|
 | L3-01 | A24 | The artboard hero is clipped inside its own stage (`height: min(74vh,720px)` vs ~150px of new fixed chrome). | TODO |
 | L3-02 | A25 · B13 | The inert "coming soon" palette strip eats 64px of a height-constrained editor and asserts the colourway by colour alone, `aria-hidden`. Retire it or make it real + accessible. | TODO |
-| L3-03 | A30 | Execute P0-06's icon decision (Phosphor migration, or record lucide as the decision). | BLOCKED P0-06 |
+| L3-03 | A30 | Execute P0-06's icon decision (Phosphor migration, or record lucide as the decision). | **DROPPED** — P0-06 decided **lucide stays**, recorded as binding DECISIONS #12. There is nothing to implement: the decision *is* the deliverable, and it closes A30 permanently. Lane 3 does no icon work. |
 | L3-04 | §D | Observe the review's unverified layout predictions in a real browser at desktop widths and close or re-file them honestly. | TODO |
 
 ### Merge train
@@ -236,9 +268,9 @@ should be restated so the register keeps meaning what it says. [[ask-before-dock
 
 | ID | Item | Status |
 |---|---|---|
-| OH-13 | `agent_handoff/on-hold/README.md` still frames its gates as Windows Docker/WSL constraints; the box is Linux with Docker installed. Rewrite the "Why gated" column so the register states real reasons. | TODO |
+| OH-13 | `agent_handoff/on-hold/README.md` still frames its gates as Windows Docker/WSL constraints; the box is Linux with Docker installed. Rewrite the "Why gated" column so the register states real reasons. | **DONE** 2026-07-25 — every surviving row now states its **real** reason (OmicVerse = GPL + breadth, not Docker · deploy image = overlaps the syd2 work · community sandbox = v2 scope · BAM = no product need · accession auto-fetch = a product decision, never infra · ClawBio = off-thesis + no partner). Two further staleness bugs found while doing it: the parking lot still listed **multi-sample scRNA assemble as parked when it shipped** in `11a115f` (same error OH-14 fixed in memory), and its footer pointed at the pre-migration Windows memory path. Both corrected. |
 | OH-14 | Memory `[[selom-multisample-scrna-assemble]]` said "parked, on-hold P1" — it **shipped** in `11a115f`. | **DONE** 2026-07-25 — memory + index corrected to SHIPPED-not-reachable, pointing at L2-05 / L1-03 / L1-04 |
-| OH-15 | Two on-hold homes (`docs/on-hold/` = parking lot, `agent_handoff/on-hold/` = infra-gated) with overlapping rows (Redis, deploy image, BAM). Fold the infra register INTO the parking lot so there is one home, per the Ratchet's one-durable-home rule. | TODO |
+| OH-15 | Two on-hold homes (`docs/on-hold/` = parking lot, `agent_handoff/on-hold/` = infra-gated) with overlapping rows (Redis, deploy image, BAM). Fold the infra register INTO the parking lot so there is one home, per the Ratchet's one-durable-home rule. | **DONE** 2026-07-25 — `docs/on-hold/README.md` is now the single home and gained a **Graduated** section so items that leave keep an audit trail (arq+Redis and journal styles unparked, Kaleido done, assemble shipped). `agent_handoff/on-hold/README.md` is a pointer stub recording where each of its five rows went and why its Docker/WSL premise was stale. |
 
 ---
 
