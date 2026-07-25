@@ -86,14 +86,46 @@ def test_unknown_provider_is_404(env):
     assert r.status_code == 404
 
 
-def test_oauth_provider_is_coming_soon_until_configured(env):
-    # Google is scaffolded but its flag is off by default → a clean "not configured" (never a 500).
+def test_oauth_provider_refuses_cleanly_while_its_flag_is_off(env, monkeypatch):
+    """A flag-off OAuth provider gives a clean "not configured" (never a 500).
+
+    The flag is forced OFF here rather than assumed off. It used to rely on the default, which made
+    the test pass only while nobody had enabled the provider in their own ``.env`` — so L2-02
+    (enabling Google + Dropbox for real) turned a correct config change into a red gate that said
+    nothing about the code. Flag state is an input to this assertion, so it is set, not inherited.
+    """
+    import routers.cloud as cloud_router
+
+    monkeypatch.setattr(cloud_router.settings, "cloud_google_enabled", False, raising=False)
     client = env
     pid = _project(client)
     r = client.post("/uploads/intake/remote",
                     json={"project_id": pid, "provider": "google", "ref": "file-id-123"})
     assert r.status_code == 400
     assert r.json()["detail"]["error"] == "provider_not_configured"
+
+
+def test_enabled_oauth_provider_gets_past_the_flag_gate_and_fails_at_the_broker(env, monkeypatch):
+    """The other half, and the one that proves L2-02 actually opened something.
+
+    With the flag ON the request is no longer refused by the gate — it reaches the Nango exchange and
+    fails there for want of a connection id. A different error from a different layer is the evidence
+    the gate is open; asserting only the flag-off case would pass just as well with the feature still
+    sealed.
+    """
+    import routers.cloud as cloud_router
+
+    monkeypatch.setattr(cloud_router.settings, "cloud_google_enabled", True, raising=False)
+    client = env
+    pid = _project(client)
+    r = client.post("/uploads/intake/remote",
+                    json={"project_id": pid, "provider": "google", "ref": "file-id-123"})
+    assert r.status_code == 400
+    detail = r.json()["detail"]
+    assert not isinstance(detail, dict) or detail.get("error") != "provider_not_configured", (
+        "the flag gate still refused an ENABLED provider"
+    )
+    assert "connection" in str(detail).lower() or "nango" in str(detail).lower()
 
 
 def test_import_into_foreign_project_is_404(env):
