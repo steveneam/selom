@@ -39,7 +39,7 @@ bleeding while it waits.
 | P0-06 | **Icon decision (A30):** migrate to Phosphor, or record "lucide stays" as a decision so the finding stops recurring in every FE review | **founder gate** | TODO |
 | P0-07 | Triage the on-hold register (§On-hold) — several items are parked on a gate that no longer exists | **founder gate** | TODO |
 | P0-08 | **Build the one-command gate of record** — `scripts/verify.sh`: `hygiene-scan --all` + BE `pytest -m "not slow"` + `ruff check` + FE `tsc` + `eslint` + `vitest`, exit-code gated, **raw output**. Selom has no single verify command today, and the merge train needs one to run against each rebased result. Also the natural home for the `\| tail` fix below. | me | TODO |
-| P0-09 | **Memory-headroom check before forking N sessions** — measure one lane session's peak RSS, multiply by the lane count, compare to box RAM; confirm the tmux supervisor's `OOMPolicy` is `continue`, not `stop`. On thalon's box one 3.7 GiB lane killed **every** session on the box mid-wrap. | me | TODO |
+| P0-09 | **Headroom check before forking 3 sessions — mostly already answered.** Confirmed on syd4 today: `agent-tmux.service` has `OOMPolicy=continue` (so thalon's fleet-killer mode is mitigated here), 6 vCPU / 15.99 GB with ~9.1 GB available, and five live agent sessions cost **~1.9 GB combined** — agents are cheap; a Next dev server is 1.4 GB and a browser ~1.5 GB. thalon's **measured** figure is **~2.26 GiB/lane** with 4 concurrent + lead fitting post-resize, and they have **retired stagger-launches** in favour of **staggering the SUITE RUNS** (reconciled via eamos 2026-07-25). Remaining action: **cap per-lane test parallelism at `-n 2`, not `-n auto`** — the real ceiling is CPU oversubscription (3 lanes x 6 workers on 6 vCPU), not RAM. | me | **DONE** (measured) — carry the `-n 2` cap into each lane's kickoff |
 
 ---
 
@@ -173,7 +173,11 @@ gates, not just how CI does.
 
 **2. The fleet dies with one lane.** If the session supervisor's `OOMPolicy` is `stop`, one oversized
 lane takes down every agent session on the shared box — thalon lost the whole fleet mid-wrap to a
-3.7 GiB lane. That is P0-09, and it must be checked *before* forking three sessions, not after.
+3.7 GiB lane. **Checked on syd4: `OOMPolicy=continue`, so we are not exposed to that mode here** (P0-09).
+What remains is CPU, not RAM: stagger the **suite runs**, not the launches, and cap each lane's test
+parallelism. Sizing basis — thalon's measured ~2.26 GiB/lane and today's per-process split of this box
+(agents cheap, dev servers/browsers/test fan-out expensive); the same numbers eamos sized their 4-lane
+backend window on, and the reason they adopted the `-n 2` cap too.
 
 ## On-hold register — nothing here is forgotten
 
