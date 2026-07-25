@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from auth import AuthContext, require_user
-from cloud import CloudError, CloudTooLarge, nango, registry
+from cloud import CloudError, CloudTooLarge, contract, nango, registry
 from cloud.ssrf import SsrfError
 from config import settings
 from storage.object_store import get_object_store
@@ -63,6 +63,70 @@ def _not_configured(provider: registry.Provider) -> HTTPException:
             ),
         },
     )
+
+
+@router.get("/cloud/providers")
+def list_cloud_providers():
+    """The provider menu the FE renders — the FROZEN contract (docs/cloud-providers-contract/spec.md).
+
+    A20: the client used to keep its own provider table with a hardcoded ``comingSoon``, so a
+    provider that went live stayed unreachable because nothing ever told the client. Provider state
+    is the server's answer now; the client renders what it is told, in the order it is told.
+
+    No auth dependency on purpose: this is public configuration (ids, labels, and the PUBLIC Nango
+    integration id), carries no tenant data and no credential material, and the menu must render
+    before a user has done anything. The body is built by ``contract.providers_payload`` rather than
+    assembled here, so the executable freeze is testing the shape this route actually returns.
+    """
+    return contract.providers_payload(settings)
+
+
+def _connection_label(row: dict) -> str:
+    """A human name for a connected account — "Steven (a@b.com)" — from Nango's ``end_user``.
+
+    Shown so the operator can tell WHICH account an import will run against. Falls back to the
+    connection id's short prefix rather than inventing a name.
+    """
+    end_user = row.get("end_user") or {}
+    name = str(end_user.get("display_name") or "").strip()
+    email = str(end_user.get("email") or "").strip()
+    if name and email:
+        return f"{name} ({email})"
+    if name or email:
+        return name or email
+    return str(row.get("connection_id", ""))[:8]
+
+
+@router.get("/cloud/connections")
+def list_cloud_connections(ctx: AuthContext = Depends(require_user)):
+    """Which provider accounts are actually CONNECTED, keyed by registry provider id.
+
+    ``enabled`` (the frozen ``/cloud/providers`` contract) says the server will *accept* a provider;
+    this says an account is on the other end of it. The FE needs both: an enabled provider with no
+    connection must render an honest "no account connected" rather than an import form that cannot
+    succeed. It also removes the only reason the UI would ever ask a human to paste a Nango UUID.
+
+    Auth-gated (unlike ``/cloud/providers``) because the label names a real account. Fail-soft is
+    the CALLER's job: a 502 here degrades the account section of the menu, never the URL/S3 path.
+    """
+    try:
+        rows = nango.list_connections()
+    except CloudError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    out = []
+    for row in rows:
+        provider = registry.provider_for_config_key(str(row.get("provider_config_key") or ""))
+        # A connection for an integration Selom does not register (or one whose flag is off) is
+        # not offerable — skip it rather than show an account the import path would refuse.
+        if provider is None or not registry.is_enabled(provider, settings):
+            continue
+        out.append({
+            "provider": provider.id,
+            "connection_id": str(row.get("connection_id") or ""),
+            "label": _connection_label(row),
+            "connected_at": row.get("created"),
+        })
+    return {"connections": out}
 
 
 @router.post("/uploads/intake/remote")

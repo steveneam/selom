@@ -126,6 +126,29 @@ export const handlers = [
   // Engine front door (P1): the layered data-type profile + dynamic cleaning plan. The mock reads
   // only the CSV header, so it matches the live engine's CLASSIFICATION (esp. ERG → no gene
   // cleaning) offline; matrix deltas are omitted (verify real content against the live backend).
+  // Cloud provider menu — mirrors the FROZEN `GET /cloud/providers` contract
+  // (app/backend/cloud/contract.py · lib/cloud/contract.ts). The wire keys, their ORDER and the
+  // provider order are part of the shape, so they are written out literally here rather than
+  // generated: a mock that drifts from the contract is how a "working" UI ships against a shape the
+  // backend never returns ([[mock-must-mirror-backend-contract]]).
+  //
+  // `enabled` mirrors the DEV default (SELOM_CLOUD_* unset ⇒ OAuth off), so dev:mock shows the
+  // honest "Not enabled" state. The enabled path is verified against a live backend + real Nango,
+  // never here ([[selom-mock-is-wire-only-verify-real]]).
+  http.get("/api/cloud/providers", () =>
+    HttpResponse.json({
+      providers: [
+        { id: "url", label: "URL / S3", kind: "url", provider_config_key: "", enabled: true },
+        { id: "google", label: "Google Drive", kind: "oauth", provider_config_key: "google-drive", enabled: false },
+        { id: "onedrive", label: "OneDrive", kind: "oauth", provider_config_key: "onedrive", enabled: false },
+        { id: "dropbox", label: "Dropbox", kind: "oauth", provider_config_key: "dropbox", enabled: false },
+      ],
+    }),
+  ),
+  // No Nango broker in dev:mock, so no account is connected. An empty list is the HONEST answer
+  // (the menu renders "No account"); fabricating a connection would offer an import that cannot run
+  // [[mock-fallback-never-fabricates-data]].
+  http.get("/api/cloud/connections", () => HttpResponse.json({ connections: [] })),
   http.post("/api/data/inspect", async ({ request }) => {
     const url = new URL(request.url);
     const override = url.searchParams.get("profile") || url.searchParams.get("hint") || undefined;

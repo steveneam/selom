@@ -58,6 +58,21 @@ def list_providers() -> list[Provider]:
     return list(_PROVIDERS.values())
 
 
+def provider_for_config_key(provider_config_key: str) -> Provider | None:
+    """Reverse lookup: a Nango integration id → the registered provider it belongs to.
+
+    Nango speaks ``provider_config_key`` (``google-drive``); Selom speaks the registry id
+    (``google``). One table owns the mapping in both directions so a connection listing can be
+    keyed the way the rest of the API is, without a second lookup table on the client.
+    """
+    if not provider_config_key:
+        return None
+    for provider in _PROVIDERS.values():
+        if provider.provider_config_key == provider_config_key:
+            return provider
+    return None
+
+
 def get_connector(provider_id: str) -> CloudConnector | None:
     return _CONNECTORS.get(provider_id)
 

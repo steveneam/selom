@@ -5,9 +5,13 @@ import { AlertCircle, ChevronDown, Cloud, HardDrive, Link2, Loader2, Package } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/ui/cn";
-import { CLOUD_PROVIDERS, OAUTH_PROVIDERS, type CloudProvider } from "@/lib/cloud/providers";
-import { importFromCloud } from "@/lib/cloud/api";
-import { connectProvider } from "@/lib/cloud/nango";
+import { FALLBACK_CLOUD_PROVIDERS, type CloudProvider } from "@/lib/cloud/providers";
+import {
+  fetchCloudConnections,
+  fetchCloudProviders,
+  importFromCloud,
+  type CloudConnection,
+} from "@/lib/cloud/api";
 import type { Dataset } from "@/lib/projects/types";
 
 /** lucide icon per provider id (kept out of the pure `lib/cloud/providers` registry). */
@@ -18,13 +22,32 @@ const PROVIDER_ICON: Record<string, typeof Cloud> = {
   dropbox: Package,
 };
 
+/** What to type into an OAuth provider's reference box, per provider. */
+const REF_HINT: Record<string, { placeholder: string; help: string }> = {
+  google: {
+    placeholder: "Drive file id (from the share link)",
+    help: "Open the file in Drive → Share → Copy link; the id is the /d/<id>/ segment.",
+  },
+  dropbox: {
+    placeholder: "/folder/file.h5ad",
+    help: "The file's path inside your Dropbox, including the leading slash.",
+  },
+  onedrive: { placeholder: "item id", help: "The OneDrive item id." },
+};
+
 /**
  * "Import from cloud ▾" — the peer of the drop-zone for files that live off the machine.
  *
- * URL/S3 fully works: paste a link → the backend streams it into the same intake→parse pipeline a
- * dropped file uses, and the returned dataset is handed back via `onImported`. Google Drive / OneDrive
- * / Dropbox render a Connect button that is visibly present but no-ops with a "coming soon" note until
- * the owner wires their OAuth client IDs into Nango (`CLOUD_CONNECT_ENABLED`).
+ * **The server owns provider state.** The menu is rendered from `GET /cloud/providers` (the frozen
+ * contract, `lib/cloud/contract.ts`) in the order received, and every disabled affordance derives
+ * from that response's `enabled`. This component used to read a local table with a hardcoded
+ * `comingSoon: true`, so both live OAuth providers stayed unreachable in the UI (A20) — hence the
+ * rule: no client-side provider truth, ever.
+ *
+ * Three honest states per OAuth provider, instead of one button that lies:
+ * - not enabled → "Not enabled" chip, no import form;
+ * - enabled, no account connected → says so, and names what is missing (L2-07, the Connect UI host);
+ * - enabled + connected → the account label and a reference box that really imports.
  */
 export function CloudImportMenu({
   projectId,
@@ -35,10 +58,51 @@ export function CloudImportMenu({
 }) {
   const [open, setOpen] = React.useState(false);
   const [url, setUrl] = React.useState("");
-  const [busy, setBusy] = React.useState(false);
+  const [busy, setBusy] = React.useState<string | null>(null); // the provider id being imported
   const [error, setError] = React.useState<string | null>(null);
-  const [connectNote, setConnectNote] = React.useState<string | null>(null);
+  const [providers, setProviders] = React.useState<CloudProvider[] | null>(null);
+  // The provider list is the OFFLINE fallback, not the server's answer — the menu must say so.
+  const [degraded, setDegraded] = React.useState(false);
+  const [connections, setConnections] = React.useState<CloudConnection[] | null>(null);
+  const [connectionsError, setConnectionsError] = React.useState<string | null>(null);
   const ref = React.useRef<HTMLDivElement>(null);
+
+  // Load the server's menu the first time it's opened (not on mount — this sits on the Data tab of
+  // every project and the list is only needed once the popover is actually shown).
+  React.useEffect(() => {
+    if (!open || providers) return;
+    let live = true;
+    void (async () => {
+      try {
+        const list = await fetchCloudProviders();
+        if (!live) return;
+        setProviders(list);
+        setDegraded(false);
+      } catch {
+        if (!live) return;
+        setProviders(FALLBACK_CLOUD_PROVIDERS);
+        setDegraded(true);
+      }
+      try {
+        const conns = await fetchCloudConnections();
+        if (live) {
+          setConnections(conns);
+          setConnectionsError(null);
+        }
+      } catch (e) {
+        // Only the account section degrades — URL/S3 needs no broker and keeps working.
+        if (live) {
+          setConnections([]);
+          setConnectionsError(
+            e instanceof Error ? e.message : "Couldn't check which accounts are connected.",
+          );
+        }
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [open, providers]);
 
   // Close on outside click / Escape while open.
   React.useEffect(() => {
@@ -57,38 +121,32 @@ export function CloudImportMenu({
     };
   }, [open]);
 
-  async function submitUrl() {
-    const ref_ = url.trim();
-    if (!ref_ || busy) return;
-    setBusy(true);
+  /** One import, whichever provider it came from. `close` collapses the menu on success. */
+  async function submit(provider: string, ref_: string, connectionId?: string) {
+    const trimmed = ref_.trim();
+    if (!trimmed || busy) return false;
+    setBusy(provider);
     setError(null);
     try {
-      const dataset = await importFromCloud(projectId, { provider: "url", ref: ref_ });
+      const dataset = await importFromCloud(projectId, {
+        provider,
+        ref: trimmed,
+        connectionId,
+      });
       onImported(dataset);
-      setUrl("");
-      setOpen(false);
+      return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't import from that link.");
+      setError(e instanceof Error ? e.message : "Couldn't import that file.");
+      return false;
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
-  async function connect(provider: CloudProvider) {
-    setConnectNote(null);
-    try {
-      // Reachable only for a provider whose `comingSoon` is false (the button is disabled
-      // otherwise); the backend still gates on its own per-provider settings flag and returns a
-      // clear error if that is off, which is what `connectNote` surfaces.
-      await connectProvider(provider.providerConfigKey, `${projectId}:${provider.id}`);
-    } catch (e) {
-      setConnectNote(
-        e instanceof Error ? e.message : `${provider.label} — coming soon. Connect your account.`,
-      );
-    }
-  }
-
-  const urlProvider = CLOUD_PROVIDERS.find((p) => p.id === "url")!;
+  const list = providers ?? [];
+  const urlProvider = list.find((p) => p.kind === "url");
+  const oauthProviders = list.filter((p) => p.kind === "oauth");
+  const connectionFor = (id: string) => connections?.find((c) => c.provider === id);
 
   return (
     <div ref={ref} className="relative">
@@ -109,96 +167,245 @@ export function CloudImportMenu({
         <div
           role="dialog"
           aria-label="Import from cloud"
-          className="absolute left-0 z-50 mt-2 w-80 origin-top-left rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl ring-1 ring-border motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95"
+          className="absolute left-0 z-50 mt-2 w-96 origin-top-left rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl ring-1 ring-border motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95"
         >
-          {/* URL / S3 — the working path */}
-          <div className="space-y-1.5">
-            <label htmlFor="cloud-import-url" className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <Link2 className="size-3.5" />
-              URL / S3 link
-            </label>
-            <div className="flex gap-1.5">
-              <Input
-                id="cloud-import-url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void submitUrl();
-                }}
-                placeholder="https://… or s3://bucket/key"
-                spellCheck={false}
-                autoComplete="off"
-                disabled={busy}
-              />
-              <Button size="sm" onClick={() => void submitUrl()} disabled={busy || !url.trim()}>
-                {busy ? <Loader2 className="size-4 animate-spin" /> : "Import"}
-              </Button>
-            </div>
-            <p className="text-[11px] leading-snug text-muted-foreground">
-              Paste a direct download link or an S3 URI — Selom streams it in and parses it like a dropped file.
+          {!providers ? (
+            <p className="flex items-center gap-2 py-2 text-xs text-muted-foreground" role="status">
+              <Loader2 className="size-3.5 animate-spin" />
+              Loading import options…
             </p>
-            {error && (
-              <p className="flex items-start gap-1.5 text-[11px] leading-snug text-destructive">
-                <AlertCircle className="mt-px size-3.5 shrink-0" />
-                <span>{error}</span>
-              </p>
-            )}
-          </div>
-
-          <div className="my-3 h-px bg-border" />
-
-          {/* OAuth providers. A provider whose `comingSoon` is set cannot succeed — its Connect
-              button is DISABLED and says so at the control, rather than looking live and failing
-              after the click (milestone review 2026-07-25, findings B4/B9). The flag is still an FE
-              literal that cannot track the backend's per-provider settings flags (finding A20) —
-              closing that fork needs a providers endpoint the FE reads, which lands with the cloud
-              import/export slice. */}
-          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Connect an account
-          </p>
-          <ul className="space-y-1">
-            {OAUTH_PROVIDERS.map((p) => {
-              const Icon = PROVIDER_ICON[p.id] ?? Cloud;
-              return (
-                <li
-                  key={p.id}
-                  className="flex items-center gap-2.5 rounded-lg border border-border/70 bg-background/40 px-2.5 py-1.5"
-                >
-                  <span aria-hidden className="grid size-7 place-items-center rounded-md border border-border bg-background/70 text-muted-foreground [&_svg]:size-4">
-                    <Icon />
-                  </span>
-                  <span className="flex-1 text-sm text-foreground/85">{p.label}</span>
-                  {p.comingSoon && (
-                    <span className="rounded-full border border-border bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Soon
-                    </span>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2.5 text-xs"
-                    disabled={p.comingSoon}
-                    title={p.comingSoon ? `${p.label} import is not enabled yet` : undefined}
-                    onClick={() => void connect(p)}
+          ) : (
+            <>
+              {/* URL / S3 — needs no account, so it is always the first thing offered. */}
+              {urlProvider && (
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="cloud-import-url"
+                    className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
                   >
-                    Connect
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
-          {connectNote && (
-            <p className="mt-2 rounded-md border border-border/70 bg-muted/40 px-2.5 py-1.5 text-[11px] leading-snug text-muted-foreground">
-              {connectNote}
-            </p>
-          )}
-          {OAUTH_PROVIDERS.some((p) => p.comingSoon) && (
-            <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-              {urlProvider.label} import works now. Account connections arrive with cloud import.
-            </p>
+                    <Link2 className="size-3.5" />
+                    {urlProvider.label}
+                  </label>
+                  <div className="flex gap-1.5">
+                    <Input
+                      id="cloud-import-url"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          void submit("url", url).then((ok) => {
+                            if (ok) {
+                              setUrl("");
+                              setOpen(false);
+                            }
+                          });
+                        }
+                      }}
+                      placeholder="https://… or s3://bucket/key"
+                      spellCheck={false}
+                      autoComplete="off"
+                      disabled={busy !== null}
+                    />
+                    <ImportButton
+                      busy={busy === "url"}
+                      disabled={busy !== null || !url.trim()}
+                      label="Import from a URL or S3 link"
+                      onClick={() =>
+                        void submit("url", url).then((ok) => {
+                          if (ok) {
+                            setUrl("");
+                            setOpen(false);
+                          }
+                        })
+                      }
+                    />
+                  </div>
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    Paste a direct download link or an S3 URI — Selom streams it in and parses it like a dropped file.
+                  </p>
+                </div>
+              )}
+
+              {error && (
+                <p className="mt-1.5 flex items-start gap-1.5 text-[11px] leading-snug text-destructive" role="alert">
+                  <AlertCircle className="mt-px size-3.5 shrink-0" />
+                  <span>{error}</span>
+                </p>
+              )}
+
+              <div className="my-3 h-px bg-border" />
+
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Your connected accounts
+              </p>
+              <ul className="space-y-1.5">
+                {oauthProviders.map((p) => (
+                  <ProviderRow
+                    key={p.id}
+                    provider={p}
+                    connection={connectionFor(p.id)}
+                    connectionsKnown={connections !== null}
+                    busy={busy === p.id}
+                    anyBusy={busy !== null}
+                    onImport={(ref_, connectionId) =>
+                      submit(p.id, ref_, connectionId).then((ok) => {
+                        if (ok) setOpen(false);
+                        return ok;
+                      })
+                    }
+                  />
+                ))}
+              </ul>
+
+              {connectionsError && (
+                <p className="mt-2 rounded-md border border-warn/40 bg-warn/10 px-2.5 py-1.5 text-[11px] leading-snug text-warn">
+                  Couldn&apos;t check your connected accounts ({connectionsError}). URL / S3 import still works.
+                </p>
+              )}
+              {degraded && (
+                <p className="mt-2 rounded-md border border-warn/40 bg-warn/10 px-2.5 py-1.5 text-[11px] leading-snug text-warn">
+                  Showing the offline list — Selom couldn&apos;t reach the server, so it can&apos;t tell which
+                  providers are enabled. Reopen this menu once you&apos;re back online.
+                </p>
+              )}
+            </>
           )}
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The Import control. The busy state is LABELLED — an unlabelled spinner tells a screen reader
+ * nothing and tells a sighted user only that something is happening, not what (finding B22). The
+ * accessible name stays stable while the visible text changes, and `aria-busy` marks the wait.
+ */
+function ImportButton({
+  busy,
+  disabled,
+  label,
+  onClick,
+}: {
+  busy: boolean;
+  disabled: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      size="sm"
+      className="shrink-0 gap-1.5"
+      onClick={onClick}
+      disabled={disabled}
+      aria-busy={busy}
+      aria-label={busy ? `${label} — importing…` : label}
+    >
+      {busy ? (
+        <>
+          <Loader2 className="size-3.5 animate-spin" />
+          Importing…
+        </>
+      ) : (
+        "Import"
+      )}
+    </Button>
+  );
+}
+
+/**
+ * One OAuth provider row. Which of the three states it renders is entirely the server's answer:
+ * `enabled` from the frozen providers contract, `connection` from `/cloud/connections`. Nothing
+ * here guesses.
+ */
+function ProviderRow({
+  provider,
+  connection,
+  connectionsKnown,
+  busy,
+  anyBusy,
+  onImport,
+}: {
+  provider: CloudProvider;
+  connection: CloudConnection | undefined;
+  /** False while the connections request is still in flight — don't claim "not connected" yet. */
+  connectionsKnown: boolean;
+  busy: boolean;
+  anyBusy: boolean;
+  onImport: (ref: string, connectionId?: string) => Promise<boolean>;
+}) {
+  const [ref, setRef] = React.useState("");
+  const Icon = PROVIDER_ICON[provider.id] ?? Cloud;
+  const hint = REF_HINT[provider.id];
+  const inputId = `cloud-import-ref-${provider.id}`;
+
+  return (
+    <li className="rounded-lg border border-border/70 bg-background/40 px-2.5 py-2">
+      <div className="flex items-center gap-2.5">
+        <span
+          aria-hidden
+          className="grid size-7 shrink-0 place-items-center rounded-md border border-border bg-background/70 text-muted-foreground [&_svg]:size-4"
+        >
+          <Icon />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm text-foreground/85">{provider.label}</p>
+          {connection && (
+            <p className="truncate text-[11px] text-muted-foreground">{connection.label}</p>
+          )}
+        </div>
+        {!provider.enabled ? (
+          <span className="rounded-full border border-border bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Not enabled
+          </span>
+        ) : connection ? (
+          <span className="rounded-full border border-stage-publish/40 bg-[color-mix(in_oklab,var(--stage-publish)_12%,transparent)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-stage-publish">
+            Connected
+          </span>
+        ) : connectionsKnown ? (
+          <span className="rounded-full border border-border bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            No account
+          </span>
+        ) : null}
+      </div>
+
+      {/* Enabled + connected → the only state where an import can actually succeed. */}
+      {provider.enabled && connection && (
+        <div className="mt-2 space-y-1">
+          <label htmlFor={inputId} className="sr-only">
+            {provider.label} file reference
+          </label>
+          <div className="flex gap-1.5">
+            <Input
+              id={inputId}
+              value={ref}
+              onChange={(e) => setRef(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void onImport(ref, connection.connectionId);
+              }}
+              placeholder={hint?.placeholder ?? "file id"}
+              spellCheck={false}
+              autoComplete="off"
+              disabled={anyBusy}
+            />
+            <ImportButton
+              busy={busy}
+              disabled={anyBusy || !ref.trim()}
+              label={`Import from ${provider.label}`}
+              onClick={() => void onImport(ref, connection.connectionId)}
+            />
+          </div>
+          {hint && <p className="text-[11px] leading-snug text-muted-foreground">{hint.help}</p>}
+        </div>
+      )}
+
+      {/* Enabled but nothing connected — say what is missing instead of offering a dead button. */}
+      {provider.enabled && !connection && connectionsKnown && (
+        <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+          Enabled, but no {provider.label} account is connected yet. Connecting one from here needs the
+          Nango Connect UI host (tracked as L2-07).
+        </p>
+      )}
+    </li>
   );
 }

@@ -95,12 +95,6 @@ INFRA_PATHS = {
 #: Backlog + reasoning: ``docs/reachability/backlog.md``. Every ``R-xx`` below was found BY THIS GUARD
 #: on its first run, not by a review — 17 unreachable paths against a review that had surfaced 2.
 WAIVERS: dict[str, tuple[str, str]] = {
-    # ---- pending implementation (contract frozen ahead of the route) -----------------------------
-    "/cloud/providers": (
-        "L2-01",
-        "Contract frozen and guarded (docs/cloud-providers-contract/spec.md) but the route is not "
-        "implemented yet; Lane 2 adds the route AND its FE consumer in the same change.",
-    ),
     "/data/assemble-scrna": (
         "L2-05",
         "Shipped working in 11a115f with no FE surface — the example that motivated this guard. "

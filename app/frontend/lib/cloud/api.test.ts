@@ -12,9 +12,16 @@ vi.mock("@/lib/api/client", () => {
 });
 
 import { api } from "@/lib/api/client";
-import { exportToCloud, importFromCloud } from "./api";
+import { CLOUD_PROVIDER_WIRE_KEYS } from "./contract";
+import {
+  exportToCloud,
+  fetchCloudConnections,
+  fetchCloudProviders,
+  importFromCloud,
+} from "./api";
 
 const post = api.post as ReturnType<typeof vi.fn>;
+const get = api.get as ReturnType<typeof vi.fn>;
 
 const READY = {
   id: "srv_ds_1",
@@ -27,7 +34,88 @@ const READY = {
   source: { provider: "url", ref: "https://example.test/counts.csv" },
 };
 
-afterEach(() => post.mockReset());
+afterEach(() => {
+  post.mockReset();
+  get.mockReset();
+});
+
+/** A providers body built from the FROZEN key list, so a renamed wire key breaks this fixture. */
+const WIRE_PROVIDERS = [
+  { id: "url", label: "URL / S3", kind: "url", provider_config_key: "", enabled: true },
+  { id: "google", label: "Google Drive", kind: "oauth", provider_config_key: "google-drive", enabled: true },
+  { id: "onedrive", label: "OneDrive", kind: "oauth", provider_config_key: "onedrive", enabled: false },
+  { id: "dropbox", label: "Dropbox", kind: "oauth", provider_config_key: "dropbox", enabled: true },
+];
+
+describe("fetchCloudProviders — the FE half of the frozen contract", () => {
+  it("reads the fixture through exactly the frozen wire keys", () => {
+    // Guards the fixture itself: if the freeze gains/renames a key, this fails before the mapping
+    // assertions below can pass against a stale shape.
+    for (const p of WIRE_PROVIDERS) {
+      expect(Object.keys(p)).toEqual([...CLOUD_PROVIDER_WIRE_KEYS]);
+    }
+  });
+
+  it("maps snake_case → camelCase and takes `enabled` from the server", async () => {
+    get.mockResolvedValueOnce({ providers: WIRE_PROVIDERS });
+    const list = await fetchCloudProviders();
+    expect(get).toHaveBeenCalledWith("/cloud/providers");
+    const google = list.find((p) => p.id === "google")!;
+    expect(google.providerConfigKey).toBe("google-drive");
+    expect(google.enabled).toBe(true);
+    expect(list.find((p) => p.id === "onedrive")!.enabled).toBe(false);
+  });
+
+  it("preserves the SERVER's menu order — the client must not re-sort", async () => {
+    get.mockResolvedValueOnce({ providers: WIRE_PROVIDERS });
+    expect((await fetchCloudProviders()).map((p) => p.id)).toEqual([
+      "url",
+      "google",
+      "onedrive",
+      "dropbox",
+    ]);
+  });
+
+  it("ignores unknown keys, so an additive backend field can't break a deployed client", async () => {
+    get.mockResolvedValueOnce({
+      providers: [{ ...WIRE_PROVIDERS[1], beta: true, icon_url: "https://x/y.png" }],
+    });
+    const [p] = await fetchCloudProviders();
+    expect(Object.keys(p).sort()).toEqual(
+      ["enabled", "id", "kind", "label", "providerConfigKey"].sort(),
+    );
+  });
+
+  it("THROWS rather than falling back — the caller decides what a dead server means", async () => {
+    get.mockRejectedValueOnce(new Error("network error"));
+    await expect(fetchCloudProviders()).rejects.toThrow("network");
+  });
+});
+
+describe("fetchCloudConnections — which accounts are actually connected", () => {
+  it("maps the wire rows and keys them by registry provider id", async () => {
+    get.mockResolvedValueOnce({
+      connections: [
+        {
+          provider: "google",
+          connection_id: "c878e8db-ab37-40ed-9866-ba458d12a7df",
+          label: "Steven (owner@example.test)",
+          connected_at: "2026-07-25T05:39:09.594+00:00",
+        },
+      ],
+    });
+    const [c] = await fetchCloudConnections();
+    expect(get).toHaveBeenCalledWith("/cloud/connections");
+    expect(c.provider).toBe("google");
+    expect(c.connectionId).toBe("c878e8db-ab37-40ed-9866-ba458d12a7df");
+    expect(c.label).toBe("Steven (owner@example.test)");
+  });
+
+  it("an absent list is an empty list, never a fabricated connection", async () => {
+    get.mockResolvedValueOnce({});
+    expect(await fetchCloudConnections()).toEqual([]);
+  });
+});
 
 describe("importFromCloud — the remote-intake client", () => {
   it("maps the ready dataset and posts the remote-intake body", async () => {
