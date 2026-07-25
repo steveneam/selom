@@ -24,6 +24,14 @@ ready (`scripts/worktree-setup.sh`, `scripts/lane-status.sh`) if a later sprint 
 
 ## Start here
 
+> **⚑ THIS WHOLE BOARD IS OWNER-APPROVED TO EXECUTE** — owner, 2026-07-25: *"we do all those next
+> session on gogogo"*. Start `W-1` on boot. Do not re-present the plan for approval, and do not ask
+> which item to begin with. Work the tracks in the order at the bottom of this file.
+>
+> **`Q-1` and `Q-2` are the exception** — founder decisions by nature. Put them to the owner
+> **early, via `AskUserQuestion`**, so the answers land while `W-1` is in flight. Do not idle on
+> them: `W-1`, `V-1` and `V-2` need no decision, and only `W-2` is genuinely blocked on `Q-1`.
+
 **`W-1` is the first action.** It is a confirmed bug, it is small, its regression test is already
 written and currently documents the broken behaviour, and **every other width fix stays invisible to
 a user until it lands**. It needs no owner decision, so it proceeds while `Q-1`/`Q-2` sit with the
