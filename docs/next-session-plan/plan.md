@@ -153,7 +153,15 @@ first was fixed. `W-1` is now fixed and its gate is green; the remaining 212px i
   `docs/editor-room/spec.md` written and paused for review before implementation.
 - **Source.** proposal §3.3/§3.4 · lane3 §RESULTS.
 
-### `W-2` — give the figure room (implements `Q-1`) · Status: `BLOCKED on the editor-room spec`
+### `W-2` — give the figure room (implements `Q-1`) · Status: `TODO — spec written + decided`
+
+> `docs/editor-room/spec.md` is written and its one owner call (`D-2`) is answered: **auto-collapse
+> BOTH the workrail and the inspector dock at ≤1280.** Build to the spec.
+>
+> **⚑ The board's arithmetic was wrong and the spec corrects it:** collapsing the dock alone reaches
+> **368px**, not 506 — even removing the dock entirely reaches only 416. The 506px target needs both
+> rails collapsed (**576px**). Do not re-derive this; it is worked in the spec's "the finding that
+> shapes this spec".
 
 - **Scope, now that `Q-1` is answered.** (1) a collapse control on the inspector dock + auto-collapse
   below a width threshold; (2) zoom-to-fit + a zoom-% control in the top strip (today a static hint

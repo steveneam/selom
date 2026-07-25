@@ -3,7 +3,8 @@
 _Written 2026-07-25 21:45 +1000 (Sydney) · implements owner decision **#13** (`agent_handoff/DECISIONS.md`),
 which answered board questions `Q-1` and `Q-2`. Scopes **`W-2`** in `docs/next-session-plan/plan.md`._
 
-**Status: WRITTEN — paused for owner review. No `W-2` code before it is approved.**
+**Status: `D-2` ANSWERED by the owner 2026-07-25 — option (a), auto-collapse both rails at ≤1280.
+`W-2` is cleared to build to this spec.**
 
 ## What
 
@@ -173,7 +174,12 @@ is the opposite of what a zoom control promises. *Reversible:* yes, the mechanis
 then edit it*: on arrival the figure is the subject and the inspector is not yet in use, which is
 precisely when the pixels are worth more to the artboard. It is also the only option that satisfies a
 requirement the owner has already refused to relax. *Reversible:* yes — it is one predicate in
-`editor-room.ts`. **This is the decision this spec is paused for.**
+`editor-room.ts`.
+
+> **RESOLVED — owner, 2026-07-25: (a).** The editor auto-collapses **both** the workrail and the
+> inspector dock at ≤1280, arriving at ~576px of plot. `R2` (the spine shows the tabs; clicking one
+> expands to it) is therefore not a nicety — it is what keeps the one-click cost honest, so it ships
+> with the collapse, not after it.
 
 **D-3 — The threshold is 1280, and it is a viewport-width rule.** Below/at 1280 auto-collapse
 applies; above it, nothing is collapsed by default (at 1440 the figure is already comfortable, and at
