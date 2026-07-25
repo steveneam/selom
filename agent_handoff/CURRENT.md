@@ -54,18 +54,28 @@ The owner asked whether anything else needs doing and then directed: *"you can w
 
 Everything below is the next session's job, in this order.
 
-### ① D-5 via a REAL UI RUN — the top item, and the blocker is already solved on paper
+### ① D-5 — INVESTIGATE THOROUGHLY (owner-directed 2026-07-25). Budget real time; do not shortcut it.
 
-**Do the real run first; it is the key that unlocks every other browser check.** The figure editor renders **only** when the *live editor store* holds a spec — `components/project/views/figure-view.tsx:91` branches on `figure.spec`, **not** on the persisted figure record — and that store is seeded exclusively by `figure.init(spec)`, called from `openFigure` (`components/project/hooks/use-figure-crud.ts:55`) or automatically at the end of a run (`components/project/hooks/use-figure-run.ts:181`).
+**Read this first, because the failure mode was mine, not the app's.** I burned most of a session on D-5 and never reached the editor, because I tried **four shortcuts in a row** instead of committing to the one path that works: demo projects → API-created project → localStorage injection → a half-driven UI run. The repo's own rule is *after two failed tries, build a helper* ([[step-back-build-helpers-when-stuck]]). I ignored it. **Do not repeat the shortcuts.**
 
-**Three approaches that DO NOT work — already tried, do not repeat:**
-1. **The demo projects.** `demo-pbmc`'s seeded figure has **no `spec`**, so the editor shows *"Figure spec not stored"*. Same for the other two.
-2. **Creating the project + figure via the API.** Works server-side (200), but the FE store is **localStorage-first**, so a project it never created renders **"Project not found"**. Projects/uploads also need a DB — start the backend with `SELOM_DATABASE_URL=sqlite:///<path>` + `SELOM_DB_AUTO_CREATE=true`, and put any such file **in the selom-data folder, not the repo** (owner-directed: all data lives in selom-data).
-3. **Injecting into `localStorage['selom.projects.v1']`.** Does not survive the store's seed/reconcile on load.
+**FIRST ACT — build the reusable harness, not another one-off script.** A small committed helper that boots the app and lands on **a real figure open in the editor**. It is the single dependency of D-5, `D-1`/`D-3`/`D-4`/`D-6`/`D-7`/`D-10`/`D-11`, the cloud round-trip, and every future browser verification — so it is worth building once properly instead of re-improvised each time ([[compound-capability-each-task]]). Suggested home: `scripts/browser-verify/` or a committed Playwright fixture. It must:
+- start the backend with a DB (`SELOM_DATABASE_URL=sqlite:///…` + `SELOM_DB_AUTO_CREATE=true`) — **put that file in the selom-data folder, never the repo** (owner-directed) — and the FE with `API_PROXY_TARGET` pointed at it, on the derived lane ports (BE `:8152`, FE `:3152`; `:8000` is eamos, never bind it);
+- drive a **real run through the UI** (new project → drop the CSV → run `volcano`), because a completed run calls `figure.init(res.figure)` itself and that is the ONLY thing that opens the editor;
+- stop every server it started, and be re-runnable.
 
-**The path that WILL work:** a real run through the UI — new project → drop the CSV → run `volcano` → the completed run calls `figure.init(res.figure)` **itself** and opens the editor. Real data that is known-good for this: `…/selom-data/eyg28/raw/output_EYG_28_RO_human-RUVge-K4_20250602/DEG/EYG_28_RO_human-RUVge-K4_DEGs_All_PDE6B_FS_d180_vs_Control_d180.csv` — verified this session to return **200 with a RESPONSIVE spec** (3 traces, no `layout.width`), which is exactly the figure `D-5` requires. Budget the UI automation, or just do it by hand.
+**Why the shortcuts fail** (so nobody re-tries them): the editor renders only when the *live editor store* holds a spec — `components/project/views/figure-view.tsx:91` branches on `figure.spec`, **not** on the persisted figure record — and that store is seeded solely by `figure.init(spec)` from `openFigure` (`components/project/hooks/use-figure-crud.ts:55`) or a completed run (`use-figure-run.ts:181`). So: **demo projects** show *"Figure spec not stored"* (their seeded figure has no spec) · an **API-created project** shows *"Project not found"* (the FE store is localStorage-first) · **localStorage injection** is lost to the store's seed/reconcile on load.
 
-**Then run `D-5` (first) and `D-4`** from `agent_handoff/lane-wraps/lane3.md` — exact route, viewport and PASS/FAIL criteria are written out. `D-5` also asks for **one new number**: `stageClient` at both viewports, because Lane 3's new `min-h-[20rem]` (320px) floor is **wrong for real screens** if that value is ever near 352px.
+**Known-good real data** (verified this session to return HTTP 200 with a **responsive** spec — 3 traces, no `layout.width`, exactly what D-5 needs):
+`…/selom-data/eyg28/raw/output_EYG_28_RO_human-RUVge-K4_20250602/DEG/EYG_28_RO_human-RUVge-K4_DEGs_All_PDE6B_FS_d180_vs_Control_d180.csv`
+
+**Then work ALL 12 checks in `agent_handoff/lane-wraps/lane3.md`** — each has its exact route, viewport and PASS/FAIL criteria written out. D-5 first. Specifics not to lose:
+- Viewports **1280×800, 1440×900 and 1920×1080** (the last for the `88rem` centring cap). **Desktop only** — Selom has no mobile.
+- D-5's PASS is `overflow === 0` **and** `card ≈ stageClient − 32`; the **FAIL signature** of A24 returning is `card ≈ min(0.74 × innerHeight, 720)` with `stageScroll > stageClient`.
+- **Report the new number D-5 asks for:** `stageClient` at both viewports. Lane 3's fix introduced a `min-h-[20rem]` (320px) floor, and if `stageClient` is ever near **352px** the floor is wrong for real screens and must be lowered. Only a browser can settle it.
+- Confirm the figure's **x-axis title and legend are visible without scrolling inside the stage**, and that it stays legible at 1280 (~506px of plot width).
+- Anything checked with `NEXT_PUBLIC_ANNOTATION_LAYER=on` is testing **deferred Plan C territory** — file it against the annotation spec, do **not** close it as shipped-and-fine.
+
+**What is already confirmed, so do not redo it:** the full-app smoke on merged `main` with real chromium — 10 routes × 2 desktop viewports, all 200, zero page errors, zero horizontal overflow. Playwright 1.60.0 works with `executablePath: /home/deploy/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome` (the bare `playwright` package resolves a build that is not installed — pass the path explicitly).
 
 ### ② Everything else I could NOT confirm
 
