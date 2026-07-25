@@ -50,7 +50,7 @@ reached. The stale-waiver half worked before the ink was dry.
 | **R-04** | `/artifacts/{artifact_id}` · `/artifacts/{artifact_id}/table` | Artifacts are produced by runs but cannot be fetched back by id, so an artifact's table cannot be opened. Blocks the proposal's `F1` (run history / version diff), which needs to read artifacts back. | Artifact fetch + table view; prerequisite for `F1`. |
 | **R-05** | `/papers/metadata/by-doi` | DOI metadata enrichment is wired into Skill Match server-side but has no user-reachable path. | Either surface it or record it as internal-only and waive permanently. |
 | **R-06** | `/reproduction-runs/{run_id}/events` | The reproduction **progress stream** has no consumer, so a run shows no live progress. The non-streaming sibling *is* reached, so this is a progress-visibility gap, not a dead feature. | Subscribe to the stream from the reproduction view. Same shape as R-02. |
-| **R-07** | `/workspace` | The workspace **root** collection is unused — the FE fetches the two child collections directly. Most likely genuinely redundant. | **Resolve, don't defer:** delete the route, or use it. Leaving it ambiguous is the cost. |
+| ~~**R-07**~~ | ~~`/workspace`~~ | **CLOSED 2026-07-25 — and my first read of it was WRONG.** I had called it "most likely genuinely redundant", a candidate for deletion. Reading the route settled it the other way: its own docstring says a GET "gives the store a single place to provision + **a name to show**", and the FE was rendering a **hardcoded `"Steven"` / `"Workspace"`** in the sidebar. So the account name was both unreachable *and wrong for anyone who is not the author* — a single-tenant assumption baked into a shared component. Not a redundant route: a real capability with a hardcoded consumer. | **Fixed, not deleted.** `lib/workspace/api.ts::fetchWorkspaceAccount` (fails soft to `null`, never fabricates a name) → the sidebar renders the server's name with a neutral `"Workspace"` fallback; MSW handler mirrors `get_workspace`'s `{id, name, created_at}`; 4 unit tests. Waiver deleted, which the ratchet enforces. **15 remain.** |
 
 Two more were tracked in the lane plan and are now **CLOSED** — their waivers are gone, which is the
 only proof that counts:
@@ -61,7 +61,7 @@ only proof that counts:
   per-sample 10x/`.h5ad` deposit now assembles into one single-cell cohort
   (`lib/intake/assemble.ts`), the sibling of the ERG `/data/combine` path.
 
-**17 → 16** — verified at the merge train, not taken on report.
+**17 → 16 → 15** — every step verified by running the guard, never taken on report.
 
 _Arithmetic correction (lead, at the train): Lane 2's wrap claimed 17 → 15 because it deleted **two**
 waivers. Only one of them, `/data/assemble-scrna`, was among the measured 17 — `/cloud/providers` was a

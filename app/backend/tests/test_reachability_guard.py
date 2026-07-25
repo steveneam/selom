@@ -162,7 +162,7 @@ WAIVERS: dict[str, tuple[str, str]] = {
         "Tabular view of an artifact has no FE call site — the table an artifact carries cannot be "
         "opened by a user.",
     ),
-    # ---- R-05..R-07 singletons ------------------------------------------------------------------
+    # ---- R-05 · R-06 singletons (R-07 CLOSED: /workspace now feeds the sidebar name) -------------
     "/papers/metadata/by-doi": (
         "R-05",
         "DOI metadata enrichment has no FE call site, so the auto-rename/XMP enrich path is not "
@@ -173,12 +173,6 @@ WAIVERS: dict[str, tuple[str, str]] = {
         "The reproduction SSE progress stream has no FE consumer, so a reproduction run reports no "
         "live progress. The non-streaming /reproduction-runs/{run_id} IS reached, so this is a "
         "progress-visibility gap rather than a dead feature.",
-    ),
-    "/workspace": (
-        "R-07",
-        "The workspace ROOT collection has no FE call site — the FE fetches the two child "
-        "collections (/workspace/gene-sets, /workspace/papers) directly. Likely genuinely "
-        "redundant: resolve by deleting the route or by using it, not by leaving it ambiguous.",
     ),
 }
 

@@ -1,12 +1,35 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { BookMarked, Crosshair, Dna, Home, ListChecks, PanelLeftClose, PanelLeftOpen, Plus, ScanSearch, Settings, Store } from "lucide-react";
 import { SelomMark, SelomWordmark } from "@/components/brand/selom-mark";
 import { cn } from "@/lib/ui/cn";
 import { projectStore, useProjects } from "@/lib/projects/store";
+import { fetchWorkspaceAccount } from "@/lib/workspace/api";
+
+/** Neutral placeholder while `GET /workspace` is in flight or unreachable — never a fabricated name. */
+const WORKSPACE_FALLBACK = "Workspace";
+
+/**
+ * The account name comes from the SERVER (`GET /workspace`, reachability finding `R-07`). It used to be
+ * a hardcoded "Steven" / "Workspace", which was both unreachable and wrong for any other account.
+ * Fails soft to {@link WORKSPACE_FALLBACK} so a dead backend degrades the label, never the shell.
+ */
+function useWorkspaceName(): string {
+  const [name, setName] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetchWorkspaceAccount().then((w) => {
+      if (live && w?.name) setName(w.name);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  return name ?? WORKSPACE_FALLBACK;
+}
 
 export function Sidebar({
   open = false,
@@ -23,6 +46,7 @@ export function Sidebar({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const workspaceName = useWorkspaceName();
   const router = useRouter();
   const { projects } = useProjects();
 
@@ -140,14 +164,15 @@ export function Sidebar({
         <RailLink href="/" icon={<Settings />} label="Settings" active={false} muted collapsed={collapsed} onNavigate={onNavigate} />
         <div className={cn("mt-2 flex items-center gap-2", collapsed ? "justify-center px-0 py-1.5" : "px-2 py-1.5")}>
           <span
-            title={collapsed ? "Steven · Workspace" : undefined}
+            title={collapsed ? workspaceName : undefined}
+            aria-hidden
             className="grid size-7 shrink-0 place-items-center rounded-full bg-secondary text-xs font-semibold text-secondary-foreground"
           >
-            S
+            {workspaceName.trim().charAt(0).toUpperCase() || "W"}
           </span>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-foreground">Steven</p>
+              <p className="truncate text-xs font-medium text-foreground">{workspaceName}</p>
               <p className="truncate text-[11px] text-muted-foreground">Workspace</p>
             </div>
           )}

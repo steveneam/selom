@@ -32,6 +32,11 @@ export const persistenceHandlers = [
   http.get("/api/skill-installs", () => HttpResponse.json({ installs: [] })),
   http.get("/api/workspace/papers", () => HttpResponse.json({ papers: [] })),
   http.get("/api/workspace/gene-sets", () => HttpResponse.json({ gene_sets: [] })),
+  // The account record itself (R-07). Mirrors `library/workspace.py::get_workspace` — {id, name,
+  // created_at} — and carries the backend's real default name so the sidebar shows what the server
+  // would actually return, not a prettier stand-in.
+  http.get("/api/workspace", () =>
+    HttpResponse.json({ id: "ws_mock", name: "My workspace", created_at: "2026-01-01T00:00:00" })),
 
   // ── projectStore writes — ack (client-authoritative ids, no remap → no rollback).
   http.post("/api/projects", ok),
