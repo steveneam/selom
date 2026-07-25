@@ -25,6 +25,9 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from engine.ingest import is_10x_dir as _is_10x_dir  # A21 — ONE 10x detector, bound by identity
+from engine.ingest import load_unit as _load_unit  # A21 — ONE loader registry, never a second one
+
 # A 10x Cell-Ranger member file, keyed by role → the name tokens it can wear (v3 ``features`` and the
 # older v2 ``genes``; gzip-compressed as GEO delivers, or plain). A per-sample deposit names each
 # member ``<prefix>_<token>`` (the GEO ``GSM…_<sample>_matrix.mtx.gz`` shape), so stripping the token
@@ -49,11 +52,6 @@ def _split_10x_member(name: str) -> tuple[str, str] | None:
                 prefix = name[: len(name) - len(tok)].rstrip("._- ")
                 return prefix, role
     return None
-
-
-def _is_10x_dir(p: Path) -> bool:
-    # A directory-form 10x sample (mirrors engine.ingest._is_10x): the canonical triplet inside a dir.
-    return p.is_dir() and any((p / f).exists() for f in ("matrix.mtx", "matrix.mtx.gz"))
 
 
 def _match_obs_entry(sample_key: str, obs_map: dict[str, dict] | None) -> dict[str, Any]:
@@ -94,16 +92,14 @@ def _resolve_obs(sample_key: str, obs_map: dict[str, dict] | None) -> dict[str, 
 
 def _read_unit(kind: str, ref: Any) -> Any:
     """Load one per-sample unit to an AnnData. ``kind`` is ``dir`` (a 10x directory), ``h5ad`` (a
-    single AnnData file), or ``triplet`` (a ``{role: path}`` dict staged into a canonical dir for
-    :func:`scanpy.read_10x_mtx`, which requires the fixed ``matrix.mtx``/``barcodes.tsv``/
-    ``features.tsv`` names GEO's ``GSM…_`` prefix hides)."""
-    import anndata as ad
-    import scanpy as sc
+    single AnnData file), or ``triplet`` (a ``{role: path}`` dict staged into a canonical dir, which
+    the registry then recognizes as a 10x directory — ``scanpy.read_10x_mtx`` requires the fixed
+    ``matrix.mtx``/``barcodes.tsv``/``features.tsv`` names GEO's ``GSM…_`` prefix hides).
 
-    if kind == "dir":
-        return sc.read_10x_mtx(ref)
-    if kind == "h5ad":
-        return ad.read_h5ad(ref)
+    Every read goes through :func:`engine.ingest.load_unit` — the ONE loader registry (A21). What
+    stays here is only what assemble genuinely adds: the canonical-name staging dir."""
+    if kind in ("dir", "h5ad"):
+        return _load_unit(ref)
     staging = Path(tempfile.mkdtemp(prefix="selom-10x-"))
     try:
         for role, src in ref.items():
@@ -114,7 +110,7 @@ def _read_unit(kind: str, ref: Any) -> Any:
                 dest.symlink_to(src)  # avoid copying a multi-hundred-MB matrix
             except OSError:
                 shutil.copyfile(src, dest)  # symlink unsupported (some FS/OS) → copy
-        return sc.read_10x_mtx(staging)
+        return _load_unit(staging)
     finally:
         shutil.rmtree(staging, ignore_errors=True)
 
@@ -167,9 +163,83 @@ def _plan_units(srcs: list[str | Path]) -> list[tuple[str, str, Any]]:
     return order
 
 
+# --- gene-axis honesty (A14) ------------------------------------------------------------------
+# ``ad.concat(join="outer", fill_value=0)`` unions the gene axis and writes 0 for every gene a
+# sample's ``features.tsv`` never carried. Downstream a fabricated 0 is byte-indistinguishable from
+# a measured zero count, so a gene present in only one sample's reference becomes a perfect
+# sample-specific marker — and because ``obs['sample']`` is mirrored to the batch key, that is
+# exactly the batch-confounded-as-biology failure mode. Live for real deposits that mix references
+# or prefixed feature names (``GRCh38_``-prefixed symbols).
+#
+# So: the join DEFAULTS TO ``"inner"`` — every count in the assembled matrix is a measured count —
+# and whichever join runs, the overlap is MEASURED and REPORTED. Silently dropping genes would be
+# the same defect wearing the other hat, so ``"inner"`` is not allowed to be quiet either: the
+# verdict below states what was dropped or fabricated, and warns when the references disagree.
+JOINS = ("inner", "outer")
+
+# Below this shared/union ratio the samples are not plausibly the same reference (a Cell-Ranger
+# re-run against one reference is the fix, not a join flag).
+_OVERLAP_WARN_BELOW = 0.9
+
+
+def gene_overlap(parts: list, join: str) -> dict:
+    """The honest gene-axis verdict for a set of per-sample AnnData, computed BEFORE the concat.
+
+    Returns ``n_genes_union`` / ``n_genes_shared`` / ``per_sample_n_genes`` / ``shared_fraction``,
+    the ``join`` that ran, how many genes it ``dropped`` (inner) or ``zero_filled`` (outer), and a
+    ``level`` + ``message`` + ``fix``. ``level`` is ``"ok"`` when every sample carries the same gene
+    set, ``"info"`` when they differ but overlap well, and ``"warn"`` below
+    :data:`_OVERLAP_WARN_BELOW` — the references disagree and no join makes that honest.
+    """
+    per_sample = {}
+    sets = []
+    for adata in parts:
+        names = [str(v) for v in adata.var_names]
+        sets.append(set(names))
+        per_sample[str(adata.obs["sample_id"].iloc[0]) if adata.n_obs else str(len(sets))] = len(names)
+    union = set().union(*sets) if sets else set()
+    shared = set.intersection(*sets) if sets else set()
+    n_union, n_shared = len(union), len(shared)
+    frac = (n_shared / n_union) if n_union else 1.0
+    dropped = n_union - n_shared if join == "inner" else 0
+    zero_filled = n_union - n_shared if join == "outer" else 0
+
+    if n_shared == n_union:
+        level = "ok"
+        message = f"All {len(parts)} sample(s) carry the same {n_union} genes — nothing was dropped or filled."
+        fix = ""
+    elif join == "outer":
+        level = "warn" if frac < _OVERLAP_WARN_BELOW else "info"
+        message = (
+            f"{zero_filled} of {n_union} genes are absent from at least one sample's reference and "
+            f"were ZERO-FILLED by join='outer'. Those zeros are NOT measured counts — they are "
+            f"indistinguishable from a measured zero downstream, and with sample mirrored to the "
+            f"batch key they read as perfect sample-specific markers. Only {n_shared} genes "
+            f"({frac:.1%}) are measured in every sample.")
+        fix = ("Re-run Cell Ranger against ONE reference, or assemble with join='inner' (the "
+               "default) so every count in the matrix is a measured count.")
+    else:
+        level = "warn" if frac < _OVERLAP_WARN_BELOW else "info"
+        message = (
+            f"{dropped} of {n_union} genes are not present in every sample's reference and were "
+            f"DROPPED by join='inner'; {n_shared} genes ({frac:.1%}) are shared and kept. No count "
+            f"was fabricated.")
+        fix = ("Re-run Cell Ranger against ONE reference if the drop is large — the samples appear "
+               "to use different references.")
+    if level == "warn":
+        fix = ("Samples appear to use DIFFERENT references. " + fix)
+    return {
+        "n_genes_union": n_union, "n_genes_shared": n_shared, "per_sample_n_genes": per_sample,
+        "shared_fraction": round(frac, 4), "join": join,
+        "dropped_genes": dropped, "zero_filled_genes": zero_filled,
+        "level": level, "message": message, "fix": fix,
+    }
+
+
 def assemble_scrna(
     srcs: list[str | Path],
     obs_map: dict[str, dict] | None = None,
+    join: str = "inner",
 ) -> Any:
     """Assemble a SET of **per-sample** scRNA matrices into ONE concatenated AnnData with the
     filename-encoded design materialized into ``obs``.
@@ -185,12 +255,21 @@ def assemble_scrna(
     override); barcodes are namespaced ``{sample_id}_{barcode}`` so cells stay distinct and traceable
     across samples. ``obs['sample']`` is mirrored from ``sample_id`` when the design didn't set it, so
     the batch-key-reading scRNA skills (integration / QC / mixing) find a batch column out of the box.
-    Genes are unioned (``join='outer'``, absent genes → 0). Raises ``ValueError`` for no inputs, an
-    unrecognized file, or an incomplete triplet."""
+
+    ``join`` is ``"inner"`` by default — the gene axis is the INTERSECTION, so every count in the
+    assembled matrix is a measured count (A14). ``"outer"`` is opt-in and zero-fills the genes a
+    sample's reference lacks; those zeros are fabricated and are disclosed as such. Either way the
+    overlap is measured and stamped into ``uns['selom_gene_overlap']`` (see :func:`gene_overlap`),
+    which :func:`summarize` surfaces — a large drop or fill is never silent.
+
+    Raises ``ValueError`` for no inputs, an unknown ``join``, an unrecognized file, or an incomplete
+    triplet."""
     import anndata as ad
 
     if not srcs:
         raise ValueError("assemble_scrna: no inputs")
+    if join not in JOINS:
+        raise ValueError(f"assemble_scrna: join must be one of {JOINS}, got {join!r}")
 
     units = _plan_units(srcs)
     parts = []
@@ -205,20 +284,36 @@ def assemble_scrna(
         adata.obs_names = [f"{sid}_{bc}" for bc in adata.obs_names.astype(str)]
         parts.append(adata)
 
-    combined = parts[0] if len(parts) == 1 else ad.concat(parts, join="outer", fill_value=0)
+    # Measured BEFORE the concat — afterwards the two gene sets are gone and the verdict would be a
+    # guess. ``fill_value`` is only passed for the outer join, so an inner assembly cannot fabricate.
+    overlap = gene_overlap(parts, join)
+    if len(parts) == 1:
+        combined = parts[0]
+    elif join == "outer":
+        combined = ad.concat(parts, join="outer", fill_value=0)
+    else:
+        combined = ad.concat(parts, join="inner")
     combined.obs_names_make_unique()  # backstop — the sample prefix already makes them unique
     if "sample" not in combined.obs.columns:
         combined.obs["sample"] = combined.obs["sample_id"]  # reachability: the canonical batch key
+    combined.uns["selom_gene_overlap"] = overlap  # travels with the .h5ad, read back by summarize()
     return combined
 
 
 def summarize(adata: Any) -> dict:
     """A small JSON summary of an assembled AnnData for the endpoint header: cell/gene counts, the
-    samples (first-seen order), the obs columns materialized, and cells-per-sample."""
+    samples (first-seen order), the obs columns materialized, cells-per-sample, and the gene-overlap
+    verdict.
+
+    ``n_genes`` is the assembled matrix's actual gene count (post-join). The verdict block
+    (``gene_overlap``, plus the flat ``n_genes_union`` / ``n_genes_shared`` / ``per_sample_n_genes``
+    the finding names) says what the union was, what is shared, and what the join dropped or
+    zero-filled — so a caller reading only this header can still tell whether a 0 in the matrix is a
+    measured count (A14)."""
     obs = adata.obs
     sid = obs["sample_id"].astype(str)
     samples = list(dict.fromkeys(sid.tolist()))  # first-seen (= file) order
-    return {
+    out = {
         "n_cells": int(adata.n_obs),
         "n_genes": int(adata.n_vars),
         "n_samples": len(samples),
@@ -226,6 +321,12 @@ def summarize(adata: Any) -> dict:
         "obs_columns": [str(c) for c in obs.columns],
         "per_sample_n": {s: int((sid == s).sum()) for s in samples},
     }
+    overlap = dict(adata.uns.get("selom_gene_overlap") or {}) if hasattr(adata, "uns") else {}
+    if overlap:
+        out["gene_overlap"] = overlap
+        for k in ("n_genes_union", "n_genes_shared", "per_sample_n_genes"):
+            out[k] = overlap[k]
+    return out
 
 
 def _prepare_for_write(adata: Any) -> Any:

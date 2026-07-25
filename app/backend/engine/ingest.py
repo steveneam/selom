@@ -209,6 +209,42 @@ def _pick_loader(path: Path) -> _Loader | None:
     return next((ld for ld in REGISTRY if ld.recognize(path)), None)
 
 
+# --- the registry, reusable by engine siblings (A21) --------------------------------------
+# :mod:`engine.assemble` used to re-declare the 10x detector (byte-identical to ``_is_10x``, with a
+# comment admitting the mirror) and re-implement the 10x/h5ad reads with its own ``sc.read_10x_mtx``
+# / ``ad.read_h5ad`` calls. Two format-decision points that agreed only by coincidence: the day this
+# registry gained a format or changed 10x detection, ``/data/assemble-scrna`` would start refusing
+# inputs the rest of the engine accepts, with a hard "unrecognized file(s)". These two names are the
+# narrow surface a sibling consumes so there stays exactly ONE decision point.
+
+is_10x_dir = _is_10x
+"""Public alias of the ONE 10x-directory detector. Bound by identity, not re-implemented — the guard
+in ``tests/test_assemble.py`` asserts ``assemble._is_10x_dir is ingest.is_10x_dir``."""
+
+
+def load_unit(path: str | Path) -> Any:
+    """Load ONE input through the declared loader registry and return the loader's raw payload.
+
+    The load half of :func:`ingest` without the classification / provenance / materialization half —
+    for an engine sibling (``engine.assemble``) that needs the payload and does its own assembly.
+    Raises the same honest, actionable ``ValueError`` :func:`ingest` raises for an unrecognized or an
+    unloadable input, so the caller's 400 message is identical either way.
+    """
+    p = Path(path)
+    loader = _pick_loader(p)
+    if loader is None:
+        raise ValueError(
+            f"no ingest loader for {p.name!r}; supported: .h5ad, 10x-mtx dir, .xlsx/.xls, "
+            ".csv/.tsv (optionally .gz-compressed)"
+        )
+    try:
+        return loader.load(p)
+    except ValueError:
+        raise  # already an honest, actionable message
+    except Exception as exc:  # noqa: BLE001 — a parse failure is an honest 400, never a 500
+        raise ValueError(_load_failure_message(loader, p, exc)) from exc
+
+
 def _load_failure_message(loader: _Loader, path: Path, exc: Exception) -> str:
     """Turn a loader's opaque parse exception into a clear, actionable reason for the user. A
     genuinely unloadable file (corrupt / wrong format / ragged rows) is an honest 400 — never a 500
