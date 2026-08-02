@@ -1,7 +1,8 @@
 """Cloud-storage import/export endpoints (docs — cloud/). Import streams a provider file into the
 SAME ``intake → confirm → parse`` pipeline the local drop-zone uses (``uploads/``) — no parallel
 ingest — and stamps ``datasets.source`` provenance. URL/S3 works today; the OAuth providers refuse
-with a clean "not configured" until their feature flag is on. Export is scaffolded (dataset → S3).
+with a clean "not configured" until their feature flag is on. Export sends either a stored dataset
+or a rendered figure to Google Drive / Dropbox / S3 (docs/cloud-export/spec.md).
 
 Every handler derives the tenant from the verified claim (``ctx.user_id``) and the object key from
 the tenant's own row — never a raw key from the request (T1, mirrors ``routers/library.py``).
@@ -37,10 +38,27 @@ class RemoteIntakeRequest(BaseModel):
 
 
 class CloudExportRequest(BaseModel):
+    """Export one of two sources to a provider — a stored dataset, or a rendered figure.
+
+    Exactly one of ``dataset_id`` / ``figure`` must be set (docs/cloud-export/spec.md D2). A figure
+    has no stored object: it is rendered on demand, exactly as ``POST /figures/export`` does for the
+    download path, and the bytes go straight to the provider without being persisted first.
+    """
+
     provider: str
-    dest: str                           # s3://bucket/key (URL provider) or a provider folder id
-    dataset_id: str                     # the tenant dataset whose stored object is exported
+    dest: str                           # s3://bucket/key (URL), Drive folder id, Dropbox folder path
     connection_id: str | None = None
+    filename: str | None = None         # download name; extension is forced to match the format
+
+    # --- source A: a stored dataset ---
+    dataset_id: str | None = None       # the tenant dataset whose stored object is exported
+
+    # --- source B: a rendered figure ---
+    figure: dict | None = None          # Plotly {data, layout} — the edited figure
+    format: str = "png"                 # png | svg | pdf
+    preset: str | None = None           # journal size preset id (export.PRESETS)
+    width: int | None = None
+    height: int | None = None
 
 
 def _derive_filename(kind: str, ref: str, given: str | None) -> str:
@@ -200,23 +218,25 @@ def intake_remote(body: RemoteIntakeRequest, repo=Depends(_uploads_repo),
 
 
 @router.post("/export/cloud")
-def export_cloud(body: CloudExportRequest, repo=Depends(_uploads_repo),
-                 ctx: AuthContext = Depends(require_user)):
-    # Scaffold: export a tenant dataset's stored object to a provider. The key is resolved from the
-    # tenant's own row (never a raw client key — T1). URL/S3 (s3:// dest) is functional; the OAuth
-    # providers refuse until their flag is on.
+async def export_cloud(body: CloudExportRequest,
+                       ctx: AuthContext = Depends(require_user)):
+    """Export a stored dataset OR a rendered figure to the user's cloud storage.
+
+    A dataset's key is resolved from the tenant's own row, never from a raw client key (T1). A
+    figure is rendered here and streamed straight out — nothing is persisted (spec D2).
+    """
     provider = registry.get_provider(body.provider)
     if provider is None:
         raise HTTPException(status_code=404, detail=f"unknown provider {body.provider!r}")
     if not registry.is_enabled(provider, settings):
         raise _not_configured(provider)
 
-    ds = repo.get_dataset(ctx.user_id, body.dataset_id)
-    if ds is None:
-        raise HTTPException(status_code=404, detail="unknown dataset")
-    key = ds.get("parquet_s3_key") or ds.get("upload_s3_key")
-    if not key:
-        raise HTTPException(status_code=409, detail="dataset has no stored object to export")
+    has_dataset = bool(body.dataset_id)
+    has_figure = body.figure is not None
+    if has_dataset == has_figure:
+        raise HTTPException(
+            status_code=400,
+            detail="send exactly one of 'dataset_id' or 'figure'")
 
     token: str | None = None
     if provider.kind == registry.KIND_OAUTH:
@@ -226,8 +246,66 @@ def export_cloud(body: CloudExportRequest, repo=Depends(_uploads_repo),
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     connector = registry.get_connector(provider.id)
+
+    if has_figure:
+        n_bytes, name = await _export_figure(body, connector, token)
+        return {"ok": True, "provider": provider.id, "dest": body.dest,
+                "bytes": n_bytes, "filename": name}
+
+    # The uploads repo is resolved HERE, not as a route dependency: a figure export touches no
+    # dataset, and depending on it in the signature made a figure export 503 on a box with no
+    # database configured -- a database requirement for a path that never reads one.
+    ds = _uploads_repo().get_dataset(ctx.user_id, body.dataset_id)
+    if ds is None:
+        raise HTTPException(status_code=404, detail="unknown dataset")
+    key = ds.get("parquet_s3_key") or ds.get("upload_s3_key")
+    if not key:
+        raise HTTPException(status_code=409, detail="dataset has no stored object to export")
+
     try:
         n_bytes = connector.push_from_store(key, body.dest, token)
     except (SsrfError, CloudError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"ok": True, "provider": provider.id, "dest": body.dest, "bytes": n_bytes}
+    return {"ok": True, "provider": provider.id, "dest": body.dest, "bytes": n_bytes,
+            "filename": PurePosixPath(key).name}
+
+
+async def _export_figure(body: CloudExportRequest, connector, token: str | None):
+    """Render the figure and hand the file to the connector. Returns ``(bytes, filename)``.
+
+    The render runs off-thread for the same reason ``POST /figures/export`` does: it is a sync
+    Kaleido call and must not block the event loop. The temp directory is context-managed, so the
+    rendered file is removed even if the upload raises.
+    """
+    import asyncio
+    import pathlib
+    import tempfile
+
+    import export as figure_export
+
+    fmt = (body.format or "png").lower()
+    if fmt not in figure_export.FORMATS:
+        raise HTTPException(status_code=400, detail=f"unsupported format '{body.format}'")
+    if "data" not in body.figure:
+        raise HTTPException(status_code=400,
+                            detail="figure must be a Plotly spec with a data array")
+    try:
+        data = await asyncio.to_thread(
+            figure_export.render, body.figure, fmt,
+            preset=body.preset, width=body.width, height=body.height)
+    except figure_export.ExportUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    stem = (body.filename or "selom-figure").rsplit(".", 1)[0] or "selom-figure"
+    name = f"{stem}.{fmt}"
+    with tempfile.TemporaryDirectory(prefix="selom-figure-export-") as td:
+        local = pathlib.Path(td) / name
+        local.write_bytes(data)
+        try:
+            n_bytes = await asyncio.to_thread(
+                connector.push_path, local, body.dest, token, filename=name)
+        except (SsrfError, CloudError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return n_bytes, name
