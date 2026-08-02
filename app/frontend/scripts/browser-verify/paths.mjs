@@ -9,7 +9,7 @@
  * Nothing host-specific is hardcoded: the corpus location is required from the caller
  * (`scripts/browser-verify.sh` says exactly what to export), and the browser is auto-detected.
  */
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /** Derived lane ports (CURRENT.md "ENV / landmines"): `:8000` is eamos and `:3000` is shared. */
@@ -77,6 +77,52 @@ export const ANNOTATION_LAYER = process.env.NEXT_PUBLIC_ANNOTATION_LAYER || "";
  */
 export const GDRIVE_REF = process.env.SELOM_BV_GDRIVE_REF || "";
 export const DROPBOX_REF = process.env.SELOM_BV_DROPBOX_REF || "";
+
+/**
+ * The checkout root, found by walking up from the cwd to the directory holding `.git`.
+ *
+ * Deliberately NOT `import.meta.dirname`: Playwright loads this module through its own CJS interop,
+ * which rewrites `import.meta` and blows up with "exports is not defined in ES module scope" before
+ * a single test runs. Walking up also keeps the harness runnable from either the repo root or
+ * `app/frontend`, which the two entry points actually do.
+ */
+function repoRoot() {
+  let dir = process.cwd();
+  for (let i = 0; i < 8; i++) {
+    if (existsSync(join(dir, ".git"))) return dir;
+    const up = join(dir, "..");
+    if (up === dir) break;
+    dir = up;
+  }
+  return process.cwd();
+}
+
+/**
+ * Nango broker credentials, read from the repo-root `.env` — the ONE home the backend itself loads
+ * (`app/backend/config.py`), and the same file `deploy/nango/preflight.sh` checks.
+ *
+ * The export round trip (`A1`) needs them because a 200 from `POST /export/cloud` is **not** proof:
+ * it says the request was accepted, not that a valid PNG landed in the account. So the spec mints an
+ * access token for the same connection the app used, reads the file back out through the provider's
+ * own API, and deletes it again — the account is the owner's, not a test fixture.
+ *
+ * Unset → the export legs skip loudly (a silent skip reads as a pass).
+ */
+export function nangoConfig() {
+  const envPath = join(repoRoot(), ".env");
+  if (!existsSync(envPath)) return { baseUrl: "", secretKey: "" };
+  const read = (key) => {
+    const line = readFileSync(envPath, "utf8")
+      .split("\n")
+      .reverse()
+      .find((l) => l.startsWith(`${key}=`));
+    return line ? line.slice(key.length + 1).trim().replace(/^["']|["']$/g, "") : "";
+  };
+  return {
+    baseUrl: (process.env.SELOM_NANGO_BASE_URL || read("SELOM_NANGO_BASE_URL")).replace(/\/$/, ""),
+    secretKey: process.env.SELOM_NANGO_SECRET_KEY || read("SELOM_NANGO_SECRET_KEY"),
+  };
+}
 
 /**
  * Resolve a Chromium binary. The bare `playwright` package resolves a build that is not installed on

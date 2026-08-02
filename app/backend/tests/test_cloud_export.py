@@ -68,6 +68,34 @@ def test_google_empty_dest_is_my_drive(tmp_path, dest):
     assert "parents" not in seen["metadata"]
 
 
+def test_google_session_uri_on_a_308_is_read_not_followed(tmp_path):
+    """Drive's resumable protocol also answers with **308** + Location, and a redirect must be READ
+    here, never followed.
+
+    Followed, httpx re-POSTs the *metadata* JSON to the session URI instead of reading it: measured
+    against the real API path, that loops to httpx's redirect cap with a 17-byte metadata body on
+    every hop, so the figure's bytes never leave the box and the upload still looks plausible from
+    the outside. Found by A1, the first real round trip (2026-08-02).
+    """
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.method, str(request.url), len(request.content)))
+        if request.method == "POST":
+            return httpx.Response(308, headers={"Location": SESSION_URI})
+        return httpx.Response(200, json={"id": "drive-file-1"})
+
+    n = GoogleDriveConnector().push_path(
+        _file(tmp_path), "", "tok", filename="f.png", transport=httpx.MockTransport(handler))
+
+    assert n == 2048
+    posts = [c for c in seen if c[0] == "POST"]
+    puts = [c for c in seen if c[0] == "PUT"]
+    assert len(posts) == 1, f"the session init was retried/followed: {posts}"
+    assert len(puts) == 1 and puts[0][1] == SESSION_URI
+    assert puts[0][2] == 2048, "the PAYLOAD must reach the session URI, not the metadata"
+
+
 def test_google_missing_session_uri_is_an_error(tmp_path):
     """A 200 with no Location must not be read as success -- nothing was uploaded."""
     transport = httpx.MockTransport(lambda r: httpx.Response(200))
@@ -124,6 +152,30 @@ def test_dropbox_empty_dest_is_app_folder_root(tmp_path):
     DropboxConnector().push_path(_file(tmp_path), "", "tok", filename="f.png",
                                  transport=httpx.MockTransport(handler))
     assert seen["arg"]["path"] == "/f.png"
+
+
+def test_dropbox_api_arg_header_is_ascii_only(tmp_path):
+    """``Dropbox-API-Arg`` is an HTTP header, so it must be **pure ASCII** — and a Selom figure name
+    very often is not ("µV", an en dash, a Greek gene symbol).
+
+    ``json.dumps`` defaults to ``ensure_ascii=True``, which escapes them to ``\\uXXXX`` — exactly
+    what Dropbox documents. That makes the requirement satisfied *implicitly*: switching to
+    ``ensure_ascii=False`` "for readability" would keep every mock green while breaking every real
+    upload with a non-ASCII name. This is the executable form of that constraint.
+    """
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["raw"] = request.headers["dropbox-api-arg"]
+        return httpx.Response(200)
+
+    name = "Selom — b-wave µV.png"
+    DropboxConnector().push_path(_file(tmp_path), "", "tok", filename=name,
+                                 transport=httpx.MockTransport(handler))
+
+    seen["raw"].encode("ascii")                      # raises if a raw non-ASCII byte got through
+    assert "µ" not in seen["raw"] and "—" not in seen["raw"]
+    assert json.loads(seen["raw"])["path"] == f"/{name}"   # …and it still decodes to the real name
 
 
 def test_dropbox_large_file_uses_upload_session(tmp_path, monkeypatch):

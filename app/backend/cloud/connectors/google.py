@@ -72,7 +72,12 @@ class GoogleDriveConnector:
             metadata["parents"] = parents
 
         with httpx.Client(transport=transport, timeout=120.0, follow_redirects=True) as client:
-            # 1. Open the resumable session. Drive returns the upload URI in the Location header.
+            # 1. Open the resumable session. Drive returns the upload URI in the Location header --
+            #    normally on a 200, but the resumable protocol also uses 308, and a redirect must
+            #    NOT be followed here: following it re-POSTs the *metadata* JSON to the session URI
+            #    instead of reading it, which loops until httpx's redirect cap and uploads the
+            #    metadata as the file body. The figure's bytes never leave the box. So this one
+            #    request opts out of the client's follow_redirects and reads Location itself.
             start = client.post(
                 _DRIVE_RESUMABLE,
                 headers={
@@ -82,6 +87,7 @@ class GoogleDriveConnector:
                     "X-Upload-Content-Length": str(size),
                 },
                 content=json.dumps(metadata).encode("utf-8"),
+                follow_redirects=False,
             )
             if start.status_code >= 400:
                 raise CloudFetchError(
