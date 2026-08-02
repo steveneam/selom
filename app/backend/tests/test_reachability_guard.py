@@ -95,39 +95,13 @@ INFRA_PATHS = {
 #: Backlog + reasoning: ``docs/reachability/backlog.md``. Every ``R-xx`` below was found BY THIS GUARD
 #: on its first run, not by a review — 17 unreachable paths against a review that had surfaced 2.
 WAIVERS: dict[str, tuple[str, str]] = {
-    # ---- R-01 lit-synthesizer: backend shipped, zero FE ------------------------------------------
-    "/methods/compose": (
-        "R-01",
-        "lit-synthesizer is recorded as SHIPPED but has no FE call site at all — auto-methods text "
-        "cannot be reached by any user. The single largest shipped-not-reachable capability found.",
-    ),
-    "/citations/by-doi": (
-        "R-01",
-        "Citation lookup by DOI shipped with the lit-synthesizer; no FE call site. Reached only by "
-        "backend tests today.",
-    ),
-    "/citations/search": (
-        "R-01",
-        "Citation search shipped with the lit-synthesizer; no FE call site. Reached only by backend "
-        "tests today.",
-    ),
+    # R-01 CLOSED: the lit-synthesizer is reached from the Paper shell's Write-up stage —
+    # `lib/litsynth/api.ts` calls /methods/compose, /citations/search and /citations/by-doi.
     # R-02 (async job pipeline) CLOSED: lib/jobs/ is the reader — submit, poll, stream, result —
     # and the run engine hands a timed-out run to the job lane. Its five waivers are deleted.
-    # ---- R-03 paper-level outputs ----------------------------------------------------------------
-    "/papers/{slug}/legends": (
-        "R-03",
-        "Generated figure legends for a paper have no FE surface, so the legend output cannot be "
-        "read or exported by a user.",
-    ),
-    "/papers/{slug}/methods": (
-        "R-03",
-        "Paper-level methods text has no FE surface — the same gap as R-01 seen from the paper side.",
-    ),
-    "/papers/{slug}/scorecard": (
-        "R-03",
-        "The Reproducibility Score is computed and served but no FE surface reads this route, so the "
-        "score cannot be shown for a paper.",
-    ),
+    # R-03 CLOSED: paper-level methods, legends and the scorecard are all read by the Write-up
+    # stage (`components/paper/stages/write-up-stage.tsx` via `lib/litsynth/api.ts`). The
+    # Reproducibility Score now has a paper-level surface — the reproducibility statement.
     # ---- R-04 artifacts -------------------------------------------------------------------------
     "/artifacts/{artifact_id}": (
         "R-04",

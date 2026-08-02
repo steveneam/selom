@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, FlaskConical } from "lucide-react";
+import { ArrowLeft, FlaskConical, NotebookPen } from "lucide-react";
 
 import { useWorkspace, wselect } from "@/lib/workspace/store";
 import { usePaperRun } from "@/lib/reproduction/run";
@@ -16,20 +16,23 @@ import { PaperMetaHeader } from "@/components/paper/paper-meta-header";
 import { SkillMatchStage } from "@/components/paper/stages/skill-match-stage";
 import { ReproduceStage } from "@/components/paper/stages/reproduce-stage";
 import { ScoreStage } from "@/components/paper/stages/score-stage";
+import { WriteUpStage } from "@/components/paper/stages/write-up-stage";
 
 /**
- * The umbrella Paper shell — one workspace over a single saved Paper, with the three pipeline stages
- * (Skill Match → Reproduce → Score) as URL-driven tabs (`?stage=`). The chrome above the divider
- * (Library back-link → pipeline → metadata header) is persistent and identical on every stage; only
- * the stage body swaps. This collapses the former per-paper surfaces (`/skill-match/[id]` +
- * `/reproduction/paper/[id]`) into one route (workspace-library spec §10 + umbrella-shell.md).
+ * The umbrella Paper shell — one workspace over a single saved Paper, with the pipeline stages
+ * (Skill Match → Reproduce → Score → Write-up) as URL-driven tabs (`?stage=`). The chrome above the
+ * divider (Library back-link → pipeline → metadata header) is persistent and identical on every
+ * stage; only the stage body swaps. This collapses the former per-paper surfaces
+ * (`/skill-match/[id]` + `/reproduction/paper/[id]`) into one route (workspace-library spec §10 +
+ * umbrella-shell.md), and Write-up is its terminal output (docs/paper-outputs/spec.md).
  */
-const STAGE_KEYS: readonly PipelineStage[] = ["skill-match", "reproduce", "score"];
+const STAGE_KEYS: readonly PipelineStage[] = ["skill-match", "reproduce", "score", "write-up"];
 
 const EYEBROW: Record<PipelineStage, string> = {
   "skill-match": "Skill Match · saved",
   reproduce: "Reproduction · carried from Skill Match",
   score: "Reproducibility score",
+  "write-up": "Write-up · methods, legends & references",
 };
 
 export function PaperShell({ id }: { id: string }) {
@@ -82,6 +85,7 @@ export function PaperShell({ id }: { id: string }) {
     "skill-match": `/paper/${paper.id}?stage=skill-match`,
     reproduce: `/paper/${paper.id}?stage=reproduce`,
     score: `/paper/${paper.id}?stage=score`,
+    "write-up": `/paper/${paper.id}?stage=write-up`,
   };
 
   // The prominent top-right action mirrors the pipeline's forward step on every stage so the next move
@@ -110,7 +114,14 @@ export function PaperShell({ id }: { id: string }) {
                   ? "Run the matched skills on your data and grade every figure"
                   : "Attach the paper PDF and at least one Excel/CSV supplement to run reproduction",
           }
-        : undefined;
+        : stage === "score"
+          ? {
+              label: "Write-up",
+              icon: NotebookPen,
+              onClick: () => router.push(links["write-up"]!),
+              title: "Methods, figure legends, references and the reproducibility statement",
+            }
+          : undefined;
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-10 lg:px-10">
@@ -141,6 +152,7 @@ export function PaperShell({ id }: { id: string }) {
         {stage === "skill-match" && <SkillMatchStage paper={paper} />}
         {stage === "reproduce" && <ReproduceStage paper={paper} run={run} />}
         {stage === "score" && <ScoreStage paper={paper} run={run} />}
+        {stage === "write-up" && <WriteUpStage paper={paper} />}
       </div>
     </div>
   );

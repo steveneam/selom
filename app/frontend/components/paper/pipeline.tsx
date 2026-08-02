@@ -2,28 +2,41 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { type LucideIcon, ArrowRight, Check, FlaskConical, Gauge, ScanSearch } from "lucide-react";
+import {
+  type LucideIcon,
+  ArrowRight,
+  Check,
+  FlaskConical,
+  Gauge,
+  NotebookPen,
+  ScanSearch,
+} from "lucide-react";
 
 import { cn } from "@/lib/ui/cn";
 import { Button } from "@/components/ui/button";
 
 /**
- * The Paper-workflow pipeline header — the umbrella's three stages shown as a stepper above the paper
+ * The Paper-workflow pipeline header — the umbrella's stages shown as a stepper above the paper
  * metadata, so the flow reads as one pipeline (workspace-library spec §10): a paper you drop flows
- * Skill Match → Reproduce → Score. Shared across surfaces (Skill Match results + the per-paper
- * Reproduction workspace, and later Recover data) so the workflow looks identical everywhere — the
- * same "one shared framework" discipline as the paper-metadata layer.
+ * Skill Match → Reproduce → Score → Write-up. Shared across surfaces (Skill Match results + the
+ * per-paper Reproduction workspace, and later Recover data) so the workflow looks identical
+ * everywhere — the same "one shared framework" discipline as the paper-metadata layer.
+ *
+ * Write-up is the pipeline's terminal output (docs/paper-outputs/spec.md): the first three stages
+ * answer "can this paper be reproduced", and the fourth answers "what do I paste into my
+ * manuscript".
  *
  * The stage the user is ON is highlighted; earlier stages read as done (✓); later ones are muted.
  * The optional `forward` action is the prominent next-step button (e.g. "Reproduce →" on Skill Match,
  * which carries the paper into the Reproduction workspace).
  */
-export type PipelineStage = "skill-match" | "reproduce" | "score";
+export type PipelineStage = "skill-match" | "reproduce" | "score" | "write-up";
 
 const STAGES: { key: PipelineStage; label: string; icon: LucideIcon }[] = [
   { key: "skill-match", label: "Skill Match", icon: ScanSearch },
   { key: "reproduce", label: "Reproduce", icon: FlaskConical },
   { key: "score", label: "Score", icon: Gauge },
+  { key: "write-up", label: "Write-up", icon: NotebookPen },
 ];
 
 export interface PipelineForward {
