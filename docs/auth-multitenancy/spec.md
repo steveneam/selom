@@ -104,6 +104,18 @@ own comment says Clerk is "a one-liner here, not a sweep across call sites". Hon
 asks Clerk for a token; **no feature module learns about auth.** This is the single reason P-E cannot
 run inside a lane.
 
+**D4a — `lib/api/client.ts` needs a `getAuthHeader()`, not just `setAuthHeader`.** Found by Sprint 3's
+Lane B while building the job-status reader (`agent/jobs/status-surface`): the transport can be
+*given* an auth header but not asked for one, so anything that talks to the API **outside** `api.*` —
+an SSE stream, a `fetch` the client does not wrap — has no way to authenticate. Concretely,
+`lib/jobs/sse.ts` follows `GET /jobs/{id}/events`, and under `auth_mode=clerk` that stream **and its
+polling floor will 401**, silently turning every long run into a run that never reports.
+
+It works today only because `dev` mode needs no header, which is exactly the shape of bug D3 is meant
+to keep out of the inner loop: correct locally, broken the day auth turns on. Lane B built that
+reader on `fetch` rather than `EventSource` **specifically** so this stays a one-line fix — add the
+getter, pass it into `followRun`. Do it in step 5, in the same change as the token wiring.
+
 **D5 — The route split is a real product decision, and it is owed to Thalon.** Today `/` **is** the
 signed-in dashboard, so there is nowhere for a signed-out visitor to land. Thalon is building the
 marketing site (owner-directed 2026-08-02) and needs to know where the app lives.
@@ -131,7 +143,8 @@ nowhere near its login screen.
    backend already proved to keep tenants apart.
 4. **Frontend:** `@clerk/nextjs`, `ClerkProvider` in `app/layout.tsx`, `middleware.ts` protecting
    `/app/**`, sign-in/sign-up routes, and a user button in the shell.
-5. **Frontend: the token,** in `_authHeader()` in `lib/api/client.ts`, and nowhere else.
+5. **Frontend: the token,** in `_authHeader()` in `lib/api/client.ts`, and nowhere else — plus the
+   `getAuthHeader()` of D4a, so the job SSE stream authenticates too.
 6. **The route split (D5)** — after the founder beat.
 7. **Browser-verify spec:** sign in as A, create a project, sign out, sign in as B, and confirm B
    sees an empty workspace and cannot open A's project by direct URL.
