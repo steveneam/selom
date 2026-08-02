@@ -91,9 +91,17 @@
   broken is **reach and affordance** — ~15 routes have no FE call site, including the whole
   lit-synthesizer and the **Reproducibility Score**, a named part of the product thesis that cannot
   currently be shown for a paper. So the fix is wiring + audit, not rewriting skills.
-- **There is no landing page.** `app/page.tsx` is the signed-in dashboard; a logged-out visitor has
-  nothing to read. P-C builds it **unlinked and `noindex` with DRAFT copy** — positioning, pricing
-  numbers and any customer claim are founder calls and will not be written autonomously.
+- **The landing page is NOT Selom's work** (owner-directed 2026-08-02): delegated to **Thalon**.
+  Selom's job is to be a complete product. Two things Selom owes that build and must not duplicate:
+  the **public/private route split** (today `/` IS the dashboard, so a marketing site forces a
+  decision about where the app moves) and the **parked hero animation** (`cb813cf`) — already built,
+  currently unused.
+- **⚑ The largest remaining "not actually a product" gap is AUTH, and it is one-sided.** The backend
+  is ready — `auth/clerk.py` verifies the JWT, the tenant comes from the verified `sub`, every
+  handler already resolves keys from the tenant's own row. The **frontend has nothing**: no
+  `@clerk/nextjs`, no provider, no middleware, no sign-in, so `auth_mode=dev` means *every request
+  is the same tenant*. Selom cannot have two users today. Now **P-E**, with the isolation proved by
+  test (tenant A cannot read/list/export tenant B) rather than claimed.
 
 ## ▸ NEXT  — **master plan = `docs/build-plan-2026-08/plan.md`. Start at `P-A / A1`: the cloud-export REAL round trip.**
 
@@ -104,11 +112,12 @@
 > **Order:** `A1` cloud-export real round trip (**first — it is owed, not optional**) → `A2` `R-02`
 > job pipeline (**before `OH-01`**, or that store ships with no reader) → `A3` `R-01`+`R-03`
 > lit-synthesizer + Reproducibility Score (spec the IA placement first) → `A4` `R-04`/`R-06`/`R-05`
-> → **P-B** workspace audit (`fe-review` at workspace scale + Mobbin per surface) → **P-C** landing
-> page (drafted, NOT shipped) → **P-D** skill smoke matrix → **P-E** `OH-01` + journal style packs.
+> → **P-B** workspace audit (`fe-review` at workspace scale + Mobbin per surface) → **P-C** skill
+> smoke matrix → **P-D** `OH-01` + journal style packs → **P-E** auth + real multi-tenancy.
 >
-> **Nothing outward-facing ships autonomously**: no publishing, no public deploy, no pricing copy,
-> no customer claims. Founder gates are batched in the plan §2.
+> **The landing page is Thalon's**, not Selom's (owner-directed 2026-08-02) — this plan touches no
+> marketing copy, positioning or pricing. **Nothing outward-facing ships autonomously**: no
+> publishing, no public deploy. Founder gates batched in the plan §2 (only Clerk keys block P-E).
 
 <details><summary>Superseded — the original W-1-first instruction (kept for provenance)</summary>
 

@@ -9,7 +9,8 @@ Written 2026-08-02 for a run of autonomous sessions (owner away several days). T
 |---|---|
 | Shipped skills | **36** in `skills/registry.py`; **35 have a real engine** (`run_real.py`). Only `umap_scrna` is stub-only. |
 | App routes | 12 (`/`, `/p/[id]`, `/library`, `/extract`, `/gene-sets`, `/skill-match`, `/reproduction`, `/store`, `/paper/[id]`, …) |
-| Marketing site | **None.** `app/page.tsx` is the signed-in dashboard (projects/datasets/figures), not a public landing page. No pricing, no signup, no product story. |
+| Marketing site | **None** — and **not Selom's job** (delegated to Thalon, 2026-08-02). `app/page.tsx` is the signed-in dashboard. |
+| Auth | Backend **ready** (Clerk JWT verified, tenant from `sub`). Frontend has **none** — no provider, no middleware, no sign-in. Every request is the same dev tenant. |
 | Unreachable routes | **~15**, waived with `R-xx` ids, enforced by `test_reachability_guard.py` (stale waivers fail). |
 | Cloud export | `E-1`/`E-2` done, `E-3` built — **real round trip owed**. |
 | Gate of record | `scripts/verify.sh` 7/7, ~78s. |
@@ -27,7 +28,22 @@ The engines are largely real — 35 of 36 skills have a real `run_real.py` path,
   the user could not get to it.
 
 So the fix is **not** "rewrite the skills". It is: wire them, then audit the workspace they live in.
-That is why Phase 1 and Phase 2 below are ordered the way they are.
+That is why P-A and P-B are ordered the way they are.
+
+### What "complete" still means beyond these phases
+
+Honest remainder, so the plan is not read as the whole product:
+
+- **Persistence** — Supabase is parked pre-launch (`build-now-gate-later`); the app runs on SQLite
+  + local object store today.
+- **Command-center C/B phases** — Skill Store install backend and real intake; parked until the
+  spine is solid (`ROADMAP.md`, [[selom-command-center-architecture]]).
+- **Ask-Selom chat** (Pillar 3), **BAM ingest**, **accession auto-fetch** — all parked on product
+  decisions, not blocked work (`docs/on-hold/README.md` is the one register).
+- **Public deploy on syd2** — founder-gated on spend.
+
+These are deliberately *not* pulled forward. P-A→P-E is what makes the thing users touch actually
+work end to end; the list above is what comes after.
 
 ---
 
@@ -40,12 +56,21 @@ calendar reads as shown, but the ordering is the commitment, not the dates.
 |---|---|---|---|
 | **P-A** | Finish cloud export + close the reachability backlog | 2–3 | no |
 | **P-B** | Workspace UX audit (Mobbin-driven) → fix pass | 2–3 | decisions batched at the end |
-| **P-C** | Public landing page + onboarding | 2 | **yes — positioning/pricing copy** |
-| **P-D** | Skill quality + coverage pass | 2 | no |
-| **P-E** | Platform: job store, style packs | 2 | no |
+| **P-C** | Skill quality + coverage pass | 2 | no |
+| **P-D** | Platform: job store, style packs | 2 | no |
+| **P-E** | Auth + real multi-tenancy (FE half) | 2 | keys only |
 
-Total ≈ **10–13 sessions**. P-A → P-B → P-D can run without the owner. P-C is drafted
-autonomously but **cannot ship** without founder input.
+Total ≈ **10–12 sessions**, all runnable without the owner.
+
+> ### The landing page is NOT on this plan — owner-directed 2026-08-02
+> Building the public marketing site is **delegated to Thalon**. Selom's job is to be a complete
+> product; the page that sells it is a separate build. Nothing in this plan touches marketing copy,
+> positioning, or pricing, and `app/page.tsx` stays the signed-in dashboard.
+>
+> Two things Selom still owes Thalon when that build starts, and should not duplicate: the
+> **public/private route split** (today `/` is the dashboard, so a marketing route needs a decision
+> about where the app moves to) and the **parked hero animation** (`cb813cf`,
+> [[selom-pipeline-flow-animation]]) — already built, currently unused.
 
 ---
 
@@ -135,41 +160,7 @@ Work the audit's confirmed rows, highest-severity first. Re-run `browser-verify`
 
 ---
 
-## P-C — landing page + onboarding (2 sessions) · **NEEDS THE OWNER**
-
-There is no public face. `app/page.tsx` is the signed-in dashboard; a visitor who is not logged in
-has nothing to read.
-
-### What I can do without the owner
-
-- **Structure and build** the marketing route (`/` public vs `/app` signed-in split, or a
-  marketing route group), responsive, themed, accessible.
-- **Mobbin-source the section inventory** (hero, proof, feature walk, pricing, FAQ, footer) —
-  `search_sections` is exactly this.
-- Draft copy from `PRODUCT.md` + `docs/records/pricing-demo-strategy` as a **strawman**.
-- Wire the pipeline-flow hero animation already built and parked (`cb813cf`,
-  [[selom-pipeline-flow-animation]]).
-
-### What I will not decide
-
-**Positioning, pricing, and claims are founder calls**, and a landing page is an outward-facing
-artifact. So:
-
-- I will build it behind a route that is **not linked** and not indexed (`noindex`), with copy
-  clearly marked `DRAFT`.
-- **No pricing numbers, no customer claims, no testimonials, no logos** get written by me.
-- Publishing is the owner's call on return.
-
-Memory says pricing is decided in principle (**no free tier; promo-code beta**,
-[[selom-pricing-demo-strategy]]) — that is enough to structure a pricing section, not to fill in
-numbers.
-
-**Spec owed:** `docs/landing/spec.md` — IA, section inventory, the public/private route split, and
-the auth boundary (Clerk owns auth; see [[selom-resend-email-decision]]).
-
----
-
-## P-D — skill quality + coverage (2 sessions)
+## P-C — skill quality + coverage (2 sessions)
 
 Not a rewrite. Three concrete things:
 
@@ -185,12 +176,40 @@ when a skill regresses.
 
 ---
 
-## P-E — platform (2 sessions)
+## P-D — platform (2 sessions)
 
 1. **`OH-01` arq + Redis job-status store** — unparked and owner-decided. **Strictly after `A2`**,
    or it ships with no reader. Redis is already on `:6380`.
 2. **Journal style packs** — the cheapest item on the whole board: `docs/journal-styles/spec.md` is
    **already written**; refactor `skills/theme.py` into a named style registry.
+
+---
+
+## P-E — auth + real multi-tenancy (2 sessions)
+
+**The largest remaining "not actually a product" gap, and it is one-sided.**
+
+Measured 2026-08-02: the **backend is ready** — `auth/clerk.py` verifies the Clerk JWT,
+`auth/context.py` derives the tenant from the verified `sub`, and every handler already takes
+`ctx.user_id` and resolves keys from the tenant's own row (the T1 rule). The **frontend has
+nothing**: no `@clerk/nextjs` dependency, no provider, no middleware, no sign-in surface. `auth_mode`
+defaults to `dev`, so *every request runs as the same dev tenant*.
+
+So Selom today cannot have two users. Everything downstream of that — quotas, the library, project
+ownership, sharing — is single-tenant by default rather than by design.
+
+1. Add the Clerk provider + middleware + sign-in/sign-up surface, behind the **existing `auth_mode`
+   flag** so `dev` stays the local default and nothing breaks offline.
+2. Wire the bearer at `lib/api/client.ts` — it is deliberately a one-liner there ("step 8"), not a
+   sweep across call sites.
+3. **Then prove the isolation**: two tenants, and tenant A cannot read, list, or export tenant B's
+   datasets, figures, or library rows. A test per boundary, not a claim.
+
+**Owner needs to supply Clerk keys** (free tier is enough to build against). That is the only
+dependency, and step 1–2 can be built and tested against a dev issuer before the keys land.
+
+**Not in scope:** Supabase persistence stays parked (pre-launch infra, `build-now-gate-later`), and
+Clerk owns auth email — Resend is product/lifecycle only ([[selom-resend-email-decision]]).
 
 ---
 
@@ -201,9 +220,10 @@ Nothing below gets decided autonomously.
 | # | Decision | Blocks | Recommendation |
 |---|---|---|---|
 | 1 | **Cloud §Scope** — Selom can only read files it created, so import is nearly useless | cloud import | Google Picker, not a broader scope (`drive.readonly` is *restricted* → annual CASA assessment) |
-| 2 | **Landing positioning + pricing copy** | P-C ships | Draft ready for edit; no numbers written by me |
+| 2 | **Clerk keys** (free tier) | P-E finishes | Build proceeds against a dev issuer until they land |
 | 3 | **`R-05`** — surface DOI enrichment or waive permanently | one waiver | Waive; it is internal plumbing |
 | 4 | **syd2 public backend** (spend + 5 data-plane answers) | public deploy | Deferred; not on this plan's path |
+| 6 | **Where the app lives once a marketing site exists** (`/` vs `/app`) | Thalon's landing build | Decide before Thalon starts, not after |
 | 5 | Anything P-B's audit surfaces as a product call | its own rows | Batched list at the end of the audit |
 
 ---
