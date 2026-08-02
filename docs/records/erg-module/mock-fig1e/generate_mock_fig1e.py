@@ -58,14 +58,20 @@ INTENSITIES_LOG = [-1.7, -0.8, 0.1, 1.0, 1.9, 2.8, 3.1]
 #   n       slope
 #   cv      eye-to-eye coefficient of variation on Vmax
 #   n_eyes  group size, matched to the real Fig 1E cohort
+# Thresholds matter as much as amplitudes here. The WT Control is fully dark-adapted and
+# already responds at the dimmest flash, but every rd10 arm -- treated or not -- has a raised
+# threshold and stays at the noise floor until flash 1.0, which is what the real recordings
+# show. That is encoded by giving Control a low log_k with a shallow slope, and every rd10 arm
+# a log_k near 1.0 with a STEEP slope (n >= 1.4) so the curve is flat below the threshold and
+# climbs sharply through it.
 CONDITIONS = [
-    # label,                        vmax,  log_k,   n,    cv,   n_eyes   target_at_log1
-    ("Control",                    232.0,  -0.09, 0.90, 0.10,  8),   # ~210 uV  WT reference
-    ("Untreated",                   42.0,   1.18, 0.70, 0.22,  4),   # ~18 uV   rd10 baseline
-    ("AAV8-RK-PDE6B",              118.0,   0.27, 0.75, 0.30,  7),   # ~92 uV   partial rescue
-    ("AAV8-RK-GFP-polyA-stuffer",   38.0,   1.20, 0.70, 0.22,  3),   # ~16 uV   null
-    ("AAV8-CMV-GFP",                34.0,   1.22, 0.70, 0.22,  4),   # ~14 uV   null (pulled down)
-    ("AAV8-RK-PDE6B-3UTR",         164.0,   0.10, 0.85, 0.20,  4),   # ~140 uV  best rescue
+    # label,                        vmax,  log_k,   n,    cv,   n_eyes   @1.0    @1.9
+    ("Control",                    235.0,  -1.55, 0.85, 0.10,  8),   # ~233   ~235  WT
+    ("Untreated",                   34.0,   1.15, 1.40, 0.22,  4),   # ~13    ~31   null
+    ("AAV8-RK-PDE6B",              105.0,   0.78, 2.30, 0.30,  7),   # ~80    ~105  partial rescue
+    ("AAV8-RK-GFP-polyA-stuffer",   30.0,   1.18, 1.40, 0.22,  3),   # ~11    ~27   null
+    ("AAV8-CMV-GFP",                26.0,   1.22, 1.40, 0.22,  4),   # ~9     ~23   null (pulled down)
+    ("AAV8-RK-PDE6B-3UTR",         165.0,   0.75, 2.40, 0.20,  4),   # ~132   ~165  best rescue
 ]
 
 # Recording noise added per (eye x intensity) measurement, uV, as
@@ -83,6 +89,10 @@ NOISE_FRAC = 0.02
 # to be indistinguishable, and the top two flashes sit 0.3 log apart on a saturated curve, so
 # demanding a strict order there would assert something the biology does not support.
 NOISE_BAND_UV = 3.0
+
+#: Ceiling for "no response yet". Every rd10 arm must read below this at flashes dimmer
+#: than 1.0 log; only the WT Control is exempt.
+THRESHOLD_FLOOR_UV = 8.0
 
 # Spread of each eye's semi-saturation point around its group value (log units).
 LOG_K_JITTER = 0.12
@@ -213,7 +223,10 @@ def widen(summary: list[dict]) -> tuple[list[str], list[list]]:
 NULL_GROUPS = ["Untreated", "AAV8-RK-GFP-polyA-stuffer", "AAV8-CMV-GFP"]
 #: Groups that must show rescue, and must beat every null group significantly.
 RESCUE_GROUPS = ["AAV8-RK-PDE6B", "AAV8-RK-PDE6B-3UTR"]
-REFERENCE_LOG_I = 1.0  # the Fig 1E bar intensity
+REFERENCE_LOG_I = 1.0            # the Fig 1E bar intensity
+#: Intensities the stats table and the console readout cover. 1.9 is included because it is
+#: the working intensity for this figure; every invariant is checked at BOTH.
+REPORT_INTENSITIES = [1.0, 1.9]
 ALPHA = 0.05           # every rescue-vs-null comparison must clear this
 #: The 3'UTR arm must beat plain RK-PDE6B, but only *slightly* -- significant, yet not the
 #: overwhelming separation the rescue-vs-null comparisons show. Hence a p-value BAND: too
@@ -294,8 +307,16 @@ def stars(p: float) -> str:
         else "*" if p < 0.05 else "ns"
 
 
-def pairwise_stats(rows: list[dict], x_log: float = REFERENCE_LOG_I) -> list[dict]:
-    """Every rescue arm vs every null arm at one intensity."""
+def pairwise_stats(rows: list[dict], intensities=None) -> list[dict]:
+    """Every rescue arm vs every null arm, plus the two rescue arms against each other,
+    at each reported intensity."""
+    out = []
+    for x_log in (REPORT_INTENSITIES if intensities is None else intensities):
+        out += _stats_at(rows, x_log)
+    return out
+
+
+def _stats_at(rows: list[dict], x_log: float) -> list[dict]:
     vals: dict[str, list[float]] = {}
     for r in rows:
         if r["intensity_log_cd_s_m2"] == x_log:
@@ -336,14 +357,14 @@ def verify(summary: list[dict], rows: list[dict]) -> list[str]:
         # 1. Control is the healthy ceiling.
         if not d["Control"] > d["AAV8-RK-PDE6B-3UTR"]:
             fails.append(f"log {x_log}: Control not above the 3'UTR arm")
-        # 2. The 3'UTR arm rescues more than PDE6B alone. Asserted only from 0.1 log up:
-        #    at the two dimmest flashes both arms sit at ~4 uV, where they are genuinely
-        #    indistinguishable and noise decides the order.
-        if x_log >= 0.1 and not d["AAV8-RK-PDE6B-3UTR"] > d["AAV8-RK-PDE6B"]:
+        # 2. The 3'UTR arm rescues more than PDE6B alone, from the threshold up (below it
+        #    both sit at the noise floor, where noise decides the order).
+        if x_log >= REFERENCE_LOG_I and not d["AAV8-RK-PDE6B-3UTR"] > d["AAV8-RK-PDE6B"]:
             fails.append(f"log {x_log}: 3'UTR not above AAV8-RK-PDE6B")
-        # 3. PDE6B alone still shows real rescue over every null (skip the dimmest flashes,
-        #    where every group is at the noise floor and no group separates).
-        if x_log >= 0.1 and not d["AAV8-RK-PDE6B"] > worst_null + NOISE_BAND_UV:
+        # 3. PDE6B alone still shows real rescue over every null, from the threshold up.
+        #    Below flash 1.0 every rd10 arm is at the noise floor by design (check 7), so
+        #    there is no separation to assert there.
+        if x_log >= REFERENCE_LOG_I and not d["AAV8-RK-PDE6B"] > worst_null + NOISE_BAND_UV:
             fails.append(f"log {x_log}: AAV8-RK-PDE6B not clearly above the nulls "
                          f"({d['AAV8-RK-PDE6B']:.1f} vs {worst_null:.1f} uV)")
 
@@ -355,14 +376,16 @@ def verify(summary: list[dict], rows: list[dict]) -> list[str]:
                      f"({ref['AAV8-CMV-GFP']:.1f} vs {ref['Untreated']:.1f} uV) -- it is a "
                      f"GFP-only control and must not show rescue")
 
-    # 5. Every condition rises with flash intensity, allowing dips inside the noise band
-    #    (real series wobble near saturation; a true reversal means the model is wrong).
+    # 5. Every condition rises with flash intensity. The allowed dip scales with amplitude:
+    #    3 uV is noise on a 230 uV Control trace but a real reversal on a 15 uV null curve,
+    #    and a flat tolerance would either miss the second or fail on the first.
     for label, *_ in CONDITIONS:
         series = [at[x][label] for x in sorted(at)]
         if series[-1] <= series[0]:
             fails.append(f"{label}: does not rise across the intensity ladder")
         for k in range(len(series) - 1):
-            if series[k + 1] < series[k] - NOISE_BAND_UV:
+            tol = max(2.0, 0.04 * series[k])
+            if series[k + 1] < series[k] - tol:
                 fails.append(f"{label}: drops {series[k]:.1f} -> {series[k+1]:.1f} uV "
                              f"between flashes {k+1} and {k+2}")
 
@@ -371,20 +394,31 @@ def verify(summary: list[dict], rows: list[dict]) -> list[str]:
     #    the result the figure is meant to stand in for.
     lo, hi = SLIGHT_P_BAND
     for st in pairwise_stats(rows):
-        a, b, p = st["group_a"], st["group_b"], st["p_value"]
+        a, b, p, xi = st["group_a"], st["group_b"], st["p_value"], st["intensity_log_cd_s_m2"]
         if b in NULL_GROUPS:
             if p >= ALPHA:
-                fails.append(f"{a} vs {b} at log {REFERENCE_LOG_I}: not significant "
+                fails.append(f"{a} vs {b} at log {xi}: not significant "
                              f"(p={p:.3g}, n={st['n_a']}/{st['n_b']})")
         else:
             # The graded rescue: significant, but only slightly.
             if p >= hi:
-                fails.append(f"{a} vs {b} at log {REFERENCE_LOG_I}: not significant "
+                fails.append(f"{a} vs {b} at log {xi}: not significant "
                              f"(p={p:.3g}) -- widen the gap between the two rescue arms")
             elif p < lo:
-                fails.append(f"{a} vs {b} at log {REFERENCE_LOG_I}: separation is too "
-                             f"strong to read as slight (p={p:.3g} < {lo}) -- narrow the "
-                             f"gap between the two rescue arms")
+                fails.append(f"{a} vs {b} at log {xi}: separation is too strong to read "
+                             f"as slight (p={p:.3g} < {lo}) -- narrow the gap between the "
+                             f"two rescue arms")
+
+    # 7. The rd10 threshold: every arm except the WT Control must sit at the noise floor
+    #    below flash 1.0, which is what the real recordings show.
+    for label, *_ in CONDITIONS:
+        if label == "Control":
+            continue
+        for x_log in (x for x in at if x < REFERENCE_LOG_I):
+            if at[x_log][label] > THRESHOLD_FLOOR_UV:
+                fails.append(f"{label}: responds at log {x_log} "
+                             f"({at[x_log][label]:.1f} uV) -- rd10 arms should be at the "
+                             f"noise floor until flash {REFERENCE_LOG_I}")
     return fails
 
 
@@ -478,18 +512,20 @@ def main() -> None:
     write_csv(args.outdir / "mock_fig1e_bwave_stats.csv", stat_cols,
               [[s[c] for c in stat_cols] for s in stats])
 
-    print(f"\n  Welch t-tests at {REFERENCE_LOG_I} log cd.s/m2 (SIMULATED):")
-    for s in stats:
-        print(f"    {s['group_a']:<20} vs {s['group_b']:<26} "
-              f"p={s['p_value']:<9.3g} {s['significance']}")
+    for xi in REPORT_INTENSITIES:
+        print(f"\n  Welch t-tests at {xi} log cd.s/m2 (SIMULATED):")
+        for s in (s for s in stats if s["intensity_log_cd_s_m2"] == xi):
+            print(f"    {s['group_a']:<20} vs {s['group_b']:<26} "
+                  f"p={s['p_value']:<9.3g} {s['significance']}")
 
     # Sanity readout at the Fig 1E reference intensity -- the ordering that must hold.
-    print("\n  b-wave at 1.0 log cd.s/m2 (SIMULATED):")
-    ref = sorted((r for r in summary if r["intensity_log_cd_s_m2"] == 1.0),
-                 key=lambda r: -r["mean_b_wave_uv"])
-    for r in ref:
-        print(f"    {r['condition']:<28} {r['mean_b_wave_uv']:>7.1f} "
-              f"+/- {r['sem_uv']:.1f} uV  (n={r['n_eyes']})")
+    for xi in REPORT_INTENSITIES:
+        print(f"\n  b-wave at {xi} log cd.s/m2 (SIMULATED):")
+        ref = sorted((r for r in summary if r["intensity_log_cd_s_m2"] == xi),
+                     key=lambda r: -r["mean_b_wave_uv"])
+        for r in ref:
+            print(f"    {r['condition']:<28} {r['mean_b_wave_uv']:>7.1f} "
+                  f"+/- {r['sem_uv']:.1f} uV  (n={r['n_eyes']})")
 
 
 if __name__ == "__main__":
