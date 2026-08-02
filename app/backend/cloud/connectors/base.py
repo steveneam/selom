@@ -26,6 +26,40 @@ class CloudConnector(Protocol):
 
     def push_from_store(self, key: str, dest: str, token: str | None) -> int:
         """Export: stream the object at ``key`` out to ``dest`` on the provider (a folder id, or an
-        ``s3://bucket/prefix`` URI). Returns the number of bytes written. Scaffolded for the OAuth
-        providers until their client IDs exist."""
+        ``s3://bucket/prefix`` URI). Returns the number of bytes written.
+
+        Implemented once for every provider by :func:`push_store_object_via_path` — download the
+        stored object to a temp file, then hand it to :meth:`push_path`."""
         ...
+
+    def push_path(self, local_path, dest: str, token: str | None, *, filename: str) -> int:
+        """Export: upload the file at ``local_path`` to ``dest`` on the provider, named
+        ``filename``. Returns the number of bytes written.
+
+        This is the primitive, not ``push_from_store``: every provider upload is "read this file,
+        write it there". Splitting it out is what lets a **rendered figure** be exported without
+        inventing a scratch object in the store first — the figure path renders to a temp file and
+        calls this directly (docs/cloud-export/spec.md D1/D2)."""
+        ...
+
+
+def push_store_object_via_path(connector: "CloudConnector", key: str, dest: str,
+                               token: str | None) -> int:
+    """Shared ``push_from_store``: object store -> temp file -> ``connector.push_path``.
+
+    Every connector's ``push_from_store`` is this, so the download-and-clean-up half exists once.
+    The temp directory is context-managed, so the local copy is removed even if the upload raises.
+    """
+    import pathlib
+    import tempfile
+
+    from cloud.errors import CloudFetchError
+    from storage.object_store import get_object_store
+
+    name = pathlib.PurePosixPath(key).name
+    store = get_object_store()
+    with tempfile.TemporaryDirectory(prefix="selom-export-") as td:
+        local = pathlib.Path(td) / name
+        if not store.download_to_path(key, local):
+            raise CloudFetchError(f"object not in store: {key}")
+        return connector.push_path(local, dest, token, filename=name)

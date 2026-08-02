@@ -28,3 +28,8 @@ class OneDriveConnector:
 
     def push_from_store(self, key: str, dest: str, token: str | None) -> int:
         raise CloudFetchError("OneDrive export is not available yet")
+
+    def push_path(self, local_path, dest: str, token: str | None, *, filename: str) -> int:
+        # Still scaffolded: OneDrive is on the DEFERRED list until a machine logs into Azure
+        # cleanly (docs/cloud-export/spec.md D5). Google + Dropbox are implemented.
+        raise CloudFetchError("OneDrive export is not available yet")

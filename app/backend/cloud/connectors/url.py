@@ -81,32 +81,36 @@ class UrlConnector:
         get_object_store().put_stream(key, reader, ctype)
         return reader.bytes_read
 
-    # --- export (scaffold seam; s3:// destination works) -------------------------------------
+    # --- export (s3:// destination) -----------------------------------------------------------
     def push_from_store(self, key: str, dest: str, token: str | None) -> int:
-        import pathlib
-        import tempfile
+        from cloud.connectors.base import push_store_object_via_path
+
+        return push_store_object_via_path(self, key, dest, token)
+
+    def push_path(self, local_path, dest: str, token: str | None, *, filename: str) -> int:
+        """Upload a local file to an ``s3://bucket/prefix`` destination.
+
+        Behaviour is unchanged from when this read the object store directly: a trailing-slash (or
+        empty) prefix is a folder and keeps ``filename``; otherwise the prefix IS the key.
+        """
+        import pathlib as _pathlib
 
         import boto3
         from botocore.exceptions import BotoCoreError, ClientError
-
-        from storage.object_store import get_object_store
 
         if not dest.lower().startswith(_S3_PREFIX):
             raise CloudFetchError("URL/S3 export supports only an s3://bucket/key destination")
         bucket, _, prefix = dest[len(_S3_PREFIX):].partition("/")
         if not bucket:
             raise CloudFetchError(f"malformed s3 destination: {dest!r}")
-        # A trailing-slash dest is a folder → keep the object's basename.
-        dest_key = prefix if prefix and not prefix.endswith("/") else f"{prefix}{pathlib.PurePosixPath(key).name}"
-        store = get_object_store()
-        with tempfile.TemporaryDirectory(prefix="selom-export-") as td:
-            local = pathlib.Path(td) / pathlib.PurePosixPath(key).name
-            if not store.download_to_path(key, local):
-                raise CloudFetchError(f"object not in store: {key}")
-            client = boto3.client("s3")
-            try:
-                with open(local, "rb") as fh:
-                    client.upload_fileobj(fh, bucket, dest_key)
-            except (BotoCoreError, ClientError) as exc:
-                raise CloudFetchError(f"could not write {dest}: {exc}") from exc
-            return local.stat().st_size
+        dest_key = prefix if prefix and not prefix.endswith("/") else f"{prefix}{filename}"
+        local = _pathlib.Path(local_path)
+        if not local.is_file():
+            raise CloudFetchError(f"nothing to upload at {local}")
+        client = boto3.client("s3")
+        try:
+            with local.open("rb") as fh:
+                client.upload_fileobj(fh, bucket, dest_key)
+        except (BotoCoreError, ClientError) as exc:
+            raise CloudFetchError(f"could not write {dest}: {exc}") from exc
+        return local.stat().st_size
