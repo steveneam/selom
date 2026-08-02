@@ -1,0 +1,8 @@
+intensity_log_cd_s_m2,intensity_group,Control mean_uv,Control sem_uv,Control n,Untreated mean_uv,Untreated sem_uv,Untreated n,AAV8-RK-PDE6B mean_uv,AAV8-RK-PDE6B sem_uv,AAV8-RK-PDE6B n,AAV8-RK-GFP-polyA-stuffer mean_uv,AAV8-RK-GFP-polyA-stuffer sem_uv,AAV8-RK-GFP-polyA-stuffer n,AAV8-CMV-GFP mean_uv,AAV8-CMV-GFP sem_uv,AAV8-CMV-GFP n,AAV8-RK-PDE6B-3UTR mean_uv,AAV8-RK-PDE6B-3UTR sem_uv,AAV8-RK-PDE6B-3UTR n
+-1.7,1,8.58,0.63,3,0.28,0.28,3,4.77,0.54,3,0.3,0.16,3,0.67,0.21,3,4.08,0.76,3
+-0.8,2,43.25,2.98,3,2.05,0.21,3,16.19,0.78,3,1.18,0.17,3,1.4,0.47,3,24.54,1.75,3
+0.1,3,139.58,11.66,3,6.38,0.92,3,47.67,0.98,3,5.63,1.09,3,4.77,1.06,3,81.85,7.41,3
+1.0,4,207.22,14.62,3,17.72,1.77,3,91.39,4.1,3,15.66,2.27,3,13.87,2.43,3,135.73,9.79,3
+1.9,5,232.19,17.03,3,31.07,2.36,3,114.31,9.31,3,28.66,3.1,3,25.73,2.78,3,153.86,11.76,3
+2.8,6,235.73,19.85,3,39.08,2.61,3,115.61,8.08,3,36.84,2.75,3,31.87,3.07,3,160.02,12.71,3
+3.1,7,237.65,20.48,3,41.63,2.81,3,118.37,6.33,3,35.61,2.32,3,34.04,2.85,3,162.01,13.52,3
