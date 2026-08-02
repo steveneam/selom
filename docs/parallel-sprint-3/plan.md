@@ -41,6 +41,9 @@ app/frontend/app/paper/**
 docs/paper-outputs/**
 ```
 
+- **Mobbin first** (standing rule): `search_screens` for *"a document view with generated citations
+  and an export action"* and *"a scorecard or quality-score panel with a breakdown"*. The
+  Reproducibility Score has no precedent in this repo — look before inventing.
 - **Check first** whether the Workspace Library's Methods/legend slot was the intended home
   ([[selom-workspace-library]]) — do not invent a second home for the same thing.
 - **Spec the IA placement before building** (`docs/paper-outputs/spec.md`, short). Where paper-level
@@ -60,6 +63,9 @@ app/backend/routers/jobs.py
 docs/jobs-surface/**
 ```
 
+- **Mobbin first** (standing rule): `search_flows` for *"a long-running job with progress and a
+  completion state"*. Note what Drive does here — a persistent bottom-right progress card with
+  collapse + dismiss — and decide explicitly whether Selom wants that or inline progress.
 - Surface progress where a long run is actually launched (skill run, reproduction).
 - `R-06` is the same shape as `R-02` — its non-streaming sibling *is* reached, so this is a
   progress-visibility gap, not a dead feature.
@@ -149,6 +155,10 @@ A worktree recalls no memory. Paste these into each `LANE-KICKOFF.md`:
 - **Commits:** conventional, named paths (never `git add -A`), **no AI co-author trailer or
   sign-off**. `git user.email` must stay `282747725+steveneam@users.noreply.github.com` or Vercel
   blocks deploys.
+- **Any frontend work ⇒ consult Mobbin MCP first** (`search_flows` / `search_screens` /
+  `search_sections`) — standing rule, owner-directed 2026-08-02. Comparison instrument, **not** a
+  template: write down which patterns you REJECTED and why, not just what you copied. Lane C is
+  backend-only and is exempt.
 - **Do not push.** The lead owns the train and the push.
 - **Stay inside your glob.** Anything outside it ⇒ stop and write the blocker.
 

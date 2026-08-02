@@ -99,6 +99,7 @@ dispatch layer: route by situation, don't wait to be asked.**
 | Breaking a spec into work | `plan` / agile slices |
 | Reviewing a **phase/milestone** diff (NOT each small task — the workflows are token-heavy and low-value at small scope; batch them to the milestone boundary) | **`review-gauntlet` workflow** (correctness/invariants — repro-integrity · spine-consistency · license · design) **+ `fe-review` workflow when the milestone touches FE** (interaction/layout/affordance — the V·R·D·A·R·N lens); both in `.claude/workflows/`, invoke by `scriptPath` |
 | A **milestone-level** FE change, or a requested FE audit/review | **`fe-review`** (the FE peer of the gauntlet; V·R·D·A·R·N + G1 user-task + G2 rendered-in-context) — it conducts the design skills: **ui-ux-pro-max** · **impeccable** |
+| **ANY frontend work at all** (new surface, redesign, audit, or a rough edge) | **Consult `mobbin` MCP first** — `search_flows` / `search_screens` / `search_sections`. Standing rule, owner-directed 2026-08-02. See the Notes below for how to use it. |
 | Implementing a scoped change | `developer` agent / `implement` / `tdd` / `refactor` |
 | Confirming a change works | `verify` / `browser-verify` — real data + live backend, **not dev:mock** |
 | Stuck after 2 tries | build a helper + capture the gap (`step-back-build-helpers-when-stuck`) |
@@ -126,3 +127,12 @@ Pipelines (run end-to-end, the same way each time): **Design loop** = forcing-Qs
   more capable of the two (owner-directed 2026-07-23). `impeccable` is installed locally under
   `.claude/skills/` (gitignored; reinstall via `npx impeccable skills install --providers=claude`);
   on a fresh clone, run `/impeccable init` once to write its design context.
+- **Mobbin MCP is STANDING on ANY frontend work** (owner-directed 2026-08-02) — not just at a
+  milestone, and not only inside `fe-review`. Before building or reshaping a surface, look at how
+  mature products solve it: `search_flows` (multi-step journeys — onboarding, intake, checkout),
+  `search_screens` (a single screen), `search_sections` (marketing/web sections); iOS + web.
+  **It is a comparison instrument, NOT a template.** Its highest-value output is ruling a pattern
+  *out*: on the cloud-export build it surfaced Drive's own folder-picker modal, which proved that
+  pattern **impossible** for Selom under the `drive.file` scope — so the honest design was no picker
+  at all. Record what does **not** apply and why, not just what to copy, and cite screens by their
+  `mobbin_url`.
