@@ -111,9 +111,29 @@ export async function importFromCloud(projectId: string, input: RemoteImportInpu
 
 export interface CloudExportInput {
   provider: string;
-  /** s3://bucket/key (url provider) or a provider folder id (OAuth providers). */
-  dest: string;
+  /**
+   * s3://bucket/key (url provider), a Drive folder id, or a Dropbox folder path.
+   * Empty means the provider's default root — My Drive, or the Dropbox App Folder.
+   *
+   * There is deliberately no folder PICKER in the UI: Google's `drive.file` scope lets Selom see
+   * only files it created, so it cannot enumerate the user's folders to offer a choice
+   * (docs/cloud-providers-contract/spec.md §Scope). Exports land in the root unless a caller
+   * already knows an id.
+   */
+  dest?: string;
   datasetId: string;
+  connectionId?: string;
+}
+
+/** Export a RENDERED FIGURE rather than a stored dataset (docs/cloud-export/spec.md D2). */
+export interface CloudFigureExportInput {
+  provider: string;
+  dest?: string;
+  figure: unknown;
+  format: string;
+  /** Journal size preset id; omit to export at the figure's own size. */
+  preset?: string;
+  filename?: string;
   connectionId?: string;
 }
 
@@ -122,13 +142,27 @@ export interface CloudExportResult {
   provider: string;
   dest: string;
   bytes: number;
+  /** The name the file was actually written under (extension forced to match the format). */
+  filename?: string;
 }
 
 export async function exportToCloud(input: CloudExportInput): Promise<CloudExportResult> {
   return api.post<CloudExportResult>("/export/cloud", {
     provider: input.provider,
-    dest: input.dest,
+    dest: input.dest ?? "",
     dataset_id: input.datasetId,
+    connection_id: input.connectionId,
+  });
+}
+
+export async function exportFigureToCloud(input: CloudFigureExportInput): Promise<CloudExportResult> {
+  return api.post<CloudExportResult>("/export/cloud", {
+    provider: input.provider,
+    dest: input.dest ?? "",
+    figure: input.figure,
+    format: input.format,
+    preset: input.preset,
+    filename: input.filename,
     connection_id: input.connectionId,
   });
 }

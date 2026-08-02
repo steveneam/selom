@@ -1,10 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, Cloud, Download, Loader2, Palette } from "lucide-react";
+import { AlertCircle, Check, Cloud, Download, Loader2, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { exportFigure, fetchExportPresets, resolveExportDimensions, type ExportFormat, type ExportPreset } from "@/lib/figure/export";
+import { exportFigureToCloud, fetchCloudConnections, fetchCloudProviders, type CloudConnection } from "@/lib/cloud/api";
+import type { CloudProvider } from "@/lib/cloud/providers";
 import type { FigureSpec } from "@/lib/figure/figure-spec";
 
 const FORMATS: { id: ExportFormat; label: string; hint: string }[] = [
@@ -220,19 +222,140 @@ export function ExportMenu({
             {busy ? "Rendering…" : `Export ${format.toUpperCase()}`}
           </Button>
 
-          {/* Export to cloud — scaffold entry; lights up with the cloud-storage integrations. */}
-          <button
-            type="button"
-            disabled
-            title="Coming soon"
-            className="mt-2 flex w-full items-center gap-2 rounded-lg border border-border/70 bg-background/40 px-2.5 py-1.5 text-left opacity-70"
-          >
-            <Cloud className="size-3.5 text-muted-foreground/80" />
-            <span className="text-xs text-muted-foreground">Export to cloud</span>
-            <span className="ml-auto text-[11px] font-medium text-muted-foreground/70">Coming soon</span>
-          </button>
+          <SaveToCloud
+            open={open}
+            spec={spec}
+            format={format}
+            preset={presetId === FIT ? undefined : presetId}
+            filename={filename}
+          />
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+
+/**
+ * "Save to Drive / Dropbox" — the figure goes straight to the user's cloud storage instead of
+ * downloading (docs/cloud-export/spec.md E-3).
+ *
+ * Provider state is the SERVER's answer, never a local table: `enabled` comes from the frozen
+ * `/cloud/providers` contract and the account from `/cloud/connections`. This replaced a hardcoded
+ * `disabled` + "Coming soon" button, which is the exact A20 failure the contract was written to
+ * stop — both OAuth providers had gone live while the UI still said they were unavailable.
+ *
+ * There is deliberately NO folder picker. Google's `drive.file` scope lets Selom see only files it
+ * created, so it cannot enumerate the user's folders to offer a choice; exports land in the root
+ * (My Drive / the Dropbox App Folder) and the copy says so rather than implying a choice exists.
+ */
+function SaveToCloud({
+  open,
+  spec,
+  format,
+  preset,
+  filename,
+}: {
+  open: boolean;
+  spec: FigureSpec;
+  format: ExportFormat;
+  preset?: string;
+  filename: string;
+}) {
+  const [providers, setProviders] = React.useState<CloudProvider[] | null>(null);
+  const [connections, setConnections] = React.useState<CloudConnection[] | null>(null);
+  const [busyId, setBusyId] = React.useState<string | null>(null);
+  const [done, setDone] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  // Load provider + connection state the first time the menu opens. Both requests are awaited
+  // together and the state is set once: listing `providers` as a dependency AND a guard is what
+  // made the import menu cancel its own connections request (V-2), so it is not done here.
+  React.useEffect(() => {
+    if (!open || providers !== null) return;
+    let live = true;
+    (async () => {
+      try {
+        const [ps, cs] = await Promise.all([
+          fetchCloudProviders(),
+          fetchCloudConnections().catch(() => [] as CloudConnection[]),
+        ]);
+        if (!live) return;
+        setProviders(ps);
+        setConnections(cs);
+      } catch {
+        if (live) setProviders([]);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [open, providers]);
+
+  // Only OAuth providers the server says are on. `url` is an s3:// destination, not a
+  // "save to my cloud" affordance, so it is not offered here.
+  const targets = (providers ?? []).filter((p) => p.kind === "oauth" && p.enabled);
+  if (providers === null || targets.length === 0) return null;
+
+  async function save(provider: CloudProvider) {
+    const connection = connections?.find((c) => c.provider === provider.id);
+    setBusyId(provider.id);
+    setError(null);
+    setDone(null);
+    try {
+      const r = await exportFigureToCloud({
+        provider: provider.id,
+        figure: spec,
+        format,
+        preset,
+        filename,
+        connectionId: connection?.connectionId,
+      });
+      setDone(`Saved ${r.filename ?? filename} to ${provider.label}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `Couldn't save to ${provider.label}.`);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="mt-2 space-y-1.5">
+      <div className="flex items-center gap-1.5 px-0.5">
+        <Cloud className="size-3.5 text-muted-foreground/80" />
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Save to cloud</span>
+      </div>
+      {targets.map((p) => {
+        const connected = connections?.some((c) => c.provider === p.id) ?? false;
+        const busy = busyId === p.id;
+        return (
+          <Button
+            key={p.id}
+            variant="outline"
+            size="sm"
+            className="w-full justify-start gap-1.5"
+            disabled={busy || !connected}
+            title={connected ? `Saves to your ${p.label}` : `Connect ${p.label} from the data panel first`}
+            onClick={() => save(p)}
+          >
+            {busy ? <Loader2 className="size-4 animate-spin" /> : <Cloud className="size-4" />}
+            <span className="truncate">{busy ? `Saving to ${p.label}…` : `Save to ${p.label}`}</span>
+            {!connected && <span className="ml-auto text-[11px] text-muted-foreground">Not connected</span>}
+          </Button>
+        );
+      })}
+      {done && (
+        <p className="flex items-start gap-1.5 text-[11px] leading-snug text-muted-foreground">
+          <Check className="mt-px size-3.5 shrink-0 text-emerald-600" />
+          <span>{done}</span>
+        </p>
+      )}
+      {error && (
+        <p className="flex items-start gap-1.5 text-[11px] leading-snug text-destructive">
+          <AlertCircle className="mt-px size-3.5 shrink-0" />
+          <span>{error}</span>
+        </p>
       )}
     </div>
   );

@@ -14,6 +14,7 @@ vi.mock("@/lib/api/client", () => {
 import { api } from "@/lib/api/client";
 import { CLOUD_PROVIDER_WIRE_KEYS } from "./contract";
 import {
+  exportFigureToCloud,
   exportToCloud,
   fetchCloudConnections,
   fetchCloudProviders,
@@ -141,7 +142,7 @@ describe("importFromCloud — the remote-intake client", () => {
   });
 });
 
-describe("exportToCloud — the scaffold export client", () => {
+describe("exportToCloud — the dataset export client", () => {
   it("posts the export body", async () => {
     post.mockResolvedValueOnce({ ok: true, provider: "url", dest: "s3://b/k", bytes: 42 });
     const r = await exportToCloud({ provider: "url", dest: "s3://b/k", datasetId: "srv_ds_1" });
@@ -152,5 +153,49 @@ describe("exportToCloud — the scaffold export client", () => {
       dataset_id: "srv_ds_1",
       connection_id: undefined,
     });
+  });
+});
+
+describe("exportFigureToCloud — the figure export client", () => {
+  const FIGURE = { data: [{ type: "scatter", x: [1], y: [2] }], layout: {} };
+
+  it("posts the figure, never a dataset_id", async () => {
+    post.mockResolvedValueOnce({
+      ok: true,
+      provider: "google",
+      dest: "",
+      bytes: 1024,
+      filename: "erg.png",
+    });
+    const r = await exportFigureToCloud({
+      provider: "google",
+      figure: FIGURE,
+      format: "png",
+      preset: "nature-single",
+      filename: "erg",
+      connectionId: "conn-1",
+    });
+
+    expect(r.filename).toBe("erg.png");
+    const [path, body] = post.mock.calls.at(-1)!;
+    expect(path).toBe("/export/cloud");
+    // Sending both sources is a 400 on the server -- the figure client must never set dataset_id.
+    expect(body).not.toHaveProperty("dataset_id");
+    expect(body).toMatchObject({
+      provider: "google",
+      figure: FIGURE,
+      format: "png",
+      preset: "nature-single",
+      filename: "erg",
+      connection_id: "conn-1",
+    });
+  });
+
+  it("defaults dest to the provider root rather than sending undefined", async () => {
+    // `drive.file` means Selom cannot list folders to offer a picker, so an unset destination is
+    // the normal case -- it must reach the server as "" (the root), not as undefined.
+    post.mockResolvedValueOnce({ ok: true, provider: "dropbox", dest: "", bytes: 1 });
+    await exportFigureToCloud({ provider: "dropbox", figure: FIGURE, format: "svg" });
+    expect(post.mock.calls.at(-1)![1]).toMatchObject({ dest: "" });
   });
 });
