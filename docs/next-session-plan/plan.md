@@ -423,29 +423,33 @@ Owner scoped it **export-only for now** — import can wait, which also defers (
 |---|---|---|---|
 | `E-1` | implement `push_from_store` for Google Drive + Dropbox | `DONE` (468886c) | **First** — it is the actual blocker, and it is self-contained: the endpoint, provider registry, Nango token exchange and SSRF guards already exist and are tested. Only the connector bodies (`cloud/connectors/google.py:29`, `dropbox.py:34`) and the enable flag are missing. OneDrive stays on hold (DEFERRED). |
 | `E-2` | let the export target a **figure**, not just a stored dataset | `DONE` (927107f) | Today `export_cloud` resolves bytes from `parquet_s3_key`/`upload_s3_key`. A figure has no stored object — it is rendered on demand by `export.render`. Decide: render-then-push in the same request, or persist the render as an artifact first (note this overlaps `R-04`, which wants artifacts fetchable by id — check before duplicating). |
-| `E-3` | FE surface: "Save to Drive" in the figure export menu | `BUILT — real round trip OWED` (ed3b435) | Extend `components/figure/export-menu.tsx`; `lib/cloud/api.ts` already has the client wrapper. Must handle the not-connected case by routing into the existing OAuth connect flow. Deletes a reachability waiver — check `docs/reachability/backlog.md` before writing one. |
+| `E-3` | FE surface: "Save to Drive" in the figure export menu | `DONE` (ed3b435; real round trip `4730300`) | Extend `components/figure/export-menu.tsx`; `lib/cloud/api.ts` already has the client wrapper. Must handle the not-connected case by routing into the existing OAuth connect flow. Deletes a reachability waiver — check `docs/reachability/backlog.md` before writing one. |
 
 **Acceptance:** a figure opened in the editor can be written to the user's Drive from the UI, the
 file appears in the account, and the round trip is proven in a real browser — not `dev:mock`
 ([[verify-on-real-data-not-mock]]). **Verify:** `scripts/verify.sh` + a `scripts/browser-verify.sh`
 spec driving editor → export menu → Drive, against the live broker (`nango.swordfish.cfd`).
 
-> ### ⚑ `E-3` is BUILT but NOT DONE — the real round trip is owed
-> All three rows are coded and `scripts/verify.sh` is 7/7, but **every test so far is a mock**, and
-> a mock proves the wire, not the product ([[selom-mock-is-wire-only-verify-real]]). Nothing has
-> yet uploaded a byte to a real Drive account. Owed, and it is the **first thing** the next session
-> should do:
-> 1. Turn the flags on (`SELOM_CLOUD_GOOGLE` / `SELOM_CLOUD_DROPBOX`) and confirm
->    `bash deploy/nango/preflight.sh` still passes against the live broker on syd2.
-> 2. Drive editor → export menu → **Save to Google Drive** in a real browser, and confirm the file
->    lands in the account **and opens** — a 200 is not proof the bytes are a valid PNG.
-> 3. Repeat for Dropbox, then **delete both test files**, as the `V-2` round trip did.
-> 4. Only then add the `browser-verify` spec that locks it in.
+> ### ✅ `A1` — the real round trip is DONE (2026-08-02, `4730300`)
+> A real figure was exported from the editor's Export menu to a **real Google Drive** and a **real
+> Dropbox**, each file downloaded back out of the account and confirmed a **valid 1600×1200 PNG**,
+> then deleted. Locked in by `app/frontend/e2e/browser-verify/cloud-export.spec.ts`, which lists the
+> account before and after, diffs by **file id** (never by name — Dropbox `autorename` would make a
+> name match pass on a previous run's file), checks the bytes, and **deletes what it created** —
+> these are the owner's accounts and it re-runs on every sweep. `verify.sh` 7/7.
 >
-> Two things are most likely to break there, both invisible to a mock: the Drive resumable
-> **session URI** is returned in a `Location` header that a real client may receive on a 200 *or* a
-> 308, and Dropbox's `Dropbox-API-Arg` header **rejects non-ASCII** — a figure named with an
-> en-dash or µ (very likely here, e.g. "µV") would fail on a real call while every mock passes.
+> **One of the two predicted failures was real, and worse than predicted.** Drive answers the
+> resumable session init with `Location` on a 200 *or* a **308**, and the connector's client had
+> `follow_redirects=True`: on a 308 httpx does not hand the Location back, it **re-POSTs to it**, so
+> the 17-byte metadata JSON went to the session URI repeatedly up to the redirect cap and the
+> figure's bytes never left the box — while the call still looked plausible from outside. Fixed by
+> opting that one request out of redirect-following; guarded by
+> `test_google_session_uri_on_a_308_is_read_not_followed`.
+>
+> **The Dropbox non-ASCII failure does not fire** — `json.dumps` defaults to `ensure_ascii=True`,
+> which is exactly the `\uXXXX` escaping Dropbox documents. That made the constraint *implicit*:
+> `ensure_ascii=False` "for readability" would keep every mock green while breaking every real
+> upload named with "µV". Now executable (`test_dropbox_api_arg_header_is_ascii_only`).
 
 **Scope note:** export writes new files, so `drive.file` is sufficient — Selom can always see what it
 created. This is why export-first is a coherent order: it needs no scope change, while import does.
