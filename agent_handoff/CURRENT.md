@@ -141,7 +141,14 @@ has no handlers for Lane A's six new routes** (harmless — MSW bypasses — but
 
 ## ▸ READ FIRST
 
-**`docs/next-session-plan/plan.md`** (the entry point — **the work board; start at `W-1`**) · **`agent_handoff/lane-wraps/lane3.md` §RESULTS** (what the browser actually measured) · **`docs/integration-robustness/proposal.md`** (awaiting owner reaction) · **`docs/cloud-providers-contract/spec.md`** (the FROZEN cross-lane contract — read before touching cloud) · **`docs/milestone-review-2026-07-25/findings.md`** (54-finding backlog + status ledger) · `agent_handoff/DECISIONS.md` (#12 = lucide stays) · `docs/on-hold/README.md` (now the ONE on-hold register) · `docs/next-session-plan/lane-mechanics-from-thalon.md` · `docs/restructure/plan.md` (WS3 done) · `docs/fe-review/spec.md` (now impeccable-only) · CLAUDE.md · `deploy/nango/` (once built). Memory: [[parallel-agent-lanes]] · [[selom-machine-migration]] · [[ask-before-docker-wsl]] · [[selom-fe-review-framework]] · [[verify-on-real-data-not-mock]] · [[selom-git-commit-email-vercel]].
+**`docs/cnsplots-port/{plan,spec}.md`** (**the entry point — Phase F, start at F1, the parity audit**)
+· **`docs/auth-multitenancy/spec.md`** (P-E; its backend half is autonomous and needs no keys) ·
+**`docs/skill-coverage/matrix.md`** (the measured answer to "do the skills work" — 35/36, re-run with
+`scripts/skill-smoke.sh`) · **`docs/jobs-surface/spec.md`** §4 (the contract `OH-01` must meet) ·
+`docs/paper-outputs/spec.md` · `docs/build-plan-2026-08/plan.md` (master sequencing) ·
+`docs/next-session-plan/plan.md` (the older board — **Tracks W/Q/V/E are DONE**; live rows are Track
+R's remainder and Track C) · **`agent_handoff/lane-wraps/lane3.md` §RESULTS** (what the browser
+actually measured) · **`docs/integration-robustness/proposal.md`** (awaiting owner reaction) · **`docs/cloud-providers-contract/spec.md`** (the FROZEN cross-lane contract — read before touching cloud) · **`docs/milestone-review-2026-07-25/findings.md`** (54-finding backlog + status ledger) · `agent_handoff/DECISIONS.md` (#12 = lucide stays) · `docs/on-hold/README.md` (now the ONE on-hold register) · `docs/next-session-plan/lane-mechanics-from-thalon.md` · `docs/restructure/plan.md` (WS3 done) · `docs/fe-review/spec.md` (now impeccable-only) · CLAUDE.md · `deploy/nango/` (once built). Memory: [[parallel-agent-lanes]] · [[selom-machine-migration]] · [[ask-before-docker-wsl]] · [[selom-fe-review-framework]] · [[verify-on-real-data-not-mock]] · [[selom-git-commit-email-vercel]].
 
 ## Codex — Last Task & Resume
 

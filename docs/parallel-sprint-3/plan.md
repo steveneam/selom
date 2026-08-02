@@ -1,5 +1,17 @@
 # Parallel Sprint 3 — Mode B (3 lanes), launch-ready
 
+> ## ✅ EXECUTED AND COMPLETE — 2026-08-02. Do NOT re-run this.
+>
+> All three lanes were forked, driven and merged; the train ran **B → A → C** with `verify.sh`
+> **7/7 on each rebased result**, worktrees removed and branches deleted. `A1` (the lead's
+> main-tree task) is closed — the cloud round trip is real. What each lane shipped and found is in
+> `agent_handoff/CURRENT.md` and the commit range; the durable outputs are
+> `docs/paper-outputs/spec.md`, `docs/jobs-surface/spec.md` and `docs/skill-coverage/`.
+>
+> **This file is now history, kept for the partition/contract/landmine pattern it records — reuse it
+> as a template for the next sprint, not as an instruction.** The live next action is in
+> `CURRENT.md` ▸ NEXT.
+
 Written 2026-08-02 to be **executed next session with no further planning**. Mode B per
 `COORDINATION.md` (> 2 lanes → own tmux session each); mechanics per
 `docs/next-session-plan/lane-mechanics-from-thalon.md`. Master sequencing:
