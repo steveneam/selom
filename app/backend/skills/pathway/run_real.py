@@ -26,10 +26,16 @@ _ANALYSIS = (
 )
 _HIERARCHY = _BASE + "/ContentService/data/eventsHierarchy/9606"  # Homo sapiens (projection target)
 _TIMEOUT = 60
+# Reactome sits behind CloudFront, which 403s urllib's default ``Python-urllib/3.x`` UA — so every
+# live call failed with a bare "Reactome request failed", measured by the skill smoke matrix
+# (docs/skill-coverage/matrix.md). Identify ourselves like a browser, exactly as
+# ``scripts/build_gene_sets.py`` already does for the GO downloads.
+_UA = "Mozilla/5.0 (Selom pathway skill)"
 
 
 def _http_json(url: str, body: bytes | None = None):
     headers = {"Content-Type": "text/plain", "Accept": "application/json"} if body else {"Accept": "application/json"}
+    headers["User-Agent"] = _UA
     req = urllib.request.Request(url, data=body, headers=headers, method="POST" if body else "GET")
     try:
         with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:

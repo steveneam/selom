@@ -1,0 +1,258 @@
+{
+  "generated": "2026-08-02 18:06 +0000",
+  "elapsed_seconds": 217.4,
+  "skills": [
+    {
+      "skill_id": "annotate",
+      "status": "pass",
+      "seconds": 4.81,
+      "dataset": "jev/retina_fadl.h5ad",
+      "detail": "7 traces \u00b7 Cell-type annotation \u2014 Retinal cell types"
+    },
+    {
+      "skill_id": "boxplot",
+      "status": "pass",
+      "seconds": 0.01,
+      "dataset": "erg-fig1e/erg_metrics_long.csv",
+      "detail": "6 traces \u00b7 b_wave_uv by condition"
+    },
+    {
+      "skill_id": "cepo",
+      "status": "pass",
+      "seconds": 0.89,
+      "dataset": "jev/retina_fadl.h5ad",
+      "detail": "1 traces \u00b7 Cepo stability markers \u2014 top 4 per leiden"
+    },
+    {
+      "skill_id": "cluster",
+      "status": "pass",
+      "seconds": 36.13,
+      "dataset": "jev/retina_fadl.h5ad",
+      "detail": "1 traces \u00b7 Leiden clusters (resolution 1.0)"
+    },
+    {
+      "skill_id": "composition",
+      "status": "pass",
+      "seconds": 0.0,
+      "dataset": "jev/deconvolution.csv",
+      "detail": "2 traces \u00b7 Composition"
+    },
+    {
+      "skill_id": "corr_heatmap",
+      "status": "pass",
+      "seconds": 0.02,
+      "dataset": "jev/proteome_matrix.csv",
+      "detail": "1 traces \u00b7 Sample correlation (Pearson)"
+    },
+    {
+      "skill_id": "deg",
+      "status": "pass",
+      "seconds": 6.32,
+      "dataset": "jev/retina_fadl.h5ad",
+      "detail": "1 traces \u00b7 Top markers \u2014 leiden group 0"
+    },
+    {
+      "skill_id": "diff_abundance",
+      "status": "pass",
+      "seconds": 5.84,
+      "dataset": "rpgrip1/processed/rpgrip1_merged.h5ad",
+      "detail": "1 traces \u00b7 Differential abundance \u2014 C3 vs WT<br><sub>pyDESeq2 (Wald, TM"
+    },
+    {
+      "skill_id": "enrichment",
+      "status": "pass",
+      "seconds": 0.91,
+      "dataset": "alpk1/irpe_rawcounts/DE_oracle_d311_limma.csv",
+      "detail": "1 traces \u00b7 Pathway enrichment (GO)"
+    },
+    {
+      "skill_id": "erg_bwave_bar",
+      "status": "pass",
+      "seconds": 0.01,
+      "dataset": "erg-fig1e/erg_metrics_long.csv",
+      "detail": "2 traces \u00b7 Scotopic b-wave by condition"
+    },
+    {
+      "skill_id": "erg_flicker",
+      "status": "pass",
+      "seconds": 0.05,
+      "dataset": "diagnosys-erg/full-txt-exp8/453_AAV_C1 - Long RK-PROM1-3\u2019UTR-BPolyA_10+E9.TXT",
+      "detail": "4 traces \u00b7 Flicker ERG (10 Hz, 30 Hz)"
+    },
+    {
+      "skill_id": "erg_intensity_response",
+      "status": "pass",
+      "seconds": 0.08,
+      "dataset": "erg-fig1e/erg_metrics_long.csv",
+      "detail": "15 traces \u00b7 Scotopic b-wave intensity-response"
+    },
+    {
+      "skill_id": "erg_traces",
+      "status": "pass",
+      "seconds": 0.33,
+      "dataset": "erg-fig1e/erg_waveforms_long.csv",
+      "detail": "84 traces \u00b7 Representative scotopic ERG"
+    },
+    {
+      "skill_id": "facs_gating",
+      "status": "skip",
+      "seconds": 0.0,
+      "dataset": "",
+      "detail": "no .fcs file exists anywhere in SELOM_DATASETS_DIR \u2014 the flow-cytometry engine (FlowIO/FlowUtils) parses FCS binaries and nothing else, so there is no honest real-data input to give it. Already recorded as a corpus gap in tests/test_flow_gating_honesty.py; unblocked the day a real .fcs is staged."
+    },
+    {
+      "skill_id": "go_graph",
+      "status": "pass",
+      "seconds": 1.31,
+      "dataset": "alpk1/irpe_rawcounts/DE_oracle_d311_limma.csv",
+      "detail": "2 traces \u00b7 GO enrichment graph"
+    },
+    {
+      "skill_id": "gsea",
+      "status": "pass",
+      "seconds": 44.11,
+      "dataset": "alpk1/irpe_rawcounts/DE_oracle_d311_limma.csv",
+      "detail": "5 traces \u00b7 GSEA \u2014 GO:CC: ER to Golgi transport vesicle membrane   ES=0."
+    },
+    {
+      "skill_id": "heatmap",
+      "status": "pass",
+      "seconds": 5.26,
+      "dataset": "jev/retina_fadl.h5ad",
+      "detail": "1 traces \u00b7 Marker heatmap"
+    },
+    {
+      "skill_id": "integration",
+      "status": "pass",
+      "seconds": 22.3,
+      "dataset": "hani/processed/hani_irpe_subset.h5ad",
+      "detail": "4 traces \u00b7 Integrated scRNA UMAP \u2014 Melody (batch: sample)<br><sub>batch"
+    },
+    {
+      "skill_id": "markers",
+      "status": "pass",
+      "seconds": 20.8,
+      "dataset": "jev/retina_fadl.h5ad",
+      "detail": "1 traces \u00b7 Marker genes \u2014 top 3 per leiden (wilcoxon)"
+    },
+    {
+      "skill_id": "mixing_metrics",
+      "status": "pass",
+      "seconds": 6.08,
+      "dataset": "hani/processed/hani_irpe_subset.h5ad",
+      "detail": "1 traces \u00b7 Integration mixing metrics \u2014 batch: sample<br><sub>embedding"
+    },
+    {
+      "skill_id": "normalization_qc",
+      "status": "pass",
+      "seconds": 0.38,
+      "dataset": "hani/processed/hani_irpe_subset.h5ad",
+      "detail": "3 traces \u00b7 Per-cell QC"
+    },
+    {
+      "skill_id": "pathway",
+      "status": "pass",
+      "seconds": 3.86,
+      "dataset": "alpk1/irpe_rawcounts/DE_oracle_d311_limma.csv",
+      "detail": "2 traces \u00b7 Reactome pathway enrichment"
+    },
+    {
+      "skill_id": "pca",
+      "status": "pass",
+      "seconds": 0.01,
+      "dataset": "jev/proteome_matrix.csv",
+      "detail": "2 traces \u00b7 PCA \u2014 10 samples, 2180 features"
+    },
+    {
+      "skill_id": "proteomics_de",
+      "status": "pass",
+      "seconds": 0.04,
+      "dataset": "jev/proteome_matrix.csv",
+      "detail": "3 traces \u00b7 Proteomics differential abundance \u2014 5v5 samples, 2180 protei"
+    },
+    {
+      "skill_id": "pseudotime_genes",
+      "status": "pass",
+      "seconds": 7.29,
+      "dataset": "jev/retina_fadl.h5ad",
+      "detail": "6 traces \u00b7 Genes along pseudotime \u2014 top 6<br><sub>auto root (DC1 extrem"
+    },
+    {
+      "skill_id": "pvca",
+      "status": "pass",
+      "seconds": 0.01,
+      "dataset": "erg-fig1e/erg_metrics_long.csv",
+      "detail": "1 traces \u00b7 PVCA \u2014 3 PCs, 78% of variance"
+    },
+    {
+      "skill_id": "regression",
+      "status": "pass",
+      "seconds": 0.0,
+      "dataset": "erg-fig1e/erg_metrics_long.csv",
+      "detail": "2 traces \u00b7 b_wave_uv vs a_wave_uv"
+    },
+    {
+      "skill_id": "sankey",
+      "status": "pass",
+      "seconds": 0.0,
+      "dataset": "hani/mmc2_markers_long.csv",
+      "detail": "1 traces \u00b7 Sankey flow"
+    },
+    {
+      "skill_id": "scorecard",
+      "status": "pass",
+      "seconds": 0.0,
+      "dataset": "hani/hani_benchmark.csv",
+      "detail": "4 traces \u00b7 Benchmark scorecard"
+    },
+    {
+      "skill_id": "ssgsea",
+      "status": "pass",
+      "seconds": 37.23,
+      "dataset": "alpk1/eyg29/EYG_29_iRPE_human_St7-TMM-K0_rawCounts.csv",
+      "detail": "1 traces \u00b7 ssGSEA \u2014 8613 gene sets x 18 samples (top 15 by variance)"
+    },
+    {
+      "skill_id": "string_network",
+      "status": "pass",
+      "seconds": 1.14,
+      "dataset": "alpk1/irpe_rawcounts/DE_oracle_d311_limma.csv",
+      "detail": "2 traces \u00b7 STRING interaction network"
+    },
+    {
+      "skill_id": "trajectory",
+      "status": "pass",
+      "seconds": 1.39,
+      "dataset": "jev/retina_fadl.h5ad",
+      "detail": "42 traces \u00b7 Trajectory & pseudotime (PAGA + DPT)"
+    },
+    {
+      "skill_id": "umap_scrna",
+      "status": "pass",
+      "seconds": 9.87,
+      "dataset": "jev/retina_fadl.h5ad",
+      "detail": "19 traces \u00b7 scRNA UMAP"
+    },
+    {
+      "skill_id": "upset",
+      "status": "pass",
+      "seconds": 0.01,
+      "dataset": "hani/mmc2_markers_long.csv",
+      "detail": "5 traces \u00b7 Set intersections"
+    },
+    {
+      "skill_id": "violin",
+      "status": "pass",
+      "seconds": 0.36,
+      "dataset": "jev/retina_fadl.h5ad",
+      "detail": "17 traces \u00b7 MT-CO1 expression by leiden"
+    },
+    {
+      "skill_id": "volcano",
+      "status": "pass",
+      "seconds": 0.02,
+      "dataset": "jev/proteome_de.csv",
+      "detail": "3 traces \u00b7 Volcano plot"
+    }
+  ]
+}
