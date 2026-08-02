@@ -70,6 +70,12 @@ docs/aws-materialization/aws-access-setup.md
 # Protocol lives in the research vault (Forj/bones/parallel-agents.md); the
 # repo-side board + boot checklist is COORDINATION.md.
 .claude/worktrees/
+# A lane's brief and its wrap are scaffolding at the worktree ROOT: the lead writes the kickoff and
+# reads the wrap off the filesystem, so neither belongs in history. Ignored rather than merely
+# forbidden -- "don't commit this" in a kickoff is a documentary rule, and a lane that commits one
+# anyway makes noise in the merge train.
+/LANE-KICKOFF.md
+/LANE-WRAP.md
 
 # ── Cross-agent coordination working-copies + migration artifacts (kept LOCAL) ──
 # The swordfish channel files are read by watchers from disk, not git; Selom's "no migration detail /
