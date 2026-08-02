@@ -18,6 +18,7 @@ import { paperFiles, usePaperFiles } from "@/lib/paper/run-files";
 import { workspaceStore, wselect } from "@/lib/workspace/store";
 import type { Accession } from "./accessions";
 import type { FileFitReport } from "./data-fit";
+import { trackReproduction } from "./progress";
 import type { Ledger } from "./types";
 
 export type RunStatus = "queued" | "running" | "succeeded" | "failed";
@@ -48,8 +49,6 @@ export interface RunPayload {
   /** Datasets the paper cites but didn't attach (Slice 5B) — for the deposit-data handoff. */
   accessions?: Accession[];
 }
-
-const TERMINAL: readonly RunStatus[] = ["succeeded", "failed"];
 
 /** POST the paper PDF + supplements → start a reproduce run. Returns the light payload.
  *  `dataMap` (panel_key → filename) carries the per-panel data-picker overrides (Slice 2). */
@@ -125,14 +124,16 @@ export function usePaperRun(paperId: string): PaperRun {
     const effectiveMap = dataMap ?? wselect.paper(workspaceStore.getSnapshot(), paperId)?.dataMap;
     setPhase("running");
     setError(null);
+    // Register the drive in the activity dock BEFORE the POST — inline runs block for their whole
+    // duration, so this is the only window in which the user can be told anything at all.
+    const track = trackReproduction(`Reproduce ${paperId}`, main.name);
     void (async () => {
       try {
         let payload = await startReproduction(paperId, main, supps, effectiveMap);
-        // Inline → already terminal. Poll only if a future async path hands back a running run.
-        for (let i = 0; i < 600 && !TERMINAL.includes(payload.status); i += 1) {
-          await new Promise((r) => setTimeout(r, 500));
-          payload = await fetchRun(payload.run_id);
-        }
+        // Follow the run's SSE progress to terminal, polling GET /reproduction-runs/{id} as the
+        // floor. Inline → already terminal, so this resolves at once; the arq path streams the
+        // per-panel transitions onto the same activity entry with no change here.
+        payload = await track.follow(payload);
         if (payload.status === "failed") {
           setPhase("failed");
           setError(payload.error ?? "The reproduction run failed.");
@@ -145,11 +146,12 @@ export function usePaperRun(paperId: string): PaperRun {
         setPhase("failed");
         // `startReproduction` throws a user-friendly message; a bare network failure is a fetch
         // TypeError → fall back to the "is the backend up?" hint.
-        setError(
+        const detail =
           e instanceof Error && e.message.startsWith("Couldn't start reproduction")
             ? e.message
-            : "Couldn't reach the reproduction service. Is the backend running on :8000?",
-        );
+            : "Couldn't reach the reproduction service. Is the backend running on :8000?";
+        track.fail(detail);
+        setError(detail);
       }
     })();
   }, [paperId, router]);

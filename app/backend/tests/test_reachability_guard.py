@@ -111,31 +111,8 @@ WAIVERS: dict[str, tuple[str, str]] = {
         "Citation search shipped with the lit-synthesizer; no FE call site. Reached only by backend "
         "tests today.",
     ),
-    # ---- R-02 async job pipeline: no FE consumer of job STATUS -----------------------------------
-    "/jobs/{job_id}": (
-        "R-02",
-        "The async job API has no FE consumer: the frontend runs skills through the SYNCHRONOUS "
-        "/skills/{id}/run path, so no surface ever polls a job. Directly relevant to the unparked "
-        "arq+Redis job-status store (OH-01) — that store would have no reader today.",
-    ),
-    "/jobs/{job_id}/events": (
-        "R-02",
-        "Job SSE stream has no FE consumer — nothing subscribes, so long-running work cannot report "
-        "progress to a user. Same root cause as /jobs/{job_id}.",
-    ),
-    "/jobs/{job_id}/result": (
-        "R-02",
-        "Job result retrieval has no FE consumer, because nothing submits async jobs from the UI.",
-    ),
-    "/skills/{skill_id}/jobs": (
-        "R-02",
-        "Async skill submission is unused — the FE calls the synchronous /run instead, so every "
-        "long skill blocks a request. The async path exists and is simply not wired.",
-    ),
-    "/skills/{skill_id}/jobs-dataset": (
-        "R-02",
-        "Async dataset-backed skill submission is unused for the same reason as /skills/{id}/jobs.",
-    ),
+    # R-02 (async job pipeline) CLOSED: lib/jobs/ is the reader — submit, poll, stream, result —
+    # and the run engine hands a timed-out run to the job lane. Its five waivers are deleted.
     # ---- R-03 paper-level outputs ----------------------------------------------------------------
     "/papers/{slug}/legends": (
         "R-03",
@@ -162,17 +139,12 @@ WAIVERS: dict[str, tuple[str, str]] = {
         "Tabular view of an artifact has no FE call site — the table an artifact carries cannot be "
         "opened by a user.",
     ),
-    # ---- R-05 · R-06 singletons (R-07 CLOSED: /workspace now feeds the sidebar name) -------------
+    # ---- R-05 singleton (R-06 CLOSED: lib/reproduction/progress.ts consumes the run event stream;
+    # R-07 CLOSED: /workspace now feeds the sidebar name) -------------------------------------------
     "/papers/metadata/by-doi": (
         "R-05",
         "DOI metadata enrichment has no FE call site, so the auto-rename/XMP enrich path is not "
         "user-reachable even though it is wired into Skill Match server-side.",
-    ),
-    "/reproduction-runs/{run_id}/events": (
-        "R-06",
-        "The reproduction SSE progress stream has no FE consumer, so a reproduction run reports no "
-        "live progress. The non-streaming /reproduction-runs/{run_id} IS reached, so this is a "
-        "progress-visibility gap rather than a dead feature.",
     ),
 }
 

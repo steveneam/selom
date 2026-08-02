@@ -369,7 +369,13 @@ export async function parseSkillRunResponse(res: Response): Promise<SkillRunResp
     if (d && typeof d === "object" && typeof (d as { message?: unknown }).message === "string") {
       const { message, fix } = d as { message: string; fix?: unknown };
       const hint = typeof fix === "string" ? fix.trim() : "";
-      throw new Error(hint && !message.includes(hint) ? `${message} ${hint}` : message);
+      const err = new Error(hint && !message.includes(hint) ? `${message} ${hint}` : message);
+      // Carry the taxonomy CODE (`detail.error`) on the thrown Error, not just its prose. A caller
+      // that needs to branch on the failure kind — `skill_timeout` hands the run to the async job
+      // lane (lib/jobs/run-skill.ts) — must not have to pattern-match a user-facing sentence.
+      const code = (d as { error?: unknown }).error;
+      if (typeof code === "string") (err as Error & { code?: string }).code = code;
+      throw err;
     }
     // Otherwise speak plainly and point at a next step. A bare string detail (a runner's terse
     // ValueError) rides inside the friendly frame; an opaque failure gets the generic text.

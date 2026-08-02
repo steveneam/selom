@@ -6,6 +6,7 @@ import { Menu, Search } from "lucide-react";
 import { Sidebar } from "./sidebar";
 import { CommandPalette } from "./command-palette";
 import { UndoToast } from "./undo-toast";
+import { ActivityDock } from "@/components/jobs/activity-dock";
 import { projectStore } from "@/lib/projects/store";
 import { workspaceStore } from "@/lib/workspace/store";
 import { importLocalStateOnce } from "@/lib/api/import-local-state";
@@ -129,6 +130,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
       {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
       <UndoToast />
+      {/* Long runs report here. Mounted in the shell (like UndoToast) so progress survives the
+          navigation a finished run triggers — the Score stage push, the workspace view swap. */}
+      <ActivityDock />
     </div>
   );
 }

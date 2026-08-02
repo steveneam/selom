@@ -11,14 +11,19 @@ import type { ProposedStep } from "@/lib/intake/mock";
 import type { FigureStore } from "@/hooks/use-figure-store";
 import {
   DataCheckError,
-  runSkill,
-  runSkillByDataset,
   runtimeSkillId,
   type DataCheck,
   type SkillParams,
   type SkillProvenance,
 } from "@/lib/skills/api";
-import { applyAiActions } from "@/lib/ai/api";
+// Every run goes out through the TRACKED wrappers: they register the run in the activity dock so
+// a long run is visibly in progress, and they hand a run killed by the 120s execution ceiling to
+// the async job lane instead of losing it. Same signatures as the raw callers they replace.
+import {
+  applyAiActionsTracked,
+  runSkillByDatasetTracked,
+  runSkillTracked,
+} from "@/lib/jobs/run-skill";
 import type { AiActionDelta } from "@/lib/ai/types";
 import type { RailView } from "../workrail";
 
@@ -153,13 +158,13 @@ export function useFigureRun({
         // exactly like a figure-data AI re-run. Deterministic result is identical (same _execute_skill_run
         // + posted params); the chokepoint stamps the trusted actor. Else the plain human run.
         const res = useDataset
-          ? await runSkillByDataset(runtimeSkillId(step.skillId), dataset!.id, step.params, opts)
+          ? await runSkillByDatasetTracked(runtimeSkillId(step.skillId), dataset!.id, step.params, opts)
           : step.aiActions?.length
-          ? await applyAiActions(runtimeSkillId(step.skillId), file!, step.params, step.aiActions, {
+          ? await applyAiActionsTracked(runtimeSkillId(step.skillId), file!, step.params, step.aiActions, {
               override: opts.override,
               design: designFile,
             })
-          : await runSkill(runtimeSkillId(step.skillId), file!, step.params, designFile, opts);
+          : await runSkillTracked(runtimeSkillId(step.skillId), file!, step.params, designFile, opts);
         const name = getSkill(step.skillId)?.name ?? step.skillId;
         // Persist the figure durably — full spec + the provenance bundle (the staleness
         // trigger-set, stamped with the dataset's current version). Both were transient
@@ -218,8 +223,8 @@ export function useFigureRun({
       setRunning(fig.skillId);
       try {
         const res = useDataset
-          ? await runSkillByDataset(runtimeSkillId(fig.skillId), dataset!.id, fig.provenance.params)
-          : await runSkill(runtimeSkillId(fig.skillId), file!, fig.provenance.params, designFile);
+          ? await runSkillByDatasetTracked(runtimeSkillId(fig.skillId), dataset!.id, fig.provenance.params)
+          : await runSkillTracked(runtimeSkillId(fig.skillId), file!, fig.provenance.params, designFile);
         const nextSpec = carryPrev.length ? carryLabels(res.figure, carryPrev) : res.figure;
         const saved = projectStore.addFigure(projectId, {
           title: fig.title,
@@ -276,8 +281,8 @@ export function useFigureRun({
         for (const value of values) {
           const params = { ...base, [param]: value };
           const res = useDataset
-            ? await runSkillByDataset(runtimeSkillId(origin.skillId), dataset!.id, params)
-            : await runSkill(runtimeSkillId(origin.skillId), file!, params, designFile);
+            ? await runSkillByDatasetTracked(runtimeSkillId(origin.skillId), dataset!.id, params)
+            : await runSkillTracked(runtimeSkillId(origin.skillId), file!, params, designFile);
           saved.push(
             projectStore.addFigure(projectId, {
               title: origin.title,
@@ -341,8 +346,8 @@ export function useFigureRun({
       setRunning(origin.skillId);
       try {
         const res = useDataset
-          ? await runSkillByDataset(runtimeSkillId(origin.skillId), dataset!.id, params)
-          : await runSkill(runtimeSkillId(origin.skillId), file!, params, designFile);
+          ? await runSkillByDatasetTracked(runtimeSkillId(origin.skillId), dataset!.id, params)
+          : await runSkillTracked(runtimeSkillId(origin.skillId), file!, params, designFile);
         const nextSpec = carryPrev.length ? carryLabels(res.figure, carryPrev) : res.figure;
         const saved = projectStore.addFigure(projectId, {
           title: origin.title,
@@ -399,7 +404,7 @@ export function useFigureRun({
       const carryPrev = captureCarryLabels();
       setRunning(origin.skillId);
       try {
-        const res = await applyAiActions(runtimeSkillId(origin.skillId), file, params, aiActions, {
+        const res = await applyAiActionsTracked(runtimeSkillId(origin.skillId), file, params, aiActions, {
           design: designFile,
         });
         const nextSpec = carryPrev.length ? carryLabels(res.figure, carryPrev) : res.figure;
