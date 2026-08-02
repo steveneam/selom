@@ -27,7 +27,7 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
-| **SPRINT-3** | 2026-08-02 | `main` `01e3736..<head>` (**unpushed — owner pushes**) | **`A1` closed for real, then Parallel Sprint 3 ran 3 lanes and the train.** `A1`: a figure exported from the editor's Export menu to a **real Google Drive and a real Dropbox**, each downloaded back and confirmed a valid 1600×1200 PNG, then deleted — and it found a live defect a mock cannot see: Drive returns the resumable session URI on a 200 **or a 308**, and with `follow_redirects=True` httpx **re-POSTs the 17-byte metadata** to the session URI in a loop, so the figure's bytes never left the box. Fixed + guarded. (The Dropbox non-ASCII fear does **not** fire — `json.dumps` already escapes; now executable.) Lanes: **A** `paper-outputs` (R-01+R-03 — the lit-synthesizer and the **Reproducibility Score** finally have a surface: a 4th `Write-up` stage in the Paper shell) · **B** `jobs` (R-02+R-06 — a run-activity dock; refused a progress bar because `Job.public()` carries no percentage) · **C** `skills` (the **36-skill smoke matrix**). Train run **B → A** with `verify.sh` **7/7 on each rebased result**; the expected `test_reachability_guard.py` waiver conflict resolved by hand. Also specced **P-E auth** (and found the plan's "backend is ready" is **half wrong** — 39 of 78 routes take no `AuthContext`, and `GET /artifacts/{id}/table` serves any tenant's matrix bytes to whoever has the id) and **Phase F**, the cnsplots figure-quality port. |
+| **SPRINT-3** | 2026-08-02 | `main` `01e3736..<head>` (**unpushed — owner pushes**) | **`A1` closed for real, then Parallel Sprint 3 ran 3 lanes and the train.** `A1`: a figure exported from the editor's Export menu to a **real Google Drive and a real Dropbox**, each downloaded back and confirmed a valid 1600×1200 PNG, then deleted — and it found a live defect a mock cannot see: Drive returns the resumable session URI on a 200 **or a 308**, and with `follow_redirects=True` httpx **re-POSTs the 17-byte metadata** to the session URI in a loop, so the figure's bytes never left the box. Fixed + guarded. (The Dropbox non-ASCII fear does **not** fire — `json.dumps` already escapes; now executable.) Lanes: **A** `paper-outputs` (R-01+R-03 — the lit-synthesizer and the **Reproducibility Score** finally have a surface: a 4th `Write-up` stage in the Paper shell) · **B** `jobs` (R-02+R-06 — a run-activity dock; refused a progress bar because `Job.public()` carries no percentage) · **C** `skills` (the **36-skill smoke matrix**). Train run **B → A → C** with `verify.sh` **7/7 on each rebased result**; the expected `test_reachability_guard.py` waiver conflict resolved by hand. Also specced **P-E auth** (and found the plan's "backend is ready" is **half wrong** — 39 of 78 routes take no `AuthContext`, and `GET /artifacts/{id}/table` serves any tenant's matrix bytes to whoever has the id) and **Phase F**, the cnsplots figure-quality port. |
 | **CLOUD-EXPORT** | 2026-08-02 | `main` `1c4a6f4..01e3736` (**pushed**) | **Track E built end-to-end: figures can be sent to Google Drive / Dropbox.** Spec first (`docs/cloud-export/spec.md`), then `E-1` real uploads (Drive resumable · Dropbox simple + chunked session above its 150 MB ceiling; both CREATE, never overwrite) · `E-2` `/export/cloud` takes **either** a `dataset_id` **or** a rendered figure · `E-3` "Save to Drive/Dropbox" in the export menu. Key design (D1): `push_path` became the connector primitive and `push_from_store` a shared wrapper — that is what let a figure export without inventing a scratch object in the store. **Three real defects found:** figure export required a DATABASE (`Depends(_uploads_repo)` at the signature, 503 on any box without one) · the export menu carried a hardcoded disabled "Coming soon", the exact client-side pattern the frozen contract forbids and the A20 failure it exists to stop · and Mobbin ruled a pattern OUT — Drive's own folder-picker modal is impossible under `drive.file`, so there is deliberately no picker. **⚑ `E-3` is BUILT, NOT DONE — every test is a mock and no byte has reached a real account.** Also wrote **`docs/build-plan-2026-08/plan.md`**, the master sequencing doc for the autonomous run. Gate 7/7 on every commit. |
 | **ERG-MOCK** | 2026-08-02 | `main` `92d6f2e..288e07d` (**pushed**) | Owner-requested mock Fig 1E dataset for laying out the ERG intensity-response figure — `docs/records/erg-module/mock-fig1e/` (+ `n3/`). Simulated b-wave table (all 210 individual points, so mean/SEM is recomputable, not taken on trust) + a trace grid whose **waveform shapes are the real decoded recordings**. Three requested departures from the printed figure: CMV-GFP pulled to a clean null, RK-PDE6B a partial rescue, and the two rescue arms separated only *slightly* (`*`, p 0.02–0.03 at **both** 1.0 and 1.9 log). Plus the rd10 **threshold**: only the WT Control responds below flash 1.0. **The generator self-checks and exits non-zero WITHOUT writing if a retune breaks the biology** — it caught four real defects during the build (null curves running *downward* with intensity from a flat noise term; rescue arms flipping at the noise floor; a too-strict rank check below threshold; a monotonicity tolerance that did not scale with amplitude). Welch t-test is hand-rolled (stdlib has no t-distribution) and **validated against scipy to 1.5e-15**. Side effect worth knowing: pushing swept up **the 6 previously-unpushed EDITOR-ROOM commits**. Answered an owner question with code, not memory: **figures cannot be exported to Drive today** → new **Track E** on the board. |
 | **EDITOR-ROOM** | 2026-07-25 | `main` `92d6f2e..f98bdbd` (**6 unpushed**) | **Worked the board top to bottom: `W-1` · `Q-1`/`Q-2` · `V-1` · `W-2` · `V-2` all DONE, browser-verify 14/14 and `verify.sh` 7/7.** **The 1280 width defect is fixed — the plotting area went 90px → 571px**, and every checked width clears §D's 506px target (1280→571, 1440→727, 1920→718), which turned the long-red `D-5 (also-confirm)` gate green. `W-1` first: a figure never reflowed when its CONTAINER resized (only the window), so collapsing a rail bought the plot **zero** pixels and every other remedy was invisible. Then the inspector dock got a collapse control + a tab-icon spine, both rails auto-collapse on a narrow viewport, and zoom/Fit landed in the strip that was an inert hint line. **Three findings the browser produced that no gate could:** `/extract`'s editor **overflowed its band and painted the figure through the Statistics table** while every per-element number read PASS (`EditorWorkspace` needs a flex parent; `CanvasShell` gave it one, `chart-extractor` did not) · the **OAuth cloud-import path was unreachable in the UI** — the menu's loader cancelled its own connections request, so no provider ever showed an import form · and the spec's own 1280 threshold was **wrong**, since at 1440 the plot was 247px, *worse than a collapsed 1280*. **⚑ FOUNDER DECISION OWED: Selom cannot see files the user already has** — Drive is `drive.file`-scoped and Dropbox is an App Folder, so it reads only what it created, and the menu's "copy the share link" hint is impossible to follow. Options + recommendation in `docs/cloud-providers-contract/spec.md` §Scope. |
@@ -45,18 +45,28 @@
   one predicted (see the SESSIONS row). Locked in by `e2e/browser-verify/cloud-export.spec.ts`, which
   diffs the account by **file id** (never by name — Dropbox `autorename` would let a previous run's
   file pass) and **deletes what it created**, because these are the owner's real accounts.
-- **Sprint 3 lanes A and B are merged**, `verify.sh` 7/7 on each rebased result. **Lane C
-  (`agent/skills/coverage`) was still running its own gate at handoff — it is NOT merged.** Its work
-  is complete on disk (`docs/skill-coverage/matrix.md` + `matrix.json` + `scripts/skill-smoke.sh`);
-  finish it with: check the pane, let it commit + write `LANE-WRAP.md`, then rebase → `verify.sh` →
-  merge. Worktrees are still forked at `/home/deploy/work/selom-lane-{a,b,c}`; **remove a/b** (merged)
-  and c once it lands: `git worktree remove <path>`.
-- **The skills question is now answered with evidence, not impression: 35 pass · 0 fail · 1 skipped**,
-  every row the REAL engine against a real corpus file, 217s. **`umap_scrna` passes on the FULL
-  scanpy pipeline** — the "last stub-only skill" line in the build plan is **superseded**. The single
-  skip is **`facs_gating`: there is no `.fcs` file anywhere in `SELOM_DATASETS_DIR`**, so the flow
-  engine has never been run on real input. That is a **corpus gap, not a code gap** — staging one
-  `.fcs` unblocks it.
+- **Sprint 3 is COMPLETE — all three lanes merged**, `verify.sh` **7/7 on each rebased result**
+  (train `B → A → C`; C is backend-only and orthogonal, so it took the slot it was ready for). The
+  expected `test_reachability_guard.py` waiver conflict was resolved by hand — R-01/R-02/R-03 rows all
+  gone, three CLOSED markers kept. Worktrees removed, branches deleted, main tree's symlinked deps
+  intact.
+- **The skills question is answered with evidence, not impression: 35 pass · 0 fail · 1 skipped**,
+  every row the REAL engine against a real corpus file, 217s (`docs/skill-coverage/matrix.md`,
+  gated by `scripts/skill-smoke.sh`). The single skip is **`facs_gating`: there is no `.fcs` file
+  anywhere in `SELOM_DATASETS_DIR`**, so the flow engine has never run on real input — a **corpus
+  gap, not a code gap**. Three findings the matrix produced that nothing else could:
+  - **`pathway` was DEAD in production** — every live Reactome call 403'd, because CloudFront rejects
+    urllib's default `Python-urllib/3.x` User-Agent, and the skill has no network fallback by design.
+    It raised on *every* run. Fixed. The only prior coverage was the stub — this row is the entire
+    argument for the matrix.
+  - **`go_graph` cannot run from a clean checkout** — its engine needs `go_dag.json`, a **gitignored
+    ~7 MB build artefact**, and it raises rather than degrading to the stub (its docstring saying
+    otherwise is stale). `scripts/skill-smoke.sh --install-artifacts` stages it from the corpus.
+  - **`umap_scrna` is NOT stub-only — the premise was wrong.** Its real engine is `run_scanpy.py`,
+    picked by `SELOM_UMAP_ENGINE` (not `SELOM_SKILLS_ENGINE`); the full filter→PCA→kNN→Leiden→UMAP
+    runs on the real 8,699-cell matrix in ~10 s. It merely ships no file named `run_real.py`.
+    **All 36 skills have a real engine and all 36 import**, proved on every run. The build plan's
+    "only `umap_scrna` is stub-only" line is **superseded**.
 - **⚑ P-E is bigger than the plan said.** `docs/auth-multitenancy/spec.md`: **39 of 78 routes take no
   `AuthContext`**, so `SELOM_AUTH_MODE=clerk` would authenticate half the API and leave the rest
   **unscoped**. `GET /artifacts/{artifact_id}/table` returns the exact matrix a skill consumed to
@@ -68,26 +78,22 @@
   cannot enter the editor, but the visual quality lives in typography/ticks/spines/legend
   geometry/palettes, which move value-for-value into `theme.py`.
 
-## ▸ NEXT — **finish Lane C, then Phase F (cnsplots figure quality). Nothing here needs the owner.**
+## ▸ NEXT — **Phase F (cnsplots figure quality). Nothing here needs the owner.**
 
 > **Owner is away and everything founder-gated is BATCHED TO NEXT WEEK** (owner-directed
 > 2026-08-02: *"anything that needs me gets deferred to next week"*). So: no Clerk keys, no route-split
 > decision, no push. Build what does not need him.
 
-1. **Finish Lane C** (`agent/skills/coverage`, worktree `/home/deploy/work/selom-lane-c`) — its work
-   is done on disk but it was still running its own gate at handoff. Let it commit + write
-   `LANE-WRAP.md`, then rebase → `scripts/verify.sh` → merge. Then `git worktree remove` all three
-   lanes (a and b are already merged).
-2. **Phase F — `docs/cnsplots-port/{plan,spec}.md`.** The owner's headline ask: *our plots look worse
+1. **Phase F — `docs/cnsplots-port/{plan,spec}.md`.** The owner's headline ask: *our plots look worse
    than cnsplots'*. Start at **F1, the parity audit** (five plot types, same real data, side by side)
    — it turns "looks better" into a checklist and makes F2 measurable. Then **F2, the theme port**,
    which finally forces the planned `theme.py` → **named style registry** refactor.
    **One cheap check owed first:** does Selom's Kaleido SVG export keep `<text>` as text or outline
    it? If it outlines, "editable vector export" is a claim the product does not meet.
-3. **P-E backend half** (`docs/auth-multitenancy/spec.md` §4 steps 1–3) — deny-by-default + scope
+2. **P-E backend half** (`docs/auth-multitenancy/spec.md` §4 steps 1–3) — deny-by-default + scope
    `/artifacts/*` and `/reproduction-runs/*` + the isolation test. **This needs no keys**, so it is
    autonomous; only the FE half and the route split wait for the owner.
-4. **`OH-01`** (arq + Redis job store) — now unblocked: Lane B built the reader, and its wrap
+3. **`OH-01`** (arq + Redis job store) — now unblocked: Lane B built the reader, and its wrap
    documents the contract the producer must meet (`docs/jobs-surface/spec.md` §4).
 
 **Two owed follow-ups the lanes recorded, so they are not lost:** there is **no run-scoped legends
