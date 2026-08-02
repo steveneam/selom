@@ -103,21 +103,29 @@
   is the same tenant*. Selom cannot have two users today. Now **P-E**, with the isolation proved by
   test (tenant A cannot read/list/export tenant B) rather than claimed.
 
-## ▸ NEXT  — **master plan = `docs/build-plan-2026-08/plan.md`. Start at `P-A / A1`: the cloud-export REAL round trip.**
+## ▸ NEXT  — **PARALLEL SPRINT 3, Mode B (3 lanes). Launch doc = `docs/parallel-sprint-3/plan.md` — execute it, do not re-plan.**
 
-> **Owner is away several days and asked for autonomous build work** (2026-08-02): frontend,
-> backend, flow, integrations, plus a Mobbin-driven UX audit. `docs/build-plan-2026-08/plan.md` is
-> the sequencing doc; `docs/next-session-plan/plan.md` stays the per-row detail for Tracks R/C/O.
+> **Owner is away several days and asked for autonomous build work** (2026-08-02), then directed
+> **parallel lanes, Mode B**. `docs/parallel-sprint-3/plan.md` is launch-ready — partition, frozen
+> contract, merge order, kickoff landmines and the launch sequence are all written. **Next session
+> executes it; it does not re-plan it.**
 >
-> **Order:** `A1` cloud-export real round trip (**first — it is owed, not optional**) → `A2` `R-02`
-> job pipeline (**before `OH-01`**, or that store ships with no reader) → `A3` `R-01`+`R-03`
-> lit-synthesizer + Reproducibility Score (spec the IA placement first) → `A4` `R-04`/`R-06`/`R-05`
-> → **P-B** workspace audit (`fe-review` at workspace scale + Mobbin per surface) → **P-C** skill
-> smoke matrix → **P-D** `OH-01` + journal style packs → **P-E** auth + real multi-tenancy.
+> **Order on `gogogo`:**
+> 1. **Lead, main tree first — `A1` cloud-export REAL round trip.** Owed, and the one thing a lane
+>    physically cannot do (Turbopack can't run in a worktree, so browser checks are main-only).
+> 2. Fork **3 lanes** (`scripts/worktree-setup.sh`), write pointer-sized `LANE-KICKOFF.md` with the
+>    landmines **inlined** — a worktree is a separate memory namespace and recalls none of them.
+> 3. tmux-launch each, **first peek at ~3 minutes** (thalon's #1 regret: a lane sat ~20 min on an
+>    unseen permission prompt).
+> 4. Merge train **C → B → A**, running `scripts/verify.sh` on the **rebased** result each time —
+>    never trust a lane's own green claim.
+> 5. Then **`P-E` auth** sequentially (it touches the frozen `lib/api/client.ts`), then **`OH-01`**
+>    (strictly after Lane B — it is the producer, Lane B builds the only reader).
 >
-> **The landing page is Thalon's**, not Selom's (owner-directed 2026-08-02) — this plan touches no
-> marketing copy, positioning or pricing. **Nothing outward-facing ships autonomously**: no
-> publishing, no public deploy. Founder gates batched in the plan §2 (only Clerk keys block P-E).
+> **Lanes:** A `paper-outputs` (R-01+R-03 lit-synth + Reproducibility Score) · B `jobs` (R-02+R-06
+> job/progress surfaces) · C `skills` (36-skill smoke matrix + `umap_scrna`, backend-only).
+>
+> **The landing page is Thalon's**, not Selom's. Nothing outward-facing ships autonomously.
 
 <details><summary>Superseded — the original W-1-first instruction (kept for provenance)</summary>
 
