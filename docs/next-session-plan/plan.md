@@ -408,6 +408,33 @@ analysis skills** — the constraint is reachability, not breadth.
 
 ---
 
+## Track E — export figures to cloud storage (owner-requested 2026-08-02)
+
+Owner asked whether figures can be saved to Google Drive instead of GitHub. **They cannot today.**
+`POST /figures/export` renders PNG/SVG/PDF to a browser download (UI: `components/figure/export-menu.tsx`),
+and `POST /export/cloud` exists but (a) takes a `dataset_id`, not a figure, and (b) every OAuth
+connector's `push_from_store` raises "export is not available yet" — only the `s3://` destination works.
+No UI calls it.
+
+Owner scoped it **export-only for now** — import can wait, which also defers (does not resolve) the
+§Scope founder decision below.
+
+| ID | What | Status | Note |
+|---|---|---|---|
+| `E-1` | implement `push_from_store` for Google Drive + Dropbox | `TODO` | **First** — it is the actual blocker, and it is self-contained: the endpoint, provider registry, Nango token exchange and SSRF guards already exist and are tested. Only the connector bodies (`cloud/connectors/google.py:29`, `dropbox.py:34`) and the enable flag are missing. OneDrive stays on hold (DEFERRED). |
+| `E-2` | let the export target a **figure**, not just a stored dataset | `TODO` | Today `export_cloud` resolves bytes from `parquet_s3_key`/`upload_s3_key`. A figure has no stored object — it is rendered on demand by `export.render`. Decide: render-then-push in the same request, or persist the render as an artifact first (note this overlaps `R-04`, which wants artifacts fetchable by id — check before duplicating). |
+| `E-3` | FE surface: "Save to Drive" in the figure export menu | `TODO` | Extend `components/figure/export-menu.tsx`; `lib/cloud/api.ts` already has the client wrapper. Must handle the not-connected case by routing into the existing OAuth connect flow. Deletes a reachability waiver — check `docs/reachability/backlog.md` before writing one. |
+
+**Acceptance:** a figure opened in the editor can be written to the user's Drive from the UI, the
+file appears in the account, and the round trip is proven in a real browser — not `dev:mock`
+([[verify-on-real-data-not-mock]]). **Verify:** `scripts/verify.sh` + a `scripts/browser-verify.sh`
+spec driving editor → export menu → Drive, against the live broker (`nango.swordfish.cfd`).
+
+**Scope note:** export writes new files, so `drive.file` is sufficient — Selom can always see what it
+created. This is why export-first is a coherent order: it needs no scope change, while import does.
+
+---
+
 ## Sequencing — the recommended order
 
 1. **`W-1`** — confirmed bug, small, unblocks all width work, needs no decision. Ask **`Q-1`** and
@@ -415,10 +442,13 @@ analysis skills** — the constraint is reachability, not breadth.
 2. **`V-1` (D-11)** — closes the browser sweep; cheap now the harness exists.
 3. **`W-2`** — once `Q-1` is answered and its spec reviewed.
 4. **`V-2`** — the cloud round-trip + D-8; independent of everything above.
-5. **`R-02` (+ `OH-01`)** → **`R-01`+`R-03`** → **`R-04`** (which unblocks `F1`) → `R-06` → the
+5. **Track E** (`E-1` → `E-2` → `E-3`) — owner-requested 2026-08-02 and explicitly queued for the
+   next session. `E-1` is self-contained and needs no decision. Check `R-04` before building `E-2`:
+   both want a rendered artifact addressable by id, and doing them blind duplicates the work.
+6. **`R-02` (+ `OH-01`)** → **`R-01`+`R-03`** → **`R-04`** (which unblocks `F1`) → `R-06` → the
    `R-05` decision.
-6. **Track C**, entered through the spec that already exists.
-7. **Track O**, as the owner reacts.
+7. **Track C**, entered through the spec that already exists.
+8. **Track O**, as the owner reacts.
 
 **Review cadence:** `review-gauntlet` + `fe-review` at a **phase/milestone boundary, not per task** —
 they are token-heavy and add little at small scope (owner-directed). A small slice gets

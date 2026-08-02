@@ -27,6 +27,7 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
+| **ERG-MOCK** | 2026-08-02 | `main` `92d6f2e..288e07d` (**pushed**) | Owner-requested mock Fig 1E dataset for laying out the ERG intensity-response figure — `docs/records/erg-module/mock-fig1e/` (+ `n3/`). Simulated b-wave table (all 210 individual points, so mean/SEM is recomputable, not taken on trust) + a trace grid whose **waveform shapes are the real decoded recordings**. Three requested departures from the printed figure: CMV-GFP pulled to a clean null, RK-PDE6B a partial rescue, and the two rescue arms separated only *slightly* (`*`, p 0.02–0.03 at **both** 1.0 and 1.9 log). Plus the rd10 **threshold**: only the WT Control responds below flash 1.0. **The generator self-checks and exits non-zero WITHOUT writing if a retune breaks the biology** — it caught four real defects during the build (null curves running *downward* with intensity from a flat noise term; rescue arms flipping at the noise floor; a too-strict rank check below threshold; a monotonicity tolerance that did not scale with amplitude). Welch t-test is hand-rolled (stdlib has no t-distribution) and **validated against scipy to 1.5e-15**. Side effect worth knowing: pushing swept up **the 6 previously-unpushed EDITOR-ROOM commits**. Answered an owner question with code, not memory: **figures cannot be exported to Drive today** → new **Track E** on the board. |
 | **EDITOR-ROOM** | 2026-07-25 | `main` `92d6f2e..f98bdbd` (**6 unpushed**) | **Worked the board top to bottom: `W-1` · `Q-1`/`Q-2` · `V-1` · `W-2` · `V-2` all DONE, browser-verify 14/14 and `verify.sh` 7/7.** **The 1280 width defect is fixed — the plotting area went 90px → 571px**, and every checked width clears §D's 506px target (1280→571, 1440→727, 1920→718), which turned the long-red `D-5 (also-confirm)` gate green. `W-1` first: a figure never reflowed when its CONTAINER resized (only the window), so collapsing a rail bought the plot **zero** pixels and every other remedy was invisible. Then the inspector dock got a collapse control + a tab-icon spine, both rails auto-collapse on a narrow viewport, and zoom/Fit landed in the strip that was an inert hint line. **Three findings the browser produced that no gate could:** `/extract`'s editor **overflowed its band and painted the figure through the Statistics table** while every per-element number read PASS (`EditorWorkspace` needs a flex parent; `CanvasShell` gave it one, `chart-extractor` did not) · the **OAuth cloud-import path was unreachable in the UI** — the menu's loader cancelled its own connections request, so no provider ever showed an import form · and the spec's own 1280 threshold was **wrong**, since at 1440 the plot was 247px, *worse than a collapsed 1280*. **⚑ FOUNDER DECISION OWED: Selom cannot see files the user already has** — Drive is `drive.file`-scoped and Dropbox is an App Folder, so it reads only what it created, and the menu's "copy the share link" hint is impossible to follow. Options + recommendation in `docs/cloud-providers-contract/spec.md` §Scope. |
 | **BROWSER-VERIFY** | 2026-07-25 | `main` `ff9705d..b0fc61b` (**pushed**) | **Built the browser-verify harness and answered the §D list in a real browser.** `scripts/browser-verify.sh` boots a real backend + frontend and drives the one path that opens the editor (new project → real EYG_28 CSV → the engine's recommended skill); checks are specs, not scripts. **It found a blocking crash on the primary flow before running a single check** — `datasets.qc` holds two shapes and the mapper cast whichever arrived into the FE's `QcReport`, so **dropping any real file took the whole app to the error overlay**; invisible to every gate because `dev:mock` skips the upload path. **D-5: A24 confirmed FIXED** (`overflow=0`, `card = stageClient − 32` exactly at 1280/1440/1920); keep the `min-h-[20rem]` floor; the `88rem` cap is unreachable. **NEW FINDING: the hero is starved of WIDTH at 1280** — 90px of plotting area, not §D's assumed 506, because fixed columns take 70% of the viewport. D-4/D-1/D-7/D-3/D-9/D-10 all PASS (§D's "Legend overflows" prediction disproven); 2 founder calls. Gate 7/7. |
 | **SPRINT-2-MERGED** | 2026-07-25 | `main` `ba0de8c..698381d` | **Phase 0 done → 3 lanes forked, driven and MERGED in one session.** Owner cleared all four founder gates; `main` pushed (`60df628..dddf5d6`) and `campaign/parallel-lanes` deleted. Built the missing groundwork: **`scripts/verify.sh`** (first single gate of record — 7 gates at CI parity incl. the `fe-build` the plan omitted, ~70s) · **`scripts/worktree-setup.sh`** (lane provisioning was **PowerShell-only**, so no lane could have been forked on Linux) · the **frozen `GET /cloud/providers`** contract · **the reachability ratchet**, which found **17 of 61 routes with no FE call site** where the whole milestone review had found 2. Then **launched and drove all three lanes autonomously** (thalon's tmux procedure — the owner no longer drives) and ran the merge train `L1→L3→L2` myself: 16 lane commits, full gate **7/7 green on every rebased result**. Lane 2 found the sprint's worst bug: **`config.py` never read `app/backend/.env`**, so the server pointed at the dead `localhost:3003` while `preflight.sh` validated the live broker **from the same unread file** — a green guard checking a file the server never read. Reachability **17 → 16**. Also wrote the **annotation-layer remediation spec** (the owed plan) and recorded the icon decision + on-hold triage. |
@@ -36,7 +37,7 @@
 | **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
 | older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · EDITOR-ROOM · 2026-07-25 23:18 +1000 (Sydney) · branch `main` `92d6f2e..f98bdbd` (**6 unpushed — owner pushes**) · Claude (FE+BE, solo, lead)
+## ▸ PRIOR · EDITOR-ROOM · 2026-07-25 23:18 +1000 (Sydney) · branch `main` `92d6f2e..f98bdbd` (**6 unpushed — owner pushes**) · Claude (FE+BE, solo, lead)
 
 - **The whole board is worked: `W-1` · `Q-1`/`Q-2` · `V-1` · `W-2` · `V-2` all `DONE`.** Gates:
   **`scripts/verify.sh` 7/7** and **`scripts/browser-verify.sh` 14/14** — the first time the browser
@@ -71,7 +72,7 @@
   `d5` now asserts the target at **every** viewport it measures, which is what would have caught the
   1440 hole immediately.
 
-## ▸ PRIOR · BROWSER-VERIFY · 2026-07-25 21:20 +1000 (Sydney) · branch `main` `ff9705d..b0fc61b` (**pushed to origin/main**, 0 ahead) · Claude (FE+BE, solo, lead)
+## ▸ EARLIER · BROWSER-VERIFY · 2026-07-25 21:20 +1000 (Sydney) · branch `main` `ff9705d..b0fc61b` (**pushed to origin/main**, 0 ahead) · Claude (FE+BE, solo, lead)
 
 - **The harness exists and the §D list is answered.** `scripts/browser-verify.sh` boots a real
   backend (`:8152`, SQLite in the corpus dir) + a real frontend (`:3152`) and drives the ONLY path
@@ -100,28 +101,59 @@
   error, everything looks clickable, nothing works); and the harness **must reset its own store each
   run** or reconcile drags every prior figure spec in and blows the timeout.
 
-## ▸ EARLIER · SPRINT-2-MERGED · 2026-07-25 19:46 +1000 (Sydney) · branch `main` · Claude (FE+BE, solo, lead)
+## ▸ LIVE · ERG-MOCK · 2026-08-02 21:05 +1000 (Sydney) · branch `main` `92d6f2e..288e07d` (**pushed, 0 ahead**) · Claude (FE+BE, solo, lead)
 
-- **State: Sprint 2 is MERGED AND PUSHED.** `main` is linear and all three lanes landed via a lead-driven train (`L1 → L3 → L2`), **full `scripts/verify.sh` 7/7 green on each rebased result**. Pushed to `origin/main` 2026-07-25 (owner-authorized), which triggered the Vercel deploy. Worktrees removed, `agent/*` branches deleted, tmux sessions killed, dev servers stopped, tree clean. Always read the live count from `git rev-list --count origin/main..main`; never trust a literal here.
-- **Lanes are fully torn down** — 3 worktrees removed, 3 `agent/*` branches deleted (all merged), 3 tmux sessions killed, main tree verified intact (39713 files, `.venv` present: `rm` does **not** follow the dep symlinks on Linux). **Lesson worth keeping: an idle Claude Code composer redisplays its last SUBMITTED message DIMMED (`ESC[2m`).** I read that as parked draft text in all three lanes and held teardown for it; the composers were empty. Check for the dim code before believing a pane has unsent input.
-- **⚑ THE GATE OF RECORD IS `scripts/verify.sh`** — 7 gates, ~70s, raw + exit-code gated. **Never pipe it through `| tail`.** `--fast` skips `fe-build`; in a worktree `fe-build` is auto-`SKIP`ped (Turbopack rejects the out-of-root symlink) so **it and any browser check are merge-train-only, on the main checkout**.
-- **⚑ CLOUD CONFIG — the bug that made the feature impossible, now fixed.** `app/backend/config.py` reads the **REPO-ROOT `.env`**; it never read `app/backend/.env`, where the creds had been staged. So `nango_base_url` silently fell back to `http://localhost:3003` (**dead**) and the secret key was empty — while `preflight.sh` read that same unused file and passed all five checks against the live broker. Migrated on this box and verified: backend now resolves `https://nango.swordfish.cfd` with Google + Dropbox **enabled**. Bound by `app/backend/tests/test_cloud_env_home.py`, which fails if the two homes diverge. **`app/backend/.env` now holds only the `GOOGLE_*`/`DROPBOX_*`/`MS_*` values for pasting into Nango's dashboard — read by nothing in this repo.**
-- **Reachability ratchet is live** (`app/backend/tests/test_reachability_guard.py`, backlog `docs/reachability/backlog.md`): **16 unreachable routes remain**, each waived with an `R-xx` ID and a reason. **A stale waiver FAILS**, so the list can only shrink. Biggest rows: **R-01 the entire lit-synthesizer** (shipped, zero FE) and **R-02 the entire async job pipeline** — which *qualifies* the unparked `OH-01`, since that job-status store would ship with no reader.
-- **Annotation layer: the owed plan EXISTS** — `docs/pillar-2-direct-manipulation/annotation-remediation-spec.md`. It is **deferred pending a proper plan, NOT shelved**; §6 states the exact flag-flip condition. Owner decisions in it: typed stars **allowed but marked `unverified`**; selection goes **full direct-manipulation**.
-- **selom-data IS here** at `/home/deploy/migration/selom-migration-staging/selom-data/` → export `SELOM_DATASETS_DIR` or real-data tests silently skip (`verify.sh` warns).
+- **Deliverable: `docs/records/erg-module/mock-fig1e/`** (+ the balanced `n3/` variant). Mock Fig 1E
+  data the owner asked for, to lay out the intensity-response figure while the real extraction is
+  blocked. Detail is in the README there and in the two commits — don't re-narrate.
+- **Everything is stamped MOCK.** The manuscript is in revision, so the b-wave numbers are labelled
+  simulated and the trace figure says its shapes are real but its condition assignment and
+  amplitudes are not. This is the constraint that shaped the whole deliverable.
+- **The traces use the REAL decoded recordings**, after a first pass built from lobe functions + a
+  sine burst that the owner correctly called out as looking fabricated. Three things had to be got
+  right, each found only by *looking at the render*: the raw traces are buried in 50/100/150/163 Hz
+  hum (notch via `_erg.clean_trace`, and measure the b-wave on the same cleaned trace that gets
+  drawn); matching each panel independently to the closest-amplitude trace made morphology change
+  row-to-row, so each condition now draws its whole column from **one real eye**; and
+  **AAV8-RK-PDE6B's own recording (256_RE) has no clean b-wave to scale** — sourcing from it
+  rendered the partial-rescue column flat, so that one column uses the WT eye scaled down
+  (declared in `SOURCE_EYE`, the only column not from its own eye).
+- **⚑ The real per-eye amplitudes in `erg_metrics_long.csv` are NOT usable as-is** — Control reads
+  118 µV at the dimmest flash, which is noise, not a b-wave. This is the reconciliation issue the
+  ERG spec documents, confirmed again here. `clean_trace` does **not** fix it: it rescues the flats
+  but destroys real signal (RK-PDE6B at 1.0 collapses 91.8 → 23.5 µV). Any future work that wants
+  real per-eye b-waves must re-measure from waveforms, and only the **6 representative eyes** have
+  waveforms on this box — the other 24 live on the CMRI share.
+- **The generator is a gate, not a script:** `verify()` asserts ordering, the CMV-GFP null, the
+  rd10 threshold, monotonicity, and the Welch significance bands, and **exits 1 without writing**
+  when a retune breaks one. Negative-tested. This is what caught the four defects listed in the
+  SESSIONS row.
+- **Owner question answered from the code: figures cannot be exported to Drive.** `POST /export/cloud`
+  exists but takes a `dataset_id` and every OAuth connector's `push_from_store` raises "not available
+  yet"; only `s3://` works and no UI calls it. Owner scoped it **export-only, next session** → new
+  **Track E** in the board (`E-1` connectors → `E-2` figure destination → `E-3` FE surface).
+- **Housekeeping:** pushing this session's commits also pushed **the 6 EDITOR-ROOM commits** that the
+  board had listed as unpushed. No dev servers were started; the `:3111` server on this box is
+  **thalon's**, not Selom's — left running.
 
-## ▸ NEXT  — **the board is `docs/next-session-plan/plan.md`. Tracks W and V are DONE; start at Track R (`R-02`).**
+## ▸ NEXT  — **the board is `docs/next-session-plan/plan.md`. Tracks W and V are DONE; start at Track E (`E-1`), then Track R (`R-02`).**
 
-> **Board state after EDITOR-ROOM:** `W-1` `W-2` `Q-1` `Q-2` `V-1` `V-2` are all **`DONE`**. The
-> remaining order is the board's own: **Track R** (reachability, `R-02` first because it is a
-> *precondition* for `OH-01`, not a consequence) → **Track C** (annotation, C1→C4, spec exists) →
-> **Track O** as the owner reacts. The standing approval from 2026-07-25 still covers them.
+> **Board state:** `W-1` `W-2` `Q-1` `Q-2` `V-1` `V-2` all **`DONE`**. Order is now **Track E**
+> (cloud figure export — owner-requested 2026-08-02 and explicitly queued: *"can build it next
+> session, as well as any other work you have planned"*) → **Track R** (`R-02` first, a
+> *precondition* for `OH-01`) → **Track C** (annotation, spec exists) → **Track O**. The standing
+> approval from 2026-07-25 covers R/C/O; Track E is newly approved.
 >
-> **Two things want the owner before code:**
-> 1. **The cloud scope decision** (`docs/cloud-providers-contract/spec.md` §Scope) — Selom can only
->    read files it created, so the import feature is nearly useless as shipped. Recommendation:
->    the Google Picker, not a broader scope.
-> 2. **6 commits are unpushed** — the owner pushes.
+> **Track E in one line:** `E-1` implement `push_from_store` for Google/Dropbox (self-contained —
+> endpoint, registry, Nango tokens and SSRF guards already exist and are tested) → `E-2` let the
+> export target a *figure*, not just a stored dataset (**check `R-04` first — both want a rendered
+> artifact addressable by id**) → `E-3` a "Save to Drive" affordance in the figure export menu.
+>
+> **The cloud §Scope founder decision is now DEFERRED, not resolved.** Owner scoped this
+> export-only, and export writes new files so `drive.file` suffices. The decision still blocks
+> *import* (`docs/cloud-providers-contract/spec.md` §Scope; recommendation remains Google Picker).
+>
+> **Nothing is unpushed** — `main` is level with `origin/main`.
 >
 > Smaller, already-recorded: `/extract`'s stage is 279px at 1280×800, so the `min-h-[20rem]` floor
 > engages there and 73px scrolls — reported, not filed, but it qualifies `D-5`'s "keep the floor"
