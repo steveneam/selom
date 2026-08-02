@@ -421,14 +421,31 @@ Owner scoped it **export-only for now** — import can wait, which also defers (
 
 | ID | What | Status | Note |
 |---|---|---|---|
-| `E-1` | implement `push_from_store` for Google Drive + Dropbox | `TODO` | **First** — it is the actual blocker, and it is self-contained: the endpoint, provider registry, Nango token exchange and SSRF guards already exist and are tested. Only the connector bodies (`cloud/connectors/google.py:29`, `dropbox.py:34`) and the enable flag are missing. OneDrive stays on hold (DEFERRED). |
-| `E-2` | let the export target a **figure**, not just a stored dataset | `TODO` | Today `export_cloud` resolves bytes from `parquet_s3_key`/`upload_s3_key`. A figure has no stored object — it is rendered on demand by `export.render`. Decide: render-then-push in the same request, or persist the render as an artifact first (note this overlaps `R-04`, which wants artifacts fetchable by id — check before duplicating). |
-| `E-3` | FE surface: "Save to Drive" in the figure export menu | `TODO` | Extend `components/figure/export-menu.tsx`; `lib/cloud/api.ts` already has the client wrapper. Must handle the not-connected case by routing into the existing OAuth connect flow. Deletes a reachability waiver — check `docs/reachability/backlog.md` before writing one. |
+| `E-1` | implement `push_from_store` for Google Drive + Dropbox | `DONE` (468886c) | **First** — it is the actual blocker, and it is self-contained: the endpoint, provider registry, Nango token exchange and SSRF guards already exist and are tested. Only the connector bodies (`cloud/connectors/google.py:29`, `dropbox.py:34`) and the enable flag are missing. OneDrive stays on hold (DEFERRED). |
+| `E-2` | let the export target a **figure**, not just a stored dataset | `DONE` (927107f) | Today `export_cloud` resolves bytes from `parquet_s3_key`/`upload_s3_key`. A figure has no stored object — it is rendered on demand by `export.render`. Decide: render-then-push in the same request, or persist the render as an artifact first (note this overlaps `R-04`, which wants artifacts fetchable by id — check before duplicating). |
+| `E-3` | FE surface: "Save to Drive" in the figure export menu | `BUILT — real round trip OWED` (ed3b435) | Extend `components/figure/export-menu.tsx`; `lib/cloud/api.ts` already has the client wrapper. Must handle the not-connected case by routing into the existing OAuth connect flow. Deletes a reachability waiver — check `docs/reachability/backlog.md` before writing one. |
 
 **Acceptance:** a figure opened in the editor can be written to the user's Drive from the UI, the
 file appears in the account, and the round trip is proven in a real browser — not `dev:mock`
 ([[verify-on-real-data-not-mock]]). **Verify:** `scripts/verify.sh` + a `scripts/browser-verify.sh`
 spec driving editor → export menu → Drive, against the live broker (`nango.swordfish.cfd`).
+
+> ### ⚑ `E-3` is BUILT but NOT DONE — the real round trip is owed
+> All three rows are coded and `scripts/verify.sh` is 7/7, but **every test so far is a mock**, and
+> a mock proves the wire, not the product ([[selom-mock-is-wire-only-verify-real]]). Nothing has
+> yet uploaded a byte to a real Drive account. Owed, and it is the **first thing** the next session
+> should do:
+> 1. Turn the flags on (`SELOM_CLOUD_GOOGLE` / `SELOM_CLOUD_DROPBOX`) and confirm
+>    `bash deploy/nango/preflight.sh` still passes against the live broker on syd2.
+> 2. Drive editor → export menu → **Save to Google Drive** in a real browser, and confirm the file
+>    lands in the account **and opens** — a 200 is not proof the bytes are a valid PNG.
+> 3. Repeat for Dropbox, then **delete both test files**, as the `V-2` round trip did.
+> 4. Only then add the `browser-verify` spec that locks it in.
+>
+> Two things are most likely to break there, both invisible to a mock: the Drive resumable
+> **session URI** is returned in a `Location` header that a real client may receive on a 200 *or* a
+> 308, and Dropbox's `Dropbox-API-Arg` header **rejects non-ASCII** — a figure named with an
+> en-dash or µ (very likely here, e.g. "µV") would fail on a real call while every mock passes.
 
 **Scope note:** export writes new files, so `drive.file` is sufficient — Selom can always see what it
 created. This is why export-first is a coherent order: it needs no scope change, while import does.
