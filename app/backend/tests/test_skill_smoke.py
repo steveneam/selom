@@ -112,6 +112,25 @@ def test_stub_output_is_treated_as_a_failure():
     assert "empty" in smoke.check_figure({"data": [], "layout": {}})
 
 
+def test_a_removed_plotly_key_is_a_failure():
+    """The no-op-encoding check, checked — the sibling of the numeric-string-axis invariant.
+
+    A trace carrying a key Plotly has REMOVED is valid JSON and renders without error; it just
+    silently ignores the instruction. `regression` shipped `transforms: [{type: groupby}]` for
+    exactly this reason and drew every point in one colour while advertising a `group` knob.
+    plotly.py 6 refuses the key, but the skills return raw dicts, so nothing was checking.
+    """
+    bad = {"data": [{"x": [1], "y": [2],
+                     "transforms": [{"type": "groupby", "groups": ["a"]}]}],
+           "layout": {"title": {"text": "Scatter"}}}
+    problem = smoke.check_figure(bad)
+    assert "transforms" in problem and "trace[0]" in problem
+    # and the fixed shape — one trace per group — passes
+    ok = {"data": [{"x": [1], "y": [2], "name": "a"}, {"x": [3], "y": [4], "name": "b"}],
+          "layout": {"title": {"text": "Scatter"}}}
+    assert smoke.check_figure(ok) == ""
+
+
 # --------------------------------------------------------------- slow: the live matrix
 
 

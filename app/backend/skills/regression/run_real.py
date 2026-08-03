@@ -6,6 +6,7 @@ draws the scatter + fit + R²/slope/p. Optional ``group`` colors points; optiona
 ``label`` annotates them. pandas + scipy only.
 """
 
+from skills._engine import to_bool
 from skills.regression.run import regression_spec
 
 _MAX_POINTS = 2000   # keep the editable spec light
@@ -30,13 +31,22 @@ def run(data_path: str, params: dict) -> dict:
 
     xs = sub[x_col].tolist()
     ys = sub[y_col].tolist()
-    fit = stats.linregress(xs, ys)
     groups = sub[group_col].astype(str).tolist() if group_col else None
     labels = sub[label_col].astype(str).tolist() if label_col else None
 
+    # `fit` off = a plain x/y/hue scatter. The OLS is not computed at all in that case:
+    # running a fit whose numbers are never shown would still put them in provenance and
+    # in the L3-synthesized table, implying a model the figure does not claim.
+    want_fit = to_bool(params.get("fit", True))
+    slope = intercept = r2 = pval = None
+    if want_fit:
+        f = stats.linregress(xs, ys)
+        slope, intercept, r2, pval = f.slope, f.intercept, f.rvalue**2, f.pvalue
+
+    title = f"{y_col} vs {x_col}"
     return regression_spec(
-        xs, ys, fit.slope, fit.intercept, fit.rvalue**2, fit.pvalue, groups, labels,
-        x_col, y_col, f"{y_col} vs {x_col}",
+        xs, ys, slope, intercept, r2, pval, groups, labels,
+        x_col, y_col, title, fit=want_fit,
     )
 
 

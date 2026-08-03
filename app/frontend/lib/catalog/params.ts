@@ -171,6 +171,16 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     ] },
     { key: "notched", label: "Notched boxes", type: "switch", help: "Notch marks the median's confidence interval." },
   ],
+  // Scatter (backend slug `regression`, kept for provenance). It had NO overlay at all, so x/y/
+  // group/label were API-only — the same gap boxplot had. `fit` is last because the fit is the
+  // default reading of this figure; turning it off is the deliberate act, not the common one.
+  regression: [
+    { key: "x", label: "X column", type: "text", placeholder: "auto-detect", help: "Blank = the first numeric column." },
+    { key: "y", label: "Y column", type: "text", placeholder: "auto-detect", help: "Blank = the second numeric column." },
+    { key: "group", label: "Colour by", type: "text", placeholder: "e.g. condition, genotype", help: "A category column. Each value becomes its own colour and legend entry." },
+    { key: "label", label: "Label points with", type: "text", placeholder: "e.g. sample_id", help: "Annotates every point — best on small tables." },
+    { key: "fit", label: "Show trend line", type: "switch", help: "Ordinary-least-squares fit with R², slope and p. Off draws a plain scatter and computes no fit." },
+  ],
   // Set overlap (venn · upset) — one input shape, two views. venn's `sets` is the choice the
   // figure cannot make for you above three columns: the engine falls back to the largest three
   // and SAYS so in the title, but naming them is what makes the figure the one you meant.

@@ -1,24 +1,25 @@
 {
   "id": "regression",
   "version": "0.1.0",
-  "title": "Regression scatter with fit",
+  "title": "Scatter plot (with optional fit)",
   "engine": "python",
   "omics": "scrna-seq|bulk-rna-seq|proteomics|metabolomics",
   "omics_type": ["general"],
   "entrypoint": "skills.regression.run:run",
   "inputs": [{ "name": "table", "kind": "csv", "required": true }],
   "param_spec": {
-    "x":     { "type": "str",  "default": "" },
-    "y":     { "type": "str",  "default": "" },
-    "group": { "type": "str",  "default": "" },
-    "label": { "type": "str",  "default": "" }
+    "x":     { "type": "str",  "default": "", "note": "X column. Blank = first numeric column." },
+    "y":     { "type": "str",  "default": "", "note": "Y column. Blank = second numeric column." },
+    "group": { "type": "str",  "default": "", "note": "Colour points by this category column (one legend entry per value)." },
+    "label": { "type": "str",  "default": "", "note": "Annotate each point with this column." },
+    "fit":   { "type": "bool", "default": true, "note": "Draw the OLS fit line and its R2/slope/p. Off = a plain scatter, and no fit is computed at all." }
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" }
   ],
   "catalog": {
-    "name": "Selom Regression",
-    "summary": "Scatter of two continuous variables with an ordinary-least-squares fit line and R²/slope/p annotation — e.g. a maturation/identity score against developmental age (Kim 2023 Fig 4C). Optional point labels and group coloring.",
+    "name": "Selom Scatter",
+    "summary": "Scatter plot of two continuous variables, coloured by an optional group and annotated with optional point labels — the generic x/y/hue panel. Keep the ordinary-least-squares fit line with its R²/slope/p for a 'does A track B?' figure (e.g. identity score vs developmental age, Kim 2023 Fig 4C), or turn it off for a plain scatter.",
     "category": "visualization",
     "tier": "verified",
     "status": "beta",

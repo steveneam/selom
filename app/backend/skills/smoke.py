@@ -329,6 +329,13 @@ def check_figure(figure) -> str:
         return f"figure is not JSON-serialisable: {exc}"
     if "stub" in _title(figure).lower():
         return f"real engine fell back to the STUB (title: {_title(figure)!r})"
+    dead = _dead_trace_keys(figure)
+    if dead:
+        return (
+            f"trace key(s) removed from Plotly and silently ignored by the renderer: "
+            f"{', '.join(dead)} — the figure is valid JSON and draws, but the encoding is a "
+            "no-op (regression's `group` painted every point one colour this way)"
+        )
     bad_axes = _numeric_string_axes(figure)
     if bad_axes:
         return (
@@ -337,6 +344,25 @@ def check_figure(figure) -> str:
             "their numeric values, reordering and mislaying them (parity-audit D2)"
         )
     return ""
+
+
+# Trace keys Plotly has REMOVED. They are still legal JSON and a spec carrying one renders
+# without error — it just ignores the instruction, which is the whole danger: the figure looks
+# fine and encodes nothing. `transforms` (groupby / filter / aggregate / sort) went in plotly.js 3
+# and plotly.py 6; this repo runs plotly.js 3.6.0 and plotly.py 6.8, and plotly.py refuses the key
+# outright, so nothing that round-trips through a real Figure could produce it — but the skills
+# return raw dicts, so nothing checked. It shipped in `regression` and made its advertised `group`
+# knob a no-op. Add to this set whenever a Plotly major removes an attribute we emit.
+_DEAD_TRACE_KEYS = ("transforms",)
+
+
+def _dead_trace_keys(figure) -> list[str]:
+    """Removed-from-Plotly keys present on any trace, as ``trace[i].key`` strings."""
+    out = []
+    for i, tr in enumerate(figure.get("data") or []):
+        if isinstance(tr, dict):
+            out += [f"trace[{i}].{k}" for k in _DEAD_TRACE_KEYS if k in tr]
+    return out
 
 
 BACKEND = pathlib.Path(__file__).resolve().parent.parent

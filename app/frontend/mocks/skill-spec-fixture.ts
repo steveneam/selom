@@ -69,6 +69,13 @@ export const SKILL_PARAM_SPECS: Record<string, BackendParamSpec> = {
     sig_test: { type: "str", default: "welch", options: ["welch", "student", "mannwhitney"] },
     correction: { type: "str", default: "none", options: ["none", "bonferroni", "bh"] },
   },
+  regression: {
+    x: { type: "str", default: "" },
+    y: { type: "str", default: "" },
+    group: { type: "str", default: "" },
+    label: { type: "str", default: "" },
+    fit: { type: "bool", default: true },
+  },
   venn: {
     sets: { type: "str", default: "" },
     show_percent: { type: "bool", default: false },
