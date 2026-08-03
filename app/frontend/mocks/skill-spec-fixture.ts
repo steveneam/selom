@@ -143,6 +143,7 @@ export const SKILL_PARAM_SPECS: Record<string, BackendParamSpec> = {
     legend: { type: "bool", default: false },
     comparisons: { type: "str", default: "" },
     sig_test: { type: "str", default: "welch", options: ["welch", "student", "mannwhitney"] },
+    correction: { type: "str", default: "none", options: ["none", "bonferroni", "bh"] },
     hline: { type: "str", default: "" },
     hline_label: { type: "str", default: "" },
     display_unit: { type: "str", default: "uV", options: ["auto", "nV", "uV", "mV", "V"] },

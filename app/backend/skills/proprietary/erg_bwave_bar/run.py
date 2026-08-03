@@ -46,8 +46,9 @@ _PATTERN = {
 def bar_spec(cond_values, *, intensity_label: str, title: str, unit: str = "µV",
              factor: float = 1.0, show_points: bool = True, wave_label: str = "b-wave",
              error: str = "sem", show_error: bool = True, bar_fill: str = "filled",
-             comparisons=None, sig_test: str = "welch", hline=None, hline_label: str = "",
-             vline=None, vline_label: str = "", legend: bool = False):
+             comparisons=None, sig_test: str = "welch", correction: str = "none",
+             hline=None, hline_label: str = "", vline=None, vline_label: str = "",
+             legend: bool = False):
     """ERG a/b-wave bar — a thin wrapper over the generic :func:`skills._charts.bar_figure` that
     supplies the ERG condition colours/labels/hatch patterns and the display-unit rounder. The full
     styling vocabulary (``error``/``show_error``/``bar_fill``/``comparisons``/``hline``/``vline``/
@@ -58,7 +59,7 @@ def bar_spec(cond_values, *, intensity_label: str, title: str, unit: str = "µV"
         cond_values, y_title=f"{wave_label} amplitude ({unit})", title=title,
         colors=_erg.COLORS, labels=_erg.COL_LABELS, patterns=_PATTERN,
         error=error, show_error=show_error, points=show_points, point_name="eyes",
-        bar_fill=bar_fill, comparisons=comparisons, sig_test=sig_test,
+        bar_fill=bar_fill, comparisons=comparisons, sig_test=sig_test, correction=correction,
         hline=hline, hline_label=hline_label, vline=vline, vline_label=vline_label,
         legend=legend, caption=intensity_label,
         round_fn=lambda v: _erg.disp_round(v, factor))

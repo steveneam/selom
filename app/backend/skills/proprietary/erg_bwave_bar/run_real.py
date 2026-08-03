@@ -38,6 +38,7 @@ def run(data_path: str, params: dict) -> dict:
     error = str(params.get("error", "sem")).strip().lower()
     bar_fill = str(params.get("bar_fill", "pattern")).strip().lower()
     sig_test = str(params.get("sig_test", "welch")).strip().lower()
+    correction = str(params.get("correction", "none")).strip().lower()
     legend = to_bool(params.get("legend", False))
     comparisons = _parse_comparisons(params.get("comparisons", ""))
     hline = _to_float_or_none(params.get("hline"))
@@ -127,6 +128,7 @@ def run(data_path: str, params: dict) -> dict:
                               wave_label=wave_label, error=error, show_error=show_error,
                               bar_fill=bar_fill,
                               comparisons=comparisons, sig_test=sig_test,
+                              correction=correction,
                               hline=hline, hline_label=str(params.get("hline_label", "")),
                               vline=vline, vline_label=str(params.get("vline_label", "")),
                               legend=legend)

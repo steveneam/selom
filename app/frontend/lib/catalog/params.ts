@@ -454,6 +454,15 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       ],
       help: "The test used to compute bracket p-values (when you don't override the stars).",
     },
+    {
+      key: "correction", label: "Multiple-comparison correction", type: "select",
+      options: [
+        { value: "none", label: "None (raw p)" },
+        { value: "bonferroni", label: "Bonferroni" },
+        { value: "bh", label: "Benjamini–Hochberg (FDR)" },
+      ],
+      help: "Several brackets means several shots at p<0.05. Correcting adjusts BOTH the stars and the reported p-values. A star you overrode by hand is never re-corrected.",
+    },
     { key: "hline", label: "Reference line (µV)", type: "text", help: "Draw a dashed horizontal line at this amplitude (leave blank for none) — e.g. a threshold or a group reference." },
     { key: "hline_label", label: "Reference line label", type: "text", help: "Optional caption for the reference line." },
     {

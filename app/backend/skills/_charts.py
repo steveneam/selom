@@ -200,9 +200,9 @@ def ref_line(value, label, *, axis: str):
 # --- the generic bar figure -------------------------------------------------------------
 def bar_figure(cat_values, *, y_title="value", title="", colors=None, labels=None, patterns=None,
                error="sem", show_error=True, points=True, point_name="points",
-               bar_fill="filled", comparisons=None, sig_test="welch", hline=None, hline_label="",
-               vline=None, vline_label="", legend=False, caption="", round_fn=None,
-               jitter_width=0.34):
+               bar_fill="filled", comparisons=None, sig_test="welch", correction="none",
+               hline=None, hline_label="", vline=None, vline_label="", legend=False, caption="",
+               round_fn=None, jitter_width=0.34):
     """A mean ± spread bar for any categorical comparison → ``(spec, table_rows)``.
 
     ``cat_values`` = ordered ``[(key, [raw values]), …]``. ``colors``/``labels``/``patterns`` are
@@ -211,9 +211,11 @@ def bar_figure(cat_values, *, y_title="value", title="", colors=None, labels=Non
 
     Styling vocabulary (mean-spread-styling-spec): ``error`` (sem|sd|ci95|minmax) · ``show_error`` ·
     ``points`` (jittered individuals) · ``bar_fill`` (filled|pattern|open) · ``comparisons``
-    (significance brackets, computed or overridden ``(a, b[, override])``) · ``hline``/``vline``
-    (reference line) · ``legend`` (per-category pattern legend). ``table_rows`` = ``[key, n, mean,
-    err]``. The ``filled · sem · no brackets/line/legend`` path is the original look."""
+    (significance brackets, computed or overridden ``(a, b[, override])``) · ``correction``
+    (multiple-comparison adjustment across those brackets — the same vocabulary box/violin use) ·
+    ``hline``/``vline`` (reference line) · ``legend`` (per-category pattern legend). ``table_rows``
+    = ``[key, n, mean, err]``. The ``filled · sem · no brackets/line/legend`` path is the original
+    look."""
     rnd = round_fn or (lambda v: round(float(v), 4))
     labels = labels or {}
     keys = [k for k, _ in cat_values]
@@ -263,7 +265,8 @@ def bar_figure(cat_values, *, y_title="value", title="", colors=None, labels=Non
     y_top = max([*(m + h for m, h in zip(means, his)), *pt_y, 0.0])
     if comparisons:
         s, a, y_top = sig_brackets(cat_values, {k: i for i, k in enumerate(keys)},
-                                   means, his, pt_y, comparisons, sig_test)
+                                   means, his, pt_y, comparisons, sig_test,
+                                   correction=correction)
         shapes += s
         extra_annos += a
     if hline is not None:
