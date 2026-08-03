@@ -36,7 +36,24 @@ NATIVE = {
     "diff_abundance", "markers", "normalization_qc", "pseudotime_genes",  # attach in run_real only
     "erg_traces", "erg_bwave_bar", "erg_intensity_response", "erg_flicker",  # attach in the stub (proprietary)
     "facs_gating",                                                     # attach in the stub + run_real
+    "boxplot", "violin",                                               # conditional attach (pairs=)
 }
+
+# The reviewed native-AND-L3 overlap. Normally a skill declares ONE table source, and the
+# disjointness assertions below force that decision. These two are deliberate exceptions, and the
+# runtime already models them: `_run.py` attaches the native table and falls back to the L3
+# synthesizer only `if table is None`.
+#
+# Both gained `pairs=` (skills/_stats.py), which computes p-values that exist nowhere in the figure
+# except as stars — so when `pairs=` is set the native table carries the numbers behind those stars,
+# because they are IRRECOVERABLE by synthesis. With no `pairs=` there is no native table and L3
+# synthesizes what the figure does encode: boxplot's five-number summary (readable straight off the
+# drawn box) and violin's PubMed marker call. The two sources cover disjoint *runs*, not disjoint
+# skills, which is the distinction the original partition could not express.
+#
+# This is a narrow, declared exception, NOT a relaxation: the completeness guard below is unchanged,
+# so a skill still cannot be silently tableless, and anything landing here has to justify itself.
+NATIVE_L3_BOTH = {"boxplot", "violin"}
 
 # The reviewed L4-only allowlist: node-link skills with no faithful table → the L4 Pro-AI tier. A
 # skill here has NO native table and NO synthesizer *by design* — ``test_l4_only_is_honestly_tableless``
@@ -70,7 +87,12 @@ def test_table_contract_partitions_every_skill():
     all_skills = set(list_skill_ids())
     l3 = set(_SYNTHESIZERS)
 
-    assert NATIVE.isdisjoint(l3), f"native ∩ L3 = {sorted(NATIVE & l3)} (a skill can't be both)"
+    overlap = (NATIVE & l3) - NATIVE_L3_BOTH
+    assert not overlap, (
+        f"native ∩ L3 = {sorted(overlap)} — a skill declares ONE table source unless its native "
+        f"table is conditional and L3 covers the other case; then add it to NATIVE_L3_BOTH with "
+        f"the reason."
+    )
     assert NATIVE.isdisjoint(L4_ONLY), f"native ∩ L4-only = {sorted(NATIVE & L4_ONLY)}"
     assert l3.isdisjoint(L4_ONLY), f"L3 ∩ L4-only = {sorted(l3 & L4_ONLY)}"
 
@@ -93,6 +115,31 @@ def test_native_classification_matches_source():
     assert detected == NATIVE, (
         f"native-table set drifted from source: in-source-not-doc={sorted(detected - NATIVE)} "
         f"in-doc-not-source={sorted(NATIVE - detected)}"
+    )
+
+
+@pytest.mark.parametrize("skill_id", sorted(NATIVE_L3_BOTH))
+def test_native_l3_overlap_really_is_conditional(skill_id):
+    """The exception must EARN itself. A skill in NATIVE_L3_BOTH has to actually behave the way the
+    note claims: no native table on a default run (so L3 is what covers it), a native table once
+    `pairs=` asks a question the figure cannot answer, and a working synthesizer either way.
+
+    Without this, NATIVE_L3_BOTH would be a hole in the partition — somewhere to park a skill that
+    is simply double-classified."""
+    _fig, default_native = run_skill_with_table(skill_id, "unused", {})
+    assert default_native is None, (
+        f"{skill_id} attaches a native table with DEFAULT params — it is unconditionally native, "
+        f"so it does not belong in NATIVE_L3_BOTH"
+    )
+    assert skill_id in _SYNTHESIZERS, f"{skill_id} has no L3 synthesizer to fall back to"
+
+    # The stub groups differ per skill, so ask for a pair drawn from the figure it just built.
+    names = [t.get("name") for t in _fig.get("data", []) if t.get("name")]
+    assert len(names) >= 2, f"{skill_id} stub has too few groups to test a pair"
+    _fig2, native = run_skill_with_table(skill_id, "unused", {"pairs": f"{names[0]}~{names[1]}"})
+    assert native is not None and native.get("columns"), (
+        f"{skill_id} drew stars from `pairs=` but attached no table — the p-values behind those "
+        f"stars exist nowhere else in the figure"
     )
 
 

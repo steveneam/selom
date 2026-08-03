@@ -246,6 +246,36 @@ def bracket_shapes(results, idx_of, data_top: float, *, orientation: str = "v", 
     return shapes, annos, (data_top + step * (level + 1) if level else data_top)
 
 
+def attach_brackets(spec: dict, results, order, values_of, value_axis: dict, *,
+                    orientation: str = "v") -> None:
+    """Hang the brackets on a spec and grow its value axis so they are not clipped — the whole
+    annotation step for any **unanchored** categorical plot (box, violin: an axis that does not
+    start at zero). Mutates ``spec["layout"]`` and ``value_axis`` in place; a no-op when there is
+    nothing to draw.
+
+    The axis is grown at BOTH ends on purpose: an explicit range that started at the data minimum
+    would clip the lower whisker of the very plot it is annotating.
+
+    A zero-anchored bar does NOT use this — ``_charts.bar_figure`` keeps its own ``rangemode:
+    tozero`` handling, and its geometry is pinned by goldens.
+    """
+    flat = [float(v) for vals in values_of.values() for v in vals
+            if v is not None and math.isfinite(float(v))]
+    if not results or not flat:
+        return
+    lo, hi = min(flat), max(flat)
+    # A degenerate span (every value identical) still needs a usable step: fall back to the
+    # magnitude, then to 1.0, so the bracket never collapses onto the data.
+    span = (hi - lo) or abs(hi) or 1.0
+    shapes, annos, top = bracket_shapes(results, {k: i for i, k in enumerate(order)}, hi,
+                                        orientation=orientation, span=span)
+    if not shapes:
+        return
+    spec.setdefault("layout", {}).setdefault("shapes", []).extend(shapes)
+    spec.setdefault("layout", {}).setdefault("annotations", []).extend(annos)
+    value_axis["range"] = [round(lo - span * 0.08, 4), round(top + span * 0.06, 4)]
+
+
 def _line(cat_ref, val_ref, c0, c1, v0, v1) -> dict:
     """One bracket segment in category/value space, emitted in Plotly's x/y space."""
     shape = {"type": "line", "xref": "x", "yref": "y", "line": dict(_LINE)}

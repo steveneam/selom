@@ -33,6 +33,6 @@ def run(data_path: str, params: dict) -> dict:
     series = {str(col): num[col].tolist() for col in num.columns}
     spec = _composition_spec(
         categories, series, params.get("mode", "grouped"), params.get("orientation", "h"),
-        "Composition",
+        "Composition", params,
     )
     return jsonable(spec)

@@ -13,7 +13,12 @@
     "normalize":  { "type": "bool",  "default": true },
     "annotate":   { "type": "str",   "default": "none" },
     "context":    { "type": "str",   "default": "" },
-    "known_min":  { "type": "int",   "default": 5, "min": 1, "max": 100000 }
+    "known_min":  { "type": "int",   "default": 5, "min": 1, "max": 100000 },
+    "order":      { "type": "str",   "default": "" },
+    "add_count":  { "type": "bool",  "default": false },
+    "pairs":      { "type": "str",   "default": "" },
+    "sig_test":   { "type": "str",   "default": "welch", "options": ["welch", "student", "mannwhitney"] },
+    "correction": { "type": "str",   "default": "none", "options": ["none", "bonferroni", "bh"] }
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" }

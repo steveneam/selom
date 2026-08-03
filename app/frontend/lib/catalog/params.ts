@@ -131,7 +131,77 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     { key: "reference", label: "Reference group", type: "text", placeholder: "e.g. control", help: "Baseline condition for the contrast." },
     { key: "treatment", label: "Treatment group", type: "text", placeholder: "e.g. treated" },
   ],
-  violin: [{ key: "gene", label: "Marker gene", type: "text", placeholder: "e.g. MS4A1" }],
+  // Distribution comparisons (boxplot · violin) share ONE vocabulary, because they share one
+  // engine (skills/_stats.py): order → add_count → pairs → the test behind the stars. Keep the two
+  // lists in the same order and wording — a user who learns the knobs on a box plot should not
+  // have to relearn them on a violin.
+  //
+  // `pairs` is a TEXT field and that is a known compromise, not the intended affordance. Mobbin
+  // (Rows / Glide / Databricks / Hex chart builders) is unanimous that "add another structural
+  // thing" is a repeatable row-list of typed selects with an explicit "+ Add" — nobody asks the
+  // user to type a mini-DSL. Selom cannot render that yet for two concrete reasons: ParamField has
+  // no repeatable-list widget, and a param control has no access to the dataset's category values
+  // at render time (the spec is static; the group names only exist after the data is loaded). So
+  // the help text carries the syntax and names the failure mode instead. Captured as a gap.
+  boxplot: [
+    { key: "group", label: "Group column", type: "text", placeholder: "auto-detect", help: "Column holding the category. Blank = first non-numeric column." },
+    { key: "value", label: "Value column", type: "text", placeholder: "auto-detect", help: "Column holding the measurement. Blank = first numeric column." },
+    { key: "order", label: "Category order", type: "text", placeholder: "e.g. Control, Low, High", help: "Comma-separated. Named categories lead, in this order; the rest follow unchanged." },
+    { key: "add_count", label: "Show n per group", type: "switch", help: "Append n= to each category label." },
+    { key: "pairs", label: "Compare groups", type: "text", placeholder: "e.g. Control~Treated, Control~Rescue", help: "Comma-separated pairs joined by ~. Each draws a bracket with significance stars, and the p-values appear in the Statistics table. A name that doesn't match a group is skipped." },
+    { key: "sig_test", label: "Significance test", type: "select", help: "Applied to every pair above.", options: [
+      { value: "welch", label: "Welch t-test (unequal variance)" },
+      { value: "student", label: "Student t-test (equal variance)" },
+      { value: "mannwhitney", label: "Mann-Whitney U (rank)" },
+    ] },
+    { key: "correction", label: "Multiple-comparison correction", type: "select", help: "Several brackets means several shots at p<0.05. Correcting adjusts BOTH the stars and the table.", options: [
+      { value: "none", label: "None (raw p)" },
+      { value: "bonferroni", label: "Bonferroni" },
+      { value: "bh", label: "Benjamini-Hochberg (FDR)" },
+    ] },
+    { key: "points", label: "Show points", type: "select", options: [
+      { value: "outliers", label: "Outliers only" },
+      { value: "all", label: "All points" },
+      { value: "suspectedoutliers", label: "Suspected outliers" },
+      { value: "none", label: "None" },
+    ] },
+    { key: "orientation", label: "Orientation", type: "select", options: [
+      { value: "v", label: "Vertical" },
+      { value: "h", label: "Horizontal" },
+    ] },
+    { key: "notched", label: "Notched boxes", type: "switch", help: "Notch marks the median's confidence interval." },
+  ],
+  violin: [
+    { key: "gene", label: "Marker gene", type: "text", placeholder: "e.g. MS4A1" },
+    { key: "order", label: "Category order", type: "text", placeholder: "e.g. cluster 2, cluster 0", help: "Comma-separated. Named categories lead, in this order; the rest follow unchanged." },
+    { key: "add_count", label: "Show n per group", type: "switch", help: "Append n= to each category label." },
+    { key: "pairs", label: "Compare groups", type: "text", placeholder: "e.g. cluster 0~cluster 1", help: "Comma-separated pairs joined by ~. Each draws a bracket with significance stars, and the p-values appear in the Statistics table. A name that doesn't match a group is skipped." },
+    { key: "sig_test", label: "Significance test", type: "select", help: "Applied to every pair above.", options: [
+      { value: "welch", label: "Welch t-test (unequal variance)" },
+      { value: "student", label: "Student t-test (equal variance)" },
+      { value: "mannwhitney", label: "Mann-Whitney U (rank)" },
+    ] },
+    { key: "correction", label: "Multiple-comparison correction", type: "select", help: "Several brackets means several shots at p<0.05. Correcting adjusts BOTH the stars and the table.", options: [
+      { value: "none", label: "None (raw p)" },
+      { value: "bonferroni", label: "Bonferroni" },
+      { value: "bh", label: "Benjamini-Hochberg (FDR)" },
+    ] },
+  ],
+  // Composition takes the ordering half of the vocabulary only — it holds one value per
+  // category x condition cell, so there is no distribution to test. See the note at the top of
+  // app/backend/skills/composition/run.py.
+  composition: [
+    { key: "order", label: "Category order", type: "text", placeholder: "e.g. Rods, Bipolar", help: "Comma-separated. Named categories lead, in this order; the rest follow unchanged." },
+    { key: "sort_by", label: "Sort by series", type: "text", placeholder: "a value column", help: "Sort categories by one series' values. Applied before Category order." },
+    { key: "mode", label: "Bar mode", type: "select", options: [
+      { value: "grouped", label: "Grouped" },
+      { value: "stacked", label: "Stacked" },
+    ] },
+    { key: "orientation", label: "Orientation", type: "select", options: [
+      { value: "h", label: "Horizontal" },
+      { value: "v", label: "Vertical" },
+    ] },
+  ],
   heatmap: [
     { key: "n_genes", label: "Genes shown", type: "range", step: 5, help: "Top genes by variance (bulk) or markers per cluster (scRNA)." },
     {

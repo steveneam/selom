@@ -9,7 +9,8 @@
   "param_spec": {
     "mode":        { "type": "str", "default": "grouped" },
     "orientation": { "type": "str", "default": "h" },
-    "sort_by":     { "type": "str", "default": "" }
+    "sort_by":     { "type": "str", "default": "" },
+    "order":       { "type": "str", "default": "" }
   },
   "outputs": [
     { "name": "figure", "kind": "plotly_spec" }

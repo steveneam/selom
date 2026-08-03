@@ -178,3 +178,53 @@ describe("hasParamControls", () => {
     expect(hasParamControls("selom.go_graph")).toBe(false);
   });
 });
+
+/**
+ * The `pairs=` vocabulary is REACHABLE (selom-shipped-not-reachable). A backend param with no
+ * overlay entry renders no control and can only be reached via the API — which is how
+ * `assemble-scrna` shipped with no surface. These prove the merge actually yields the controls,
+ * not merely that the keys line up (registry-completeness.test.ts already checks that).
+ */
+describe("distribution-comparison controls (boxplot · violin)", () => {
+  const VOCAB = ["order", "add_count", "pairs", "sig_test", "correction"];
+
+  it.each(["boxplot", "violin"])("%s surfaces the whole shared vocabulary", (id) => {
+    const keys = paramFieldsFromSpec(id, SKILL_PARAM_SPECS[id]).map((f) => f.key);
+    for (const k of VOCAB) expect(keys).toContain(k);
+  });
+
+  it.each(["boxplot", "violin"])("%s offers every backend test + correction option", (id) => {
+    const fields = paramFieldsFromSpec(id, SKILL_PARAM_SPECS[id]);
+    const opts = (k: string) => fields.find((f) => f.key === k)!.options!.map((o) => o.value);
+    expect(opts("sig_test")).toEqual(["welch", "student", "mannwhitney"]);
+    expect(opts("correction")).toEqual(["none", "bonferroni", "bh"]);
+  });
+
+  it("boxplot's pre-existing knobs are reachable too (it had NO overlay before)", () => {
+    const keys = paramFieldsFromSpec("boxplot", SKILL_PARAM_SPECS.boxplot).map((f) => f.key);
+    for (const k of ["group", "value", "points", "orientation", "notched"]) {
+      expect(keys).toContain(k);
+    }
+  });
+
+  it("both skills present the shared vocabulary in the SAME order", () => {
+    const order = (id: string) =>
+      paramFieldsFromSpec(id, SKILL_PARAM_SPECS[id])
+        .map((f) => f.key)
+        .filter((k) => VOCAB.includes(k));
+    expect(order("boxplot")).toEqual(order("violin"));
+  });
+
+  it("composition takes the ordering half only — no pairs (one value per cell, nothing to test)", () => {
+    const keys = paramFieldsFromSpec("composition", SKILL_PARAM_SPECS.composition).map((f) => f.key);
+    expect(keys).toContain("order");
+    expect(keys).not.toContain("pairs");
+    expect(keys).not.toContain("add_count");
+  });
+
+  it("defaults still come from the spec, never the overlay", () => {
+    const fields = paramFieldsFromSpec("boxplot", SKILL_PARAM_SPECS.boxplot);
+    expect(fields.find((f) => f.key === "correction")!.default).toBe("none");
+    expect(fields.find((f) => f.key === "add_count")!.default).toBe(false);
+  });
+});

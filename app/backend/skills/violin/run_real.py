@@ -43,28 +43,14 @@ def run(data_path: str, params: dict) -> dict:
     expr = np.asarray(expr.todense()).ravel() if hasattr(expr, "todense") else np.asarray(expr).ravel()
     groups = adata.obs[groupby].astype(str)
 
-    traces = []
-    for g in sorted(groups.unique(), key=lambda s: (len(s), s)):
-        ys = expr[(groups == g).to_numpy()]
-        traces.append(
-            {
-                "type": "violin",
-                "name": f"cluster {g}",
-                "y": ys,
-                "box": {"visible": True},
-                "meanline": {"visible": True},
-                "points": False,
-            }
-        )
+    from skills.violin.run import violin_spec
 
-    spec = {
-        "data": traces,
-        "layout": {
-            "title": {"text": f"{gene} expression by {groupby}"},
-            "xaxis": {"title": {"text": groupby}},
-            "yaxis": {"title": {"text": "expression (log1p)"}},
-        },
+    cells = {
+        f"cluster {g}": expr[(groups == g).to_numpy()]
+        for g in sorted(groups.unique(), key=lambda s: (len(s), s))
     }
+    spec = violin_spec(cells, params, "expression (log1p)", groupby,
+                       f"{gene} expression by {groupby}")
     if str(params.get("annotate") or "none").lower() == "pubmed":
         spec = _annotate_with_pubmed(spec, gene, params)
     return jsonable(spec)

@@ -9,6 +9,14 @@ deterministic three-group comparison of the same wire shape.
 """
 
 from skills._engine import to_bool, use_real_engine
+from skills._stats import (
+    attach_brackets,
+    count_labels,
+    pairs_table,
+    parse_pairs,
+    resolve_order,
+    test_pairs,
+)
 
 # Plotly ``boxpoints`` spellings exposed via the ``points`` param.
 _POINTS = {"outliers": "outliers", "all": "all", "none": False,
@@ -41,30 +49,52 @@ def boxplot_spec(groups: dict, params: dict, value_label: str, group_label: str,
     ``groups`` = {label: [values]}. One ``box`` trace per group so each is
     independently editable and legend-toggleable; Plotly computes the quartiles /
     whiskers / outliers from the raw values client-side.
+
+    Grouping + annotation vocabulary (``skills._stats``, shared with every other categorical
+    skill): ``order`` (explicit category order) · ``add_count`` (``n=`` welded to each label) ·
+    ``pairs`` (``"A~B, C~D"`` → test + bracket + stars, with ``sig_test`` and ``correction``).
+    With no ``pairs`` the spec is unchanged, which is what keeps the golden stable.
     """
     horizontal = str(params.get("orientation", "v")).lower().startswith("h")
     boxpoints = _POINTS.get(str(params.get("points", "outliers")).lower(), "outliers")
     notched = to_bool(params.get("notched", False))
 
+    order = resolve_order(list(groups.keys()), params.get("order"))
+    values_of = {k: groups[k] for k in order}
+    # add_count welds n= to the trace NAME rather than emitting a separate annotation, so the
+    # count cannot drift out of alignment when the axis reorders (see _stats.count_labels).
+    names = (count_labels(order, values_of) if to_bool(params.get("add_count", False))
+             else {k: str(k) for k in order})
+
     data = []
-    for name, values in groups.items():
-        vals = [round(float(v), 4) for v in values]
-        trace = {"type": "box", "name": str(name), "boxpoints": boxpoints,
+    for key in order:
+        vals = [round(float(v), 4) for v in values_of[key]]
+        trace = {"type": "box", "name": names[key], "boxpoints": boxpoints,
                  "notched": notched}
         trace["x" if horizontal else "y"] = vals
         data.append(trace)
 
     value_axis = {"title": {"text": value_label}, "zeroline": False}
     cat_axis = {"title": {"text": group_label}, "type": "category"}
-    return {
-        "data": data,
-        "layout": {
-            "title": {"text": title},
-            "xaxis": value_axis if horizontal else cat_axis,
-            "yaxis": cat_axis if horizontal else value_axis,
-            "legend": {"title": {"text": group_label}},
-            "boxgap": 0.3,
-            "showlegend": False,
-            "plot_bgcolor": "white",
-        },
+    layout = {
+        "title": {"text": title},
+        "xaxis": value_axis if horizontal else cat_axis,
+        "yaxis": cat_axis if horizontal else value_axis,
+        "legend": {"title": {"text": group_label}},
+        "boxgap": 0.3,
+        "showlegend": False,
+        "plot_bgcolor": "white",
     }
+    spec = {"data": data, "layout": layout}
+
+    results = test_pairs(parse_pairs(params.get("pairs")), values_of,
+                         test=str(params.get("sig_test", "welch")),
+                         correction=str(params.get("correction", "none")))
+    if results:
+        attach_brackets(spec, results, order, values_of, value_axis,
+                        orientation="h" if horizontal else "v")
+        tbl = pairs_table(results, test=str(params.get("sig_test", "welch")),
+                          correction=str(params.get("correction", "none")))
+        if tbl:
+            spec["table"] = tbl
+    return spec

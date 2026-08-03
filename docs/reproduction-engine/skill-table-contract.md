@@ -50,8 +50,31 @@ Every skill's Statistics table comes from exactly one of three layers
 | `markers` | `run_real.py` only | only when `rank_by ∈ {cohens_d, auc}` |
 | `normalization_qc` | `run_real.py` only | only when `filter` and/or `doublets` |
 | `pseudotime_genes` | `run_real.py` only | stub emits none |
+| `boxplot` | `run.py` (cond.) | conditional on `pairs=`; also L3 — see below |
+| `violin` | `run.py` (cond.) | conditional on `pairs=`; also L3 — see below |
 
 Column-level detail (exact columns, caps, golden metrics readable) is in `skill-table-schemas.md`.
+
+### The one declared native ∩ L3 overlap — `boxplot` · `violin`
+
+A skill normally declares **one** table source, and the guard's disjointness assertions force that
+decision. These two are a reviewed exception (`NATIVE_L3_BOTH` in the guard), and the runtime
+already models it: `_run.py` attaches the native table and falls back to L3 **only** `if table is
+None`.
+
+Both gained `pairs=` (the shared significance engine, `skills/_stats.py`). A pairwise p-value exists
+nowhere in the figure except as a star, so when `pairs=` is set the native table carries the numbers
+behind those stars — they are **irrecoverable** by synthesis, and stars without their p-values are a
+claim the figure cannot back. With no `pairs=` there is no native table and L3 synthesizes what the
+figure *does* encode: `boxplot`'s five-number summary (readable straight off the drawn box) and
+`violin`'s PubMed marker call.
+
+So the two sources cover disjoint **runs**, not disjoint **skills** — the distinction the original
+three-way partition could not express. The completeness guard is unchanged, so nothing can become
+silently tableless, and `test_native_l3_overlap_really_is_conditional` makes each entry prove it
+behaves this way (no native table on a default run, a native table once `pairs=` is set, and a
+working synthesizer either way) rather than letting the set become a place to park a
+double-classified skill.
 
 ### L3 — synthesized from the figure (16, == `_SYNTHESIZERS`)
 
