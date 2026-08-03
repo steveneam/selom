@@ -58,6 +58,7 @@ export const SKILL_PARAM_SPECS: Record<string, BackendParamSpec> = {
     correction: { type: "str", default: "none", options: ["none", "bonferroni", "bh"] },
   },
   boxplot: {
+    style: { type: "str", default: "box", options: ["box", "strip"] },
     group: { type: "str", default: "" },
     value: { type: "str", default: "" },
     points: { type: "str", default: "outliers", options: ["outliers", "all", "none", "suspectedoutliers"] },

@@ -1,7 +1,7 @@
 {
   "id": "boxplot",
   "version": "0.1.0",
-  "title": "Grouped box-and-whisker",
+  "title": "Box / strip plot",
   "engine": "python",
   "omics": "scrna-seq|bulk-rna-seq|proteomics|metabolomics",
   "omics_type": ["general"],
@@ -10,6 +10,7 @@
   "param_spec": {
     "group":       { "type": "str",  "default": "" },
     "value":       { "type": "str",  "default": "" },
+    "style":              { "type": "str", "default": "box", "options": ["box", "strip"], "note": "strip hides the box entirely and shows every individual value — the honest companion when n is small." },
     "points":      { "type": "str",  "default": "outliers", "options": ["outliers", "all", "none", "suspectedoutliers"] },
     "orientation": { "type": "str",  "default": "v", "options": ["v", "h"] },
     "notched":     { "type": "bool", "default": false },
@@ -24,7 +25,7 @@
   ],
   "catalog": {
     "name": "Selom Box Plot",
-    "summary": "Grouped box-and-whisker distributions — compare a numeric measure across categories (quartiles, median, 1.5×IQR whiskers, outliers), with optional point overlay. The distribution-comparison companion to violin and composition.",
+    "summary": "Box or strip plot of a numeric measure across categories — quartiles, median and 1.5×IQR whiskers, or (style=strip) every individual value with the box hidden, which is the honest choice when n is small. Optional significance brackets between named pairs. The distribution-comparison companion to violin and composition.",
     "category": "visualization",
     "tier": "verified",
     "status": "beta",

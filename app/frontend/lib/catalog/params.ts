@@ -144,6 +144,10 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   // at render time (the spec is static; the group names only exist after the data is loaded). So
   // the help text carries the syntax and names the failure mode instead. Captured as a gap.
   boxplot: [
+    { key: "style", label: "Chart style", type: "select", help: "Strip hides the box and shows every individual value — honest when n is small, where a box implies more data than you have.", options: [
+      { value: "box", label: "Box plot (quartiles + whiskers)" },
+      { value: "strip", label: "Strip plot (individual points only)" },
+    ] },
     { key: "group", label: "Group column", type: "text", placeholder: "auto-detect", help: "Column holding the category. Blank = first non-numeric column." },
     { key: "value", label: "Value column", type: "text", placeholder: "auto-detect", help: "Column holding the measurement. Blank = first numeric column." },
     { key: "order", label: "Category order", type: "text", placeholder: "e.g. Control, Low, High", help: "Comma-separated. Named categories lead, in this order; the rest follow unchanged." },

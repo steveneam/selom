@@ -58,6 +58,15 @@ def boxplot_spec(groups: dict, params: dict, value_label: str, group_label: str,
     horizontal = str(params.get("orientation", "v")).lower().startswith("h")
     boxpoints = _POINTS.get(str(params.get("points", "outliers")).lower(), "outliers")
     notched = to_bool(params.get("notched", False))
+    # `strip` = every individual value, with the box furniture hidden. It is a MODE here rather
+    # than a separate skill because Plotly's own box trace draws it (boxpoints="all" plus a
+    # transparent box), and because a strip plot must keep the whole shared vocabulary — order,
+    # add_count, pairs/brackets, orientation — which a parallel skill would have had to re-import
+    # and could then drift from. The review called strip "the honest companion to every box plot";
+    # that companionship is the argument for one skill with two faces, not two skills.
+    strip = str(params.get("style", "box")).strip().lower() == "strip"
+    if strip:
+        boxpoints = "all"
 
     order = resolve_order(list(groups.keys()), params.get("order"))
     values_of = {k: groups[k] for k in order}
@@ -71,6 +80,18 @@ def boxplot_spec(groups: dict, params: dict, value_label: str, group_label: str,
         vals = [round(float(v), 4) for v in values_of[key]]
         trace = {"type": "box", "name": names[key], "boxpoints": boxpoints,
                  "notched": notched}
+        if strip:
+            # Box hidden by zero WIDTH + no fill, deliberately not by a transparent line colour:
+            # a box trace's points inherit their colour from the trace, so `line.color:
+            # rgba(0,0,0,0)` makes the MARKERS transparent too and the panel renders completely
+            # empty — axes, ticks and n= labels all correct, and not one point drawn. (Found by
+            # rendering it; every assertion on the spec passed.) Zero width leaves the marker
+            # colour alone, so the points still take the style's colourway.
+            trace["fillcolor"] = "rgba(0,0,0,0)"
+            trace["line"] = {"width": 0}
+            trace["pointpos"] = 0
+            trace["jitter"] = 0.6
+            trace["hoveron"] = "points"
         trace["x" if horizontal else "y"] = vals
         data.append(trace)
 

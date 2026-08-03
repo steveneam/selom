@@ -290,3 +290,49 @@ def test_pairs_table_reports_an_untestable_pair_as_na():
     tbl = _stats.pairs_table(results)
     assert tbl["rows"][0][4] == "n/a"
     assert tbl["rows"][0][-1] == "ns"
+
+
+# --- strip mode (boxplot style=strip) -----------------------------------------------------
+# Defect-driven, per the cnsplots review's "every bug becomes a named permanent test" habit.
+
+
+def _strip_trace(**params):
+    from skills.boxplot.run import _stub_figure
+
+    return _stub_figure({"style": "strip", **params})["data"][0]
+
+
+def test_strip_hides_the_box_without_hiding_its_points():
+    """The bug this pins: a box trace's POINTS inherit the trace colour, so hiding the box with
+    ``line.color: rgba(0,0,0,0)`` makes the markers transparent too and the panel renders
+    completely empty — correct axes, correct n= labels, not one point drawn. Every assertion on
+    the spec still passed; only rendering it showed the failure. Hide the box by zero WIDTH.
+    """
+    tr = _strip_trace()
+    assert tr["boxpoints"] == "all", "strip must plot every value, not just outliers"
+    assert tr["fillcolor"] == "rgba(0,0,0,0)", "the box body must not be filled"
+    assert tr["line"] == {"width": 0}, "hide the box by width — a colour also hides the points"
+    assert "color" not in tr["line"], "never set a transparent line COLOUR on a box trace"
+    # No marker colour is set at all, so the points take the style's colourway (themed centrally).
+    assert "marker" not in tr or "color" not in tr.get("marker", {})
+
+
+def test_strip_keeps_the_shared_categorical_vocabulary():
+    """The argument for strip being a MODE rather than its own skill: order / add_count / pairs
+    keep working. A parallel skill would have had to re-import _stats and could then drift."""
+    spec = __import__("skills.boxplot.run", fromlist=["_stub_figure"])._stub_figure(
+        {"style": "strip", "pairs": "Cepo~HVG", "add_count": True}
+    )
+    assert spec["layout"].get("shapes"), "significance brackets must still be drawn on a strip"
+    assert spec["table"]["rows"], "the p-value behind the stars must still reach the table"
+    assert "n=" in spec["data"][0]["name"], "add_count must still weld n= to the label"
+
+
+def test_default_style_is_a_box_and_carries_no_strip_keys():
+    """The golden's stability rides on this: style defaults to box, so no strip key is emitted."""
+    from skills.boxplot.run import _stub_figure
+
+    tr = _stub_figure({})["data"][0]
+    assert tr["boxpoints"] == "outliers"
+    for key in ("fillcolor", "pointpos", "jitter", "hoveron"):
+        assert key not in tr, f"default box trace must not carry the strip key {key!r}"
