@@ -27,6 +27,7 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
+| **PHASE-F1-F2** | 2026-08-03 | `main` `8520466..e14ee9e` (**unpushed — owner pushes**) | **The owner's "our plots look worse than cnsplots" is answered with a measurement, and the answer was not the one the charter predicted.** `F1`: five plot types through Selom's own skills on the real corpus, then the **identical arrays** fed to cnsplots 0.6.0 in a throwaway venv, both on one canvas (6×4.5in @ 200dpi — typography only compares in points). Result: 24 named differences with PORT/REJECT/CHECK verdicts (`docs/cnsplots-port/parity-audit.md`). **But three of the five plot types were BROKEN, not merely ugly**, so `F1.5` went first: `enrichment` passed the raw gene count to `marker.size` with `sizemode:"diameter"` → dots **1–3 PIXELS** across and no size key at all (matplotlib's `s` is an *area*, which is why it looked fine on the other side and hid the bug) · `heatmap`'s cluster axis was numeric-looking **strings in lexicographic order**, so Plotly inferred a LINEAR axis and **7 of 17 clusters were unreadable** with cluster 10 sitting between 1 and 11 · and the house font `Inter` was **bundled by nothing**, with the FE and BE stacks falling through to *different* faces (measured by ink width: 517px DejaVu vs 466px Liberation) — so the figure on screen and the figure exported were **different typefaces**. The axis-type bug was a *class*, so the sweep became a standing invariant in `smoke.check_figure` (every skill, real data, every run); it found exactly one more (`cluster`, where the 6-cluster stub renders identically either way and hid it perfectly). Then `F2` ported **10 of the 14 PORT rows** as style tokens — gridless, bold title, black spines/ticks at cnsplots' geometry, flattened title ramp, legend density, and diverging matrices finally putting HIGH at the **red** end (`heatmap`/`corr_heatmap`/`cepo` all had it inverted; verified by sampling rendered pixels). FE defaults moved in step so an editor-made figure matches a skill-made one. `verify.sh` **7/7**, full smoke **35 pass / 0 fail**, **browser-verify 14/14** (F2's D5 acceptance — a real figure restyled and still editable). |
 | **SPRINT-3** | 2026-08-02 | `main` `01e3736..<head>` (**unpushed — owner pushes**) | **`A1` closed for real, then Parallel Sprint 3 ran 3 lanes and the train.** `A1`: a figure exported from the editor's Export menu to a **real Google Drive and a real Dropbox**, each downloaded back and confirmed a valid 1600×1200 PNG, then deleted — and it found a live defect a mock cannot see: Drive returns the resumable session URI on a 200 **or a 308**, and with `follow_redirects=True` httpx **re-POSTs the 17-byte metadata** to the session URI in a loop, so the figure's bytes never left the box. Fixed + guarded. (The Dropbox non-ASCII fear does **not** fire — `json.dumps` already escapes; now executable.) Lanes: **A** `paper-outputs` (R-01+R-03 — the lit-synthesizer and the **Reproducibility Score** finally have a surface: a 4th `Write-up` stage in the Paper shell) · **B** `jobs` (R-02+R-06 — a run-activity dock; refused a progress bar because `Job.public()` carries no percentage) · **C** `skills` (the **36-skill smoke matrix**). Train run **B → A → C** with `verify.sh` **7/7 on each rebased result**; the expected `test_reachability_guard.py` waiver conflict resolved by hand. Also specced **P-E auth** (and found the plan's "backend is ready" is **half wrong** — 39 of 78 routes take no `AuthContext`, and `GET /artifacts/{id}/table` serves any tenant's matrix bytes to whoever has the id) and **Phase F**, the cnsplots figure-quality port. |
 | **CLOUD-EXPORT** | 2026-08-02 | `main` `1c4a6f4..01e3736` (**pushed**) | **Track E built end-to-end: figures can be sent to Google Drive / Dropbox.** Spec first (`docs/cloud-export/spec.md`), then `E-1` real uploads (Drive resumable · Dropbox simple + chunked session above its 150 MB ceiling; both CREATE, never overwrite) · `E-2` `/export/cloud` takes **either** a `dataset_id` **or** a rendered figure · `E-3` "Save to Drive/Dropbox" in the export menu. Key design (D1): `push_path` became the connector primitive and `push_from_store` a shared wrapper — that is what let a figure export without inventing a scratch object in the store. **Three real defects found:** figure export required a DATABASE (`Depends(_uploads_repo)` at the signature, 503 on any box without one) · the export menu carried a hardcoded disabled "Coming soon", the exact client-side pattern the frozen contract forbids and the A20 failure it exists to stop · and Mobbin ruled a pattern OUT — Drive's own folder-picker modal is impossible under `drive.file`, so there is deliberately no picker. **⚑ `E-3` is BUILT, NOT DONE — every test is a mock and no byte has reached a real account.** Also wrote **`docs/build-plan-2026-08/plan.md`**, the master sequencing doc for the autonomous run. Gate 7/7 on every commit. |
 | **ERG-MOCK** | 2026-08-02 | `main` `92d6f2e..288e07d` (**pushed**) | Owner-requested mock Fig 1E dataset for laying out the ERG intensity-response figure — `docs/records/erg-module/mock-fig1e/` (+ `n3/`). Simulated b-wave table (all 210 individual points, so mean/SEM is recomputable, not taken on trust) + a trace grid whose **waveform shapes are the real decoded recordings**. Three requested departures from the printed figure: CMV-GFP pulled to a clean null, RK-PDE6B a partial rescue, and the two rescue arms separated only *slightly* (`*`, p 0.02–0.03 at **both** 1.0 and 1.9 log). Plus the rd10 **threshold**: only the WT Control responds below flash 1.0. **The generator self-checks and exits non-zero WITHOUT writing if a retune breaks the biology** — it caught four real defects during the build (null curves running *downward* with intensity from a flat noise term; rescue arms flipping at the noise floor; a too-strict rank check below threshold; a monotonicity tolerance that did not scale with amplitude). Welch t-test is hand-rolled (stdlib has no t-distribution) and **validated against scipy to 1.5e-15**. Side effect worth knowing: pushing swept up **the 6 previously-unpushed EDITOR-ROOM commits**. Answered an owner question with code, not memory: **figures cannot be exported to Drive today** → new **Track E** on the board. |
@@ -39,67 +40,68 @@
 | **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
 | older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · SPRINT-3 · 2026-08-03 04:13 +1000 (Sydney) · branch `main` (**unpushed — owner pushes**) · Claude (FE+BE, solo, lead)
+## ▸ LIVE · PHASE-F1-F2 · 2026-08-03 11:01 +1000 (Sydney) · branch `main` (**unpushed — owner pushes**) · Claude (FE+BE, solo, lead)
 
-- **`A1` is closed — the cloud round trip is real, not mocked**, and it found a defect worse than the
-  one predicted (see the SESSIONS row). Locked in by `e2e/browser-verify/cloud-export.spec.ts`, which
-  diffs the account by **file id** (never by name — Dropbox `autorename` would let a previous run's
-  file pass) and **deletes what it created**, because these are the owner's real accounts.
-- **Sprint 3 is COMPLETE — all three lanes merged**, `verify.sh` **7/7 on each rebased result**
-  (train `B → A → C`; C is backend-only and orthogonal, so it took the slot it was ready for). The
-  expected `test_reachability_guard.py` waiver conflict was resolved by hand — R-01/R-02/R-03 rows all
-  gone, three CLOSED markers kept. Worktrees removed, branches deleted, main tree's symlinked deps
-  intact.
-- **The skills question is answered with evidence, not impression: 35 pass · 0 fail · 1 skipped**,
-  every row the REAL engine against a real corpus file, 217s (`docs/skill-coverage/matrix.md`,
-  gated by `scripts/skill-smoke.sh`). The single skip is **`facs_gating`: there is no `.fcs` file
-  anywhere in `SELOM_DATASETS_DIR`**, so the flow engine has never run on real input — a **corpus
-  gap, not a code gap**. Three findings the matrix produced that nothing else could:
-  - **`pathway` was DEAD in production** — every live Reactome call 403'd, because CloudFront rejects
-    urllib's default `Python-urllib/3.x` User-Agent, and the skill has no network fallback by design.
-    It raised on *every* run. Fixed. The only prior coverage was the stub — this row is the entire
-    argument for the matrix.
-  - **`go_graph` cannot run from a clean checkout** — its engine needs `go_dag.json`, a **gitignored
-    ~7 MB build artefact**, and it raises rather than degrading to the stub (its docstring saying
-    otherwise is stale). `scripts/skill-smoke.sh --install-artifacts` stages it from the corpus.
-  - **`umap_scrna` is NOT stub-only — the premise was wrong.** Its real engine is `run_scanpy.py`,
-    picked by `SELOM_UMAP_ENGINE` (not `SELOM_SKILLS_ENGINE`); the full filter→PCA→kNN→Leiden→UMAP
-    runs on the real 8,699-cell matrix in ~10 s. It merely ships no file named `run_real.py`.
-    **All 36 skills have a real engine and all 36 import**, proved on every run. The build plan's
-    "only `umap_scrna` is stub-only" line is **superseded**.
-- **⚑ P-E is bigger than the plan said.** `docs/auth-multitenancy/spec.md`: **39 of 78 routes take no
-  `AuthContext`**, so `SELOM_AUTH_MODE=clerk` would authenticate half the API and leave the rest
-  **unscoped**. `GET /artifacts/{artifact_id}/table` returns the exact matrix a skill consumed to
-  anyone holding the id. Also `lib/api/client.ts` has `setAuthHeader` but **no getter**, so Lane B's
-  job SSE stream + its polling floor will 401 the day Clerk lands.
-- **Phase F (cnsplots) is chartered** — `docs/cnsplots-port/{plan,spec}.md`. It is **BSD-3-Clause**,
-  so **no clean room is needed** (that is the copyleft path, per the Harmony rule); we copy and
-  credit. The port is at the **styling layer** — matplotlib render calls would produce figures that
-  cannot enter the editor, but the visual quality lives in typography/ticks/spines/legend
-  geometry/palettes, which move value-for-value into `theme.py`.
+- **F1 and F2 are DONE; F1.5 was found and done in between.** The audit is
+  `docs/cnsplots-port/parity-audit.md` — 24 rows with PORT/REJECT/CHECK verdicts, before/after
+  images for all five plot types, and its own §5 stating what it cannot claim. Re-runnable end to
+  end: `app/backend/scripts/render_parity.py` (Selom's side, reads its skill→corpus→params pairing
+  from `skills.smoke.CASES` so the audit can never drift onto data the matrix does not cover) and
+  `docs/cnsplots-port/audit/render_cns.py` (cnsplots' side, throwaway venv outside the repo).
+- **The charter's premise held but its scope was wrong: three of five plot types were BROKEN.**
+  A restyle over them would have produced a prettier unreadable figure, so F1.5 went first —
+  detail in the SESSIONS row, mechanism and after-images in the audit §1. All three fixed,
+  regressions in `app/backend/tests/test_figure_encoding_integrity.py`.
+- **The axis-type bug was a class, so the sweep is now a ratchet, not a one-off inspection.**
+  `smoke.check_figure` rejects any figure whose axis carries numeric-looking string categories
+  without `type: "category"` — every registered skill, real data, every run, and every future skill
+  inherits it. It found exactly one more instance (`cluster`) and cleared the rest.
+- **F2 closed 10 of the 14 PORT rows, all as style TOKENS** (`skills/styles.py`), so one edit
+  restyles all 36 skills and the journal packs inherit the mechanism. The FE's own defaults moved
+  in step, because they fill what the BE theme did not set — otherwise an editor-made figure and a
+  skill-made figure would sit in one library looking like different products.
+- **Gates:** `verify.sh` **7/7** on every commit · full `skill-smoke.sh` **35 pass / 0 fail / 1
+  skipped** · **`browser-verify.sh` 14/14**, which is F2's D5 acceptance (a real figure, restyled,
+  still editable) and not a claim taken on trust. No dev servers left running.
+- **⚑ Found, diagnosed, NOT fixed — a slice of the `slow` test suite cannot run on this box.**
+  `pyarrow` is in the lock, so pandas 3 backs categoricals with `ArrowStringArray`, which
+  `anndata` 0.12.6 cannot write to h5ad — `tests/test_cepo.py` and all of `tests/test_deg_pseudobulk.py`
+  die in their fixtures. **It is pre-existing** (proven by stashing and re-running at `HEAD`), it
+  never reached the gate (`verify.sh` runs `-m "not slow"`, which deselects them), and it is **not a
+  product defect** — `write_h5ad` appears only in tests; production only reads h5ad. The fix is
+  verified and two lines, but it sets a GLOBAL pandas option so it wants its own change, not a
+  drive-by at the end of a phase: `pd.options.mode.string_storage = "python"` **plus**
+  `anndata.settings.allow_write_nullable_strings = True` in `tests/conftest.py` (either alone
+  fails; together the h5ad round-trip is clean).
 
-## ▸ NEXT — **Phase F (cnsplots figure quality). Nothing here needs the owner.**
+## ▸ NEXT — **Phase F continues at F3/F4. Nothing here needs the owner.**
 
 > **Owner is away and everything founder-gated is BATCHED TO NEXT WEEK** (owner-directed
 > 2026-08-02: *"anything that needs me gets deferred to next week"*). So: no Clerk keys, no route-split
 > decision, no push. Build what does not need him.
 
-1. **Phase F — `docs/cnsplots-port/{plan,spec}.md`.** The owner's headline ask: *our plots look worse
-   than cnsplots'*. Start at **F1, the parity audit** (five plot types, same real data, side by side)
-   — it turns "looks better" into a checklist and makes F2 measurable. Then **F2, the theme port**,
-   which finally forces the planned `theme.py` → **named style registry** refactor.
-   **One cheap check owed first:** does Selom's Kaleido SVG export keep `<text>` as text or outline
-   it? If it outlines, "editable vector export" is a claim the product does not meet.
-2. **P-E backend half** (`docs/auth-multitenancy/spec.md` §4 steps 1–3) — deny-by-default + scope
-   `/artifacts/*` and `/reproduction-runs/*` + the isolation test. **This needs no keys**, so it is
-   autonomous; only the FE half and the route split wait for the owner.
-3. **`OH-01`** (arq + Redis job store) — now unblocked: Lane B built the reader, and its wrap
-   documents the contract the producer must meet (`docs/jobs-surface/spec.md` §4).
+1. **Finish the audit's open rows — and rows 21–23 are the interesting ones.** They are layout
+   defects that are **Selom's own and that cnsplots does not solve either**: long category labels
+   colliding with the axis title (Selom is already *ahead* of cnsplots here — its labels smear into
+   an unreadable block), point-label collision on scatter/volcano (neither side applies
+   `adjustText`), and the axis title colliding with long tick labels under `automargin`. This is
+   where Selom can beat the reference rather than match it, and it is the honest next move before
+   any new plot type.
+2. **F3 (the design overhaul)** — `plan.md` §3 says scope it *by the audit*, not by ambition, and
+   **Mobbin first is a standing rule on any FE work**. Run `fe-review` at the end of F3.
+3. **F4's plot gaps**, individually shippable, cheapest and most-wanted first: **venn** (the owner
+   named it) and **significance brackets** (the ERG work hand-rolled exactly this).
+4. **P-E backend half** (`docs/auth-multitenancy/spec.md` §4 steps 1–3) — deny-by-default + scope
+   `/artifacts/*` and `/reproduction-runs/*` + the isolation test. **Needs no keys.**
+5. **`OH-01`** (arq + Redis job store) — unblocked; the contract it must meet is
+   `docs/jobs-surface/spec.md` §4.
 
-**Two owed follow-ups the lanes recorded, so they are not lost:** there is **no run-scoped legends
+**Owed follow-ups still open:** the `slow`-suite h5ad fix above · there is **no run-scoped legends
 route** (`/papers/{slug}/legends` is published-paper scoped, so a user's own reproduction shows a
-stated limit — `compose_ledger_legends(ledger)` already does the work), and **`mocks/handlers.ts`
-has no handlers for Lane A's six new routes** (harmless — MSW bypasses — but a clean follow-up).
+stated limit — `compose_ledger_legends(ledger)` already does the work) · **`mocks/handlers.ts` has
+no handlers for Lane A's six new routes** (harmless — MSW bypasses — but a clean follow-up) · and
+the audit's CHECK rows 13/24 (journal packs + panel geometry) need **each journal's own author
+guidelines**, not cnsplots, per spec D4.
 
 ## ▸ DEFERRED
 
@@ -115,6 +117,11 @@ has no handlers for Lane A's six new routes** (harmless — MSW bypasses — but
 - **Phase F, one product call:** should Selom ever add a *static-render* skill class for plots that
   are better as publication images, at the cost of editability? Recommendation is **no**
   (`docs/cnsplots-port/plan.md` §2). Nothing depends on the answer.
+- **Phase F, a second product call (audit row 17):** should a figure export on a **transparent**
+  background (cnsplots' default — it composites cleanly into a multi-panel) or stay white (safer for
+  someone who just downloads it)? Best answer is probably *offer both at export*; nothing is blocked
+  on it. Row 2 (title centred vs left) is the same shape — a per-journal-pack decision, not a global
+  one, and it lands with the journal packs.
 - **Selom cannot see files the user already has** — the `drive.file` / App-Folder scope decision
   (`docs/cloud-providers-contract/spec.md` §Scope), still open from EDITOR-ROOM.
 
@@ -141,8 +148,10 @@ has no handlers for Lane A's six new routes** (harmless — MSW bypasses — but
 
 ## ▸ READ FIRST
 
-**`docs/cnsplots-port/{plan,spec}.md`** (**the entry point — Phase F, start at F1, the parity audit**)
-· **`docs/auth-multitenancy/spec.md`** (P-E; its backend half is autonomous and needs no keys) ·
+**`docs/cnsplots-port/parity-audit.md`** (**the entry point — F1+F2 are DONE and this is the ledger:
+what was ported, what was rejected and why, what is still open. Its §3 table is the remaining work**)
+· `docs/cnsplots-port/{plan,spec}.md` (the charter; F3/F4 are still un-specced by design) ·
+**`docs/auth-multitenancy/spec.md`** (P-E; its backend half is autonomous and needs no keys) ·
 **`docs/skill-coverage/matrix.md`** (the measured answer to "do the skills work" — 35/36, re-run with
 `scripts/skill-smoke.sh`) · **`docs/jobs-surface/spec.md`** §4 (the contract `OH-01` must meet) ·
 `docs/paper-outputs/spec.md` · `docs/build-plan-2026-08/plan.md` (master sequencing) ·
