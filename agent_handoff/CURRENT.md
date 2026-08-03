@@ -95,26 +95,42 @@
   b-wave tables are per-eye with n/SEM, this is the one representative trace per condition.
   **ERG is closed until the owner raises it again.**
 
-## ▸ NEXT — **Phase F continues at F3/F4. Nothing here needs the owner.**
+## ▸ NEXT — **Phase F, and the board is now `docs/cnsplots-port/source-review.md`.**
+
+> **Owner-directed 2026-08-03:** review every folder/file of the cnsplots repo, check Selom can
+> replicate **every plot type** "exactly if not better — backend, engine, and interface frontend
+> wise", and carry it into the build phase. That review is **done and written**; the sequence
+> below is its §7. Two premises it corrected: cnsplots has **no web/backend/frontend at all**
+> (pure Python + Sphinx docs), and its `_methods.py` is statistical *models*, not methods prose —
+> so Selom's auto-methods has no counterpart there. **Selom covers 12 of its 31 plot types at or
+> above parity, 16 do not exist yet, and Selom has 20 skills cnsplots cannot do.**
 
 > **Owner is away and everything founder-gated is BATCHED TO NEXT WEEK** (owner-directed
 > 2026-08-02: *"anything that needs me gets deferred to next week"*). So: no Clerk keys, no route-split
 > decision, no push. Build what does not need him.
 
-1. **Finish the audit's open rows — and rows 21–23 are the interesting ones.** They are layout
+1. **F2.5a — the significance-annotation engine.** `pairs=` (test + bracket + stars) spans SIX
+   cnsplots plot types and Selom has it **nowhere** — the ERG work hand-rolled it once already.
+   One engine feature upgrades every categorical skill at once, and it brings `add_count` (`n=`
+   labels) and a uniform `hue`/`order`/`hue_order` contract with it. Port the STATISTICS and
+   bracket geometry from `statannotations` (BSD-3), never its matplotlib artist — the figure has
+   to stay an editable Plotly spec. Then **F2.5b**, the shared validator module.
+2. **Then the audit's open rows 21–23 — still the interesting ones.** They are layout
    defects that are **Selom's own and that cnsplots does not solve either**: long category labels
    colliding with the axis title (Selom is already *ahead* of cnsplots here — its labels smear into
    an unreadable block), point-label collision on scatter/volcano (neither side applies
    `adjustText`), and the axis title colliding with long tick labels under `automargin`. This is
    where Selom can beat the reference rather than match it, and it is the honest next move before
    any new plot type.
-2. **F3 (the design overhaul)** — `plan.md` §3 says scope it *by the audit*, not by ambition, and
+3. **F3 (the design overhaul)** — the picker is now specced (source-review §6): a **fit-scored**
+   gallery, not a flat one, driven by `engine/compat.py`. Mobbin ruled OUT abstract illustration
+   tiles (Fibery); Asana's category rail + GA's search/provenance line are the skeleton. — `plan.md` §3 says scope it *by the audit*, not by ambition, and
    **Mobbin first is a standing rule on any FE work**. Run `fe-review` at the end of F3.
-3. **F4's plot gaps**, individually shippable, cheapest and most-wanted first: **venn** (the owner
-   named it) and **significance brackets** (the ERG work hand-rolled exactly this).
-4. **P-E backend half** (`docs/auth-multitenancy/spec.md` §4 steps 1–3) — deny-by-default + scope
+4. **F4's plot gaps** — ranked in source-review §3.2 (venn, forest, qq first). Every one closes
+   the seven-point wiring checklist in §5, and **reachability is where past work died**.
+5. **P-E backend half** (`docs/auth-multitenancy/spec.md` §4 steps 1–3) — deny-by-default + scope
    `/artifacts/*` and `/reproduction-runs/*` + the isolation test. **Needs no keys.**
-5. **`OH-01`** (arq + Redis job store) — unblocked; the contract it must meet is
+6. **`OH-01`** (arq + Redis job store) — unblocked; the contract it must meet is
    `docs/jobs-surface/spec.md` §4.
 
 **Owed follow-ups still open:** the `slow`-suite h5ad fix above · there is **no run-scoped legends
