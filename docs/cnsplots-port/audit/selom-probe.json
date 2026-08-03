@@ -1,0 +1,208 @@
+{
+  "box": {
+    "base_size_pt": 9.75,
+    "base_size_px": 13,
+    "bytes": {
+      "png": 79226,
+      "svg": 12510
+    },
+    "colorway": [
+      "#2f6db0",
+      "#e08a2b",
+      "#3f9b6b",
+      "#c0392b",
+      "#7d5ba6",
+      "#1f9aa6",
+      "#9aa017",
+      "#6b7280"
+    ],
+    "dataset": "erg-fig1e/erg_metrics_long.csv",
+    "font_family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+    "margin": {
+      "b": 52,
+      "l": 64,
+      "r": 24,
+      "t": 46
+    },
+    "n_traces": 6,
+    "paper_bgcolor": "#ffffff",
+    "params": {
+      "group": "condition",
+      "value": "b_wave_uv"
+    },
+    "plot_bgcolor": "#ffffff",
+    "seconds": 0.33,
+    "skill": "boxplot",
+    "x_gridcolor": "#eef1f5",
+    "x_linecolor": "#c4ccd4",
+    "x_mirror": false,
+    "x_showgrid": true,
+    "x_ticklen": 4,
+    "x_ticks": "outside"
+  },
+  "dotplot": {
+    "base_size_pt": 9.75,
+    "base_size_px": 13,
+    "bytes": {
+      "png": 97150,
+      "svg": 11485
+    },
+    "colorway": [
+      "#2f6db0",
+      "#e08a2b",
+      "#3f9b6b",
+      "#c0392b",
+      "#7d5ba6",
+      "#1f9aa6",
+      "#9aa017",
+      "#6b7280"
+    ],
+    "dataset": "alpk1/irpe_rawcounts/DE_oracle_d311_limma.csv",
+    "font_family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+    "margin": {
+      "b": 52,
+      "l": 64,
+      "r": 24,
+      "t": 46
+    },
+    "n_traces": 1,
+    "paper_bgcolor": "#ffffff",
+    "params": {
+      "fdr_threshold": 0.05,
+      "top_n": 10
+    },
+    "plot_bgcolor": "#ffffff",
+    "seconds": 0.05,
+    "skill": "enrichment",
+    "x_gridcolor": "#eef1f5",
+    "x_linecolor": "#c4ccd4",
+    "x_mirror": false,
+    "x_showgrid": true,
+    "x_ticklen": 4,
+    "x_ticks": "outside"
+  },
+  "heatmap": {
+    "base_size_pt": 9.75,
+    "base_size_px": 13,
+    "bytes": {
+      "png": 69917,
+      "svg": 15776
+    },
+    "colorway": [
+      "#2f6db0",
+      "#e08a2b",
+      "#3f9b6b",
+      "#c0392b",
+      "#7d5ba6",
+      "#1f9aa6",
+      "#9aa017",
+      "#6b7280"
+    ],
+    "dataset": "jev/retina_fadl.h5ad",
+    "font_family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+    "margin": {
+      "b": 52,
+      "l": 64,
+      "r": 24,
+      "t": 46
+    },
+    "n_traces": 1,
+    "paper_bgcolor": "#ffffff",
+    "params": {
+      "groupby": "leiden",
+      "n_genes": 5
+    },
+    "plot_bgcolor": "#ffffff",
+    "seconds": 10.8,
+    "skill": "heatmap",
+    "x_gridcolor": "#eef1f5",
+    "x_linecolor": "#c4ccd4",
+    "x_mirror": false,
+    "x_showgrid": true,
+    "x_ticklen": 4,
+    "x_ticks": "outside"
+  },
+  "scatter": {
+    "base_size_pt": 9.75,
+    "base_size_px": 13,
+    "bytes": {
+      "png": 81371,
+      "svg": 17270
+    },
+    "colorway": [
+      "#2f6db0",
+      "#e08a2b",
+      "#3f9b6b",
+      "#c0392b",
+      "#7d5ba6",
+      "#1f9aa6",
+      "#9aa017",
+      "#6b7280"
+    ],
+    "dataset": "jev/proteome_matrix.csv",
+    "font_family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+    "margin": {
+      "b": 52,
+      "l": 64,
+      "r": 24,
+      "t": 46
+    },
+    "n_traces": 2,
+    "paper_bgcolor": "#ffffff",
+    "params": {
+      "label_points": true,
+      "scale": true
+    },
+    "plot_bgcolor": "#ffffff",
+    "seconds": 0.86,
+    "skill": "pca",
+    "x_gridcolor": "#eef1f5",
+    "x_linecolor": "#c4ccd4",
+    "x_mirror": false,
+    "x_showgrid": true,
+    "x_ticklen": 4,
+    "x_ticks": "outside"
+  },
+  "volcano": {
+    "base_size_pt": 9.75,
+    "base_size_px": 13,
+    "bytes": {
+      "png": 156574,
+      "svg": 214764
+    },
+    "colorway": [
+      "#2f6db0",
+      "#e08a2b",
+      "#3f9b6b",
+      "#c0392b",
+      "#7d5ba6",
+      "#1f9aa6",
+      "#9aa017",
+      "#6b7280"
+    ],
+    "dataset": "jev/proteome_de.csv",
+    "font_family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+    "margin": {
+      "b": 52,
+      "l": 64,
+      "r": 24,
+      "t": 46
+    },
+    "n_traces": 3,
+    "paper_bgcolor": "#ffffff",
+    "params": {
+      "fc_threshold": 1.0,
+      "fdr_threshold": 0.05,
+      "top_n": 10
+    },
+    "plot_bgcolor": "#ffffff",
+    "seconds": 0.04,
+    "skill": "volcano",
+    "x_gridcolor": "#eef1f5",
+    "x_linecolor": "#c4ccd4",
+    "x_mirror": false,
+    "x_showgrid": true,
+    "x_ticklen": 4,
+    "x_ticks": "outside"
+  }
+}

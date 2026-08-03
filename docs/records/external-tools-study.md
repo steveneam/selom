@@ -169,6 +169,7 @@ Clean = permissive (BSD/MIT/Apache/MPL/CC0) and shippable. ⚠ = copyleft concer
 | Tool / resource | Verified license | Shippable verdict |
 |---|---|---|
 | gseapy (incl. `ssgsea`) | BSD-3 | ✅ clean — GSEA + ssGSEA engine |
+| **cnsplots** (v0.6.0) | **BSD-3-Clause** | ✅ clean — **styling values ported, not depended on** (Phase F). Copy + credit; no clean room needed. Its runtime set (`lifelines`, `comprisk`, `pycomplexheatmap`, `statannotations`, `biopython`) is **not** a Selom dependency and is triaged separately if ever adopted. |
 | blitzgsea | Apache-2.0 | ✅ clean (opt-in; slow JIT in-env) |
 | decoupler-py | **BSD-3 (corr.; was reported GPL-3)** | ✅ clean |
 | salmon | **BSD-3 (corr.)** | ✅ clean (FASTQ tier only) |
