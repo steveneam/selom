@@ -88,8 +88,34 @@ names, plus its own trace figure.
 | `mock_fig1e_bwave_stats.csv` | Welch t-tests at the reference intensity: rescue arms vs each null arm, and the two rescue arms against each other. |
 | `mock_fig1e_waveforms_long.csv` | **The trace data, plottable.** Every sample behind the trace figure: 6 conditions × 7 intensities × 0…260 ms. Columns: `condition`, `intensity_log_cd_s_m2`, `time_ms`, `voltage_uv`. |
 | `mock_fig1e_traces.jpg` | The rendered trace grid. |
+| `mock_fig1e_awave_summary.csv` | **a-wave per condition x intensity**, measured off the drawn traces: `a_wave_uv` (positive magnitude, baseline to trough), `b_peak_uv_trace`, `a_over_b`, and which of the two the value came from. Added 2026-08-03 — see the caveats below before plotting it. |
 | `generate_mock_fig1e.py` | Generates the b-wave + stats CSVs, and self-checks before writing. Pure standard library. |
 | `render_mock_fig1e_traces.py` | Renders the trace grid + waveform CSV from the real waveform library. Needs matplotlib + numpy + the backend on `PYTHONPATH`. |
+
+## The a-wave table — read this before plotting it
+
+`mock_fig1e_awave_summary.csv` exists so the a-wave the figure now shows is available as numbers.
+It is **not** a second sample, and it is not interchangeable with the b-wave tables:
+
+- **Different granularity.** The b-wave tables are simulated **per eye** (30 eyes x 7 intensities)
+  and carry n / mean / SEM. This one is measured from the **one representative trace per
+  condition** that the figure draws, so it has no n and no SEM. That is why it is a separate file
+  rather than extra columns — merging them would imply per-eye a-wave measurements that do not
+  exist.
+- **`b_peak_uv_trace` is not the group mean.** It is the raw maximum of that representative trace,
+  so it rides on oscillatory potentials and noise and sits a little off the b-wave table's mean.
+  It is there to make `a_over_b` self-contained. **The b-wave tables remain the amplitude source
+  of record** — use them for anything quantitative.
+- **The rd10 values are a designed ceiling, not a simulation.** Every non-Control arm is capped at
+  `a/b <= 0.18` (see above), so those rows express a constraint the figure imposes. The Control
+  column is its source eye untouched. The `a_wave_source` column states which, per row.
+
+Everything here is **scotopic** — the whole Fig 1E series is the dark-adapted rod-driven intensity
+ladder (-1.7 to +3.1 log cd·s/m2). There is no photopic/light-adapted data in this set.
+
+If a per-eye a-wave with n and SEM is ever wanted, the real source (`erg_metrics_long.csv`) does
+carry `a_wave_uv` per eye, so the generator could simulate one the same way it does the b-wave.
+Not built — nobody has asked for it.
 
 ## Plotting intensity vs b-wave amplitude
 

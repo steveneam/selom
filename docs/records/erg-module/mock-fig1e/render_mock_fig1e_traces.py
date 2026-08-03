@@ -228,8 +228,11 @@ def build_panel(target_uv: float, cond: str, x_log: float, lib, pool, rng):
     return t, out
 
 
-def awave_ratio(t, y):
-    """``(trough_depth / b_wave_peak, peak_index)`` for one trace — the a-wave as the EYE reads it.
+def awave_metrics(t, y):
+    """``(a_wave_uv, b_peak_uv, ratio, peak_index)`` for one trace — the a-wave as the EYE reads it.
+
+    ``a_wave_uv`` is a POSITIVE magnitude, baseline to trough, matching how the b-wave table
+    reports amplitude.
 
     Deliberately not ``_erg.landmarks``: that routine's ``a_wave_uv`` measures a specific landmark
     and on these filtered traces it returns ~18 µV where the visible trough is ~180 µV, so it is
@@ -238,13 +241,20 @@ def awave_ratio(t, y):
     """
     win = (t >= 20.0) & (t <= 140.0)
     if not win.any():
-        return 0.0, 0
+        return 0.0, 0.0, 0.0, 0
     pk_i = int(np.argmax(np.where(win, y, -np.inf)))
     peak = float(y[pk_i])
     trough = float(y[:pk_i + 1].min()) if pk_i else 0.0
+    a_uv = abs(min(trough, 0.0))
     if peak <= 0:
-        return 0.0, pk_i
-    return abs(min(trough, 0.0)) / peak, pk_i
+        return a_uv, peak, 0.0, pk_i
+    return a_uv, peak, a_uv / peak, pk_i
+
+
+def awave_ratio(t, y):
+    """``(ratio, peak_index)`` — the two fields :func:`cap_awave` and :func:`check_awave` need."""
+    a_uv, peak, ratio, pk_i = awave_metrics(t, y)
+    return ratio, pk_i
 
 
 def cap_awave(t, y, cond: str, target_uv: float):
@@ -400,6 +410,45 @@ def check_awave(panels, targets) -> None:
         sys.exit("REFUSING to write — a-wave biology check failed:\n  - " + "\n  - ".join(bad))
 
 
+def write_awave_csv(panels, out_path: Path) -> None:
+    """a-wave / b-peak / ratio per condition x intensity, measured off the drawn traces.
+
+    WHY THIS EXISTS AND WHAT IT IS NOT. The b-wave tables are simulated PER EYE (30 eyes x 7
+    intensities) and carry mean + SEM. This one is measured from the ONE representative trace per
+    condition that the figure draws, so it has no n, no SEM, and no per-eye rows — it is the
+    figure's own morphology in numbers, not a second sample. Mixing it into the b-wave tables
+    would imply per-eye a-wave measurements that do not exist.
+
+    Generated here, in the renderer, on purpose: it is measured from the same in-memory panels
+    that get drawn, so the table and the figure cannot disagree — the same reason the trace CSV
+    is written here and the b-wave CSVs are written by the generator.
+
+    Note the rd10 arms' values are shaped by ``AWAVE_MAX_RATIO`` (a ceiling), so they express a
+    designed constraint rather than an independent simulation. The column says so.
+
+    ``b_peak_uv_trace`` is the raw maximum of that representative trace, so it sits a little off
+    the group mean in the b-wave table (it rides on oscillatory potentials and noise, and it is
+    ONE trace, not a mean of eyes). It is here to make ``a_over_b`` self-contained; the b-wave
+    tables remain the amplitude source of record. Named ``_trace`` so the two are not confused.
+    """
+    with out_path.open("w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh, lineterminator="\n")
+        w.writerow(["condition", "condition_order", "intensity_group",
+                    "intensity_log_cd_s_m2", "a_wave_uv", "b_peak_uv_trace", "a_over_b",
+                    "a_wave_source"])
+        for order, cond in enumerate(CONDITION_ORDER, start=1):
+            capped = AWAVE_RATIO_BY_COND.get(cond, AWAVE_MAX_RATIO)
+            for group, x_log in enumerate(INTENSITIES_LOG, start=1):
+                a_uv, b_uv, ratio, _ = awave_metrics(*panels[(cond, x_log)])
+                # No comma inside the field: these files get pasted into Excel/GraphPad, where a
+                # quoted comma is legal CSV but still splits under a naive text import.
+                source = ("source eye (unmodified)" if capped is None else
+                          f"capped at a/b <= {capped:g}")
+                w.writerow([cond, order, group, x_log,
+                            round(a_uv, 2), round(b_uv, 2), round(ratio, 4), source])
+    print(f"  wrote {out_path.name}  ({len(CONDITION_ORDER) * len(INTENSITIES_LOG)} rows)")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--outdir", type=Path, default=Path(__file__).parent)
@@ -425,6 +474,7 @@ def main() -> None:
     check_awave(panels, targets)
     render(panels, args.outdir / "mock_fig1e_traces.jpg", args.dpi)
     write_waveform_csv(panels, args.outdir / "mock_fig1e_waveforms_long.csv")
+    write_awave_csv(panels, args.outdir / "mock_fig1e_awave_summary.csv")
 
 
 if __name__ == "__main__":
