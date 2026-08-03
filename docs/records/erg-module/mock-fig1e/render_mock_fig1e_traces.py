@@ -87,7 +87,7 @@ COLORS = {
     "AAV8-RK-PDE6B-3UTR": "#D55E00",         # vermillion -- best rescue
 }
 
-LINE_WIDTH = 1.7
+LINE_WIDTH = 2.1
 ROW_GAP = 0.0
 COL_GAP = 0.10
 FIG_SIZE = (13.5, 7.8)
@@ -95,6 +95,10 @@ HEADER_SIZE = 11
 INTENSITY_SIZE = 10
 SCALEBAR_UV = 200
 SCALEBAR_MS = 100
+#: How far the scale-bar axes sits below the last row, as a fraction of one panel's height.
+#: Its HEIGHT must stay equal to a panel's (see render) so 200 µV is drawn at exactly the panel
+#: scale — only its position is tunable, which is what this is.
+SCALEBAR_DROP = 0.70
 
 T_MAX_MS = 260.0        # trim the long quiet tail; the response is over well before this
 NOISE_TAIL_MS = 220.0   # samples past this are treated as recording noise
@@ -108,9 +112,10 @@ SOURCE_EYE = {
     "Untreated": "255_LE",
     # NOT this arm's own eye (256_RE): that recording is noise-dominated and has no clean
     # b-wave to scale, so the partial-rescue column rendered flat -- the opposite of what
-    # the figure is meant to show. The WT eye scaled down reads correctly as a partial
-    # rescue (a rescued retina gives a smaller version of a normal response) and stays
-    # visually distinct from the 3'UTR column, which keeps its own eye.
+    # the figure is meant to show. Borrowing the WT eye costs one thing, which AWAVE_MAX_RATIO
+    # then pays for: a uniform gain would also carry the WT's full a-wave into this column,
+    # and a rescued rd10 retina does NOT give a smaller version of a normal response -- it
+    # gives a b-wave without the matching photoreceptor trough.
     "AAV8-RK-PDE6B": "633_LE",
     "AAV8-RK-GFP-polyA-stuffer": "248_LE",
     "AAV8-CMV-GFP": "257_LE",
@@ -308,7 +313,8 @@ def render(panels, out_path: Path, dpi: int) -> None:
     # Shared scale bar in its own axes below the grid, given the same width, height and
     # limits as a grid panel so 200 µV and 100 ms are drawn at exactly the panel scale.
     pos = axes[nrows - 1][0].get_position()
-    sb = fig.add_axes([pos.x0, pos.y0 - pos.height - 0.015, pos.width, pos.height])
+    sb = fig.add_axes([pos.x0, pos.y0 - pos.height * SCALEBAR_DROP - 0.005,
+                       pos.width, pos.height])
     sb.set_xlim(*xlim)
     sb.set_ylim(*ylim)
     sb.axis("off")
