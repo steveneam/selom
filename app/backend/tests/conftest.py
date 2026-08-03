@@ -11,10 +11,26 @@ cache itself (test_result_cache.py) opt back in by swapping in their own enabled
 import os
 import tempfile
 
+import anndata
+import pandas as pd
 import pytest
 
 from config import settings
 from skills import _result_cache
+
+# --- h5ad round-trip on pandas 3 + pyarrow -----------------------------------------------
+# `pyarrow` is in the lock, so on pandas 3 a categorical's `.categories` is backed by
+# `ArrowStringArray`, and anndata 0.12.6 has no writer registered for it -- every fixture that
+# builds an AnnData and calls `write_h5ad` dies with IORegistryError (test_cepo.py and all of
+# test_deg_pseudobulk.py). Both lines are needed: forcing python-backed strings gets past the
+# Arrow writer, and the resulting `StringArray` is then refused as a nullable dtype unless
+# anndata is told to allow it.
+#
+# This is a TEST-ONLY concern, which is why it lives here and not in production code: `write_h5ad`
+# appears nowhere outside the suite -- production only ever READS h5ad. It also never reached the
+# gate, since `verify.sh` runs `-m "not slow"` and deselects both files.
+pd.options.mode.string_storage = "python"
+anndata.settings.allow_write_nullable_strings = True
 
 # --- E2 fast/slow test split -------------------------------------------------------------
 # A feature commit runs the fast "contract gate" — `pytest -m "not slow"` — in seconds; the
