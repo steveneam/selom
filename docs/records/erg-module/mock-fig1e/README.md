@@ -245,10 +245,19 @@ Reworked because the first pass was hard to read:
   (`#9aa3ad`), so the partial-rescue arm — the one this figure is about — was the least
   visible thing on it. Palette is now Okabe-Ito, colourblind-safe, one distinct hue per
   condition.
-- **Thicker lines** (1.9 pt), so traces hold up when the figure is scaled down.
+- **Thicker lines** (2.1 pt), so traces hold up when the figure is scaled down.
 - **Rows packed tight** — panels touch, and the panel height was cut so the stacked traces sit
   as close as a shared vertical scale allows.
-- **Clearer labels** — condition headers bold and tinted to match their trace; intensity
-  labels aligned to each row's trace baseline rather than the panel centre.
+- **Clearer labels** — condition headers bold and **black**; intensity labels aligned to each
+  row's trace baseline rather than the panel centre. (The headers were tinted to match their
+  trace until 2026-08-03; the traces already carry the colour coding, so tinting the labels too
+  was redundant.)
+- **No on-figure title.** The panel is laid out with its legend underneath, so a title on the
+  artwork only has to be cropped off later (owner, 2026-08-03). The MOCK provenance does not go
+  with it: the caption under the figure still states that the amplitudes are simulated, and this
+  README carries the full warning.
 - **Scale bar moved out of the grid** into its own matched-scale axes below it; inside the
-  bottom-left panel the brightest Control a-wave ran straight through it.
+  bottom-left panel the brightest Control a-wave ran straight through it. It sits closer to the
+  grid than it first did (`SCALEBAR_DROP`) — its axes HEIGHT must stay equal to a panel's, since
+  that equality is what makes 200 µV render at exactly the panel scale, so only its position is
+  tunable.

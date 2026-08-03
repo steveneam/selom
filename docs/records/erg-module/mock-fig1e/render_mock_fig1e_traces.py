@@ -92,6 +92,9 @@ ROW_GAP = 0.0
 COL_GAP = 0.10
 FIG_SIZE = (13.5, 7.8)
 HEADER_SIZE = 11
+#: Column headers are black rather than the trace colour: the traces themselves already carry
+#: the colour coding, so tinting the labels too was redundant (owner, 2026-08-03).
+HEADER_COLOR = "#000000"
 INTENSITY_SIZE = 10
 SCALEBAR_UV = 200
 SCALEBAR_MS = 100
@@ -286,7 +289,7 @@ def render(panels, out_path: Path, dpi: int) -> None:
     nrows, ncols = len(INTENSITIES_LOG), len(CONDITION_ORDER)
     fig, axes = plt.subplots(nrows, ncols, figsize=FIG_SIZE, dpi=dpi,
                              sharex=True, sharey=True)
-    fig.subplots_adjust(left=0.035, right=0.87, top=0.885, bottom=0.20,
+    fig.subplots_adjust(left=0.035, right=0.87, top=0.935, bottom=0.20,
                         hspace=ROW_GAP, wspace=COL_GAP)
 
     for ri, x_log in enumerate(INTENSITIES_LOG):
@@ -301,7 +304,7 @@ def render(panels, out_path: Path, dpi: int) -> None:
 
             if ri == 0:
                 ax.set_title(COL_LABELS[cond], fontsize=HEADER_SIZE, fontweight="bold",
-                             color=COLORS[cond], pad=14, linespacing=1.25)
+                             color=HEADER_COLOR, pad=14, linespacing=1.25)
             if ci == ncols - 1:
                 ax.text(1.07, baseline_frac, f"{x_log:+.1f}", transform=ax.transAxes,
                         fontsize=INTENSITY_SIZE, fontweight="bold", va="center",
@@ -330,8 +333,10 @@ def render(panels, out_path: Path, dpi: int) -> None:
     sb.text(x0 + SCALEBAR_MS / 2, y0 - 0.05 * (ylim[1] - ylim[0]), f"{SCALEBAR_MS} ms",
             va="top", ha="center", fontsize=INTENSITY_SIZE, fontweight="bold")
 
-    fig.suptitle("Representative scotopic ERG traces — MOCK FIGURE",
-                 fontsize=14, fontweight="bold", y=0.975)
+    # No on-figure title: this panel gets laid out with its legend underneath, so a title on
+    # the artwork only has to be cropped off later (owner, 2026-08-03). The MOCK provenance is
+    # NOT lost with it -- the caption below still states that the amplitudes are simulated, and
+    # the README carries the full warning.
     fig.text(0.5, 0.022,
              "Waveform shapes are real recordings; condition assignment and amplitudes follow "
              "the simulated b-wave table. Shared vertical scale across all panels.",
