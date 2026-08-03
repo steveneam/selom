@@ -199,13 +199,43 @@ How a panel is built:
    out regardless of what the source eye did.
 4. Where the gain shrinks a trace, add real recording noise back in proportion, so scaled-down
    panels keep an authentic noise floor instead of going implausibly smooth.
+5. **Cap the a-wave on every rd10 arm** (see below).
 
 Source eyes are declared in `SOURCE_EYE` in the renderer. Five columns use the eye actually
 recorded for that condition. **AAV8-RK-PDE6B is the exception** and uses the WT eye scaled
 down: its own recording (256_RE) is noise-dominated with no clean b-wave to scale, so sourcing
-from it rendered the partial-rescue column flat — the opposite of what the figure shows. A
-rescued retina gives a smaller version of a normal response, so the scaled WT eye reads
-correctly, and stays visually distinct from the 3'UTR column, which keeps its own eye.
+from it rendered the partial-rescue column flat — the opposite of what the figure shows. It
+stays visually distinct from the 3'UTR column, which keeps its own eye.
+
+### The a-wave is capped on the rd10 arms
+
+Gaining a source trace onto a target is a **uniform** scale, so a panel keeps its source eye's
+a:b morphology. Borrowing the WT eye for AAV8-RK-PDE6B therefore also borrowed a full healthy
+**a-wave** — a deep trough saying the photoreceptors came back. They do not: the a-wave is
+photoreceptor mass, the b-wave is downstream signalling, and a rescued rd10 retina recovers the
+b-wave far more than the a-wave. Corrected 2026-08-03 on the owner's observation.
+
+Measured on the real recordings — trough depth over b-wave peak, which is what a reader's eye
+actually reads (deliberately **not** `landmarks()['a_wave_uv']`: on these filtered traces that
+returns ~18 µV where the visible trough is ~180 µV, so it is the wrong instrument here):
+
+| Eye | Arm | 1.0 | 1.9 | 2.8 |
+|---|---|---:|---:|---:|
+| `633_LE` | Control (WT) | 0.90 | 0.98 | 0.90 |
+| `257_RE` | RK-PDE6B-3UTR — a real rescued eye | 0.15 | 0.12 | 0.38 |
+
+A 6–7× difference that a uniform gain cannot express. `AWAVE_MAX_RATIO = 0.18` is therefore a
+**ceiling, not a target**, set just above the real rescued eye's own ratio: an authentic rd10
+trace passes through untouched and only a borrowed WT trough is pulled down. Only the negative
+samples before the b-wave peak are scaled, so the b-wave is unchanged and the trace stays
+continuous. At 1 month post-treatment a *slight* a-wave is expected, which is what 0.18 leaves.
+
+`check_awave()` **refuses to write the figure** if any rd10 arm exceeds the cap, or if the
+Control's a-wave ever falls to the treated arms' level — that contrast is the point of the panel.
+
+**The flash threshold is unchanged and was already correct**: only the WT Control responds below
+flash 1.0; every rd10 arm sits at the noise floor until +1.0 and climbs through it. That comes
+from the gain in step 3, not from the a-wave cap.
 
 ### Styling
 

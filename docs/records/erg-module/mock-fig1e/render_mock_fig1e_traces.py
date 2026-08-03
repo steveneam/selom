@@ -125,6 +125,27 @@ FLAT_TARGET_UV = 6.0
 #: switch to the same eye's strongest trace instead of amplifying its noise.
 MIN_SOURCE_FRACTION = 0.45
 
+#: Deepest the pre-b-wave trough (the a-wave) may go, as a fraction of that panel's b-wave peak.
+#:
+#: WHY THIS EXISTS. Gaining a source trace onto a target is a UNIFORM scale, so the panel keeps
+#: its source eye's a:b morphology. That is fine when the source is the arm's own eye, and wrong
+#: when it is borrowed: `AAV8-RK-PDE6B` is drawn from the WT Control eye (see SOURCE_EYE), so it
+#: inherited a full healthy a-wave — a deep trough that says the photoreceptors came back.
+#:
+#: They do not. The a-wave is photoreceptor mass; the b-wave is downstream signalling. A rescued
+#: rd10 retina recovers b-wave far more than a-wave, so a treated trace should show a b-wave with
+#: a nearly flat leading edge. Measured on the real recordings, trough-to-peak:
+#:     633_LE  WT Control      0.90 / 0.98 / 0.90  at 1.0 / 1.9 / 2.8 log
+#:     257_RE  RK-PDE6B-3UTR   0.15 / 0.12 / 0.38  (a real rescued eye, its own trace)
+#: — a 6-7x difference that a uniform gain cannot express.
+#:
+#: The cap is set just above the real rescued eye's own ratio, so it is a CEILING and not a
+#: target: an authentic rd10 trace passes through untouched and only a borrowed WT trough is
+#: pulled down. At 1 month post-treatment a slight a-wave is expected (owner, 2026-08-03), which
+#: is what ~0.18 leaves. `None` = leave this condition's own morphology alone.
+AWAVE_MAX_RATIO = 0.18
+AWAVE_RATIO_BY_COND = {"Control": None}
+
 
 def load_real_library(src: Path):
     """Real decoded waveforms -> {sample_id: {intensity: (t, y, b_wave)}}.
@@ -194,7 +215,50 @@ def build_panel(target_uv: float, cond: str, x_log: float, lib, pool, rng):
         seg = pool[start:start + len(out)]
         if len(seg) == len(out):
             out = out + seg * (1.0 - gain)
+
+    out = cap_awave(t, out, cond, target_uv)
     return t, out
+
+
+def awave_ratio(t, y):
+    """``(trough_depth / b_wave_peak, peak_index)`` for one trace — the a-wave as the EYE reads it.
+
+    Deliberately not ``_erg.landmarks``: that routine's ``a_wave_uv`` measures a specific landmark
+    and on these filtered traces it returns ~18 µV where the visible trough is ~180 µV, so it is
+    the wrong instrument for "how prominent does the dip LOOK". This takes the b-wave peak in the
+    20-140 ms window and the deepest point before it, which is what a reader sees.
+    """
+    win = (t >= 20.0) & (t <= 140.0)
+    if not win.any():
+        return 0.0, 0
+    pk_i = int(np.argmax(np.where(win, y, -np.inf)))
+    peak = float(y[pk_i])
+    trough = float(y[:pk_i + 1].min()) if pk_i else 0.0
+    if peak <= 0:
+        return 0.0, pk_i
+    return abs(min(trough, 0.0)) / peak, pk_i
+
+
+def cap_awave(t, y, cond: str, target_uv: float):
+    """Pull this panel's pre-b-wave trough down to :data:`AWAVE_MAX_RATIO` if it exceeds it.
+
+    Only the NEGATIVE samples before the b-wave peak are scaled, so the b-wave itself and any
+    positive early oscillation are untouched — and because the factor multiplies values that are
+    already zero at a zero crossing, the trace stays continuous (no kink is introduced).
+
+    Skipped below ``FLAT_TARGET_UV``: those panels are the noise floor, where "trough over peak"
+    means nothing and squashing it would just make a non-response look unnaturally smooth.
+    """
+    limit = AWAVE_RATIO_BY_COND.get(cond, AWAVE_MAX_RATIO)
+    if limit is None or target_uv < FLAT_TARGET_UV:
+        return y
+    ratio, pk_i = awave_ratio(t, y)
+    if ratio <= limit or pk_i == 0:
+        return y
+    out = y.copy()
+    head = out[:pk_i + 1]
+    head[head < 0] *= limit / ratio
+    return out
 
 
 def load_targets(summary_csv: Path) -> dict:
@@ -290,6 +354,41 @@ def write_waveform_csv(panels, out_path: Path) -> None:
     print(f"  wrote {out_path.name}  ({n} rows)")
 
 
+def check_awave(panels, targets) -> None:
+    """Report the a-wave prominence per column, and REFUSE to write if the biology is wrong.
+
+    Same discipline as ``generate_mock_fig1e.py``: exit non-zero rather than emit a figure that
+    misrepresents the model. Two things must hold on every responding panel:
+
+      * no rd10 arm's trough exceeds :data:`AWAVE_MAX_RATIO` — a treated retina must not show a
+        photoreceptor response it does not have;
+      * the WT Control's trough stays well ABOVE that cap — if the Control ever flattened to the
+        treated arms' level the figure would have lost the one contrast it exists to show.
+    """
+    print("  a-wave check (trough / b-wave peak, responding panels only):")
+    bad, control_max = [], 0.0
+    for cond in CONDITION_ORDER:
+        ratios = [awave_ratio(*panels[(cond, x)])[0]
+                  for x in INTENSITIES_LOG if targets[(cond, x)] >= FLAT_TARGET_UV]
+        if not ratios:
+            print(f"    {cond:28s} (no responding panel)")
+            continue
+        lo, hi = min(ratios), max(ratios)
+        limit = AWAVE_RATIO_BY_COND.get(cond, AWAVE_MAX_RATIO)
+        print(f"    {cond:28s} {lo:.2f}-{hi:.2f}"
+              f"{'' if limit is None else f'   (cap {limit:.2f})'}")
+        if limit is None:
+            control_max = hi
+        elif hi > limit + 1e-9:
+            bad.append(f"{cond} reaches {hi:.2f}, above its {limit:.2f} cap")
+
+    if control_max <= AWAVE_MAX_RATIO:
+        bad.append(f"Control's a-wave is only {control_max:.2f} — at or below the treated cap "
+                   f"({AWAVE_MAX_RATIO:.2f}), so the figure no longer shows the WT/rd10 contrast")
+    if bad:
+        sys.exit("REFUSING to write — a-wave biology check failed:\n  - " + "\n  - ".join(bad))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--outdir", type=Path, default=Path(__file__).parent)
@@ -312,6 +411,7 @@ def main() -> None:
     panels = {(c, x): build_panel(targets[(c, x)], c, x, lib, pool, rng)
               for c in CONDITION_ORDER for x in INTENSITIES_LOG}
 
+    check_awave(panels, targets)
     render(panels, args.outdir / "mock_fig1e_traces.jpg", args.dpi)
     write_waveform_csv(panels, args.outdir / "mock_fig1e_waveforms_long.csv")
 
