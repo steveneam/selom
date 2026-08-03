@@ -60,17 +60,29 @@
   user", which is a reduction, not a fix. Steps 4–7 (the frontend half) are **blocked on Clerk keys**
   and stay batched to the owner.
 - **⚑ THE FINDING THAT OUTLIVES THIS SESSION: the `slow` test lane is enforced NOWHERE.**
-  `.github/workflows/ci.yml` runs `pytest -m "not slow"` and `verify.sh` does the same, so ~280
-  tests have no gate at all. It is how the pandas-3/pyarrow h5ad breakage survived, and this session
-  it let **7 tests broken by a signature change report PASS**. **Not fixed blind on purpose**: the
-  slow lane needs `SELOM_DATASETS_DIR` (the real corpus), which CI does not have — so this is a
-  decision about what CI can actually run (a corpus-free subset? a self-hosted runner? a nightly?),
-  not a one-line job addition. And a workflow change is only verified in a real PR run
-  [[verify-ci-in-its-target-event]]. **Run `uv run pytest` with no `-m` before trusting a green
-  gate on any signature change.**
+  `.github/workflows/ci.yml` runs `pytest -m "not slow"` and `verify.sh` does the same, so **385 of
+  the 1907 tests have no gate at all.** It is how the pandas-3/pyarrow h5ad breakage survived, and
+  this session it let **7 tests broken by a signature change report PASS**.
+  **Run `uv run pytest` with no `-m` before trusting a green gate on any signature change.**
+- **The fix is small, and my first read of it was WRONG — measured 2026-08-03, trust the number.**
+  I assumed "slow" meant "needs the real corpus", which would have made this a real decision about
+  what CI can run. It does not. `env -u SELOM_DATASETS_DIR uv run pytest -m slow -n 2` gives
+  **373 passed, 12 skipped, 0 failed in 16s** — the same 12 skips as with the corpus. The lane is
+  mostly *heavy-import* tests (scanpy, pydeseq2), not *real-data* tests.
+  **So: add a corpus-free `pytest -m slow` step to the EXISTING backend CI job** (which already has
+  a 20-minute budget) — not a new job, not a nightly, not a self-hosted runner. It would have caught
+  this session's 7 breakages exactly, since `test_reproduction_runs.py` needs no corpus.
+  Be honest that it is a WEAKER gate: with the corpus that same lane takes ~7½ min because the real
+  engines chew on real matrices, so this catches breakage, not numerical regression —
+  `scripts/skill-smoke.sh` + a local full run stay the deeper check. CI triggers on `push: [main]`
+  and `pull_request`, so it self-verifies on the next push [[verify-ci-in-its-target-event]].
 
 ## ▸ NEXT
 
+0. **Gate the `slow` lane — ~6 lines, do it first.** Add a corpus-free `uv run pytest -m slow -n auto`
+   step to the **existing** backend job in `.github/workflows/ci.yml` (16s; it already budgets 20
+   min). Measured, not assumed — see LIVE. Do it before Lane B so Lane B's own breakages are caught
+   by CI rather than by the next person to run the full suite by hand.
 1. **Lane B — the three new plot types** (`venn`, `forest`, `qq`), ranked in source-review §3.2.
    Each must close the **seven-point wiring checklist** (§5) — and item 7, *reachable*, is the one
    that has killed this class of work twice now: `assemble-scrna` shipped with no surface, and this
@@ -110,10 +122,9 @@ journal's own author guidelines**, not cnsplots.
 - ~~Push `main`~~ **DONE 2026-08-03.** The 31-commit backlog *and* this session's Lane A + Lane C
   went to `origin` at the owner's direct request; `origin/main` = `d75de27`, working tree clean,
   nothing local. The long-standing unpushed-backlog risk is closed.
-- **The CI slow-lane decision** (new, 2026-08-03) — ~280 `slow` tests are enforced nowhere, and the
-  reason it is not already fixed is a genuine question: the lane needs `SELOM_DATASETS_DIR`, which
-  CI has no copy of. Corpus-free subset, self-hosted runner, or nightly? Cheap to decide, and it is
-  the difference between a green gate that means something and one that does not.
+- ~~The CI slow-lane *decision*~~ — **measured, and there is no decision to make.** The lane runs
+  corpus-free in 16s (373 pass / 0 fail), so it is ~6 lines in the existing backend job, needs no
+  keys/spend/infra, and is **NEXT#1**. Left unbuilt only because the session was wrapping.
 - **Phase F, one product call:** should Selom ever add a *static-render* skill class for plots that
   are better as publication images, at the cost of editability? Recommendation is **no**
   (`docs/cnsplots-port/plan.md` §2). Nothing depends on the answer.
