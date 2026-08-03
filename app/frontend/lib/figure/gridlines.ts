@@ -32,7 +32,7 @@ export const GRID_DASH_OPTIONS: { value: string; label: string }[] = [
 /** Read-time fallbacks — mirror normalizeSpec's axis defaults (showgrid, gridcolor) + Plotly's own
  *  defaults for the leaves normalizeSpec leaves unset (gridwidth 1, griddash solid). */
 export const GRID_DEFAULTS = {
-  showgrid: true,
+  showgrid: false, // normalizeSpec now defaults gridless (parity-audit row 5) — keep these in step
   gridcolor: "#e2e8f0",
   gridwidth: 1,
   griddash: "solid",

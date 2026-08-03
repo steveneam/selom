@@ -122,59 +122,56 @@
       "text": "Proteomics differential abundance (stub)",
       "font": {
         "family": "Arimo, Arial, Helvetica, sans-serif",
-        "size": 16,
-        "color": "#1f2a37"
+        "size": 14,
+        "color": "#111111",
+        "weight": "bold"
       },
       "x": 0.01,
       "xanchor": "left"
     },
     "xaxis": {
       "showline": true,
-      "linecolor": "#c4ccd4",
-      "linewidth": 1,
+      "linecolor": "#1a1a1a",
+      "linewidth": 0.8,
       "mirror": false,
       "ticks": "outside",
-      "tickcolor": "#c4ccd4",
-      "ticklen": 4,
-      "tickwidth": 1,
+      "tickcolor": "#1a1a1a",
+      "ticklen": 3.0,
+      "tickwidth": 0.8,
       "tickfont": {
         "size": 11,
-        "color": "#33404d"
+        "color": "#2b2b2b"
       },
       "zeroline": false,
-      "showgrid": true,
-      "gridcolor": "#eef1f5",
-      "gridwidth": 1,
+      "showgrid": false,
       "title": {
         "text": "log2 fold-change",
         "font": {
           "size": 13,
-          "color": "#1f2a37"
+          "color": "#111111"
         }
       }
     },
     "yaxis": {
       "showline": true,
-      "linecolor": "#c4ccd4",
-      "linewidth": 1,
+      "linecolor": "#1a1a1a",
+      "linewidth": 0.8,
       "mirror": false,
       "ticks": "outside",
-      "tickcolor": "#c4ccd4",
-      "ticklen": 4,
-      "tickwidth": 1,
+      "tickcolor": "#1a1a1a",
+      "ticklen": 3.0,
+      "tickwidth": 0.8,
       "tickfont": {
         "size": 11,
-        "color": "#33404d"
+        "color": "#2b2b2b"
       },
       "zeroline": false,
-      "showgrid": true,
-      "gridcolor": "#eef1f5",
-      "gridwidth": 1,
+      "showgrid": false,
       "title": {
         "text": "-log10 adjusted p",
         "font": {
           "size": 13,
-          "color": "#1f2a37"
+          "color": "#111111"
         }
       }
     },
@@ -404,7 +401,7 @@
     "font": {
       "family": "Arimo, Arial, Helvetica, sans-serif",
       "size": 13,
-      "color": "#33404d"
+      "color": "#2b2b2b"
     },
     "paper_bgcolor": "#ffffff",
     "plot_bgcolor": "#ffffff",
@@ -423,7 +420,7 @@
         "family": "Arimo, Arial, Helvetica, sans-serif",
         "size": 12
       },
-      "bgcolor": "#1f2a37"
+      "bgcolor": "#111111"
     },
     "margin": {
       "t": 46,
@@ -432,9 +429,11 @@
       "l": 64
     },
     "legend": {
+      "itemwidth": 30,
+      "tracegroupgap": 6,
       "font": {
         "size": 11,
-        "color": "#33404d"
+        "color": "#2b2b2b"
       },
       "bgcolor": "rgba(0,0,0,0)",
       "bordercolor": "rgba(0,0,0,0)"

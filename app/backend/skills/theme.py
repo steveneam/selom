@@ -20,7 +20,7 @@ from skills.styles import DEFAULT_STYLE, get_style
 # ``(source hash, skill_id, style, THEME_VERSION)``; bump this whenever the theme transform or the
 # style tokens change so every cached envelope misses cleanly — the same discipline as a skill's
 # ``version`` invalidating the C1 compute cache. ``apply`` itself is unaffected.
-THEME_VERSION = "1"
+THEME_VERSION = "2"  # F2: ported cnsplots styling values + the matrix kind
 
 # skill id -> figure-type polish
 _KIND = {
@@ -31,6 +31,9 @@ _KIND = {
     "upset": "upset",
     "normalization_qc": "qc",
     "erg_traces": "trace_grid",
+    "heatmap": "matrix",
+    "corr_heatmap": "matrix",
+    "cepo": "matrix",
 }
 
 # Render-inert figure tag (``layout.meta.selom.figureKind``, set by primitives like
@@ -52,8 +55,8 @@ def _tagged_kind(spec):
 # ---- axis / base -------------------------------------------------------------
 def _axis(st, grid=True):
     ax = dict(
-        showline=True, linecolor=st.axis, linewidth=1, mirror=False,
-        ticks="outside", tickcolor=st.axis, ticklen=4, tickwidth=1,
+        showline=True, linecolor=st.axis, linewidth=st.axis_width, mirror=False,
+        ticks="outside", tickcolor=st.axis, ticklen=st.tick_len, tickwidth=st.tick_width,
         tickfont=dict(size=st.size_tick, color=st.ink),
         zeroline=False, showgrid=grid,
     )
@@ -95,14 +98,20 @@ def _apply_base(st, spec, grid=True):
     lay["hoverlabel"] = dict(font=dict(family=st.font_family, size=12), bgcolor=st.ink_strong)
     lay.setdefault("margin", dict(t=46, r=24, b=52, l=64))
     t = lay.get("title")
-    tfont = dict(family=st.font_family, size=st.size_title, color=st.ink_strong)
+    tfont = dict(family=st.font_family, size=st.size_title, color=st.ink_strong,
+                 weight=st.title_weight)
     tx, txa = (0.01, "left") if st.title_align == "left" else (0.5, "center")
     if isinstance(t, dict):
         lay["title"] = {**t, "font": tfont, "x": tx, "xanchor": txa}
     elif isinstance(t, str):
         lay["title"] = dict(text=t, font=tfont, x=tx, xanchor=txa)
     lg = lay.get("legend", {})
-    lay["legend"] = {**lg, "font": dict(size=st.size_legend, color=st.ink),
+    # Legend density (audit row 11). cnsplots shrinks its legend markers (markerscale 0.5) and
+    # tightens the handles so the key costs the plot as little width as possible; Plotly's levers
+    # are itemwidth (the marker+gap column) and tracegroupgap. `itemsizing` is deliberately NOT set
+    # here — a figure whose legend IS the size key (enrichment) sets it itself and must win.
+    lay["legend"] = {**{"itemwidth": 30, "tracegroupgap": 6}, **lg,
+                     "font": dict(size=st.size_legend, color=st.ink),
                      "bgcolor": "rgba(0,0,0,0)", "bordercolor": "rgba(0,0,0,0)"}
     for k in ("xaxis", "yaxis"):
         if k in lay:
@@ -170,6 +179,31 @@ def _style_embedding(st, spec, pseudotime=False):
     lay["yaxis"]["scaleratio"] = 1
     lay["xaxis"].setdefault("title", dict(text="UMAP 1"))
     lay["yaxis"].setdefault("title", dict(text="UMAP 2"))
+    return spec
+
+
+def _style_matrix(st, spec):
+    """Diverging matrices — expression z-scores, sample correlation, stability scores.
+
+    Two things a matrix figure needs and did not have: no grid (it is a filled surface, so a grid
+    can only be drawn *through* the data), and the style's diverging scale rather than a per-skill
+    one. `heatmap`, `corr_heatmap` and `cepo` each hard-coded ``RdBu`` + ``reversescale`` — which
+    put HIGH values at the blue end, backwards from the genomics convention (audit row 15).
+
+    Only the midpoint declaration marks a trace as diverging — ``zmid`` on a heatmap, ``cmid`` on a
+    coloured marker (``cepo`` draws its diverging DS scores as a dot matrix, not a filled one). The
+    clustermap's categorical annotation strips are heatmaps too, but they carry ``zmin``/``zmax``
+    with a stepwise scale and NO midpoint, so their colours are left alone.
+    """
+    _apply_base(st, spec, grid=False)
+    for tr in spec["data"]:
+        if tr.get("type") == "heatmap" and "zmid" in tr:
+            tr["colorscale"] = st.diverging
+            tr.pop("reversescale", None)
+        marker = tr.get("marker")
+        if isinstance(marker, dict) and "cmid" in marker:
+            marker["colorscale"] = st.diverging
+            marker.pop("reversescale", None)
     return spec
 
 
@@ -263,6 +297,8 @@ def _theme_for_kind(st, spec, kind):
         return _style_embedding(st, spec, pseudotime=False)
     if kind == "trajectory":
         return _style_embedding(st, spec, pseudotime=True)
+    if kind == "matrix":
+        return _style_matrix(st, spec)
     if kind == "upset":
         return _style_upset(st, spec)
     if kind == "qc":

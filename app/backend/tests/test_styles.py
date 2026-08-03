@@ -103,3 +103,63 @@ def test_style_apply_endpoint():
 
 def test_style_apply_rejects_bad_figure():
     assert client.post("/figures/style/apply", json={"figure": {"nope": 1}}).status_code == 400
+
+
+# --- Phase F2: the ported cnsplots styling values (docs/cnsplots-port/parity-audit.md §3) -------
+
+
+def test_default_style_carries_the_ported_furniture():
+    """The rows the audit marked PORT are style TOKENS, so one edit restyles all 36 skills."""
+    st = styles.get_style("selom")
+    assert st.force_grid is False           # row 5 — publication default is gridless
+    assert st.title_weight == "bold"        # row 1
+    assert st.size_title == 14              # row 3 — the title:tick ramp was 1.45x
+    assert st.axis_width < 1.0              # row 6 — cnsplots' spine is 0.5 pt, not 1 px
+    assert st.tick_len < 4.0 and st.tick_width < 1.0   # row 7
+
+
+def test_theme_lands_the_ported_furniture_on_a_figure():
+    fig = theme.apply(_base_fig(), "regression")
+    lay = fig["layout"]
+    assert lay["title"]["font"]["weight"] == "bold"
+    for axis in ("xaxis", "yaxis"):
+        assert lay[axis]["showgrid"] is False
+        assert lay[axis]["linewidth"] == styles.get_style("selom").axis_width
+        assert lay[axis]["ticklen"] == styles.get_style("selom").tick_len
+        # a gridless axis must not carry grid paint it will never use
+        assert "gridcolor" not in lay[axis]
+
+
+def test_diverging_matrices_put_high_values_at_the_RED_end():
+    """Row 15. The skills hard-coded RdBu + reversescale, which reads HIGH as blue — backwards
+    from the genomics convention for an expression z-score."""
+    fig = theme.apply(
+        {"data": [{"type": "heatmap", "z": [[-1, 1]], "colorscale": "RdBu",
+                   "reversescale": True, "zmid": 0}], "layout": {}},
+        "heatmap",
+    )
+    trace = fig["data"][0]
+    assert "reversescale" not in trace
+    assert trace["colorscale"] == styles.get_style("selom").diverging
+
+
+def test_diverging_marker_matrices_are_covered_too():
+    """`cepo` draws its diverging scores as a DOT matrix, so the midpoint is marker.cmid."""
+    fig = theme.apply(
+        {"data": [{"type": "scatter", "mode": "markers", "x": [1], "y": [1],
+                   "marker": {"color": [0.5], "colorscale": "RdBu", "reversescale": True,
+                              "cmid": 0}}], "layout": {}},
+        "cepo",
+    )
+    marker = fig["data"][0]["marker"]
+    assert "reversescale" not in marker
+    assert marker["colorscale"] == styles.get_style("selom").diverging
+
+
+def test_categorical_annotation_strips_keep_their_own_scale():
+    """A clustermap's category strips are heatmaps with NO midpoint and a deliberate stepwise
+    scale. Restyling them would destroy the category encoding."""
+    strip = {"type": "heatmap", "z": [[0, 1]], "colorscale": [[0, "#aaa"], [1, "#bbb"]],
+             "zmin": -0.5, "zmax": 1.5}
+    fig = theme.apply({"data": [strip], "layout": {}}, "heatmap")
+    assert fig["data"][0]["colorscale"] == [[0, "#aaa"], [1, "#bbb"]]

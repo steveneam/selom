@@ -36,7 +36,7 @@ The three defects, then the styling table.
 
 | Selom (before) | cnsplots, **identical numbers** | Selom (after) |
 |---|---|---|
-| ![](audit/selom/dotplot.png) | ![](audit/cnsplots/dotplot.png) | ![](audit/dotplot-fix-evidence.png) |
+| ![](audit/selom/dotplot.png) | ![](audit/cnsplots/dotplot.png) | ![](audit/selom-after/dotplot.png) |
 
 The skill emits `marker.size = [1, 2, 3, 3]` (the gene count per term) with
 `marker.sizemode = "diameter"`. In Plotly `sizemode: "diameter"` means **size is a diameter in
@@ -62,7 +62,7 @@ data semantics (spec D1).
 
 | Selom (before) | Selom (after) |
 |---|---|
-| ![](audit/selom/heatmap.png) | ![](audit/heatmap-fix-evidence.png) |
+| ![](audit/selom/heatmap.png) | ![](audit/selom-after/heatmap.png) |
 
 The trace's `x` is `['0','1','10','11','12','13','14','15','16','2',…,'9']` — **strings that look
 like numbers, in lexicographic order**. Plotly coerces a numeric-looking string axis to a *linear*
@@ -252,6 +252,40 @@ v0.6.0); Selom values are measured from `audit/selom-probe.json`.
 | 24 | Panel geometry | 150 × 150 pt panel, `figure_dpi 144` / `savefig 288` | figure-driven, export presets in mm | **CHECK** | Selom's mm-based presets are the better model; take cnsplots' *max panel height* research into the packs. |
 
 **Ported: 14 · Rejected: 4 · Check (needs a journal guideline or a product call): 5 · Already equal: 2.**
+
+### F2 status — 10 of the 14 PORT rows are closed
+
+Closed as **style tokens** in `skills/styles.py`, so one edit restyles all 36 skills and every
+journal pack inherits the mechanism: rows **1** (bold title), **3** (title 16 → 14 px, flattening
+the 1.45× ramp), **4** (font family — this was D3), **5** (gridless), **6** (black spines at
+0.8 px), **7** (ticks 4 → 3 px long, 1 → 0.8 px wide), **8** (black tick furniture, darker labels),
+**11** (legend `itemwidth`/`tracegroupgap`), **15** (diverging matrices put HIGH at the red end),
+**19–20 partially** — `enrichment` gained its size key, but significance brackets and `n=` counts
+are still F4.
+
+The frontend's own defaults (`lib/figure/figure-spec.ts`) were moved in step, because they fill
+what the backend theme did not set — a figure a *skill* produced and a figure the *editor* created
+would otherwise have sat in the same library looking like different products.
+
+**Still open from this table:** row 2 (title alignment — a per-journal decision), rows 13 and 24
+(the journal packs and their panel geometry, which need each journal's own author guidelines, spec
+D4), row 17 (transparent vs white export background — a product call), and rows **21–23**, the
+layout defects that are Selom's own and which cnsplots does *not* solve either: long category
+labels colliding with the axis title, point-label collision, and the axis title colliding with long
+tick labels. Those three are where Selom can beat the reference rather than match it.
+
+### F2 before / after, same data, same canvas
+
+| | Before | After |
+|---|---|---|
+| box | ![](audit/selom/box.png) | ![](audit/selom-after/box.png) |
+| scatter | ![](audit/selom/scatter.png) | ![](audit/selom-after/scatter.png) |
+| heatmap | ![](audit/selom/heatmap.png) | ![](audit/selom-after/heatmap.png) |
+| volcano | ![](audit/selom/volcano.png) | ![](audit/selom-after/volcano.png) |
+| dotplot | ![](audit/selom/dotplot.png) | ![](audit/selom-after/dotplot.png) |
+
+The remaining visible blemishes — the box plot's clipped category labels, the volcano's overlapping
+gene labels — are rows 21–23 above, and are deliberately still open.
 
 ---
 

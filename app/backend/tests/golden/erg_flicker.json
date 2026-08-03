@@ -1329,8 +1329,8 @@
       "yanchor": "top",
       "font": {
         "family": "Arimo, Arial, Helvetica, sans-serif",
-        "size": 16,
-        "color": "#1f2a37"
+        "size": 14,
+        "color": "#111111"
       },
       "x": 0.01,
       "xanchor": "left"
@@ -1673,7 +1673,7 @@
     "font": {
       "family": "Arimo, Arial, Helvetica, sans-serif",
       "size": 13,
-      "color": "#33404d"
+      "color": "#2b2b2b"
     },
     "paper_bgcolor": "#ffffff",
     "plot_bgcolor": "#ffffff",

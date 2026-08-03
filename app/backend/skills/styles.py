@@ -6,10 +6,15 @@ colourway, the continuous colourscale, volcano semantic colours, and title align
 ``theme.apply(spec, skill_id, style=...)`` reads these tokens, so a style only changes
 how a figure *looks* — never its data — and figures stay editable Plotly specs.
 
-``selom`` reproduces today's hard-coded theme verbatim (golden-pinned default). The
-journal styles differ in the things journals actually mandate — legibility,
-colourblind-safety, density — not invented brand palettes. Proprietary fonts
-(Helvetica/Arial) map to the open, metric-compatible **Arimo**; nothing paid is bundled.
+``selom`` is the default. As of Phase F2 its values are **ported from cnsplots** (BSD-3-Clause) —
+gridless, black axis furniture, bold title, tighter tick geometry — because the audit showed those
+specific settings are most of what separates a journal figure from a web chart. Every ported value
+carries its row number from ``docs/cnsplots-port/parity-audit.md`` §3. The journal styles differ in
+the things journals actually mandate — legibility, colourblind-safety, density — not invented brand
+palettes. Proprietary fonts (Helvetica/Arial) map to the open, metric-compatible **Arimo**; nothing
+paid is bundled.
+
+Ported from cnsplots (BSD-3-Clause) — see ``LICENSES/cnsplots-BSD-3-Clause.txt``.
 """
 
 from __future__ import annotations
@@ -38,6 +43,7 @@ class Style:
     size_tick: int = 11
     size_legend: int = 11
     size_text: float = 10.5            # in-figure text labels (e.g. volcano gene names)
+    title_weight: str = "normal"       # normal | bold — cnsplots titles are bold (audit row 1)
     # colour
     ink: str = "#33404d"               # body text / ticks
     ink_strong: str = "#1f2a37"        # titles, axis labels
@@ -46,9 +52,19 @@ class Style:
     paper: str = "#ffffff"
     colorway: list[str] = field(default_factory=lambda: list(OKABE_ITO))
     sequential: str = "Viridis"
+    # Diverging matrices (expression z-scores, correlation). Plotly's own "RdBu" runs blue-low →
+    # red-high, which IS the genomics convention; the skills used to reverse it, so high expression
+    # read as blue (audit row 15). Theme applies this and drops any `reversescale`.
+    diverging: str = "RdBu"
     volcano: dict[str, str] = field(
         default_factory=lambda: {"n.s.": "#cdd4dc", "up": "#c0392b", "down": "#2f6db0"}
     )
+    # axis furniture — ported from cnsplots' rcParams (audit rows 6-8). Its native values are in
+    # POINTS (spine 0.5 pt, tick length 2 pt, tick width 0.6 pt); these are the CSS-px equivalents
+    # rounded to values that stay crisp at export scale rather than landing on a half pixel.
+    axis_width: float = 1.0
+    tick_len: float = 4.0
+    tick_width: float = 1.0
     # layout
     title_align: str = "left"          # left | center
     force_grid: bool | None = None     # None = let the figure type decide; bool = override
@@ -82,6 +98,18 @@ _SELOM = Style(
     # `app/frontend/lib/figure/figure-spec.ts`.
     font_family=SANS_OPEN,
     colorway=["#2f6db0", "#e08a2b", "#3f9b6b", "#c0392b", "#7d5ba6", "#1f9aa6", "#9aa017", "#6b7280"],
+    # --- Phase F2: the ported cnsplots styling values (docs/cnsplots-port/parity-audit.md §3).
+    # These are what turned "reads as a web chart" into "reads as a journal figure"; each one is a
+    # row in that table, and none of them is taste — they are the reference's measured settings.
+    size_title=14,          # row 3: title:tick was 1.45x, far above cnsplots' 1.14x
+    title_weight="bold",    # row 1
+    force_grid=False,       # row 5: publication default is gridless
+    axis="#1a1a1a",         # rows 6+8: black spines and ticks, not #c4ccd4 dashboard grey
+    ink="#2b2b2b",          # row 8: tick labels need print contrast
+    ink_strong="#111111",
+    axis_width=0.8,         # row 6: cnsplots 0.5 pt
+    tick_len=3.0,           # row 7: cnsplots 2 pt
+    tick_width=0.8,         # row 7: cnsplots 0.6 pt
 )
 
 _NATURE = Style(

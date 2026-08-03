@@ -30,9 +30,23 @@ export interface FigureSpec {
  * wrapping and overlap between what you edit and what you download (parity-audit D3).
  */
 const FIGURE_FONT = "Arimo, Arial, Helvetica, sans-serif";
-const INK = "#0f172a";
+
+/**
+ * Figure defaults, kept in step with the backend style registry (`skills/styles.py`, the `selom`
+ * style) so a figure looks the same whether a skill produced it or the editor did.
+ *
+ * These fill only what the backend theme did NOT set (`??=` throughout), so a themed figure keeps
+ * its ported values untouched — but a figure created client-side (a digitized chart, a blank one)
+ * gets its defaults from here, and if these drifted the two would sit side by side in the same
+ * library looking like different products. Values ported from cnsplots via
+ * `docs/cnsplots-port/parity-audit.md` §3.
+ */
+const INK = "#2b2b2b";
+const INK_STRONG = "#111111";
 const GRID = "#e2e8f0";
-const AXIS_LINE = "#cbd5e1";
+const AXIS_LINE = "#1a1a1a";
+const AXIS_WIDTH = 0.8;
+const TICK_LEN = 3;
 
 /** Named colourways for the palette swap (colourblind-safe defaults first). */
 export const COLORWAYS: Record<string, { label: string; colors: string[] }> = {
@@ -91,15 +105,16 @@ export function normalizeSpec(input: FigureSpec): FigureSpec {
 
   L.font ??= {};
   L.font.family ??= FIGURE_FONT;
-  L.font.size ??= 12;
+  L.font.size ??= 13;
   L.font.color ??= INK;
 
   if (typeof L.title === "string") L.title = { text: L.title };
   L.title ??= {};
   L.title.text ??= "";
   L.title.font ??= {};
-  L.title.font.size ??= 17;
-  L.title.font.color ??= INK;
+  L.title.font.size ??= 14;
+  L.title.font.color ??= INK_STRONG;
+  L.title.font.weight ??= "bold";
 
   L.colorway ??= COLORWAYS.okabeito.colors;
 
@@ -114,12 +129,15 @@ export function normalizeSpec(input: FigureSpec): FigureSpec {
     A.title ??= {};
     A.title.text ??= "";
     A.title.font ??= {};
-    A.showgrid ??= true;
+    A.showgrid ??= false; // publication default is gridless (parity-audit row 5)
     A.gridcolor ??= GRID;
     A.zeroline ??= false;
     A.linecolor ??= AXIS_LINE;
+    A.linewidth ??= AXIS_WIDTH;
     A.ticks ??= "outside";
     A.tickcolor ??= AXIS_LINE;
+    A.ticklen ??= TICK_LEN;
+    A.tickwidth ??= AXIS_WIDTH;
     A.type ??= "-"; // "-" = auto-detect
   }
 

@@ -229,7 +229,9 @@ def test_render_caches_the_envelope(monkeypatch, fresh_cache):
     assert applies["n"] == 1 and a == b          # 2nd identical render served from the envelope cache
     theme.render(fig, "volcano", "nature")
     assert applies["n"] == 2                      # a style change -> a clean miss -> re-theme
-    monkeypatch.setattr(theme, "THEME_VERSION", "2")
+    # Bump RELATIVE to the live value — a literal here silently stops testing anything the day
+    # THEME_VERSION is bumped to that same literal (which is exactly what F2 did).
+    monkeypatch.setattr(theme, "THEME_VERSION", theme.THEME_VERSION + "-bumped")
     theme.render(fig, "volcano", "selom")
     assert applies["n"] == 3                      # a theme-version bump -> a clean miss
 
