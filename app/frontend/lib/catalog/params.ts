@@ -181,6 +181,35 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     { key: "label", label: "Label points with", type: "text", placeholder: "e.g. sample_id", help: "Annotates every point — best on small tables." },
     { key: "fit", label: "Show trend line", type: "switch", help: "Ordinary-least-squares fit with R², slope and p. Off draws a plain scatter and computes no fit." },
   ],
+  // Line — the spread vocabulary here is the SAME one the bar chart and the ERG trace grid use
+  // (skills/_charts.py), because it is the same code. Keep the wording identical to those so a
+  // user who learns "Spread shows" once does not relearn it per chart type.
+  line: [
+    { key: "x", label: "X column", type: "text", placeholder: "auto-detect", help: "Blank = the first numeric column." },
+    { key: "y", label: "Y column", type: "text", placeholder: "auto-detect", help: "Blank = the second numeric column." },
+    { key: "series", label: "One line per", type: "text", placeholder: "e.g. condition, genotype", help: "A category column. Never auto-detected — guessing it would silently change what the figure means." },
+    { key: "spread", label: "Spread shows", type: "select", options: [
+      { value: "band", label: "Shaded band" },
+      { value: "error_bars", label: "Error bars" },
+      { value: "individual", label: "Individual replicates" },
+      { value: "both", label: "Band + individual replicates" },
+      { value: "none", label: "No spread" },
+    ] },
+    { key: "error", label: "Error metric", type: "select", help: "What the band or bars measure.", options: [
+      { value: "sem", label: "SEM (standard error)" },
+      { value: "sd", label: "SD (standard deviation)" },
+      { value: "ci95", label: "95% confidence interval" },
+      { value: "minmax", label: "Min-max range" },
+    ] },
+    { key: "central", label: "Line shows", type: "select", options: [
+      { value: "mean", label: "Mean of replicates" },
+      { value: "representative", label: "A representative replicate" },
+      { value: "none", label: "No central line" },
+    ] },
+    { key: "markers", label: "Mark each point", type: "switch", help: "Show a marker at every measured x." },
+    { key: "points", label: "Show replicates", type: "switch", help: "Plot every individual value behind the line." },
+    { key: "log_x", label: "Log x-axis", type: "switch", help: "For dose or intensity ladders." },
+  ],
   // Set overlap (venn · upset) — one input shape, two views. venn's `sets` is the choice the
   // figure cannot make for you above three columns: the engine falls back to the largest three
   // and SAYS so in the title, but naming them is what makes the figure the one you meant.

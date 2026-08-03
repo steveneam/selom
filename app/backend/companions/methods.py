@@ -377,6 +377,29 @@ def _upset(p: dict):
     return text, [UPSET]
 
 
+def _line(p: dict):
+    err = str(p.get("error", "sem")).lower()
+    err_txt = {"sem": "the standard error of the mean", "sd": "one standard deviation",
+               "ci95": "a 95% confidence interval (t-quantile)",
+               "minmax": "the observed minimum and maximum"}.get(err, "the standard error of the mean")
+    spread = str(p.get("spread", "band")).lower()
+    how = {"band": "a shaded band", "error_bars": "error bars",
+           "individual": "the individual replicate curves",
+           "both": "a shaded band and the individual replicate curves",
+           "none": "no spread"}.get(spread, "a shaded band")
+    series = str(p.get("series") or "").strip()
+    grouping = f" separately for each {series}" if series else ""
+    text = (
+        f"Values were plotted against the x variable{grouping}, with observations sharing an x "
+        f"treated as replicates at that point. Each point shows the mean, and {how} shows "
+        f"{err_txt}"
+    )
+    text += "; the x-axis is logarithmic." if _truthy(p.get("log_x")) else "."
+    text += (" The per-point mean, spread and replicate count are reported in the accompanying "
+             "table.")
+    return text, []
+
+
 def _venn(p: dict):
     named = str(p.get("sets") or "").strip()
     which = (f"the sets {named}" if named
@@ -982,6 +1005,7 @@ _TEMPLATES = {
     "diff_abundance": _diff_abundance,
     "corr_heatmap": _corr_heatmap,
     "upset": _upset,
+    "line": _line,
     "venn": _venn,
     "forest": _forest,
     "qq": _qq,

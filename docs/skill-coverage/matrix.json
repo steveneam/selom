@@ -1,11 +1,11 @@
 {
-  "generated": "2026-08-03 16:33 +0000",
-  "elapsed_seconds": 211.3,
+  "generated": "2026-08-03 17:38 +0000",
+  "elapsed_seconds": 207.6,
   "skills": [
     {
       "skill_id": "annotate",
       "status": "pass",
-      "seconds": 4.19,
+      "seconds": 4.47,
       "dataset": "jev/retina_fadl.h5ad",
       "detail": "7 traces \u00b7 Cell-type annotation \u2014 Retinal cell types"
     },
@@ -26,7 +26,7 @@
     {
       "skill_id": "cluster",
       "status": "pass",
-      "seconds": 35.69,
+      "seconds": 35.66,
       "dataset": "jev/retina_fadl.h5ad",
       "detail": "1 traces \u00b7 Leiden clusters (resolution 1.0)"
     },
@@ -47,28 +47,28 @@
     {
       "skill_id": "deg",
       "status": "pass",
-      "seconds": 6.41,
+      "seconds": 6.52,
       "dataset": "jev/retina_fadl.h5ad",
       "detail": "1 traces \u00b7 Top markers \u2014 leiden group 0"
     },
     {
       "skill_id": "diff_abundance",
       "status": "pass",
-      "seconds": 5.9,
+      "seconds": 5.08,
       "dataset": "rpgrip1/processed/rpgrip1_merged.h5ad",
       "detail": "1 traces \u00b7 Differential abundance \u2014 C3 vs WT<br><sub>pyDESeq2 (Wald, TM"
     },
     {
       "skill_id": "enrichment",
       "status": "pass",
-      "seconds": 0.9,
+      "seconds": 0.86,
       "dataset": "alpk1/irpe_rawcounts/DE_oracle_d311_limma.csv",
       "detail": "4 traces \u00b7 Pathway enrichment (GO)"
     },
     {
       "skill_id": "erg_bwave_bar",
       "status": "pass",
-      "seconds": 0.02,
+      "seconds": 0.01,
       "dataset": "erg-fig1e/erg_metrics_long.csv",
       "detail": "2 traces \u00b7 Scotopic b-wave by condition"
     },
@@ -89,7 +89,7 @@
     {
       "skill_id": "erg_traces",
       "status": "pass",
-      "seconds": 0.33,
+      "seconds": 0.31,
       "dataset": "erg-fig1e/erg_waveforms_long.csv",
       "detail": "84 traces \u00b7 Representative scotopic ERG"
     },
@@ -117,49 +117,56 @@
     {
       "skill_id": "gsea",
       "status": "pass",
-      "seconds": 42.7,
+      "seconds": 39.12,
       "dataset": "alpk1/irpe_rawcounts/DE_oracle_d311_limma.csv",
       "detail": "5 traces \u00b7 GSEA \u2014 GO:CC: ER to Golgi transport vesicle membrane   ES=0."
     },
     {
       "skill_id": "heatmap",
       "status": "pass",
-      "seconds": 5.36,
+      "seconds": 4.98,
       "dataset": "jev/retina_fadl.h5ad",
       "detail": "1 traces \u00b7 Marker heatmap"
     },
     {
       "skill_id": "integration",
       "status": "pass",
-      "seconds": 22.77,
+      "seconds": 21.06,
       "dataset": "hani/processed/hani_irpe_subset.h5ad",
       "detail": "4 traces \u00b7 Integrated scRNA UMAP \u2014 Melody (batch: sample)<br><sub>batch"
     },
     {
+      "skill_id": "line",
+      "status": "pass",
+      "seconds": 0.01,
+      "dataset": "erg-fig1e/erg_metrics_long.csv",
+      "detail": "18 traces \u00b7 b_wave_uv over intensity_log_cd_s_m2 by condition"
+    },
+    {
       "skill_id": "markers",
       "status": "pass",
-      "seconds": 17.64,
+      "seconds": 18.13,
       "dataset": "jev/retina_fadl.h5ad",
       "detail": "1 traces \u00b7 Marker genes \u2014 top 3 per leiden (wilcoxon)"
     },
     {
       "skill_id": "mixing_metrics",
       "status": "pass",
-      "seconds": 7.09,
+      "seconds": 5.97,
       "dataset": "hani/processed/hani_irpe_subset.h5ad",
       "detail": "1 traces \u00b7 Integration mixing metrics \u2014 batch: sample<br><sub>embedding"
     },
     {
       "skill_id": "normalization_qc",
       "status": "pass",
-      "seconds": 0.38,
+      "seconds": 0.39,
       "dataset": "hani/processed/hani_irpe_subset.h5ad",
       "detail": "3 traces \u00b7 Per-cell QC"
     },
     {
       "skill_id": "pathway",
       "status": "pass",
-      "seconds": 3.48,
+      "seconds": 3.76,
       "dataset": "alpk1/irpe_rawcounts/DE_oracle_d311_limma.csv",
       "detail": "2 traces \u00b7 Reactome pathway enrichment"
     },
@@ -173,14 +180,14 @@
     {
       "skill_id": "proteomics_de",
       "status": "pass",
-      "seconds": 0.03,
+      "seconds": 0.04,
       "dataset": "jev/proteome_matrix.csv",
       "detail": "3 traces \u00b7 Proteomics differential abundance \u2014 5v5 samples, 2180 protei"
     },
     {
       "skill_id": "pseudotime_genes",
       "status": "pass",
-      "seconds": 7.02,
+      "seconds": 7.15,
       "dataset": "jev/retina_fadl.h5ad",
       "detail": "6 traces \u00b7 Genes along pseudotime \u2014 top 6<br><sub>auto root (DC1 extrem"
     },
@@ -194,7 +201,7 @@
     {
       "skill_id": "qq",
       "status": "pass",
-      "seconds": 0.14,
+      "seconds": 0.15,
       "dataset": "alpk1/irpe_rawcounts/DE_oracle_d311_limma.csv",
       "detail": "3 traces \u00b7 P-value Q-Q \u2014 P.Value"
     },
@@ -222,49 +229,49 @@
     {
       "skill_id": "ssgsea",
       "status": "pass",
-      "seconds": 36.18,
+      "seconds": 38.08,
       "dataset": "alpk1/eyg29/EYG_29_iRPE_human_St7-TMM-K0_rawCounts.csv",
       "detail": "1 traces \u00b7 ssGSEA \u2014 8613 gene sets x 18 samples (top 15 by variance)"
     },
     {
       "skill_id": "string_network",
       "status": "pass",
-      "seconds": 1.18,
+      "seconds": 1.16,
       "dataset": "alpk1/irpe_rawcounts/DE_oracle_d311_limma.csv",
       "detail": "2 traces \u00b7 STRING interaction network"
     },
     {
       "skill_id": "trajectory",
       "status": "pass",
-      "seconds": 1.35,
+      "seconds": 1.59,
       "dataset": "jev/retina_fadl.h5ad",
       "detail": "42 traces \u00b7 Trajectory & pseudotime (PAGA + DPT)"
     },
     {
       "skill_id": "umap_scrna",
       "status": "pass",
-      "seconds": 9.49,
+      "seconds": 9.93,
       "dataset": "jev/retina_fadl.h5ad",
       "detail": "19 traces \u00b7 scRNA UMAP"
     },
     {
       "skill_id": "upset",
       "status": "pass",
-      "seconds": 0.01,
+      "seconds": 0.02,
       "dataset": "hani/mmc2_markers_long.csv",
       "detail": "5 traces \u00b7 Set intersections"
     },
     {
       "skill_id": "venn",
       "status": "pass",
-      "seconds": 0.01,
+      "seconds": 0.02,
       "dataset": "hani/mmc2_markers_long.csv",
       "detail": "5 traces \u00b7 Set overlap \u2014 3 largest of 9 sets"
     },
     {
       "skill_id": "violin",
       "status": "pass",
-      "seconds": 0.36,
+      "seconds": 0.5,
       "dataset": "jev/retina_fadl.h5ad",
       "detail": "17 traces \u00b7 MT-CO1 expression by leiden"
     },

@@ -185,6 +185,13 @@ CASES: dict[str, Case | Skip] = {
                    "limma oracle table: no CI columns and no stderr, so this smokes the "
                    "t-statistic derivation path (se = logFC / t) — the one that would silently "
                    "fabricate intervals if it were wrong"),
+    # The ERG metrics table is the honest input: it is genuinely long-form (many eyes recorded at
+    # each flash intensity), so repeated rows at one x ARE replicates and the band is real spread
+    # rather than a reshaping artefact. log_x because an intensity ladder is logarithmic.
+    "line": Case(ERG_METRICS, {"x": "intensity_log_cd_s_m2", "y": "b_wave_uv",
+                               "series": "condition", "error": "sem", "spread": "band"},
+                 "b-wave amplitude across the flash-intensity ladder, one line per treatment arm — "
+                 "real replicate spread from repeated eyes at each intensity"),
     "qq": Case(HUMAN_DE, {"top_n": 10},
                "~21 k human genes with a raw P.Value column — exercises λ, the Beta null band "
                "and the tail-preserving thinning at real scale"),

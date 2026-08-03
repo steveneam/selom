@@ -43,6 +43,9 @@ NATIVE = {
     # three derivations produced them is nowhere on the canvas; a Q-Q's λ is a property of the whole
     # ranking. Synthesis (L3) could recover none of those honestly.
     "venn", "forest", "qq",
+    # `line` — the per-point mean, spread and n. n is the number that judges the band and
+    # is nowhere on the canvas, so it cannot be synthesized from the drawn shapes.
+    "line",
 }
 
 # The reviewed native-AND-L3 overlap. Normally a skill declares ONE table source, and the
@@ -70,7 +73,7 @@ L4_ONLY = {"go_graph", "pathway", "string_network"}
 # ``run_real`` or conditionally on real data — covered by the source check, not runnable stubless).
 STUB_NATIVE = {"volcano", "deg", "proteomics_de", "enrichment", "cepo", "mixing_metrics", "erg_traces",
                "erg_bwave_bar", "erg_intensity_response", "erg_flicker", "facs_gating",
-               "venn", "forest", "qq"}
+               "venn", "forest", "qq", "line"}
 
 
 def _attaches_table(skill_id: str) -> bool:

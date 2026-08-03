@@ -76,6 +76,17 @@ export const SKILL_PARAM_SPECS: Record<string, BackendParamSpec> = {
     label: { type: "str", default: "" },
     fit: { type: "bool", default: true },
   },
+  line: {
+    x: { type: "str", default: "" },
+    y: { type: "str", default: "" },
+    series: { type: "str", default: "" },
+    error: { type: "str", default: "sem", options: ["sem", "sd", "ci95", "minmax"] },
+    spread: { type: "str", default: "band", options: ["band", "error_bars", "individual", "both", "none"] },
+    central: { type: "str", default: "mean", options: ["mean", "representative", "none"] },
+    markers: { type: "bool", default: false },
+    points: { type: "bool", default: false },
+    log_x: { type: "bool", default: false },
+  },
   venn: {
     sets: { type: "str", default: "" },
     show_percent: { type: "bool", default: false },
