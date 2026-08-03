@@ -109,6 +109,35 @@
 > 2026-08-02: *"anything that needs me gets deferred to next week"*). So: no Clerk keys, no route-split
 > decision, no push. Build what does not need him.
 
+### ⚑ STEP 0 — two debt items, BEFORE forking the lanes (owner-directed 2026-08-03)
+
+**0a. Remind the owner to push — first thing, one line, then carry on.** 28 commits are local and
+`origin/main` is still at `46d5c6c`; it has not moved through Phase F, the ERG corrections or the
+cloud-export work. **The agent does not push** (owner pushes — CLAUDE.md commit conventions), so
+this is a prompt, not a task. It blocks no work; it is pure loss-risk, which is why it is worth
+raising before a session's worth of new commits piles on top.
+
+**0b. Unblock the `slow` test suite — and do it on the MAIN checkout, before any lane exists.**
+`pyarrow` is in the lock, so pandas 3 backs categoricals with `ArrowStringArray`, which anndata
+0.12.6 cannot write to h5ad — `tests/test_cepo.py` and all of `tests/test_deg_pseudobulk.py` die
+in their fixtures. Pre-existing (proven by stashing to `HEAD`), never reached the gate
+(`verify.sh` runs `-m "not slow"`, which deselects them), and not a product defect (`write_h5ad`
+appears only in tests; production only reads). The fix is verified and two lines in
+`tests/conftest.py`:
+
+```python
+pd.options.mode.string_storage = "python"        # else categories are ArrowStringArray
+anndata.settings.allow_write_nullable_strings = True   # else StringArray is refused
+```
+
+Either alone still fails; together the h5ad round-trip is clean. **Sequencing matters:**
+`conftest.py` is shared by all three lanes, and it sets a GLOBAL pandas option — landing it in a
+lane would guarantee a merge conflict and change behaviour under every other lane's tests. Do it
+first, on main, as its own commit, then fork. Run the full suite (not `-m "not slow"`) to confirm
+what it actually unblocks.
+
+---
+
 1. **F2.5a — the significance-annotation engine.** `pairs=` (test + bracket + stars) spans SIX
    cnsplots plot types and Selom has it **nowhere** — the ERG work hand-rolled it once already.
    One engine feature upgrades every categorical skill at once, and it brings `add_count` (`n=`
