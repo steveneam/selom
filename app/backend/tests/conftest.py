@@ -27,17 +27,21 @@ from skills import _result_cache
 # anndata is told to allow it.
 #
 # This is a TEST-ONLY concern, which is why it lives here and not in production code: `write_h5ad`
-# appears nowhere outside the suite -- production only ever READS h5ad. It also never reached the
-# gate, since `verify.sh` runs `-m "not slow"` and deselects both files.
+# appears nowhere outside the suite -- production only ever READS h5ad. The breakage went unnoticed
+# for so long because both files are `slow`, and the slow lane was gated NOWHERE; since 2026-08-03
+# `verify.sh` (be-slow) and the CI backend job both run `-m slow`, so these two lines are now
+# exercised by the gate rather than only by a hand-run full suite.
 pd.options.mode.string_storage = "python"
 anndata.settings.allow_write_nullable_strings = True
 
 # --- E2 fast/slow test split -------------------------------------------------------------
 # A feature commit runs the fast "contract gate" — `pytest -m "not slow"` — in seconds; the
 # heavy lanes (reproduction drives over real data, golden-figure renders across every skill,
-# real-engine scverse validations) carry @slow and only run in the full/CI pass (`pytest -m
-# slow`). Auto-marked by FILE here so no per-test edits are needed — a new heavy file just
-# joins the set below. (Telemetry split, architecture-consistency Task E2.)
+# real-engine scverse validations) carry @slow and run in the SEPARATE slow gate (`pytest -m
+# slow`) — corpus-free in CI and in verify.sh's be-slow (~16s, a breakage gate), and with the real
+# corpus in a full local run (~7.5 min, the numerical check). Auto-marked by FILE here so no
+# per-test edits are needed — a new heavy file just joins the set below, and it is gated the moment
+# it does. (Telemetry split, architecture-consistency Task E2.)
 _SLOW_PREFIXES = ("test_reproduction",)
 _SLOW_FILES = {
     "test_skills_golden.py",

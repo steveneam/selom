@@ -56,9 +56,20 @@ the push-to-`main` path was not exercised until the FF-merge of PR #1, one commi
 
 ## What this does NOT do
 
-- **Not the full science suite.** The backend job runs a light fast-gate closure (`pytest -m "not
-  slow"`) without the omics extras, so `auto` resolves the **stub** engine for the science skills — the
-  gate protects structure / contract / provenance, not real deg/gsea (see gate-ledger **DL-017**). The
-  slow suite is out of the merge gate by design.
+- **Not the full science suite.** The backend job installs a light closure without the omics extras,
+  so `auto` resolves the **stub** engine for the science skills — the gate protects structure /
+  contract / provenance, not real deg/gsea (see gate-ledger **DL-017**).
+
+  It does now run **both** lanes: `pytest -m "not slow"` and, since 2026-08-03, `pytest -m slow`.
+  The slow lane used to be out of the merge gate "by design", which was really an unexamined
+  assumption — it meant ~385 of 1907 tests were enforced **nowhere** (neither here nor in
+  `verify.sh`). That is how the pandas-3/pyarrow h5ad breakage survived, and how a signature change
+  left 7 tests broken while the gate read green. Measured against this job's own closure with no
+  corpus it is **16s**, so it needed no new job, no nightly and no self-hosted runner.
+
+  What the slow lane here is **not**: a real-data check. Without `SELOM_DATASETS_DIR` the corpus-backed
+  tests skip, so it catches *breakage*, not numerical regression — the same lane takes ~7.5 min with
+  the real corpus. Depth over real matrices stays with `scripts/skill-smoke.sh` and a full local
+  `uv run pytest` at a milestone.
 - **Not a lockfile refresh.** `uv.lock` is not regenerated here; `uv sync` (no `--locked`) resolves the
   pinned deps. A deliberate `uv lock` bump is a separate task.

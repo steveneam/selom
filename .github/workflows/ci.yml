@@ -98,6 +98,28 @@ jobs:
       - name: Fast test gate (pytest -m "not slow", parallel via xdist)
         run: uv run pytest -m "not slow" -n auto
 
+      # The `slow` lane was enforced NOWHERE -- CI and verify.sh both ran only `-m "not slow"`, so
+      # ~385 of 1907 tests had no gate at all. That is how the pandas-3/pyarrow h5ad breakage
+      # survived, and how a signature change left 7 tests broken while the gate read GREEN
+      # (test_reproduction_runs.py matches the `test_reproduction` slow prefix, so it was silently
+      # deselected). Closed 2026-08-03.
+      #
+      # It runs HERE, in the existing job, because it needs nothing this job lacks: measured against
+      # this exact light closure with no corpus -- 352 passed, 21 skipped, 0 failed in 16s. The 21
+      # skips are the omics-gated tests (pydeseq2/gseapy/scvi/kaleido/flowio), which skip cleanly
+      # rather than error, so no extra extras are needed. No new job, no nightly, no self-hosted
+      # runner, and well inside the 20-minute budget.
+      #
+      # Be honest about what this is: a BREAKAGE gate, not a numerical-regression one. The same lane
+      # takes ~7.5 min WITH the real corpus (SELOM_DATASETS_DIR), where the real engines chew on real
+      # matrices; that depth stays with `scripts/skill-smoke.sh` + a local full run at a milestone.
+      #
+      # `!cancelled()` so a fast-gate failure does not HIDE a slow-gate failure: one run reports both,
+      # matching verify.sh's contract (run every gate, let the ledger decide the outcome).
+      - name: Slow test gate (pytest -m slow -- corpus-free breakage lane)
+        if: ${{ !cancelled() }}
+        run: uv run pytest -m slow -n auto
+
   frontend:
     needs: changes
     if: ${{ needs.changes.outputs.frontend == 'true' }}

@@ -19,10 +19,21 @@
 #   hygiene  node scripts/guards/hygiene-scan.mjs --all
 #   be-lint  uv run ruff check .
 #   be-test  uv run pytest -m "not slow" -n "$SELOM_PYTEST_WORKERS"
+#   be-slow  env -u SELOM_DATASETS_DIR uv run pytest -m slow -n "$SELOM_PYTEST_WORKERS"
 #   fe-lint  npm run lint
 #   fe-types npx tsc --noEmit
 #   fe-test  npm run test
 #   fe-build npm run build            <-- the ONLY gate that catches SSR/integration breaks
+#
+# be-slow deliberately runs with SELOM_DATASETS_DIR UNSET, which is the one place this script drops
+# coverage on purpose -- so read the reason. The `slow` lane (reproduction drives, golden renders,
+# real-engine validations) was gated NOWHERE: this script and CI both ran only `-m "not slow"`,
+# leaving ~385 of 1907 tests with no gate. That is how the pandas-3/pyarrow h5ad breakage survived,
+# and how a signature change left 7 tests broken while this gate reported PASS. Corpus-free the lane
+# is ~16s and catches exactly that class (measured 2026-08-03: 352 pass / 0 fail against CI's own
+# dependency closure); WITH the corpus it is ~7.5 min, which would make the gate of record too
+# expensive to keep running. So it is a BREAKAGE gate at CI parity -- numerical regression over real
+# data stays with `scripts/skill-smoke.sh` and a full local `uv run pytest` at a milestone.
 #
 # fe-build is in the default set on purpose. tsc + eslint + vitest all pass on a tree whose pages
 # throw on server render (a WebGL import escaping `dynamic(..., {ssr:false})` is the standing
@@ -76,6 +87,7 @@ if [ "$LIST_ONLY" -eq 1 ]; then
     echo "hygiene   node scripts/guards/hygiene-scan.mjs --all"
     echo "be-lint   uv run ruff check .                       (cwd: app/backend)"
     echo "be-test   uv run pytest -m 'not slow' -n $WORKERS   (cwd: app/backend)"
+    echo "be-slow   uv run pytest -m slow -n $WORKERS         (cwd: app/backend, corpus-free)"
     echo "fe-lint   npm run lint                              (cwd: app/frontend)"
     echo "fe-types  npx tsc --noEmit                          (cwd: app/frontend)"
     echo "fe-test   npm run test                              (cwd: app/frontend)"
@@ -155,6 +167,10 @@ START=$SECONDS
 if [ "$WANT_BE" -eq 1 ]; then
     run_gate be-lint "$BE" uv run ruff check .
     run_gate be-test "$BE" uv run pytest -m "not slow" -n "$WORKERS"
+    # `env -u` is the mechanism, not a style choice: run_gate execs an argv array with no shell, so a
+    # `VAR= cmd` prefix would be parsed as the COMMAND NAME, not an assignment. See the header note
+    # for WHY the corpus is dropped for this one gate.
+    run_gate be-slow "$BE" env -u SELOM_DATASETS_DIR uv run pytest -m slow -n "$WORKERS"
 fi
 
 if [ "$WANT_FE" -eq 1 ]; then
