@@ -1947,7 +1947,7 @@
     "title": {
       "text": "GSEA \u2014 Gene set   ES=0.62  NES=2.04  p=0.001",
       "font": {
-        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "family": "Arimo, Arial, Helvetica, sans-serif",
         "size": 16,
         "color": "#1f2a37"
       },
@@ -2050,7 +2050,7 @@
       }
     ],
     "font": {
-      "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      "family": "Arimo, Arial, Helvetica, sans-serif",
       "size": 13,
       "color": "#33404d"
     },
@@ -2068,7 +2068,7 @@
     ],
     "hoverlabel": {
       "font": {
-        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "family": "Arimo, Arial, Helvetica, sans-serif",
         "size": 12
       },
       "bgcolor": "#1f2a37"

@@ -69,9 +69,18 @@ class Style:
 _SELOM = Style(
     id="selom",
     label="Selom default",
-    description="Selom's house publication look — Inter, blue/amber colourblind-aware palette.",
+    description="Selom's house publication look — open Arial-metric sans, blue/amber "
+                "colourblind-aware palette.",
     attribution="",
-    font_family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+    # Was `Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif`. Inter is bundled by NOTHING —
+    # not the frontend, not the render box — so it never rendered; the stack silently fell through
+    # to whatever came next, and the frontend's own chain fell through somewhere ELSE, so the
+    # figure on screen and the figure in the export were different typefaces (parity-audit D3,
+    # measured: 517 px vs 466 px for one string). Converged on SANS_OPEN, the same
+    # metric-compatible stack every journal style already uses, so both sides resolve alike on
+    # Linux (Liberation Sans), macOS and Windows (Arial). Keep this in step with
+    # `app/frontend/lib/figure/figure-spec.ts`.
+    font_family=SANS_OPEN,
     colorway=["#2f6db0", "#e08a2b", "#3f9b6b", "#c0392b", "#7d5ba6", "#1f9aa6", "#9aa017", "#6b7280"],
 )
 

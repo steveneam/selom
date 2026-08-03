@@ -54,6 +54,54 @@ def _stub_split() -> dict:
     return dotplot_split_spec(up, down, "Pathway enrichment — up/down split (stub)")
 
 
+# Dot DIAMETERS in px. Matches the `markers` dotplot's 4..26 band, the in-repo precedent for
+# encoding a count in dot size.
+_DOT_MIN_PX, _DOT_MAX_PX = 6.0, 26.0
+
+
+def _dot_sizes(counts, top=None):
+    """Map overlap counts to marker diameters in **pixels**.
+
+    The raw count must never reach ``marker.size``: Plotly reads that as a diameter in px, so an
+    ORA returning 1-3 overlapping genes drew dots 1-3 PIXELS across and the size channel was
+    invisible (parity-audit D1). matplotlib's ``s`` is an area, which is why the same array looks
+    fine there and hid the bug in review. Exact counts stay in the hover text and the table.
+
+    ``top`` pins the count that maps to the largest dot. Pass it whenever the dots are split
+    across several traces — scaling each trace to its own maximum would draw the same count at two
+    different sizes and make the encoding a lie.
+    """
+    vals = [float(c or 0) for c in counts]
+    top = max(vals, default=0.0) if top is None else float(top)
+    if top <= 0:
+        return [_DOT_MIN_PX] * len(vals)
+    span = _DOT_MAX_PX - _DOT_MIN_PX
+    return [round(_DOT_MIN_PX + (min(v, top) / top) * span, 2) for v in vals]
+
+
+def _size_legend(counts, color="#7c8794"):
+    """Legend proxies that make the dot-size channel readable.
+
+    A size encoding with no key is undecodable — the reader sees big and small dots and cannot
+    recover the counts. Plotly builds no size legend of its own, so emit up to three point-free
+    traces (``x=[None]``) at representative counts; they render in the legend and nowhere else.
+    """
+    distinct = sorted({int(c) for c in counts if c})
+    if not distinct:
+        return []
+    picks = sorted({distinct[0], distinct[len(distinct) // 2], distinct[-1]})
+    sizes = _dot_sizes(picks)
+    return [
+        {
+            "type": "scatter", "mode": "markers", "x": [None], "y": [None],
+            "name": f"{c} gene{'s' if c != 1 else ''}", "hoverinfo": "skip",
+            "legendgroup": "dotsize",
+            "marker": {"size": s, "color": color},
+        }
+        for c, s in zip(picks, sizes)
+    ]
+
+
 def dotplot_spec(pathways, nlp, overlap, title) -> dict:
     """Shared enrichment dotplot — used by both the stub and the real engine.
 
@@ -71,20 +119,32 @@ def dotplot_spec(pathways, nlp, overlap, title) -> dict:
                 "x": list(reversed(nlp)),
                 "y": list(reversed(pathways)),
                 "text": [f"{o} genes" for o in reversed(overlap)],
+                "showlegend": False,  # the legend carries the size key, not this trace
                 "marker": {
-                    "size": list(reversed(overlap)),
+                    "size": _dot_sizes(reversed(overlap)),
                     "sizemode": "diameter",
                     "color": list(reversed(nlp)),
                     "colorscale": "Viridis",
                     "showscale": True,
                     "colorbar": {"title": {"text": "-log10 padj"}},
                 },
-            }
+            },
+            *_size_legend(overlap),
         ],
         "layout": {
             "title": {"text": title},
             "xaxis": {"title": {"text": "-log10 adjusted p"}},
             "yaxis": {"title": {"text": "pathway"}, "automargin": True},
+            # Size key inside the axes at the bottom-right. The colourbar owns the right margin,
+            # so a default legend lands on top of it; and the bottom-right of THIS figure type is
+            # structurally empty — terms are sorted by significance down the y axis, so the bottom
+            # row always carries the smallest x. `itemsizing: "trace"` keeps the key dots at the
+            # sizes they encode, which is the whole point of the key.
+            "legend": {
+                "title": {"text": "overlap", "font": {"size": 10}},
+                "x": 0.97, "xanchor": "right", "y": 0.03, "yanchor": "bottom",
+                "itemsizing": "trace", "font": {"size": 10},
+            },
         },
     }
     # Statistics node (Pillar 1) — the enriched terms, most significant first.
@@ -108,6 +168,8 @@ def dotplot_split_spec(up_rows, down_rows, title) -> dict:
         best[r["pathway"]] = max(best.get(r["pathway"], 0.0), r["nlp"])
     # plotly draws y categories bottom-up, so ascending significance puts the top hit on top
     ordered = sorted(best, key=lambda p: best[p])
+    # ONE dot scale across both directions, so an overlap of n is the same dot up or down
+    size_top = max((r["overlap"] for r in up_rows + down_rows), default=0)
 
     def _trace(rows, sign, name, color):
         return {
@@ -117,7 +179,8 @@ def dotplot_split_spec(up_rows, down_rows, title) -> dict:
             "x": [round(sign * r["nlp"], 3) for r in rows],
             "y": [r["pathway"] for r in rows],
             "text": [f"{r['overlap']} genes" for r in rows],
-            "marker": {"size": [r["overlap"] for r in rows], "sizemode": "diameter", "color": color},
+            "marker": {"size": _dot_sizes([r["overlap"] for r in rows], top=size_top),
+                       "sizemode": "diameter", "color": color},
         }
 
     from skills._table import table

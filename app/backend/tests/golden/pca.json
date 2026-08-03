@@ -65,7 +65,7 @@
     "title": {
       "text": "PCA (stub)",
       "font": {
-        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "family": "Arimo, Arial, Helvetica, sans-serif",
         "size": 16,
         "color": "#1f2a37"
       },
@@ -135,7 +135,7 @@
     },
     "plot_bgcolor": "#ffffff",
     "font": {
-      "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      "family": "Arimo, Arial, Helvetica, sans-serif",
       "size": 13,
       "color": "#33404d"
     },
@@ -152,7 +152,7 @@
     ],
     "hoverlabel": {
       "font": {
-        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "family": "Arimo, Arial, Helvetica, sans-serif",
         "size": 12
       },
       "bgcolor": "#1f2a37"

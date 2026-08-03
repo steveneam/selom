@@ -238,6 +238,20 @@ def _row_quant_layer(quant, y_labels, x0, x1, y_hi, aid):
     return trace, axes
 
 
+def _cat_axis(axis: dict) -> dict:
+    """Pin an axis to ``category``.
+
+    BOTH heatmap axes are categorical by construction — they carry row/column LABELS, never a
+    continuous scale. Plotly does not know that: given labels that happen to look like numbers
+    (Leiden cluster ids arrive as ``"0"``, ``"1"``, ``"10"``, …) it infers a LINEAR axis and lays
+    the columns out at their numeric values instead of at consecutive slots. The measured effect on
+    a real 17-cluster matrix was a heatmap filling ~55% of the canvas with 7 clusters unreadable
+    as distinct columns (parity-audit D2). Declaring the type is the fix, and it is correct for
+    every heatmap, numeric-looking labels or not.
+    """
+    return {**axis, "type": "category"}
+
+
 def heatmap_spec(
     z, x_labels, y_labels, title, x_title, row_dendro=None, col_dendro=None, col_tracks=None,
     row_quant=None, col_headers=None,
@@ -285,9 +299,8 @@ def heatmap_spec(
         return {
             "data": [heat],
             "layout": {
-                "title": {"text": title},
-                "xaxis": {"title": {"text": x_title}},
-                "yaxis": {"title": {"text": "gene"}, "automargin": True},
+                "title": {"text": title}, "xaxis": _cat_axis({"title": {"text": x_title}}),
+                "yaxis": _cat_axis({"title": {"text": "gene"}, "automargin": True}),
                 "meta": orig_meta,
             },
         }
@@ -315,8 +328,8 @@ def heatmap_spec(
     data = [heat]
     layout = {
         "title": {"text": title},
-        "xaxis": {"title": {"text": x_title}, "domain": [x_lo, 1.0]},
-        "yaxis": {"title": {"text": "gene"}, "automargin": True, "domain": [0.0, y_hi]},
+        "xaxis": _cat_axis({"title": {"text": x_title}, "domain": [x_lo, 1.0]}),
+        "yaxis": _cat_axis({"title": {"text": "gene"}, "automargin": True, "domain": [0.0, y_hi]}),
     }
 
     if has_quant:

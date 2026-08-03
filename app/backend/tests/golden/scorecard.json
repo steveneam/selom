@@ -71,7 +71,7 @@
     "title": {
       "text": "Benchmark scorecard (stub)",
       "font": {
-        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "family": "Arimo, Arial, Helvetica, sans-serif",
         "size": 16,
         "color": "#1f2a37"
       },
@@ -99,7 +99,7 @@
       "bordercolor": "rgba(0,0,0,0)"
     },
     "font": {
-      "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      "family": "Arimo, Arial, Helvetica, sans-serif",
       "size": 13,
       "color": "#33404d"
     },
@@ -117,7 +117,7 @@
     ],
     "hoverlabel": {
       "font": {
-        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "family": "Arimo, Arial, Helvetica, sans-serif",
         "size": 12
       },
       "bgcolor": "#1f2a37"

@@ -40,18 +40,19 @@
         "20 genes",
         "22 genes"
       ],
+      "showlegend": false,
       "marker": {
         "size": [
-          4,
-          6,
-          8,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22
+          9.64,
+          11.45,
+          13.27,
+          15.09,
+          16.91,
+          18.73,
+          20.55,
+          22.36,
+          24.18,
+          26.0
         ],
         "sizemode": "diameter",
         "color": [
@@ -74,13 +75,64 @@
           }
         }
       }
+    },
+    {
+      "type": "scatter",
+      "mode": "markers",
+      "x": [
+        null
+      ],
+      "y": [
+        null
+      ],
+      "name": "4 genes",
+      "hoverinfo": "skip",
+      "legendgroup": "dotsize",
+      "marker": {
+        "size": 9.64,
+        "color": "#7c8794"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "markers",
+      "x": [
+        null
+      ],
+      "y": [
+        null
+      ],
+      "name": "14 genes",
+      "hoverinfo": "skip",
+      "legendgroup": "dotsize",
+      "marker": {
+        "size": 18.73,
+        "color": "#7c8794"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "markers",
+      "x": [
+        null
+      ],
+      "y": [
+        null
+      ],
+      "name": "22 genes",
+      "hoverinfo": "skip",
+      "legendgroup": "dotsize",
+      "marker": {
+        "size": 26.0,
+        "color": "#7c8794"
+      }
     }
   ],
   "layout": {
     "title": {
       "text": "Pathway enrichment (stub)",
       "font": {
-        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "family": "Arimo, Arial, Helvetica, sans-serif",
         "size": 16,
         "color": "#1f2a37"
       },
@@ -138,8 +190,27 @@
         }
       }
     },
+    "legend": {
+      "title": {
+        "text": "overlap",
+        "font": {
+          "size": 10
+        }
+      },
+      "x": 0.97,
+      "xanchor": "right",
+      "y": 0.03,
+      "yanchor": "bottom",
+      "itemsizing": "trace",
+      "font": {
+        "size": 11,
+        "color": "#33404d"
+      },
+      "bgcolor": "rgba(0,0,0,0)",
+      "bordercolor": "rgba(0,0,0,0)"
+    },
     "font": {
-      "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      "family": "Arimo, Arial, Helvetica, sans-serif",
       "size": 13,
       "color": "#33404d"
     },
@@ -157,7 +228,7 @@
     ],
     "hoverlabel": {
       "font": {
-        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "family": "Arimo, Arial, Helvetica, sans-serif",
         "size": 12
       },
       "bgcolor": "#1f2a37"
@@ -167,14 +238,6 @@
       "r": 24,
       "b": 52,
       "l": 64
-    },
-    "legend": {
-      "font": {
-        "size": 11,
-        "color": "#33404d"
-      },
-      "bgcolor": "rgba(0,0,0,0)",
-      "bordercolor": "rgba(0,0,0,0)"
     }
   }
 }

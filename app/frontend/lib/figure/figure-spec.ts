@@ -20,8 +20,16 @@ export interface FigureSpec {
   layout: PlotlyLayout;
 }
 
-/** Figure text font — independent of the app UI font; a clean default for plots. */
-const FIGURE_FONT = "Inter, ui-sans-serif, system-ui, sans-serif";
+/**
+ * Figure text font — independent of the app UI font (Geist); a clean default for plots.
+ *
+ * Must stay in step with `skills/styles.py` SANS_OPEN. This used to read
+ * `Inter, ui-sans-serif, system-ui, sans-serif`, but Inter is bundled by nothing — so the browser
+ * fell through to `system-ui` (DejaVu Sans on Linux) while the export's stack fell through to
+ * Arial metrics. One figure, two typefaces, an 11% difference in string width, which moves label
+ * wrapping and overlap between what you edit and what you download (parity-audit D3).
+ */
+const FIGURE_FONT = "Arimo, Arial, Helvetica, sans-serif";
 const INK = "#0f172a";
 const GRID = "#e2e8f0";
 const AXIS_LINE = "#cbd5e1";
@@ -52,8 +60,9 @@ export const COLORWAYS: Record<string, { label: string; colors: string[] }> = {
 
 /** Figure font-family options surfaced in the Page tab. */
 export const FONT_FAMILIES: { label: string; value: string }[] = [
-  { label: "Inter", value: FIGURE_FONT },
-  { label: "Arial / Helvetica", value: "Arial, Helvetica, sans-serif" },
+  // Labelled by what actually renders. An option named for a font nobody ships is a lie the
+  // picker tells every time it is used.
+  { label: "Helvetica / Arial (default)", value: FIGURE_FONT },
   { label: "Times New Roman", value: "'Times New Roman', Times, serif" },
   { label: "Georgia", value: "Georgia, serif" },
   { label: "Courier (mono)", value: "'Courier New', monospace" },

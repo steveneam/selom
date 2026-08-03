@@ -18,6 +18,29 @@ def jsonable(obj):
     return _convert(obj, np)
 
 
+def numeric_label_order(labels):
+    """Indices that put ``labels`` in NUMERIC order when every label is a number written as a
+    string, else ``None`` (leave the caller's order alone).
+
+    Cluster ids reach a figure as strings (``adata.obs["leiden"].astype(str)``), and every default
+    ordering in the stack — ``pandas.groupby``, ``sorted`` — is then LEXICOGRAPHIC: ``0, 1, 10, 11,
+    …, 2, …, 9``. On a categorical axis that silently places cluster 10 between 1 and 11, so a
+    reader decoding cluster identity from column position decodes it wrong (parity-audit D2).
+
+    Returns indices rather than sorted labels because the caller almost always has a matrix to
+    permute in step with them.
+    """
+    labels = list(labels)
+    try:
+        keys = [int(str(v)) for v in labels]
+    except (TypeError, ValueError):
+        return None
+    if not keys:
+        return None
+    order = sorted(range(len(keys)), key=lambda i: keys[i])
+    return None if order == list(range(len(keys))) else order
+
+
 def _convert(obj, np):
     import base64
 

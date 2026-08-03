@@ -21,17 +21,22 @@ in §3 are real. But the audit found something the phase charter did not predict
 So F2's checklist grew a prerequisite: **F1.5 — fix what is broken before restyling what is ugly.**
 A restyle applied on top of these would produce a prettier unreadable figure.
 
+**F1.5 is done: all three are fixed**, each with an after-image below and a regression test in
+`app/backend/tests/test_figure_encoding_integrity.py`. The "Selom (as shipped)" images throughout
+this document are kept deliberately — they are the *before* evidence, and the §3 styling table is
+still the open work.
+
 The three defects, then the styling table.
 
 ---
 
 ## 1. Confirmed defects (not styling — correctness)
 
-### D1 — `enrichment` dot sizes are 1–3 px, so the dot plot has no visible dots
+### D1 — `enrichment` dot sizes are 1–3 px, so the dot plot has no visible dots — **FIXED**
 
-| Selom (as shipped) | cnsplots, **identical numbers** |
-|---|---|
-| ![](audit/selom/dotplot.png) | ![](audit/cnsplots/dotplot.png) |
+| Selom (before) | cnsplots, **identical numbers** | Selom (after) |
+|---|---|---|
+| ![](audit/selom/dotplot.png) | ![](audit/cnsplots/dotplot.png) | ![](audit/dotplot-fix-evidence.png) |
 
 The skill emits `marker.size = [1, 2, 3, 3]` (the gene count per term) with
 `marker.sizemode = "diameter"`. In Plotly `sizemode: "diameter"` means **size is a diameter in
@@ -44,13 +49,18 @@ Two consequences, both visible above:
 - **there is no size legend at all**, so even at a correct size the reader could not decode it.
   cnsplots emits one by default.
 
-**Fix:** scale the count to a pixel diameter with an explicit floor and ceiling (Plotly's
-`sizeref`/`sizemin` exist for exactly this), and emit a size legend. Home: the `enrichment` skill's
-figure builder, not `theme.py` — the theme must not learn a skill's data semantics (spec D1).
+**Fixed:** counts now map to a 6–26 px diameter band — the same band the `markers` dotplot already
+used, which is the in-repo precedent — and the figure emits a **size key** as legend proxy traces,
+placed inside the axes at the bottom-right (the colourbar owns the right margin, and this figure
+type sorts terms by significance, so its bottom row always carries the smallest x and that corner
+is structurally empty). The diverging up/down variant scales **both directions on one scale**, so
+an overlap of *n* is the same dot either way — scaling per trace would have made the encoding lie.
+Home is the `enrichment` skill's figure builder, not `theme.py`: the theme must not learn a skill's
+data semantics (spec D1).
 
-### D2 — `heatmap` loses 7 of its 17 clusters and orders the rest lexicographically
+### D2 — `heatmap` loses 7 of its 17 clusters and orders the rest lexicographically — **FIXED**
 
-| Selom (as shipped) | Same spec, `xaxis.type="category"` + numeric order |
+| Selom (before) | Selom (after) |
 |---|---|
 | ![](audit/selom/heatmap.png) | ![](audit/heatmap-fix-evidence.png) |
 
@@ -60,40 +70,63 @@ axis, so the columns are placed at their numeric values instead of at consecutiv
 The result on the left: the matrix occupies ~55% of the canvas, ticks run to 16 past the data, and
 the columns that should be clusters 10–16 are not readable as distinct columns.
 
-The right-hand image is the *same figure spec* with two changes — `xaxis.type = "category"` and the
-columns sorted `key=int`. All 17 clusters appear, evenly spaced, in cluster order.
-
 This is a **data-integrity** defect, not a cosmetic one: a reader of the shipped figure draws
 conclusions about cluster identity from column position, and the position is wrong. Lexicographic
 ordering alone would be a defect even if the axis type were right (cluster 10 sits between 1 and 11).
 
-**Fix:** pin `type: "category"` and sort cluster-like category axes numerically when every label
-parses as an int. Worth auditing every skill that builds a categorical axis from `str(...)` labels —
-this is a class of bug, not one instance.
+**Fixed** in two places, because it is two bugs wearing one symptom:
 
-### D3 — the declared house font `Inter` is loaded nowhere, so no figure ever renders in it
+- **Axis type** — `heatmap_spec` now pins `type: "category"` on both axes, in the plain *and* the
+  clustermap branch. That is correct for every heatmap regardless of label shape: a heatmap axis
+  carries labels, never a scale.
+- **Order** — `numeric_label_order` (in `skills/_plotly.py`, so it is reusable) returns the
+  permutation that puts numeric-looking labels in numeric order, and returns `None` for anything
+  else so a caller's deliberate ordering is never disturbed. It returns *indices* because the
+  caller always has a matrix to permute in step.
 
-`skills/styles.py` sets the default style's `font_family` to
-`"Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"`, and `lib/figure/figure-spec.ts:24`
-repeats it for the browser. **Inter is not installed on the render box and is not loaded by the
-frontend** — `app/layout.tsx` loads Geist (via `next/font`), and a repo-wide search finds `Inter`
-named in exactly two places and fetched in zero.
+The after-image is the real code path, not a hand-patched spec. All 17 clusters, evenly spaced, in
+cluster order.
 
-Measured on this box: `fc-match Inter` → **DejaVu Sans**. So every server-side export (PNG/SVG/PDF
-through Kaleido/Chrome) renders the house style in DejaVu Sans — a wide, low-contrast face that is
-a large part of why the shipped figures read as "web chart" rather than "journal figure".
+**Still open:** this is a class of bug, and only the instance the audit hit is fixed. Every skill
+that builds a categorical axis from `str(...)` labels is a candidate — `cluster`, `markers`,
+`composition` and `deg` all stringify group ids. None was in the audited five, so none is *known*
+broken; each needs the same two checks.
 
-The sharper half: **the on-screen figure and the exported figure need not agree.** The browser falls
-back through *its own* stack (`ui-sans-serif, system-ui`), the server falls back through fontconfig.
-A viewer on macOS sees Helvetica Neue; the export is DejaVu. For a product promising
-publication-ready output, the typography is currently unspecified rather than chosen.
+### D3 — the on-screen figure and the exported figure render in different typefaces — **FIXED**
 
-The journal styles degrade *correctly* by comparison — `Arimo` → Liberation Sans, which is
-metric-compatible with Arial by design. Only the default style falls off a cliff.
+`skills/styles.py` set the default style's `font_family` to
+`"Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"`; `lib/figure/figure-spec.ts` declared
+`"Inter, ui-sans-serif, system-ui, sans-serif"` for the browser. **Inter is bundled by neither
+side** — `app/layout.tsx` loads Geist via `next/font`, and a repo-wide search finds `Inter` named
+in exactly two places and fetched in zero.
 
-**Fix:** pick one and do it properly — bundle Inter (`next/font/local` + install the face for the
-server renderer) **or** change the declared family to one present on both sides. Do not leave a
-font named but never loaded.
+Fonts were **measured**, not assumed: the same string rendered through Kaleido/Chrome at 40 px,
+compared by ink width.
+
+| Declared stack | Ink width | Resolves to |
+|---|---|---|
+| `Inter` alone | 448 px | *nothing* — identical to a deliberately nonexistent family |
+| `ZzzNoSuchFontZzz` | 448 px | Chrome's last-resort face |
+| **backend stack** (`Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif`) | **466 px** | **Liberation Sans** (Arial metrics) |
+| **frontend stack** (`Inter, ui-sans-serif, system-ui, sans-serif`) | **517 px** | **DejaVu Sans** |
+| `Arimo, Arial, Helvetica, sans-serif` (the journal styles) | 466 px | Liberation Sans |
+
+So the defect is not "everything renders in DejaVu". It is worse in kind and smaller in blast
+radius: **the two stacks fall through to different places**, so the figure a user edits on screen
+and the figure they download are set in different typefaces — an **11% difference in string width**
+for the same text, which moves label wrapping and decides whether labels overlap. WYSIWYG is broken
+on the one output the product exists to produce.
+
+`Inter` itself renders nowhere, on either side, and the frontend's font picker offered it by name.
+
+The journal styles were already correct — `Arimo` is metric-compatible with Arial by design, which
+is exactly why it degrades to the same face everywhere. Only the default style diverged.
+
+**Fixed** by converging both sides on that same stack (`SANS_OPEN` / `Arimo, Arial, Helvetica,
+sans-serif`) and relabelling the picker entry to what it actually renders. The alternative — bundle
+Inter properly via `next/font/local` *and* install the face into the backend render image — is the
+higher-fidelity path but depends on a backend Dockerfile that does not exist yet (a standing
+deferred item), and would reintroduce this exact divergence the day it deployed without it.
 
 ### Not a defect: SVG export keeps live text
 
@@ -188,7 +221,7 @@ v0.6.0); Selom values are measured from `audit/selom-probe.json`.
 | 1 | Typography — title weight | `bold` | regular | **PORT** | Single biggest "reads as a journal figure" cue. |
 | 2 | Typography — title position | `center` | `left` | **CHECK** | Journal-dependent; Cell/Nature captions sit below. Decide per style pack, not globally. |
 | 3 | Typography — title:body ratio | 8 pt title / 7 pt ticks (1.14×) | 16 px / 11 px (1.45×) | **PORT** | Selom's title is proportionally oversized; flatten the ramp. |
-| 4 | Typography — family | Helvetica → Arial → DejaVu | `Inter` (**never loaded**) | **PORT** | = **D3**. Declare a family that resolves on both sides. |
+| 4 | Typography — family | Helvetica → Arial → DejaVu | `Inter` (**never loaded**; FE and BE resolved differently) | **PORT** | = **D3**. cnsplots targets the same Arial-metric face Selom now converges on. |
 | 5 | Grid | `axes.grid = False` | on for box/scatter/volcano/heatmap | **PORT** | Publication default is gridless. Keep a per-style override. |
 | 6 | Spines | bottom + left only, `black`, 0.5 pt | `showline` both, `#c4ccd4`, 1 px | **PORT** | Black at 0.5 pt vs light grey at 1 px is most of the "print vs dashboard" feel. |
 | 7 | Tick geometry | len 2 pt, width 0.6 pt, pad 1 pt | len 4 px (3 pt), width 1 px (0.75 pt) | **PORT** | Selom's ticks are ~50% too long and heavy. |
@@ -216,8 +249,11 @@ v0.6.0); Selom values are measured from `audit/selom-probe.json`.
 
 ## 4. What F2 should do, in order
 
-1. **F1.5 first — D1, D2, D3.** They are correctness, they are cheap, and a restyle over them is
-   wasted. D2's fix should be a sweep of every `str(...)`-labelled categorical axis, not one skill.
+1. ~~**F1.5 first — D1, D2, D3.**~~ **Done.** Regression tests in
+   `tests/test_figure_encoding_integrity.py`; goldens re-baselined and the diff reviewed as a set
+   (35 files: font-family only, except `enrichment` gaining the dot sizes + size key and `heatmap`
+   gaining the two `type: "category"` pins — nothing else moved). **The D2 sweep across the other
+   `str(...)`-labelled axes is still owed.**
 2. **The base restyle** — rows 1, 3, 5, 6, 7, 8, 9, 11 land as style tokens in `skills/styles.py`.
    All eight are single values; none needs a skill to change.
 3. **The rules, not the values** — row 12 (colour only when it encodes) and row 15 (diverging

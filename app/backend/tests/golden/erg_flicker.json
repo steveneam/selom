@@ -1328,7 +1328,7 @@
       "y": 0.985,
       "yanchor": "top",
       "font": {
-        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "family": "Arimo, Arial, Helvetica, sans-serif",
         "size": 16,
         "color": "#1f2a37"
       },
@@ -1520,7 +1520,7 @@
         "yanchor": "middle",
         "font": {
           "size": 11,
-          "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"
+          "family": "Arimo, Arial, Helvetica, sans-serif"
         }
       },
       {
@@ -1534,7 +1534,7 @@
         "yanchor": "top",
         "font": {
           "size": 11,
-          "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"
+          "family": "Arimo, Arial, Helvetica, sans-serif"
         }
       },
       {
@@ -1548,7 +1548,7 @@
         "yanchor": "middle",
         "font": {
           "size": 11,
-          "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"
+          "family": "Arimo, Arial, Helvetica, sans-serif"
         }
       },
       {
@@ -1562,7 +1562,7 @@
         "yanchor": "middle",
         "font": {
           "size": 11,
-          "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"
+          "family": "Arimo, Arial, Helvetica, sans-serif"
         }
       },
       {
@@ -1577,7 +1577,7 @@
         "font": {
           "size": 12,
           "color": "#111",
-          "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"
+          "family": "Arimo, Arial, Helvetica, sans-serif"
         }
       },
       {
@@ -1592,7 +1592,7 @@
         "font": {
           "size": 12,
           "color": "#111",
-          "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"
+          "family": "Arimo, Arial, Helvetica, sans-serif"
         }
       },
       {
@@ -1607,7 +1607,7 @@
         "font": {
           "size": 12,
           "color": "#111",
-          "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"
+          "family": "Arimo, Arial, Helvetica, sans-serif"
         }
       }
     ],
@@ -1671,7 +1671,7 @@
       }
     },
     "font": {
-      "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      "family": "Arimo, Arial, Helvetica, sans-serif",
       "size": 13,
       "color": "#33404d"
     },

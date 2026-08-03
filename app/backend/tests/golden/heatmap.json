@@ -208,7 +208,7 @@
     "title": {
       "text": "Marker heatmap (stub)",
       "font": {
-        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "family": "Arimo, Arial, Helvetica, sans-serif",
         "size": 16,
         "color": "#1f2a37"
       },
@@ -232,6 +232,7 @@
       "showgrid": true,
       "gridcolor": "#eef1f5",
       "gridwidth": 1,
+      "type": "category",
       "title": {
         "text": "cluster",
         "font": {
@@ -257,6 +258,7 @@
       "showgrid": true,
       "gridcolor": "#eef1f5",
       "gridwidth": 1,
+      "type": "category",
       "automargin": true,
       "title": {
         "text": "gene",
@@ -314,7 +316,7 @@
       }
     },
     "font": {
-      "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+      "family": "Arimo, Arial, Helvetica, sans-serif",
       "size": 13,
       "color": "#33404d"
     },
@@ -332,7 +334,7 @@
     ],
     "hoverlabel": {
       "font": {
-        "family": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        "family": "Arimo, Arial, Helvetica, sans-serif",
         "size": 12
       },
       "bgcolor": "#1f2a37"

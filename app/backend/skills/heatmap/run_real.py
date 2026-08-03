@@ -6,7 +6,7 @@ top-variance genes, z-scored per gene. Both feed ``run.heatmap_spec``.
 """
 
 from skills.heatmap.run import _CLUSTER_PALETTE, _TRUNK_COLOR, heatmap_spec
-from skills._plotly import jsonable
+from skills._plotly import jsonable, numeric_label_order
 from skills._design import load_design
 
 
@@ -289,6 +289,11 @@ def _scrna(data_path: str, params: dict) -> dict:
     expr = pd.DataFrame(dense, columns=genes)
     expr["__g"] = sub.obs[groupby].astype(str).to_numpy()
     means = expr.groupby("__g")[genes].mean().T  # genes x groups
+    # `groupby` sorts its string keys LEXICOGRAPHICALLY, so cluster 10 lands between 1 and 11.
+    # Put numeric cluster ids back in numeric order before anything downstream reads the order.
+    col_order = numeric_label_order(means.columns)
+    if col_order is not None:
+        means = means.iloc[:, col_order]
     z = _row_zscore(means, np)
     rq = _row_quant(means, params)
     z, genes, xlabels, row_dendro, col_dendro, col_headers = _cluster_and_split(
