@@ -93,7 +93,7 @@ do not exist.** Selom has 20 skills cnsplots has no answer to (§3.3).
 | `dotplot` | `markers`, `enrichment` | **HAVE** (size key fixed 2026-08-03) |
 | `volcanoplot` | `volcano` | **HAVE+** — Selom labels genes with leader lines; cnsplots drew none |
 | `upsetplot` | `upset` | **HAVE** |
-| `sankeyplot` | `sankey` | **HAVE** |
+| `sankeyplot` | `sankey` | **HAVE+** — Plotly's native `sankey` trace vs their 15 KB hand-drawn matplotlib helper (§4) |
 | `stackplot` | `composition` | **HAVE** + needs `pairs`/`normalize` parity |
 | `regplot` | `regression` | **HAVE** — confirm correlation stats are on-figure |
 | `prerank` | `gsea` (gseapy) | **HAVE** |
@@ -145,13 +145,28 @@ Plus the three things that are the product: **an editable figure**, **provenance
   `validate_binary_column`, `validate_pairs_format`, `safe_division`…), each raising a message
   naming the function and column. Selom's equivalent is scattered per skill. A shared
   `skills/_validate.py` with the same shape is cheap and pays back on every new skill.
-- **`_svg.py` — TAKE the goal, REJECT the implementation.** Their pipeline is
+- **A large share of cnsplots' code is *matplotlib compensation* — and Plotly gives Selom it free.**
+  This is the single biggest cost correction in the review, and it cuts the estimate rather than
+  raising it. `helpers/_sankey.py` (15 KB) hand-draws a Sankey from vertical bars and strips
+  **because matplotlib has no sankey primitive** — Selom emits Plotly's native `sankey` trace
+  (`skills/sankey/run.py:34`). `helpers/_heatmap.py` (21 KB) subclasses PyComplexHeatmap purely to
+  stabilise detached colorbar/legend axes; Selom sets Plotly axis domains directly. The SVG
+  pipeline below is the same story. **None of those three helpers needs porting**, and a future
+  session should not read their size as difficulty.
+- **`_svg.py` — TAKE the goal, and the AGPL flag turns out to be moot.** Their pipeline is
   matplotlib → PDF → `mutool convert -O text=text` → SVG → *ungroup text, flatten clip groups,
   restore bold, un-subset font names*. That is what "opens cleanly in Illustrator" actually
-  requires. **`mutool` is AGPL and must not go on the shipped path.** Selom's Kaleido SVG already
-  keeps live `<text>` (verified, `parity-audit.md` §1); what is **unverified** is whether it is
-  *flat* or a nest of `<g clip-path>`. **Owed check:** open a Selom SVG export in an editor and
-  count group depth. If it is nested, write a pure-Python post-process — no AGPL needed.
+  requires. **`mutool` is AGPL and must not go on the shipped path** — but Selom never needs that
+  conversion: cnsplots round-trips through PDF only because *matplotlib's own SVG is poor*, and
+  Kaleido/Chrome emits SVG with live `<text>` directly (verified, `parity-audit.md` §1).
+  Selom's PDF stack is already licence-clean and was chosen with the same instinct —
+  **`pypdfium2`** (BSD-3/Apache-2.0, wrapping Google's PDFium, the engine inside Chrome) plus
+  **`pypdf`** (BSD-3), with `papers.py:16` stating outright that it *"Deliberately AVOIDS
+  PyMuPDF/`fitz` (AGPL)"*. That stack covers text, raster and metadata, **not** vector PDF→SVG —
+  and it does not need to. So the AGPL flag costs us nothing.
+  What is still **unverified** is whether Kaleido's SVG is *flat* or a nest of `<g clip-path>`.
+  **Owed check:** open a Selom SVG export and count group depth. If nested, a pure-Python
+  post-process closes it — still no AGPL.
 - **Defect-driven tests — TAKE the habit.** Of 30 test files, 7 are named `*_defects.py` /
   `*_regressions.py` (`test_heatmap_defects`, `test_crash_regressions`,
   `test_plot_behavior_regressions`…). Every bug becomes a named permanent test. Selom's

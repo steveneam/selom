@@ -133,6 +133,35 @@
 6. **`OH-01`** (arq + Redis job store) — unblocked; the contract it must meet is
    `docs/jobs-surface/spec.md` §4.
 
+### ⚑ Next session runs as THREE PARALLEL LANES ([[parallel-agent-lanes]])
+
+Three genuinely disjoint buckets, so the rule fires. Provision with
+`scripts/worktree-setup.sh`; **never `npm install` in a lane** (deps are shared symlinks), and
+Turbopack cannot run in one — so `fe-build` + browser checks are **train-only**, on the main
+checkout.
+
+| Lane | Owns (glob) | Deliverable |
+|---|---|---|
+| **A — engine** | `skills/_stats.py` (new) · `skills/_validate.py` (new) · `skills/{boxplot,violin,composition,erg_bwave_bar}/` + their goldens | `pairs=` significance annotation (test + bracket + stars), `add_count`, the `hue`/`order`/`hue_order` contract, shared validators. **The keystone — six skills gain a feature at once.** |
+| **B — new skills** | `skills/{venn,forest,qq}/` (all NEW dirs) · their goldens · the three `CASES` entries | The first three plot gaps, each closing the seven-point wiring checklist (source-review §5). |
+| **C — auth** | `routers/` · `auth/` · `tests/test_auth*` | P-E backend half: deny-by-default + scope `/artifacts/*` and `/reproduction-runs/*` + the isolation test. Needs no keys. |
+
+**FROZEN for every lane** (a change here is a contract change and must be coordinated, not made
+in-lane): `theme.py`, `styles.py`, the figure-spec envelope, `docs/cnsplots-port/source-review.md`.
+
+**Declared conflict points, pre-assigned so the train does not fight:** `skills/smoke.py` `CASES`
+and `docs/skill-coverage/matrix.md` are **B's alone** (A adds no skills). Lane A touches only the
+goldens of the four skills it edits; B only *adds* golden files. This is the same class as
+Sprint 3's `test_reachability_guard.py` waiver clash — pre-assigning it is what avoids a hand
+merge.
+
+**Merge order A → B → C.** A first because B's new skills should be able to use its validators and
+brackets; C is orthogonal and can take whichever slot it is ready for (Sprint 3's Lane C logic).
+Full `verify.sh` + `skill-smoke.sh` on **each rebased result**, on the main checkout.
+
+**Owner steps: none.** All three are autonomous — no keys, no spend, no founder gate. Pushing
+stays the owner's.
+
 **Owed follow-ups still open:** the `slow`-suite h5ad fix above · there is **no run-scoped legends
 route** (`/papers/{slug}/legends` is published-paper scoped, so a user's own reproduction shows a
 stated limit — `compose_ledger_legends(ledger)` already does the work) · **`mocks/handlers.ts` has
