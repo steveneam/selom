@@ -20,6 +20,9 @@ from jobs.store import JobStatus
 from main import app
 from reproduction.drive import DriveResult, PanelDrive
 
+# Every run belongs to a verified tenant now (auth-multitenancy §4 step 2).
+OWNER = "test-tenant"
+
 client = TestClient(app)
 
 
@@ -52,20 +55,20 @@ def _raising_drive(main_path, supplement_paths, **kw):
 
 
 def test_start_run_succeeds_and_stores_ledger():
-    rec = reproduction_runs.start_run("m.pdf", ["d.csv"], paper_id="p", drive_fn=_fake_drive)
+    rec = reproduction_runs.start_run("m.pdf", ["d.csv"], paper_id="p", drive_fn=_fake_drive, owner=OWNER)
     assert rec.status == JobStatus.SUCCEEDED
     assert rec.ledger is not None and rec.ledger.scorecard is not None
     assert reproduction_runs.get_run(rec.id) is not None
 
 
 def test_start_run_records_failure_never_raises():
-    rec = reproduction_runs.start_run("m.pdf", [], drive_fn=_raising_drive)
+    rec = reproduction_runs.start_run("m.pdf", [], drive_fn=_raising_drive, owner=OWNER)
     assert rec.status == JobStatus.FAILED and "ingest blew up" in (rec.error or "")
     assert rec.ledger is None
 
 
 def test_public_light_omits_ledger():
-    rec = reproduction_runs.start_run("m.pdf", [], drive_fn=_fake_drive)
+    rec = reproduction_runs.start_run("m.pdf", [], drive_fn=_fake_drive, owner=OWNER)
     light = reproduction_runs.public(rec, light=True)
     full = reproduction_runs.public(rec)
     assert "ledger" not in light and light["status"] == "succeeded"
@@ -74,7 +77,7 @@ def test_public_light_omits_ledger():
 
 def test_public_surfaces_data_fits_with_confidence_band():
     # the run contract carries the dropped-data fit ranking + the confidence band the score means.
-    rec = reproduction_runs.start_run("m.pdf", ["d.csv"], drive_fn=_fake_drive)
+    rec = reproduction_runs.start_run("m.pdf", ["d.csv"], drive_fn=_fake_drive, owner=OWNER)
     full = reproduction_runs.public(rec)
     assert full["data_fits"] and full["data_fits"][0]["filename"] == "d.csv"
     assert full["data_fits"][0]["confidence"] == "confident"  # computed band, serialized for the FE
@@ -83,7 +86,7 @@ def test_public_surfaces_data_fits_with_confidence_band():
 def test_public_surfaces_panel_drives_for_the_picker():
     # the per-panel drive record rides the run contract so the FE can offer a data picker for exactly
     # the data_unmatched panels (Slice 2). The light tick omits it (no heavy payload).
-    rec = reproduction_runs.start_run("m.pdf", ["d.csv"], drive_fn=_fake_drive)
+    rec = reproduction_runs.start_run("m.pdf", ["d.csv"], drive_fn=_fake_drive, owner=OWNER)
     full = reproduction_runs.public(rec)
     assert full["panel_drives"][0]["panel_key"] == "4"
     assert full["panel_drives"][0]["status"] == "driven"
@@ -100,7 +103,7 @@ def test_public_surfaces_cited_accessions_with_download_handoff():
         res.accessions = find_accessions("Data Availability. The data are in GEO: GSE213152.")
         return res
 
-    rec = reproduction_runs.start_run("m.pdf", ["d.csv"], drive_fn=_drive_with_accessions)
+    rec = reproduction_runs.start_run("m.pdf", ["d.csv"], drive_fn=_drive_with_accessions, owner=OWNER)
     full = reproduction_runs.public(rec)
     assert full["accessions"][0]["id"] == "GSE213152"
     assert full["accessions"][0]["download_hint"]  # the per-repo "which file, how" copy
@@ -180,7 +183,11 @@ def test_get_unknown_run_404():
 
 
 def test_events_stream_resolves_terminal(monkeypatch):
-    rec = reproduction_runs.start_run("m.pdf", [], drive_fn=_fake_drive)
+    # The run must be owned by the tenant the request carries — the SSE stream is tenant-scoped, so
+    # a run belonging to someone else resolves as "unknown run" (see the isolation test below).
+    from config import settings
+
+    rec = reproduction_runs.start_run("m.pdf", [], drive_fn=_fake_drive, owner=settings.dev_user_id)
     with client.stream("GET", f"/reproduction-runs/{rec.id}/events") as resp:
         assert resp.status_code == 200
         body = "".join(resp.iter_text())
@@ -220,3 +227,17 @@ def test_assess_data_flags_a_wrong_file_not_a_fit():
 def test_assess_data_no_supplements_is_empty():
     r = client.post("/papers/p/assess-data", data={"skills": "volcano"})
     assert r.status_code == 200 and r.json() == {"paper_id": "p", "n_files": 0, "data_fits": []}
+
+
+def test_a_run_is_invisible_to_another_tenant():
+    """auth-multitenancy §4 step 2: a reproduction run carries the user's own paper, data and drive
+    results, so it is read back through its owner. Another tenant's id must be indistinguishable
+    from a run that never existed — 404, never 403, so the status code is not an existence oracle."""
+    rec = reproduction_runs.start_run("m.pdf", [], drive_fn=_fake_drive, owner="somebody-else")
+    assert client.get(f"/reproduction-runs/{rec.id}").status_code == 404
+    assert client.get("/reproduction-runs/definitely-not-a-real-id").status_code == 404
+    # ...and the SSE stream refuses it the same way, rather than streaming another tenant's progress.
+    with client.stream("GET", f"/reproduction-runs/{rec.id}/events") as resp:
+        assert "unknown run" in "".join(resp.iter_text())
+    # The owner itself still reads it, so this is scoping and not a blanket break.
+    assert reproduction_runs.get_run(rec.id, owner="somebody-else") is not None

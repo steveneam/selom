@@ -28,6 +28,9 @@ class RunRecord(BaseModel):
     """One reproduction run — the unit the FE polls (GET) / streams (SSE)."""
 
     id: str
+    # The verified tenant that started this run (auth-multitenancy §4 step 2). A run carries the
+    # user's own data and drive results, so it is read back through its owner exactly as a job is.
+    owner: str = ""
     status: JobStatus = JobStatus.QUEUED
     progress: str = ""
     ledger: R.Ledger | None = None
@@ -46,14 +49,23 @@ class RunStore:
     def __init__(self) -> None:
         self._runs: dict[str, RunRecord] = {}
 
-    def create(self) -> RunRecord:
+    def create(self, owner: str) -> RunRecord:
         now = time.time()
-        rec = RunRecord(id=uuid.uuid4().hex, status=JobStatus.QUEUED, created_at=now, updated_at=now)
+        rec = RunRecord(id=uuid.uuid4().hex, owner=owner, status=JobStatus.QUEUED,
+                        created_at=now, updated_at=now)
         self._runs[rec.id] = rec
         return rec
 
-    def get(self, run_id: str) -> RunRecord | None:
-        return self._runs.get(run_id)
+    def get(self, run_id: str, *, owner: str | None = None) -> RunRecord | None:
+        """The run, or None when it is not this tenant's.
+
+        A mismatched owner is indistinguishable from a missing id, which is what keeps the route's
+        404 from becoming an existence oracle. ``owner=None`` is the unscoped internal read used by
+        the drive itself, never by a route."""
+        rec = self._runs.get(run_id)
+        if rec is None or (owner is not None and rec.owner != owner):
+            return None
+        return rec
 
     def update(self, run_id: str, **changes) -> RunRecord:
         rec = self._runs[run_id]
@@ -65,14 +77,15 @@ class RunStore:
 run_store = RunStore()
 
 
-def start_run(main_path: str, supplement_paths: list | None = None, *, paper_id: str = "",
+def start_run(main_path: str, supplement_paths: list | None = None, *, owner: str,
+              paper_id: str = "",
               paper: R.Paper | None = None, data_map: dict[str, str] | None = None,
               params: dict | None = None, drive_fn=None) -> RunRecord:
     """Create a run and drive it inline to completion (the v1 path). ``drive_fn`` is injectable for
     tests; the default is the real ``reproduction_drive.reproduce``. Never raises — a drive failure
     is recorded as a ``failed`` run, not a 500."""
     drive = drive_fn or reproduction_drive.reproduce
-    rec = run_store.create()
+    rec = run_store.create(owner)
     run_store.update(rec.id, status=JobStatus.RUNNING, progress="running the matched skills")
     try:
         result = drive(main_path, supplement_paths or [], paper_id=(paper_id or rec.id),
@@ -87,8 +100,8 @@ def start_run(main_path: str, supplement_paths: list | None = None, *, paper_id:
     return run_store.get(rec.id)
 
 
-def get_run(run_id: str) -> RunRecord | None:
-    return run_store.get(run_id)
+def get_run(run_id: str, *, owner: str | None = None) -> RunRecord | None:
+    return run_store.get(run_id, owner=owner)
 
 
 def public(rec: RunRecord, *, light: bool = False) -> dict:

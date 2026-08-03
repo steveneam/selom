@@ -4,11 +4,12 @@ import pathlib
 import shutil
 import tempfile
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 import paper_metadata
+from auth import AuthContext, require_user
 from extract import routing
 from config import settings
 from jobs.store import TERMINAL
@@ -25,6 +26,7 @@ async def reproduce_paper(
     supplements: list[UploadFile] = File(default=[]),
     design: UploadFile | None = File(None),
     data_map: str = Form(""),
+    ctx: AuthContext = Depends(require_user),
 ):
     # Live-reproduction drive (docs/reproduction-engine/live-reproduction-spec.md §5): the user's
     # paper PDF + its supplements -> a graded two-axis ledger. Bytes are saved to a per-run temp dir
@@ -50,7 +52,8 @@ async def reproduce_paper(
         if design is not None:  # a design sheet (sample->condition) threads to the DE skills
             params = {"_design_path": await _save_capped(run_dir, design, max_bytes)}
         resolved_map = _resolve_data_map(data_map, path_by_name)
-        rec = reproduction_runs.start_run(main_path, supp_paths, paper_id=paper_id, params=params,
+        rec = reproduction_runs.start_run(main_path, supp_paths, owner=ctx.user_id,
+                                          paper_id=paper_id, params=params,
                                           data_map=resolved_map)
         return reproduction_runs.public(rec, light=True)
     except ValueError as exc:  # the size cap
@@ -65,6 +68,7 @@ async def assess_paper_data(
     main: UploadFile | None = File(None),
     supplements: list[UploadFile] = File(default=[]),
     skills: str = Form(""),
+    ctx: AuthContext = Depends(require_user),
 ):
     # Pre-run data-fit check (Slice 2): classify + score each dropped supplement against the
     # analyses this paper routes to — so the user sees a confidence band (Confident / Not a fit /
@@ -103,26 +107,27 @@ async def assess_paper_data(
 
 
 @router.get("/reproduction-runs/{run_id}")
-def get_reproduction_run(run_id: str):
+def get_reproduction_run(run_id: str, ctx: AuthContext = Depends(require_user)):
     # The run's state; on `succeeded` the driven Ledger + scorecard (same shape as GET /papers/{slug})
     # so the Score stage reuses the showcase heatmap / dual-axis score / golden-vs-computed.
     from reproduction import runs as reproduction_runs
 
-    rec = reproduction_runs.get_run(run_id)
+    # Scoped to the caller: another tenant's run id is indistinguishable from a missing one.
+    rec = reproduction_runs.get_run(run_id, owner=ctx.user_id)
     if rec is None:
         raise HTTPException(status_code=404, detail="unknown reproduction run")
     return reproduction_runs.public(rec)
 
 
 @router.get("/reproduction-runs/{run_id}/events")
-async def reproduction_run_events(run_id: str):
+async def reproduction_run_events(run_id: str, ctx: AuthContext = Depends(require_user)):
     # SSE progress for the drive. Inline runs are already terminal, so this resolves in one event;
     # the arq path (deferred) would stream the per-panel transitions.
     from reproduction import runs as reproduction_runs
 
     async def stream():
         for _ in range(600):  # ~5 min ceiling at 0.5s/tick
-            rec = reproduction_runs.get_run(run_id)
+            rec = reproduction_runs.get_run(run_id, owner=ctx.user_id)
             if rec is None:
                 yield f"event: error\ndata: {json.dumps({'detail': 'unknown run'})}\n\n"
                 return

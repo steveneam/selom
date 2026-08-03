@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 from auth import AuthContext, require_user
 from config import settings
-from storage.object_store import get_object_store
+from storage.object_store import LocalObjectStore, get_object_store
 from uploads import QuotaExceeded, materialize_dataset
 
 from routers.deps import _library_repo, _uploads_repo
@@ -98,14 +98,28 @@ def upload_intake(body: IntakeRequest, repo=Depends(_uploads_repo),
 
 
 @router.put("/uploads/local/{key:path}")
-async def upload_local_put(key: str, request: Request):
+async def upload_local_put(key: str, request: Request,
+                           ctx: AuthContext = Depends(require_user)):
     # Dev-only stand-in for the S3 direct PUT: the LocalObjectStore presign returns this in-app route
     # (there's no S3 to PUT to offline). The presigned URL IS the credential in the S3 model, so this
     # mirrors that — but it only ever accepts the known uploads/ prefix, never an arbitrary key.
+    #
+    # It REFUSES TO EXIST once the store is S3 (auth-multitenancy §1). Being merely unused there is
+    # not enough: this accepts any key under uploads/ — including another tenant's prefix — so on a
+    # real object store it is a cross-tenant WRITE waiting for someone to call it directly. The
+    # 404 (not 403) keeps it indistinguishable from a route that was never mounted.
+    store = get_object_store()
+    if not isinstance(store, LocalObjectStore):
+        raise HTTPException(status_code=404, detail="Not Found")
     if not key.startswith("uploads/"):
         raise HTTPException(status_code=400, detail="local upload key must be under uploads/")
+    # Even in dev, confine the write to the caller's own prefix — the presign signs exactly this
+    # key, so a client following the normal flow is unaffected; a hand-rolled PUT at another
+    # tenant's key is refused.
+    if not key.startswith(f"uploads/{ctx.user_id}/"):
+        raise HTTPException(status_code=403, detail="local upload key is outside your prefix")
     body = await request.body()
-    get_object_store().put_bytes(key, body)
+    store.put_bytes(key, body)
     return {"ok": True, "key": key, "size": len(body)}
 
 
