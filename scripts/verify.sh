@@ -17,6 +17,7 @@
 #
 # GATES (CI parity -- .github/workflows/ci.yml is the source of truth for each command):
 #   hygiene  node scripts/guards/hygiene-scan.mjs --all
+#   wf-lint  zizmor --persona=regular .github/workflows/   (ONLINE -- see the note below)
 #   be-lint  uv run ruff check .
 #   be-test  uv run pytest -m "not slow" -n "$SELOM_PYTEST_WORKERS"
 #   be-slow  env -u SELOM_DATASETS_DIR uv run pytest -m slow -n "$SELOM_PYTEST_WORKERS"
@@ -24,6 +25,15 @@
 #   fe-types npx tsc --noEmit
 #   fe-test  npm run test
 #   fe-build npm run build            <-- the ONLY gate that catches SSR/integration breaks
+#
+# wf-lint exists because this gate was MISSING and cost a red `main`. CI's workflow-lint job failed
+# on five zizmor `ref-version-mismatch` findings for two commits before anyone noticed, and the
+# local check said "No findings. Good job!" the whole time -- because `zizmor` starts in OFFLINE
+# mode unless it has a GitHub token, and that audit needs the API to resolve tags to SHAs. An
+# offline zizmor is not a weaker version of CI's gate; it is a DIFFERENT one that cannot fail the
+# way CI fails. So this gate resolves a token (GH_TOKEN, else `gh auth token`) and reports NOT RUN
+# with the reason when it can't -- never a pass. No new credential is involved: an authenticated
+# `gh` already has one; zizmor simply does not look for it on its own.
 #
 # be-slow deliberately runs with SELOM_DATASETS_DIR UNSET, which is the one place this script drops
 # coverage on purpose -- so read the reason. The `slow` lane (reproduction drives, golden renders,
@@ -68,7 +78,7 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
 BE="$ROOT/app/backend"
 FE="$ROOT/app/frontend"
 
-WANT_HYGIENE=1 WANT_BE=1 WANT_FE=1 WANT_BUILD=1 LIST_ONLY=0 FORCE_BUILD=0
+WANT_HYGIENE=1 WANT_BE=1 WANT_FE=1 WANT_BUILD=1 LIST_ONLY=0 FORCE_BUILD=0 WF_SKIP_REASON=""
 for arg in "$@"; do
     case "$arg" in
         --fast)        WANT_BUILD=0 ;;
@@ -85,6 +95,7 @@ WORKERS="${SELOM_PYTEST_WORKERS:-2}"
 
 if [ "$LIST_ONLY" -eq 1 ]; then
     echo "hygiene   node scripts/guards/hygiene-scan.mjs --all"
+    echo "wf-lint   uv tool run zizmor@latest --persona=regular .github/workflows/  (needs a token)"
     echo "be-lint   uv run ruff check .                       (cwd: app/backend)"
     echo "be-test   uv run pytest -m 'not slow' -n $WORKERS   (cwd: app/backend)"
     echo "be-slow   uv run pytest -m slow -n $WORKERS         (cwd: app/backend, corpus-free)"
@@ -164,6 +175,24 @@ START=$SECONDS
 
 [ "$WANT_HYGIENE" -eq 1 ] && run_gate hygiene "$ROOT" node scripts/guards/hygiene-scan.mjs --all
 
+# wf-lint: resolve a token FIRST (see the header note) -- exported, not passed as an argv, so it
+# never lands in `ps` output. Without one, zizmor would still exit 0 while skipping the API-backed
+# audits, which is the precise false green this gate exists to remove; so it is reported NOT RUN.
+if [ "$WANT_HYGIENE" -eq 1 ]; then
+    if [ -z "${GH_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
+        _tok=$(gh auth token 2>/dev/null) && [ -n "$_tok" ] && export GH_TOKEN="$_tok"
+    fi
+    if ! command -v uv >/dev/null 2>&1; then
+        WF_SKIP_REASON="uv is not on PATH (zizmor runs via 'uv tool run')"
+    elif [ -z "${GH_TOKEN:-}" ]; then
+        WF_SKIP_REASON="no GitHub token -- zizmor would run OFFLINE and silently skip the
+    API-backed audits (ref-version-mismatch), reporting a PASS that CI does not agree with.
+    Fix: 'gh auth login', or export GH_TOKEN."
+    else
+        run_gate wf-lint "$ROOT" uv tool run zizmor@latest --persona=regular .github/workflows/
+    fi
+fi
+
 if [ "$WANT_BE" -eq 1 ]; then
     run_gate be-lint "$BE" uv run ruff check .
     run_gate be-test "$BE" uv run pytest -m "not slow" -n "$WORKERS"
@@ -197,6 +226,7 @@ for i in "${!NAMES[@]}"; do
 done
 
 # Report what did NOT run, so a narrowed gate is never read as the full one.
+[ -n "$WF_SKIP_REASON" ] && echo "  SKIP  wf-lint -- $WF_SKIP_REASON"
 [ "$WANT_BE" -eq 0 ]    && echo "  SKIP  backend gates (--fe)"
 [ "$WANT_FE" -eq 0 ]    && echo "  SKIP  frontend gates (--be)"
 if [ "$WANT_FE" -eq 1 ] && [ "$WANT_BUILD" -eq 0 ]; then
