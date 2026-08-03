@@ -18,6 +18,16 @@ from __future__ import annotations
 
 import math
 
+# The significance machinery moved down into `_stats` — the general engine must not depend on this
+# bar-shaped module, and every categorical skill (box, violin, composition …) now needs it too.
+# Re-exported here so this module's published contract, and `_erg`'s re-export of it, are unchanged.
+from skills._stats import (  # noqa: F401  (re-export)
+    compare_groups,
+    sig_stars,
+)
+from skills._stats import bracket_shapes as _bracket_shapes
+from skills._stats import test_pairs as _test_pairs
+
 # Display label for an error metric (caption / table header).
 ERR_LABEL = {"sem": "SEM", "sd": "SD", "ci95": "95% CI", "minmax": "range"}
 
@@ -72,33 +82,6 @@ def rgba(hexcolor, alpha) -> str:
     return f"rgba({r},{g},{b},{round(float(alpha), 3)})"
 
 
-def sig_stars(p) -> str:
-    """p-value → significance stars (GraphPad convention): ``***`` <0.001 · ``**`` <0.01 ·
-    ``*`` <0.05 · ``ns`` otherwise. None/non-finite → ``ns``."""
-    if p is None or not math.isfinite(float(p)):
-        return "ns"
-    p = float(p)
-    return "***" if p < 0.001 else "**" if p < 0.01 else "*" if p < 0.05 else "ns"
-
-
-def compare_groups(a, b, test: str = "welch"):
-    """Two-group two-sided p-value, or None when either side has n<2. ``test``: ``welch`` (default,
-    unequal-variance t) · ``student`` (equal-variance t) · ``mannwhitney`` (rank). scipy lazy."""
-    a = [float(x) for x in a if x is not None and math.isfinite(float(x))]
-    b = [float(x) for x in b if x is not None and math.isfinite(float(x))]
-    if len(a) < 2 or len(b) < 2:
-        return None
-    from scipy import stats
-
-    t = str(test or "welch").strip().lower()
-    try:
-        if t in ("mannwhitney", "mwu", "u"):
-            return float(stats.mannwhitneyu(a, b, alternative="two-sided").pvalue)
-        return float(stats.ttest_ind(a, b, equal_var=(t == "student")).pvalue)
-    except (ValueError, ZeroDivisionError):
-        return None
-
-
 def jitter(center: int, n: int, width: float = 0.34) -> list[float]:
     """Deterministic horizontal spread of n points around an integer position (no RNG → golden-stable)."""
     if n <= 1:
@@ -108,18 +91,11 @@ def jitter(center: int, n: int, width: float = 0.34) -> list[float]:
 
 
 def resolve_stars(override, vals_a, vals_b, sig_test):
-    """Stars for one comparison: a manual override (``"**"`` / a literal p like ``"0.003"``) when
-    given, else computed by :func:`compare_groups` on the raw values (the owner's "both available" —
-    Selom computes but every star stays overridable)."""
-    if override:
-        o = str(override).strip()
-        if o in ("*", "**", "***", "ns"):
-            return o
-        try:
-            return sig_stars(float(o))
-        except ValueError:
-            pass
-    return sig_stars(compare_groups(vals_a, vals_b, test=sig_test))
+    """Stars for one comparison — thin wrapper over :func:`skills._stats.resolve_stars`, which also
+    returns the p-value; this keeps the stars-only signature this module has always published."""
+    from skills._stats import resolve_stars as _resolve
+
+    return _resolve(override, vals_a, vals_b, sig_test)[0]
 
 
 # --- shape / overlay builders -----------------------------------------------------------
@@ -147,37 +123,27 @@ def _bar_marker(bar_fill, colors, keys, patterns):
     return {"color": colors, "line": {"color": "#333333", "width": 1}}  # filled (default)
 
 
-def sig_brackets(cat_values, idx_of, means, his, pt_y, comparisons, sig_test):
-    """Significance brackets above the bars. Each comparison is ``(keyA, keyB[, override])``; stars
-    come from the override else :func:`compare_groups`. Returns ``(shapes, annotations, y_top)``: a
-    horizontal bar with end ticks + a star annotation per comparison, stacked so they don't overlap,
-    and the top y so the caller can grow the axis. Unknown key → skipped."""
+def sig_brackets(cat_values, idx_of, means, his, pt_y, comparisons, sig_test, *,
+                 correction: str = "none"):
+    """Significance brackets above the bars — the bar-shaped front door to :mod:`skills._stats`.
+
+    Each comparison is ``(keyA, keyB[, override])``; stars come from the override else the test.
+    Returns ``(shapes, annotations, y_top)``: a horizontal bar with end ticks + a star annotation
+    per comparison, stacked so they don't overlap, and the top y so the caller can grow the axis.
+    Unknown key → skipped.
+
+    All this still owns is the bar's own geometry — where the ink stops (mean + error, and any
+    plotted point). The statistics, the stacking and the drawing are ``_stats``', shared with every
+    other categorical skill."""
     vals_of = dict((k, v) for k, v in cat_values)
     data_top = max([*(m + h for m, h in zip(means, his)), *pt_y, 0.0])
-    step = (data_top or 1.0) * 0.12
-    tick = step * 0.35
-    shapes, annos = [], []
-    level = 0
-    for comp in comparisons:
-        a, b = comp[0], comp[1]
-        override = comp[2] if len(comp) > 2 else None
-        if a not in idx_of or b not in idx_of:
-            continue
-        ia, ib = idx_of[a], idx_of[b]
-        stars = resolve_stars(override, vals_of.get(a, []), vals_of.get(b, []), sig_test)
-        y = data_top + step * (level + 1)
-        x0, x1 = min(ia, ib), max(ia, ib)
-        line = {"color": "#333333", "width": 1.2}
-        shapes.append({"type": "line", "xref": "x", "yref": "y", "x0": x0, "x1": x1,
-                       "y0": round(y, 4), "y1": round(y, 4), "line": line})
-        for xe in (x0, x1):  # downward end ticks
-            shapes.append({"type": "line", "xref": "x", "yref": "y", "x0": xe, "x1": xe,
-                           "y0": round(y, 4), "y1": round(y - tick, 4), "line": line})
-        annos.append({"xref": "x", "yref": "y", "x": (x0 + x1) / 2.0, "y": round(y + tick * 0.4, 4),
-                      "text": stars, "showarrow": False, "yanchor": "bottom",
-                      "font": {"size": 14 if stars != "ns" else 11, "color": "#333333"}})
-        level += 1
-    return shapes, annos, (data_top + step * (level + 1) if level else data_top)
+    results = _test_pairs(_pairs3(comparisons), vals_of, test=sig_test, correction=correction)
+    return _bracket_shapes(results, idx_of, data_top, orientation="v")
+
+
+def _pairs3(comparisons):
+    """``(a, b)`` / ``(a, b, override)`` tuples → the uniform 3-tuple ``_stats`` takes."""
+    return [(c[0], c[1], c[2] if len(c) > 2 else None) for c in (comparisons or [])]
 
 
 def band_traces(x, lower, upper, *, color="#888888", alpha=0.25, boundary="none",
