@@ -1,0 +1,29 @@
+{
+  "id": "forest",
+  "version": "0.1.0",
+  "title": "Forest plot",
+  "engine": "python",
+  "omics": "bulk-rna-seq|scrna-seq|proteomics",
+  "omics_type": ["general"],
+  "entrypoint": "skills.forest.run:run",
+  "inputs": [{ "name": "de_table", "kind": "csv|tsv|xlsx", "required": true }],
+  "param_spec": {
+    "top_n":      { "type": "int",   "default": 15,   "min": 2,   "max": 60, "note": "Rows drawn. A forest plot is read row by row; beyond ~30 it stops being legible." },
+    "sort_by":    { "type": "str",   "default": "significance", "options": ["significance", "effect", "label", "none"] },
+    "conf_level": { "type": "float", "default": 0.95, "min": 0.5, "max": 0.999, "note": "Confidence level for intervals derived from a standard error or t-statistic. Explicit CI columns are used as-is." },
+    "ref_line":   { "type": "float", "default": 0.0,  "min": -100, "max": 100, "note": "The null. 0 for a log fold-change or coefficient; 1 for an unlogged ratio." }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "summary": "Forest plot of effect sizes with confidence intervals — one row per feature, a reference line at the null, and colour by whether the interval clears it. Takes a DE / model-results table and uses its explicit CI columns, its standard error, or its t-statistic (in that order, and says which).",
+    "category": "data-visualization",
+    "tier": "verified",
+    "status": "production",
+    "input_formats": [".csv", ".tsv", ".xlsx"],
+    "chains_with": ["deg", "proteomics_de", "volcano"],
+    "license": "MIT",
+    "popularity": 72
+  }
+}

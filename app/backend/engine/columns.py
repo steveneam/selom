@@ -200,6 +200,30 @@ def pick_significance(cols: dict) -> tuple[Any | None, bool]:
     return col, is_adjusted_column(low)
 
 
+def pick_raw_significance(cols: dict) -> Any | None:
+    """The UNCORRECTED p-value column, or ``None`` — the deliberate inverse of
+    :func:`pick_significance`.
+
+    Every DE runner wants the adjusted column, and :func:`pick_significance` is tiered to guarantee
+    it. A *calibration* diagnostic wants the opposite and cannot accept a substitute: an adjusted
+    p-value is a monotone transform of the raw ranking, so its quantiles are not uniform under the
+    null and any inflation factor (λ) computed from them is meaningless — it would read as
+    "conservative" no matter how badly inflated the underlying test is. ``skills/qq`` is the caller.
+
+    Adjusted columns are skipped rather than merely deprioritized: substring matching makes a raw
+    token like ``pval`` match the adjusted header ``pvals_adj``, so scanning the raw tier alone is
+    not sufficient — each candidate is re-checked with :func:`is_adjusted_column`.
+
+    ``None`` is a real outcome (a table carrying only ``padj``): the caller must refuse to draw
+    rather than plot a corrected column on an axis that claims raw p.
+    """
+    for syn in _PRAW:
+        for low, orig in cols.items():
+            if syn in low and not is_adjusted_column(low):
+                return orig
+    return None
+
+
 def resolve_significance(override: Any, df_columns: Any, cols: dict) -> tuple[Any | None, bool]:
     """``(column, adjusted)`` for the ``pval`` role — user override first, then adjusted-tier-first
     auto-detection. The one resolution site every DE runner calls, so the tier discipline cannot fork.

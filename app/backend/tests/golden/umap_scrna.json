@@ -1,0 +1,156 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "markers",
+      "name": "Cluster 0",
+      "x": [
+        0.6,
+        0.5354,
+        0.136,
+        -0.4544,
+        -0.9422,
+        -0.5619,
+        -0.3432,
+        0.1492,
+        0.698,
+        0.9999
+      ],
+      "y": [
+        0.0,
+        0.451,
+        0.7884,
+        0.7769,
+        0.335,
+        -0.2105,
+        -0.6101,
+        -0.786,
+        -0.5681,
+        0.0168
+      ]
+    },
+    {
+      "type": "scatter",
+      "mode": "markers",
+      "name": "Cluster 1",
+      "x": [
+        4.5576,
+        4.3006,
+        4.3672,
+        4.8102,
+        5.4685,
+        5.5565,
+        5.6652,
+        5.4209,
+        4.8691,
+        4.2514
+      ],
+      "y": [
+        1.4053,
+        1.0291,
+        0.5105,
+        0.1202,
+        0.1165,
+        0.7757,
+        1.2181,
+        1.6803,
+        1.8904,
+        1.663
+      ]
+    },
+    {
+      "type": "scatter",
+      "mode": "markers",
+      "name": "Cluster 2",
+      "x": [
+        2.5525,
+        2.996,
+        3.2972,
+        3.2342,
+        2.7513,
+        2.2412,
+        1.8622,
+        1.7301,
+        1.9951,
+        2.6042
+      ],
+      "y": [
+        3.9023,
+        4.0061,
+        4.4335,
+        5.0205,
+        5.4679,
+        5.0413,
+        4.7885,
+        4.2827,
+        3.755,
+        3.5054
+      ]
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "scRNA UMAP (stub)",
+      "font": {
+        "family": "Arimo, Arial, Helvetica, sans-serif",
+        "size": 14,
+        "color": "#111111",
+        "weight": "bold"
+      },
+      "x": 0.01,
+      "xanchor": "left"
+    },
+    "font": {
+      "family": "Arimo, Arial, Helvetica, sans-serif",
+      "size": 13,
+      "color": "#2b2b2b"
+    },
+    "paper_bgcolor": "#ffffff",
+    "plot_bgcolor": "#ffffff",
+    "colorway": [
+      "#2f6db0",
+      "#e08a2b",
+      "#3f9b6b",
+      "#c0392b",
+      "#7d5ba6",
+      "#1f9aa6",
+      "#9aa017",
+      "#6b7280"
+    ],
+    "hoverlabel": {
+      "font": {
+        "family": "Arimo, Arial, Helvetica, sans-serif",
+        "size": 12
+      },
+      "bgcolor": "#111111"
+    },
+    "margin": {
+      "t": 46,
+      "r": 24,
+      "b": 52,
+      "l": 64
+    },
+    "legend": {
+      "itemwidth": 30,
+      "tracegroupgap": 6,
+      "font": {
+        "size": 11,
+        "color": "#2b2b2b"
+      },
+      "bgcolor": "rgba(0,0,0,0)",
+      "bordercolor": "rgba(0,0,0,0)"
+    },
+    "xaxis": {
+      "title": {
+        "text": "UMAP 1"
+      }
+    },
+    "yaxis": {
+      "scaleanchor": "x",
+      "scaleratio": 1,
+      "title": {
+        "text": "UMAP 2"
+      }
+    }
+  }
+}

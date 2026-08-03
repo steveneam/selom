@@ -34,6 +34,9 @@ _KIND = {
     "heatmap": "matrix",
     "corr_heatmap": "matrix",
     "cepo": "matrix",
+    # A Venn has no axes to style — the circles ARE the coordinate system, and its
+    # x/y ranges exist only to hold the geometry. Same axis-less treatment as a trace grid.
+    "venn": "axisless",
 }
 
 # Render-inert figure tag (``layout.meta.selom.figureKind``, set by primitives like
@@ -222,12 +225,23 @@ def _style_trace_grid(st, spec):
     per-panel axis stays hidden. Unlike ``_apply_base`` we must not restyle the bare
     ``xaxis``/``yaxis`` (the first panel) into a visible axis — the scale bar is the
     only axis cue. Scale-bar shapes + label annotations are left as the primitive set them."""
+    return _style_axisless(st, spec, margin=dict(t=10, r=10, b=10, l=10))
+
+
+def _style_axisless(st, spec, margin):
+    """Shared body for figures that carry NO axes — a trace grid, a Venn.
+
+    The distinction from ``_apply_base`` is that it must not build a styled axis at all:
+    ``_style_axis`` copies only a keep-list of keys, which would drop ``visible: False``
+    and paint a spine/ticks straight through a diagram that has no coordinate meaning.
+    Everything the skill set on its axes (ranges, ``scaleanchor``) survives untouched.
+    """
     lay = spec.setdefault("layout", {})
     lay["font"] = dict(family=st.font_family, size=st.size_base, color=st.ink)
     lay["paper_bgcolor"] = st.paper
     lay["plot_bgcolor"] = st.paper
     lay["colorway"] = list(st.colorway)
-    lay.setdefault("margin", dict(t=10, r=10, b=10, l=10))
+    lay.setdefault("margin", margin)
     t = lay.get("title")
     tfont = dict(family=st.font_family, size=st.size_title, color=st.ink_strong)
     tx, txa = (0.01, "left") if st.title_align == "left" else (0.5, "center")
@@ -306,5 +320,8 @@ def _theme_for_kind(st, spec, kind):
         return _apply_base(st, spec, grid=False)
     if kind == "trace_grid":
         return _style_trace_grid(st, spec)
+    if kind == "axisless":
+        # Roomier margin than a trace grid: a Venn's outer set names sit beyond the circles.
+        return _style_axisless(st, spec, margin=dict(t=60, r=30, b=30, l=30))
     grid = True if st.force_grid is None else st.force_grid
     return _apply_base(st, spec, grid=grid)

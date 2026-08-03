@@ -1,0 +1,29 @@
+{
+  "id": "qq",
+  "version": "0.1.0",
+  "title": "P-value Q-Q plot",
+  "engine": "python",
+  "omics": "bulk-rna-seq|scrna-seq|proteomics|genomics",
+  "omics_type": ["general"],
+  "entrypoint": "skills.qq.run:run",
+  "inputs": [{ "name": "results_table", "kind": "csv|tsv|xlsx", "required": true }],
+  "param_spec": {
+    "p_col":      { "type": "str",  "default": "", "note": "Raw p-value column. Blank = auto-detect (adjusted columns are excluded — they would make λ meaningless)." },
+    "band":       { "type": "bool", "default": true, "note": "Shade the 95% pointwise null band (Beta order statistics)." },
+    "top_n":      { "type": "int",  "default": 15, "min": 1, "max": 200, "note": "Most-extreme points listed in the Statistics table." },
+    "max_points": { "type": "int",  "default": 6000, "min": 200, "max": 200000, "note": "Plotted-point budget. The significant tail is kept whole; only the bulk is thinned. λ and n always use every p-value." }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "summary": "Q-Q plot of observed vs expected -log10 p-values with the 95% null band and the inflation factor λ — the calibration check that shows whether a test is inflated, conservative, or honest. A volcano of an inflated test looks better, not worse; this is the figure that catches it.",
+    "category": "quality-control",
+    "tier": "verified",
+    "status": "production",
+    "input_formats": [".csv", ".tsv", ".xlsx"],
+    "chains_with": ["deg", "proteomics_de", "volcano"],
+    "license": "MIT",
+    "popularity": 58
+  }
+}

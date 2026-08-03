@@ -69,6 +69,22 @@ export const SKILL_PARAM_SPECS: Record<string, BackendParamSpec> = {
     sig_test: { type: "str", default: "welch", options: ["welch", "student", "mannwhitney"] },
     correction: { type: "str", default: "none", options: ["none", "bonferroni", "bh"] },
   },
+  venn: {
+    sets: { type: "str", default: "" },
+    show_percent: { type: "bool", default: false },
+  },
+  forest: {
+    top_n: { type: "int", default: 15, min: 2, max: 60 },
+    sort_by: { type: "str", default: "significance", options: ["significance", "effect", "label", "none"] },
+    conf_level: { type: "float", default: 0.95, min: 0.5, max: 0.999 },
+    ref_line: { type: "float", default: 0, min: -100, max: 100 },
+  },
+  qq: {
+    p_col: { type: "str", default: "" },
+    band: { type: "bool", default: true },
+    top_n: { type: "int", default: 15, min: 1, max: 200 },
+    max_points: { type: "int", default: 6000, min: 200, max: 200000 },
+  },
   composition: {
     mode: { type: "str", default: "grouped" },
     orientation: { type: "str", default: "h" },

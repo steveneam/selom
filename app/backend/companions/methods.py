@@ -377,6 +377,58 @@ def _upset(p: dict):
     return text, [UPSET]
 
 
+def _venn(p: dict):
+    named = str(p.get("sets") or "").strip()
+    which = (f"the sets {named}" if named
+             else "the three largest sets in the membership matrix")
+    text = (
+        f"Set overlaps were drawn as a Venn diagram over {which}. Each element was assigned to "
+        "the region of exactly the sets it belongs to, so the regions are disjoint and their "
+        "counts sum to the union"
+    )
+    text += (", with each region's share of the union shown alongside its count."
+             if _truthy(p.get("show_percent")) else ".")
+    text += (" Region counts and per-set totals are reported in full in the accompanying table.")
+    return text, [UPSET]
+
+
+def _forest(p: dict):
+    level = float(p.get("conf_level", 0.95) or 0.95)
+    order = str(p.get("sort_by", "significance")).lower()
+    ordering = {
+        "significance": "ordered by significance",
+        "effect": "ordered by absolute effect size",
+        "label": "ordered alphabetically",
+    }.get(order, "in table order")
+    ref = float(p.get("ref_line", 0.0) or 0.0)
+    text = (
+        f"Effect sizes were displayed as a forest plot for the top {p.get('top_n', 15)} features, "
+        f"{ordering}, with each point showing the estimated effect and horizontal bars spanning "
+        f"its {level:.0%} confidence interval against a reference line at {ref:g}. Intervals were "
+        "taken from the input table's own confidence bounds where present; otherwise they were "
+        "derived as effect ± z·SE from the reported standard error, or from the "
+        "t-statistic via SE = effect / t. Features whose interval excludes the reference value "
+        "are distinguished by direction."
+    )
+    return text, [SMYTH]
+
+
+def _qq(p: dict):
+    text = (
+        "Test calibration was assessed with a quantile-quantile plot of observed against expected "
+        "−log10 p-values under the uniform null"
+    )
+    text += (", with a pointwise 95% confidence band derived from the Beta(i, n−i+1) "
+             "distribution of the i-th order statistic"
+             if _truthy(p.get("band", True)) else "")
+    text += (". The genomic inflation factor λ was computed as the median observed "
+             "chi-square statistic (1 df) divided by its null expectation; λ ≈ 1 "
+             "indicates a calibrated test, while λ > 1 indicates inflation. λ was "
+             "computed from raw, uncorrected p-values over all tested features, independently of "
+             "any thinning applied for display.")
+    return text, [SCIPY]
+
+
 def _scorecard(p: dict):
     norm = (
         " Each metric was min–max normalized to [0,1] so differently-scaled scores are comparable."
@@ -930,6 +982,9 @@ _TEMPLATES = {
     "diff_abundance": _diff_abundance,
     "corr_heatmap": _corr_heatmap,
     "upset": _upset,
+    "venn": _venn,
+    "forest": _forest,
+    "qq": _qq,
     "scorecard": _scorecard,
     "normalization_qc": _normalization_qc,
     "sankey": _sankey,

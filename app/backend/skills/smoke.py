@@ -174,6 +174,20 @@ CASES: dict[str, Case | Skip] = {
     "upset": Case("hani/mmc2_markers_long.csv", {"mode": "distinct", "min_size": 1},
                   "marker-per-cell-type long table pivoted to the membership matrix the engine "
                   "documents ('top markers per cell type')", adapter="membership"),
+    # venn shares upset's input EXACTLY (same adapter, same file) — the two are the small-n and
+    # large-n views of one question, so smoking them on one table is what proves that claim.
+    # The corpus table has more cell types than a Venn can draw, which exercises the "3 largest
+    # of N" selection path rather than the trivial already-3-columns one.
+    "venn": Case("hani/mmc2_markers_long.csv", {}, adapter="membership",
+                 note="the same marker membership matrix upset smokes on — >3 sets, so the "
+                      "largest-three selection + its title note are exercised"),
+    "forest": Case(HUMAN_DE, {"top_n": 12, "sort_by": "significance"},
+                   "limma oracle table: no CI columns and no stderr, so this smokes the "
+                   "t-statistic derivation path (se = logFC / t) — the one that would silently "
+                   "fabricate intervals if it were wrong"),
+    "qq": Case(HUMAN_DE, {"top_n": 10},
+               "~21 k human genes with a raw P.Value column — exercises λ, the Beta null band "
+               "and the tail-preserving thinning at real scale"),
 
     # ---- ERG (proprietary) -------------------------------------------------------------------
     "erg_traces": Case(ERG_WAVEFORMS, {"role": "representative", "marks": True},

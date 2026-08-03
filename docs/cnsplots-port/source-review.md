@@ -109,10 +109,10 @@ Ship both; do not conflate them.
 
 | # | Plot | Why now | Cost |
 |---|---|---|---|
-| 1 | **Significance annotation** (not a plot — §1) | Unlocks 6 existing skills | M |
-| 2 | **`venn`** | Owner named it; 2–3-set DE overlap is what reviewers expect | S |
-| 3 | **`forest`** | Selom's DE output is already the input; pairs with effect sizes | S |
-| 4 | **`qq`** | Makes an inflated test *visible* — diagnostic for work Selom already does | S |
+| 1 | ~~**Significance annotation**~~ (not a plot — §1) | **DONE** 2026-08-03 — `skills/_stats.py` | M |
+| 2 | ~~**`venn`**~~ | **DONE** 2026-08-03 — all 7 wiring points; shares `upset`'s membership matrix | S |
+| 3 | ~~**`forest`**~~ | **DONE** 2026-08-03 — CI from explicit bounds → SE → t, and it says which | S |
+| 4 | ~~**`qq`**~~ | **DONE** 2026-08-03 — λ + Beta null band; λ forced onto RAW p | S |
 | 5 | **`scatter`** (generic x/y/hue) | The most-requested shape Selom cannot draw without a PCA | S |
 | 6 | **`line`** (generic, with `errorbar`) | Same; the ERG skills each hand-roll one | S |
 | 7 | **`confusion`** | Trivial heatmap variant | S |
@@ -192,7 +192,13 @@ against, and it is why the count of plot types is the *small* part of the work.
 
 1. **Real engine** in `skills/<id>/run_real.py` + a dependency-free stub in `run.py`.
 2. **`skill.json`** — id, title, engine, omics, entrypoint, inputs, `param_spec`.
-3. **Golden test** — the stub pinned (`tests/test_skills_golden.py` picks it up automatically).
+3. **Golden test** — the stub pinned in `tests/test_skills_golden.py`. **Correction (2026-08-03):
+   this does NOT happen automatically**, as this line used to claim. `SKILLS` there is a
+   hand-maintained list, and the same list was *duplicated* in `tests/regen_golden.py`, so a new
+   skill could ship with no pinned stub and nothing would fail. Now: the list lives once (the test),
+   regen imports it, and `test_every_installed_skill_has_a_golden` fails on any installed skill
+   that is missing. It found `umap_scrna` — the flagship P0 skill — had never had a golden, because
+   it reads its own `SELOM_UMAP_ENGINE` selector that the test fixture did not pin.
 4. **A smoke case** in `skills/smoke.py` `CASES` against a **real corpus file** — a missing case
    fails the ratchet, and the figure-integrity invariants apply automatically
    ([[selom-skill-smoke-matrix]]).

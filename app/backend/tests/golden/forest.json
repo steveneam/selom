@@ -1,0 +1,258 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "markers",
+      "name": "excludes null (higher)",
+      "x": [
+        6.39,
+        3.11,
+        1.86
+      ],
+      "y": [
+        "TSTD1",
+        "CFH",
+        "RPE65"
+      ],
+      "orientation": "h",
+      "marker": {
+        "color": "#b2432b",
+        "size": 9,
+        "symbol": "square"
+      },
+      "error_x": {
+        "type": "data",
+        "array": [
+          0.78,
+          0.69,
+          0.84
+        ],
+        "arrayminus": [
+          0.78,
+          0.69,
+          0.84
+        ],
+        "visible": true,
+        "color": "#b2432b",
+        "thickness": 1.6,
+        "width": 5
+      },
+      "hovertemplate": "%{y}: %{x} [%{customdata[0]}, %{customdata[1]}]<extra></extra>",
+      "customdata": [
+        [
+          5.61,
+          7.17
+        ],
+        [
+          2.42,
+          3.8
+        ],
+        [
+          1.02,
+          2.7
+        ]
+      ]
+    },
+    {
+      "type": "scatter",
+      "mode": "markers",
+      "name": "excludes null (lower)",
+      "x": [
+        -2.44
+      ],
+      "y": [
+        "MERTK"
+      ],
+      "orientation": "h",
+      "marker": {
+        "color": "#2f6ea8",
+        "size": 9,
+        "symbol": "square"
+      },
+      "error_x": {
+        "type": "data",
+        "array": [
+          0.86
+        ],
+        "arrayminus": [
+          0.86
+        ],
+        "visible": true,
+        "color": "#2f6ea8",
+        "thickness": 1.6,
+        "width": 5
+      },
+      "hovertemplate": "%{y}: %{x} [%{customdata[0]}, %{customdata[1]}]<extra></extra>",
+      "customdata": [
+        [
+          -3.3,
+          -1.58
+        ]
+      ]
+    },
+    {
+      "type": "scatter",
+      "mode": "markers",
+      "name": "crosses null",
+      "x": [
+        0.42,
+        -0.28
+      ],
+      "y": [
+        "BEST1",
+        "TYR"
+      ],
+      "orientation": "h",
+      "marker": {
+        "color": "#8a939d",
+        "size": 9,
+        "symbol": "square"
+      },
+      "error_x": {
+        "type": "data",
+        "array": [
+          0.73,
+          0.76
+        ],
+        "arrayminus": [
+          0.73,
+          0.76
+        ],
+        "visible": true,
+        "color": "#8a939d",
+        "thickness": 1.6,
+        "width": 5
+      },
+      "hovertemplate": "%{y}: %{x} [%{customdata[0]}, %{customdata[1]}]<extra></extra>",
+      "customdata": [
+        [
+          -0.31,
+          1.15
+        ],
+        [
+          -1.04,
+          0.48
+        ]
+      ]
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Effect sizes (stub)",
+      "font": {
+        "family": "Arimo, Arial, Helvetica, sans-serif",
+        "size": 14,
+        "color": "#111111",
+        "weight": "bold"
+      },
+      "x": 0.01,
+      "xanchor": "left"
+    },
+    "xaxis": {
+      "showline": true,
+      "linecolor": "#1a1a1a",
+      "linewidth": 0.8,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#1a1a1a",
+      "ticklen": 3.0,
+      "tickwidth": 0.8,
+      "tickfont": {
+        "size": 11,
+        "color": "#2b2b2b"
+      },
+      "zeroline": false,
+      "showgrid": false,
+      "title": {
+        "text": "log2 fold-change",
+        "font": {
+          "size": 13,
+          "color": "#111111"
+        }
+      }
+    },
+    "yaxis": {
+      "showline": true,
+      "linecolor": "#1a1a1a",
+      "linewidth": 0.8,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#1a1a1a",
+      "ticklen": 3.0,
+      "tickwidth": 0.8,
+      "tickfont": {
+        "size": 11,
+        "color": "#2b2b2b"
+      },
+      "zeroline": false,
+      "showgrid": false,
+      "type": "category",
+      "categoryorder": "array",
+      "categoryarray": [
+        "TYR",
+        "BEST1",
+        "MERTK",
+        "RPE65",
+        "CFH",
+        "TSTD1"
+      ],
+      "automargin": true
+    },
+    "shapes": [
+      {
+        "type": "line",
+        "x0": 0.0,
+        "x1": 0.0,
+        "yref": "paper",
+        "y0": 0,
+        "y1": 1,
+        "line": {
+          "color": "#8a939d",
+          "width": 1,
+          "dash": "dash"
+        }
+      }
+    ],
+    "showlegend": true,
+    "plot_bgcolor": "#ffffff",
+    "font": {
+      "family": "Arimo, Arial, Helvetica, sans-serif",
+      "size": 13,
+      "color": "#2b2b2b"
+    },
+    "paper_bgcolor": "#ffffff",
+    "colorway": [
+      "#2f6db0",
+      "#e08a2b",
+      "#3f9b6b",
+      "#c0392b",
+      "#7d5ba6",
+      "#1f9aa6",
+      "#9aa017",
+      "#6b7280"
+    ],
+    "hoverlabel": {
+      "font": {
+        "family": "Arimo, Arial, Helvetica, sans-serif",
+        "size": 12
+      },
+      "bgcolor": "#111111"
+    },
+    "margin": {
+      "t": 46,
+      "r": 24,
+      "b": 52,
+      "l": 64
+    },
+    "legend": {
+      "itemwidth": 30,
+      "tracegroupgap": 6,
+      "font": {
+        "size": 11,
+        "color": "#2b2b2b"
+      },
+      "bgcolor": "rgba(0,0,0,0)",
+      "bordercolor": "rgba(0,0,0,0)"
+    }
+  }
+}

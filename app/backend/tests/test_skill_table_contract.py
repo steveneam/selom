@@ -37,6 +37,12 @@ NATIVE = {
     "erg_traces", "erg_bwave_bar", "erg_intensity_response", "erg_flicker",  # attach in the stub (proprietary)
     "facs_gating",                                                     # attach in the stub + run_real
     "boxplot", "violin",                                               # conditional attach (pairs=)
+    # Lane B. Each is native and UNCONDITIONAL: the numbers are the point of the figure, and in
+    # every case they are irrecoverable from the drawn shapes. A Venn region count is printed but
+    # the per-set totals are not; a forest bar's endpoints are pixels, not values, and which of the
+    # three derivations produced them is nowhere on the canvas; a Q-Q's λ is a property of the whole
+    # ranking. Synthesis (L3) could recover none of those honestly.
+    "venn", "forest", "qq",
 }
 
 # The reviewed native-AND-L3 overlap. Normally a skill declares ONE table source, and the
@@ -63,7 +69,8 @@ L4_ONLY = {"go_graph", "pathway", "string_network"}
 # The native skills whose STUB attaches a table with default params (the rest attach only in
 # ``run_real`` or conditionally on real data — covered by the source check, not runnable stubless).
 STUB_NATIVE = {"volcano", "deg", "proteomics_de", "enrichment", "cepo", "mixing_metrics", "erg_traces",
-               "erg_bwave_bar", "erg_intensity_response", "erg_flicker", "facs_gating"}
+               "erg_bwave_bar", "erg_intensity_response", "erg_flicker", "facs_gating",
+               "venn", "forest", "qq"}
 
 
 def _attaches_table(skill_id: str) -> bool:

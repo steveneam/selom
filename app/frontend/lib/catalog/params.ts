@@ -171,6 +171,36 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     ] },
     { key: "notched", label: "Notched boxes", type: "switch", help: "Notch marks the median's confidence interval." },
   ],
+  // Set overlap (venn · upset) — one input shape, two views. venn's `sets` is the choice the
+  // figure cannot make for you above three columns: the engine falls back to the largest three
+  // and SAYS so in the title, but naming them is what makes the figure the one you meant.
+  venn: [
+    { key: "sets", label: "Sets to draw", type: "text", placeholder: "e.g. Rod, Cone, Bipolar", help: "Comma-separated column names, 2 or 3. Blank = the three largest, and the title says so. For more sets, use the UpSet plot." },
+    { key: "show_percent", label: "Show % of union", type: "switch", help: "Print each region's share of the union under its count." },
+  ],
+  // Forest — effect + interval. `conf_level` only acts when the interval is DERIVED (from a
+  // standard error or t-statistic); a table carrying explicit CI columns is used as-is, which is
+  // why the control says so rather than implying it always applies.
+  forest: [
+    { key: "top_n", label: "Features shown", type: "range", step: 1, help: "A forest plot is read row by row; past ~30 rows it stops being legible." },
+    { key: "sort_by", label: "Order rows by", type: "select", options: [
+      { value: "significance", label: "Significance (most significant first)" },
+      { value: "effect", label: "Effect size (largest magnitude first)" },
+      { value: "label", label: "Feature name (A-Z)" },
+      { value: "none", label: "Table order" },
+    ] },
+    { key: "conf_level", label: "Confidence level", type: "range", step: 0.01, help: "Used when the interval is derived from a standard error or t-statistic. Explicit CI columns in your table are used as they are." },
+    { key: "ref_line", label: "Null line", type: "number", step: 0.5, help: "0 for a log fold-change or coefficient; 1 for an unlogged ratio." },
+  ],
+  // Q-Q — a calibration check. `p_col` is surfaced first because auto-detect deliberately
+  // REFUSES adjusted columns (an adjusted p is monotone-transformed, so λ and the quantiles
+  // would be meaningless), and a table whose only p-column is adjusted needs the user to say so.
+  qq: [
+    { key: "p_col", label: "P-value column", type: "text", placeholder: "auto-detect", help: "Must be RAW p-values. Adjusted/FDR columns are skipped by auto-detect on purpose — their quantiles and λ are not interpretable." },
+    { key: "band", label: "Show 95% null band", type: "switch", help: "The pointwise interval a calibrated test should stay inside." },
+    { key: "top_n", label: "Points in the table", type: "range", step: 1, help: "How many of the most extreme features to list in the Statistics table." },
+    { key: "max_points", label: "Plotted-point budget", type: "range", step: 500, help: "Large tables are thinned to keep the figure editable. The significant tail is always kept whole; λ and n always use every p-value." },
+  ],
   violin: [
     { key: "gene", label: "Marker gene", type: "text", placeholder: "e.g. MS4A1" },
     { key: "order", label: "Category order", type: "text", placeholder: "e.g. cluster 2, cluster 0", help: "Comma-separated. Named categories lead, in this order; the rest follow unchanged." },

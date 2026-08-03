@@ -12,18 +12,16 @@ import pathlib
 import sys
 
 os.environ["SELOM_SKILLS_ENGINE"] = "stub"
+os.environ["SELOM_UMAP_ENGINE"] = "stub"   # umap_scrna has its own selector; must match the test's
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from skills.contract import run_skill  # noqa: E402
 
-SKILLS = [
-    "cluster", "violin", "deg", "volcano", "heatmap", "enrichment", "go_graph", "pathway",
-    "markers", "annotate", "trajectory", "pca", "composition", "proteomics_de", "gsea",
-    "corr_heatmap", "upset", "scorecard", "normalization_qc", "sankey", "string_network",
-    "cepo", "boxplot", "pvca", "regression", "integration", "pseudotime_genes",
-    "diff_abundance", "ssgsea", "erg_traces", "erg_bwave_bar", "erg_intensity_response",
-    "erg_flicker", "mixing_metrics", "facs_gating",
-]
+# The list lives in the TEST, which is the enforcement point, and is imported here rather than
+# copied. It used to be duplicated in both files: adding a skill to one and not the other either
+# writes a snapshot nothing asserts on, or asserts on a snapshot this script never regenerates.
+# `test_every_installed_skill_has_a_golden` now covers this script too, for free.
+from tests.test_skills_golden import SKILLS  # noqa: E402
 
 
 def main() -> None:
