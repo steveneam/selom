@@ -55,11 +55,14 @@
   Cause: **zizmor `ref-version-mismatch`** on all five `actions/checkout` uses. The SHA pins were
   correct — the SHA is an annotated-tag object dereferencing to the commit tagged **v5.0.1** while
   the comment said `# v5`. Fixed in `c8ddbbb`; `ci` is green now.
-- **⚑ AND HOW IT HID, which is the durable part: `uv tool run zizmor@latest` runs OFFLINE by
-  default**, and that audit needs the GitHub API to resolve tags → SHAs. A local run reports
-  *"No findings. Good job!"* while CI (which sets `GH_TOKEN`) reports five. **Any local zizmor check
-  must export a token or it is not the same gate:**
-  `GH_TOKEN=$(gh auth token) uv tool run zizmor@latest --persona=regular .github/workflows/`
+- **⚑ AND HOW IT HID — now CLOSED in the gate, not in a note.** `zizmor` starts OFFLINE unless it
+  finds a token, and that audit needs the API to resolve tags → SHAs, so a local run said *"No
+  findings. Good job!"* while CI (which sets `GH_TOKEN`) reported five. **No new credential was ever
+  involved** — `gh` was authenticated throughout; zizmor just does not look. `verify.sh` now carries
+  a **`wf-lint`** gate that resolves `GH_TOKEN` (falling back to `gh auth token`, exported not
+  passed as argv) and reports **NOT RUN with the fix** when it can't, never a pass. Proven both
+  ways, and reverting one `# v5.0.1` → `# v5` turns it FAIL (exit 13) — CI's exact failure,
+  reproduced locally. **9 gates now.**
 - **⚑ OWNER CALL OWED (small, no spend): the `workflow-lint` job runs `zizmor@latest`,** so a new
   audit in a new zizmor release turns `main` red with **no repo change** — which is exactly what
   happened here. Pinning it makes the gate reproducible but stops new audits arriving for free.
