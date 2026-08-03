@@ -31,6 +31,10 @@ Made 2026-08-02. Two variants, same six conditions and the same 7-point intensit
 | `mock_fig1e_bwave_long.csv` | Every individual data point, one row per eye × intensity — the canonical file. |
 | `mock_fig1e_bwave_summary.csv` | n / mean / SD / SEM already computed, if you'd rather not. |
 
+Plus `mock_fig1e_awave_summary.csv` — the **a-wave** per condition × intensity, if you want it.
+It is measured off the drawn traces rather than simulated per eye, so it has no n or SEM; the
+folder's own README explains what it is and is not before you plot it. All of it is **scotopic**.
+
 The full manifest, what differs from the printed Fig 1E, the significance tables, and how to
 regenerate any of it are in **`ERG Fig 1E (mock, n=5)/README.md`** — which documents both variants,
 including the n = 3 tables. (The `n=3` folder holds only data files, no README of its own.)
