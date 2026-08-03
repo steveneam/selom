@@ -1,8 +1,9 @@
 import json
 import pathlib
 
-from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 
+from auth import AuthContext, require_user
 from routers._errors import RunError
 from routers._run import _save_upload
 
@@ -11,7 +12,8 @@ router = APIRouter()
 
 @router.post("/data/inspect")
 async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str | None = None,
-                       profile: str | None = None, design: UploadFile | None = File(None)):
+                       profile: str | None = None, design: UploadFile | None = File(None),
+                       ctx: AuthContext = Depends(require_user)):
     # Engine spine front door (P1, docs/engine-spine/spec.md): drop a data file -> its layered
     # data-type (format -> keywords -> modality), an "is-my-data-clean?" QC report, AND the dynamic
     # cleaning plan for that type. Product A's entry point; library-only, runs no analysis. The cheap
@@ -87,7 +89,8 @@ async def inspect_data(matrix: UploadFile, sheet: str | None = None, hint: str |
 
 
 @router.post("/data/combine")
-async def combine_data(files: list[UploadFile] = File(...), labels: str | None = Form(None)):
+async def combine_data(files: list[UploadFile] = File(...), labels: str | None = Form(None),
+                       ctx: AuthContext = Depends(require_user)):
     # C6 multi-file combine: merge several single-condition ERG files (one .iwxdata/Diagnosys =
     # one eye/animal = one condition) into ONE multi-condition canonical table, so the trace-mean +
     # Fig-1E-with-reps run on a real cohort n. Returns the merged CSV (the FE turns it into a normal
@@ -138,7 +141,8 @@ async def combine_data(files: list[UploadFile] = File(...), labels: str | None =
     # D3 — materialize the merged cohort table as a content-addressed artifact: parents = the input
     # files (each by content SHA, captured above), so its lineage renders "merged from {A, B, C}".
     art = lineage.materialize(
-        df, kind=lineage.KIND_COMBINED, filename=bundle.source.filename, parents=parent_refs,
+        df, owner=ctx.user_id,
+        kind=lineage.KIND_COMBINED, filename=bundle.source.filename, parents=parent_refs,
         recipe_note=f"merged {bundle.meta.get('n_files')} file(s) into {len(conds)} condition(s)")
     if art is not None:
         summary["artifact_id"] = art.artifact_id
@@ -151,7 +155,8 @@ async def combine_data(files: list[UploadFile] = File(...), labels: str | None =
 
 
 @router.post("/data/assemble-scrna")
-async def assemble_scrna_data(files: list[UploadFile] = File(...), obs_map: str | None = Form(None)):
+async def assemble_scrna_data(files: list[UploadFile] = File(...), obs_map: str | None = Form(None),
+                              ctx: AuthContext = Depends(require_user)):
     # The scRNA sibling of /data/combine: a real GEO scRNA deposit (e.g. Kim/Hani GSE201356) arrives
     # as a SET of per-sample 10x matrices (loose barcodes/features/matrix triplets or per-sample
     # .h5ad) with NO per-cell design in obs — the design (line/genotype, sample id) lives in the
@@ -210,7 +215,8 @@ async def assemble_scrna_data(files: list[UploadFile] = File(...), obs_map: str 
     # hand-made (milestone review 2026-07-25, finding A8). An AnnData records meta-only (shape +
     # parents, no CSV) and lineage is fail-soft — a missing artifact never breaks the assembly.
     art = lineage.materialize(
-        adata, kind=lineage.KIND_MATRIX, filename="assembled_scrna.h5ad", parents=parent_refs,
+        adata, owner=ctx.user_id,
+        kind=lineage.KIND_MATRIX, filename="assembled_scrna.h5ad", parents=parent_refs,
         recipe_note=(f"assembled {len(files)} per-sample matrix file(s) into one AnnData"
                      + (" with a filename-keyed obs design overlay" if parsed_obs_map else
                         " (sample_id from filenames only, no design overlay)")))
@@ -225,30 +231,32 @@ async def assemble_scrna_data(files: list[UploadFile] = File(...), obs_map: str 
 
 
 @router.get("/artifacts/{artifact_id}")
-def get_artifact(artifact_id: str):
+def get_artifact(artifact_id: str, ctx: AuthContext = Depends(require_user)):
     # D3 — the lineage record for a materialized intermediate table: its metadata (shape, recipe,
     # parents, the "merged from {…}" receipt) + the ancestor chain. "Inspect the matrix the skill saw".
     from engine import lineage
 
-    meta = lineage.get_meta(artifact_id)
+    # Resolved inside the caller's own prefix: another tenant's id simply does not exist here, so
+    # this 404s rather than 403s. A 403 would confirm the id is real, which is itself a leak.
+    meta = lineage.get_meta(artifact_id, owner=ctx.user_id)
     if meta is None:
         raise HTTPException(status_code=404, detail="artifact not found")
     return {"meta": meta.model_dump(),
-            "lineage": [m.model_dump() for m in lineage.lineage(artifact_id)]}
+            "lineage": [m.model_dump() for m in lineage.lineage(artifact_id, owner=ctx.user_id)]}
 
 
 @router.get("/artifacts/{artifact_id}/table")
-def get_artifact_table(artifact_id: str):
+def get_artifact_table(artifact_id: str, ctx: AuthContext = Depends(require_user)):
     # D3 — the materialized table bytes themselves (CSV): the exact matrix a skill consumed, for
     # download/inspection. A meta-only matrix artifact has no table bytes (404 with a clear note).
     from engine import lineage
 
-    data = lineage.get_table(artifact_id)
+    data = lineage.get_table(artifact_id, owner=ctx.user_id)
     if data is None:
-        meta = lineage.get_meta(artifact_id)
+        meta = lineage.get_meta(artifact_id, owner=ctx.user_id)
         note = (meta.note if meta is not None else "artifact table not found")
         raise HTTPException(status_code=404, detail=note)
-    meta = lineage.get_meta(artifact_id)
+    meta = lineage.get_meta(artifact_id, owner=ctx.user_id)
     fname = (meta.filename if meta is not None else "") or f"{artifact_id}.csv"
     return Response(
         content=data, media_type="text/csv",

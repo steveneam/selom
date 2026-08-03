@@ -129,8 +129,13 @@ async def _execute_skill_run(
     skill_id: str, path: str, filename: str | None, params: dict,
     override: bool, design_path: str | None,
     *,
+    owner: str,
     ai_actions: list[dict] | None = None,
 ):
+    # `owner` is the verified tenant (auth-multitenancy §4 step 2) and is REQUIRED, with no default:
+    # the run's lineage artifact is written under it, and a default here would let a call site
+    # silently materialize a user's intermediate table into a shared prefix — the exact leak the
+    # tenant-prefixed keys exist to close.
     # Shared run body for the multipart /run and the run-from-dataset_id path (sub-spec §5): one
     # ingest → gates (QC / D1 / D2) → run → response. `filename` is the dropped name (or the dataset
     # filename) used for provenance + the engine's derived sample labels. `override` is already popped
@@ -318,7 +323,7 @@ async def _execute_skill_run(
             from engine import lineage
 
             meta = lineage.materialize_bundle(
-                bundle, recipe=(plan.steps if plan is not None else None),
+                bundle, owner=owner, recipe=(plan.steps if plan is not None else None),
                 recipe_note=(plan.note if plan is not None else ""))
             artifact = meta.model_dump() if meta is not None else None
         # B4 publish-confidence: every figure ships with its reproducibility bundle +

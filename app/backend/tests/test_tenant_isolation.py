@@ -76,6 +76,63 @@ def test_a_job_is_invisible_to_another_tenant(http):
     assert client.get(f"/jobs/{jid}/events").text.count("error") >= 1  # SSE → unknown job
 
 
+def test_artifact_table_bytes_are_invisible_to_another_tenant(http, tmp_path):
+    """`GET /artifacts/{id}/table` — the sharpest hole the P-E audit found (spec §1).
+
+    It served the EXACT matrix a skill consumed to whoever held the id, with no tenant check at
+    all. An opaque id is an identifier, not an authorization, and "you would have to guess it" is
+    not a control. Proved at the HTTP layer here; the engine layer is `test_lineage.py`.
+    """
+    import pandas as pd
+
+    from engine import lineage
+    from engine.lineage import ArtifactStore
+
+    client, verifier = http
+    prev = lineage._default
+    lineage.set_store(ArtifactStore(root=tmp_path / "artifacts", enabled=True))
+    try:
+        df = pd.DataFrame({"gene": ["ACTB"], "padj": [0.01]})
+        meta = lineage.materialize(df, owner="A", kind=lineage.KIND_INGESTED, filename="de.csv")
+        aid = meta.artifact_id
+
+        verifier.user_id = "A"
+        assert client.get(f"/artifacts/{aid}").status_code == 200
+        table = client.get(f"/artifacts/{aid}/table")
+        assert table.status_code == 200 and b"ACTB" in table.content
+
+        # B knows the id exactly — it is a content hash of a table B could hold too.
+        verifier.user_id = "B"
+        assert client.get(f"/artifacts/{aid}").status_code == 404
+        assert client.get(f"/artifacts/{aid}/table").status_code == 404
+    finally:
+        lineage.set_store(prev)
+
+
+def test_a_missing_artifact_404s_rather_than_403s(http, tmp_path):
+    """404, never 403. A 403 confirms the id EXISTS, which turns the error code itself into an
+    oracle for enumerating another tenant's artifacts."""
+    import pandas as pd
+
+    from engine import lineage
+    from engine.lineage import ArtifactStore
+
+    client, verifier = http
+    prev = lineage._default
+    lineage.set_store(ArtifactStore(root=tmp_path / "artifacts", enabled=True))
+    try:
+        meta = lineage.materialize(pd.DataFrame({"a": [1]}), owner="A",
+                                   kind=lineage.KIND_INGESTED, filename="x.csv")
+        verifier.user_id = "B"
+        real_but_not_mine = client.get(f"/artifacts/{meta.artifact_id}")
+        pure_fiction = client.get("/artifacts/0000000000000000000000000000000000000000000000000000000000000000")
+        assert real_but_not_mine.status_code == pure_fiction.status_code == 404, (
+            "a real-but-other-tenant id must be indistinguishable from a nonexistent one"
+        )
+    finally:
+        lineage.set_store(prev)
+
+
 def test_request_param_cannot_reassign_job_ownership(http):
     client, verifier = http
     verifier.user_id = "A"

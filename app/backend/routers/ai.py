@@ -392,5 +392,6 @@ async def apply_approved(
         _stringify_params(params_dict),
         override,
         design_path,
+        owner=ctx.user_id,
         ai_actions=trusted_actions,
     )

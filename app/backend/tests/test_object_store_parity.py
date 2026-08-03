@@ -216,14 +216,17 @@ def test_artifact_store_over_the_seam(store):
 
     meta = ArtifactMeta(artifact_id="aid123", kind="ingested", filename="de.csv",
                         n_rows=1, n_cols=2, columns=["a", "b"])
-    ArtifactStore(object_store=store).put("aid123", meta, b"a,b\n1,2\n")
+    ArtifactStore(object_store=store).put("aid123", meta, b"a,b\n1,2\n", owner="t1")
     # a cold instance (empty in-proc meta cache) reads both table + meta back over the seam
     cold = ArtifactStore(object_store=store)
-    assert cold.get_table("aid123") == b"a,b\n1,2\n"          # round-trip the bytes
-    back = cold.get_meta("aid123")
+    assert cold.get_table("aid123", owner="t1") == b"a,b\n1,2\n"          # round-trip the bytes
+    back = cold.get_meta("aid123", owner="t1")
     assert back is not None and back.artifact_id == "aid123" and back.columns == ["a", "b"]
-    assert store.head("artifacts/aid123.csv") and store.head("artifacts/aid123.meta.json")
-    assert cold.get_table("missing") is None
+    # Tenant-prefixed (auth-multitenancy §4 step 2): the owner segment is part of the KEY, which is
+    # the object-store analogue of WHERE user_id = ?. A flat artifacts/<id> key is what let one
+    # tenant read another's table bytes by id.
+    assert store.head("artifacts/t1/aid123.csv") and store.head("artifacts/t1/aid123.meta.json")
+    assert cold.get_table("missing", owner="t1") is None
 
 
 def test_ledger_store_over_the_seam(store):
@@ -332,9 +335,9 @@ def test_real_s3objectstore_against_moto():
 
         meta = ArtifactMeta(artifact_id="aidS3", kind="ingested", filename="de.csv",
                             n_rows=1, n_cols=2, columns=["a", "b"])
-        ArtifactStore(object_store=store).put("aidS3", meta, b"a,b\n1,2\n")
-        assert ArtifactStore(object_store=store).get_table("aidS3") == b"a,b\n1,2\n"
-        assert store.head("artifacts/aidS3.meta.json") is True
+        ArtifactStore(object_store=store).put("aidS3", meta, b"a,b\n1,2\n", owner="t1")
+        assert ArtifactStore(object_store=store).get_table("aidS3", owner="t1") == b"a,b\n1,2\n"
+        assert store.head("artifacts/t1/aidS3.meta.json") is True
 
         ls = R.ObjectStoreLedgerStore(object_store=store)
         ls.save(R.Ledger(paper=R.Paper(id="p1", slug="s3-paper", title="T")))

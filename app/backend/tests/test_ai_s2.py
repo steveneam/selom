@@ -334,9 +334,11 @@ def test_apply_endpoint_threads_design_sheet(tmp_path, monkeypatch):
 
     captured: dict = {}
 
-    async def _fake_exec(skill_id, path, filename, params, override, design_path, *, ai_actions=None):
+    async def _fake_exec(skill_id, path, filename, params, override, design_path, *,
+                         owner, ai_actions=None):
         captured["design_path"] = design_path
         captured["has_design_param"] = "_design_path" in params
+        captured["owner"] = owner        # the run's lineage artifact is written under this
         return {"figure": {"data": [], "layout": {}}, "provenance": {}}
 
     monkeypatch.setattr(ai_router, "_execute_skill_run", _fake_exec)

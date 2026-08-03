@@ -57,7 +57,8 @@ def recommend_params_route(skill_id: str, body: RecommendRequest):
 
 
 @router.post("/skills/{skill_id}/run")
-async def run(skill_id: str, request: Request, matrix: UploadFile, design: UploadFile | None = File(None)):
+async def run(skill_id: str, request: Request, matrix: UploadFile, design: UploadFile | None = File(None),
+              ctx: AuthContext = Depends(require_user)):
     # Synchronous one-shot — the proven fast path for light skills (B1). Heavy skills
     # should use POST /skills/{id}/jobs (below). Tuning params arrive as the query
     # string; the contract fills skill defaults and each runner coerces types.
@@ -73,7 +74,8 @@ async def run(skill_id: str, request: Request, matrix: UploadFile, design: Uploa
     design_path = _save_upload(design) if design is not None else None
     if design_path:
         params["_design_path"] = design_path
-    return await _execute_skill_run(skill_id, path, matrix.filename, params, override, design_path)
+    return await _execute_skill_run(skill_id, path, matrix.filename, params, override, design_path,
+                                    owner=ctx.user_id)
 
 
 @router.post("/skills/{skill_id}/jobs")
@@ -121,7 +123,8 @@ async def run_dataset(skill_id: str, body: RunDatasetRequest, repo=Depends(_uplo
             fix="Re-upload the file to materialize its bytes, then run.") from exc
     try:
         return await _execute_skill_run(
-            skill_id, path, filename, _stringify_params(body.params), body.override, None)
+            skill_id, path, filename, _stringify_params(body.params), body.override, None,
+            owner=ctx.user_id)
     finally:
         shutil.rmtree(pathlib.Path(path).parent, ignore_errors=True)
 
