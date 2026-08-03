@@ -35,7 +35,10 @@ def _stub_figure() -> dict:
                 "text": "Leiden clusters (stub)",
                 "subtitle": {"text": "6 clusters · silhouette 0.50 — higher = cleaner separation"},
             },
-            "xaxis": {"title": {"text": "cluster"}},
+            # Cluster ids are LABELS, not a scale. Left untyped, Plotly reads "0","1","10" as
+            # numbers and lays the bars out at those values (parity-audit D2). Harmless at six
+            # contiguous clusters, wrong the moment there are more than ten.
+            "xaxis": {"title": {"text": "cluster"}, "type": "category"},
             "yaxis": {"title": {"text": "cells"}},
             "bargap": 0.25,
         },

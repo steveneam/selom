@@ -11,7 +11,7 @@ def run(data_path: str, params: dict) -> dict:
     import plotly.express as px
 
     from skills._engine import to_bool
-    from skills._plotly import jsonable
+    from skills._plotly import jsonable, numeric_label_order
 
     from skills._genes import read_anndata
 
@@ -35,9 +35,14 @@ def run(data_path: str, params: dict) -> dict:
     )
 
     counts = adata.obs["leiden"].value_counts().sort_index()
+    labels = [str(c) for c in counts.index]
+    order = numeric_label_order(labels)
+    if order is not None:  # `sort_index` follows the categorical's own order, not necessarily 0..n
+        labels = [labels[i] for i in order]
+        counts = counts.iloc[order]
     subtitle = _silhouette_subtitle(adata, n_pcs)
     fig = px.bar(
-        x=[str(c) for c in counts.index],
+        x=labels,
         y=counts.to_numpy(),
     )
     fig.update_traces(marker={"color": "#22d3ee"}, name="cells")
@@ -48,6 +53,7 @@ def run(data_path: str, params: dict) -> dict:
         },
         xaxis_title="cluster",
         yaxis_title="cells",
+        xaxis_type="category",  # cluster ids are labels, never a scale (parity-audit D2)
         bargap=0.25,
     )
     return jsonable(fig.to_plotly_json())

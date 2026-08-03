@@ -259,6 +259,45 @@ def _title(figure: dict) -> str:
     return str(title or "")
 
 
+def _axis_key(letter: str, anchor) -> str:
+    """``('x', 'x2') -> 'xaxis2'`` — the layout key for the axis a trace is drawn against."""
+    suffix = str(anchor or letter)[1:]
+    return f"{letter}axis{suffix}"
+
+
+def _numeric_string_axes(figure) -> list[str]:
+    """Axes whose category values are numbers written as STRINGS but which do not declare
+    ``type: "category"`` — the D2 defect, reported per axis.
+
+    Plotly infers the axis type from the values it is given. Handed ``["0", "1", "10"]`` it decides
+    the axis is LINEAR and lays the points out at their numeric values instead of at consecutive
+    category slots, which silently mislays and reorders whole columns (parity-audit D2). Cluster
+    ids reach a figure as strings on every scRNA path (``adata.obs[key].astype(str)``), so this is
+    a class of bug, not one skill's.
+    """
+    layout = figure.get("layout") or {}
+    offenders = []
+    for trace in figure.get("data") or []:
+        if not isinstance(trace, dict):
+            continue
+        for letter in ("x", "y"):
+            values = trace.get(letter)
+            if not isinstance(values, list):
+                continue
+            present = [v for v in values if v is not None]
+            if not present or not all(isinstance(v, str) for v in present):
+                continue
+            try:
+                [int(v) for v in present]
+            except ValueError:
+                continue  # ordinary text categories — Plotly cannot mistake those for a scale
+            key = _axis_key(letter, trace.get(f"{letter}axis"))
+            axis = layout.get(key) or {}
+            if axis.get("type") != "category" and key not in offenders:
+                offenders.append(key)
+    return offenders
+
+
 def check_figure(figure) -> str:
     """Validate one skill's output. Returns "" when it is a genuine editable figure, else the
     reason it is not. Mirrors the golden test's shape assertions plus the stub-leak check."""
@@ -276,6 +315,13 @@ def check_figure(figure) -> str:
         return f"figure is not JSON-serialisable: {exc}"
     if "stub" in _title(figure).lower():
         return f"real engine fell back to the STUB (title: {_title(figure)!r})"
+    bad_axes = _numeric_string_axes(figure)
+    if bad_axes:
+        return (
+            f"{', '.join(bad_axes)} carries numeric-looking STRING categories without "
+            'type: "category" — Plotly will infer a LINEAR axis and lay the categories out at '
+            "their numeric values, reordering and mislaying them (parity-audit D2)"
+        )
     return ""
 
 

@@ -87,10 +87,18 @@ ordering alone would be a defect even if the axis type were right (cluster 10 si
 The after-image is the real code path, not a hand-patched spec. All 17 clusters, evenly spaced, in
 cluster order.
 
-**Still open:** this is a class of bug, and only the instance the audit hit is fixed. Every skill
-that builds a categorical axis from `str(...)` labels is a candidate — `cluster`, `markers`,
-`composition` and `deg` all stringify group ids. None was in the audited five, so none is *known*
-broken; each needs the same two checks.
+**The class was then swept, with evidence rather than inspection.** `smoke.check_figure` gained the
+invariant — *an axis carrying numeric-looking string categories must declare `type: "category"`* —
+so it now runs against **every registered skill on real data** on every `scripts/skill-smoke.sh`
+run, and any future skill inherits it. The sweep found exactly **one** more instance:
+
+- **`cluster`** — its cluster-size bar chart, in both the real engine and the stub. The stub hid it
+  perfectly: with six clusters at `0`–`5`, a linear axis and a category axis render identically,
+  so the bug only appears past ten clusters. That is precisely the case a golden test cannot catch
+  and the real corpus can.
+
+`markers`, `composition`, `deg` and the other `str(...)`-labelled skills came back clean. Full
+matrix after the fixes: **35 pass · 0 fail · 1 skipped** (`facs_gating`, the known corpus gap).
 
 ### D3 — the on-screen figure and the exported figure render in different typefaces — **FIXED**
 
@@ -252,8 +260,8 @@ v0.6.0); Selom values are measured from `audit/selom-probe.json`.
 1. ~~**F1.5 first — D1, D2, D3.**~~ **Done.** Regression tests in
    `tests/test_figure_encoding_integrity.py`; goldens re-baselined and the diff reviewed as a set
    (35 files: font-family only, except `enrichment` gaining the dot sizes + size key and `heatmap`
-   gaining the two `type: "category"` pins — nothing else moved). **The D2 sweep across the other
-   `str(...)`-labelled axes is still owed.**
+   gaining the two `type: "category"` pins — nothing else moved). The D2 sweep is done and is now a
+   standing invariant in `smoke.check_figure`; it found one more skill (`cluster`).
 2. **The base restyle** — rows 1, 3, 5, 6, 7, 8, 9, 11 land as style tokens in `skills/styles.py`.
    All eight are single values; none needs a skill to change.
 3. **The rules, not the values** — row 12 (colour only when it encodes) and row 15 (diverging

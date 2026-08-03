@@ -55,6 +55,7 @@
       "showgrid": true,
       "gridcolor": "#eef1f5",
       "gridwidth": 1,
+      "type": "category",
       "title": {
         "text": "cluster",
         "font": {
