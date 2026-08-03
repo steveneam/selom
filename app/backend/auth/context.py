@@ -137,5 +137,17 @@ def reset_verifier() -> None:
 async def require_user(
     request: Request, verifier: AuthVerifier = Depends(get_verifier)
 ) -> AuthContext:
-    """FastAPI dependency → the verified ``AuthContext``. Raises 401 if auth is required and absent."""
-    return verifier.verify(request)
+    """FastAPI dependency → the verified ``AuthContext``. Raises 401 if auth is required and absent.
+
+    Reuses the context the app-level ``enforce_auth`` (``auth/policy.py``) already resolved for this
+    request when there is one — otherwise a private route with its own ``require_user`` would verify
+    the same JWT twice per request. Falls through to verifying directly so this dependency still
+    stands alone (a test that calls it without the app-level guard, or a public route that
+    additionally wants the caller's identity).
+    """
+    cached = getattr(request.state, "auth", None)
+    if isinstance(cached, AuthContext):
+        return cached
+    ctx = verifier.verify(request)
+    request.state.auth = ctx
+    return ctx

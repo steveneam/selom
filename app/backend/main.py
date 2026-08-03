@@ -1,11 +1,16 @@
 import pathlib
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from auth.policy import enforce_auth
 from routers import ai, cloud, data, extract, figures, gene_sets, jobs, library, litsynth, papers, reproduction, skills, system
 
-app = FastAPI(title="Selom API")
+# Deny-by-default (auth-multitenancy spec D2). The verifier runs on EVERY route; `auth/policy.py`
+# holds the explicit public allow-list, so a new route is private unless someone writes down that it
+# is not. No-op in `dev` mode (DevVerifier returns a fixed tenant and never raises), so the inner
+# loop and every existing test are unaffected — it only bites under SELOM_AUTH_MODE=clerk.
+app = FastAPI(title="Selom API", dependencies=[Depends(enforce_auth)])
 
 # ★D bridge: serve the staged X3 panel thumbnails (repro_assets) as read-only static files at
 # /repro-assets/{slug}/{panel_key}.png. Presentational only — never a score input. Mounted only
