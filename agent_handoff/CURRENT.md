@@ -42,14 +42,28 @@
 | **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
 | older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · SLOW-GATE-LANE-B · 2026-08-03 · branch `main` (**2 commits ahead of `origin/main` — `6c2e334` + `454b974`; owner pushes**) · Claude (FE+BE, solo, lead)
+## ▸ LIVE · SLOW-GATE-LANE-B · 2026-08-03 · branch `main` (**PUSHED — `origin/main` = `c8ddbbb`, nothing local, CI GREEN**) · Claude (FE+BE, solo, lead)
 
 - **NEXT#0 and NEXT#1 from the last board are both DONE.** The slow lane is gated in CI *and* in
   `verify.sh`; `venn`/`forest`/`qq` are built, wired and reachable. Detail in the SESSIONS row.
-- **The slow-lane gate self-verifies on the next push** — CI triggers on `push: [main]` and
-  `pull_request`, and the change touches `.github/workflows/ci.yml`, which is in the backend job's
-  own path filter, so the job runs [[verify-ci-in-its-target-event]]. **Nobody has seen it green in
-  its target event yet** — that is the one thing outstanding on it, and it resolves itself.
+- **The slow gate is verified in its target event** [[verify-ci-in-its-target-event]] — run
+  `30834926456` on `c8ddbbb`, backend step 7 *"Slow test gate"* → **361 passed, 21 skipped in
+  8.65s** (faster than the local 16s: CI runs `-n auto` on its own runner). Not inferred; read off
+  the run.
+- **⚑ `ci` was ALREADY RED on `main` before this session's work** — the two preceding doc-only
+  commits (`ced7f31`, `8de5e39`) both failed, so the last board's "CI green" assumption was stale.
+  Cause: **zizmor `ref-version-mismatch`** on all five `actions/checkout` uses. The SHA pins were
+  correct — the SHA is an annotated-tag object dereferencing to the commit tagged **v5.0.1** while
+  the comment said `# v5`. Fixed in `c8ddbbb`; `ci` is green now.
+- **⚑ AND HOW IT HID, which is the durable part: `uv tool run zizmor@latest` runs OFFLINE by
+  default**, and that audit needs the GitHub API to resolve tags → SHAs. A local run reports
+  *"No findings. Good job!"* while CI (which sets `GH_TOKEN`) reports five. **Any local zizmor check
+  must export a token or it is not the same gate:**
+  `GH_TOKEN=$(gh auth token) uv tool run zizmor@latest --persona=regular .github/workflows/`
+- **⚑ OWNER CALL OWED (small, no spend): the `workflow-lint` job runs `zizmor@latest`,** so a new
+  audit in a new zizmor release turns `main` red with **no repo change** — which is exactly what
+  happened here. Pinning it makes the gate reproducible but stops new audits arriving for free.
+  Both are defensible; it is a policy choice, so it is not being made unilaterally.
 - **Reachability was verified against a live backend, not inferred**: `GET /skills` serves all three
   as `verified`/`production` and `GET /skills/{id}` serves their `param_spec`, which is what the
   panel merges with the FE overlay. **I did not click through the Store in a browser** — the
