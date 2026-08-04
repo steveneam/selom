@@ -157,7 +157,14 @@ export function DataTypeStrip({
           </span>
         )}
         <Select
-          value={code && OVERRIDE_OPTIONS.some((o) => o.code === code) ? code : undefined}
+          // `""`, never `undefined`. `code` is `qc?.profileCode`, which is absent until the real
+          // `/data/inspect` lands — so `undefined` here made the Select mount UNCONTROLLED and then
+          // flip to controlled the moment the classification arrived, which Radix warns about on
+          // every single upload. It is not cosmetic: while uncontrolled, Radix keeps its own
+          // internal selection, so an override chosen in that window is silently overwritten when
+          // the prop takes over. `""` is Radix's own "no selection" value (which is exactly why a
+          // SelectItem may not use it) and still shows the placeholder.
+          value={code && OVERRIDE_OPTIONS.some((o) => o.code === code) ? code : ""}
           disabled={!canOverride}
           onValueChange={(v) => onSetDataType(v as DataTypeOverride)}
         >
