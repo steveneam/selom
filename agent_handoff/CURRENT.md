@@ -27,6 +27,7 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
+| **KNOBS-2** | 2026-08-05 | `main` `62c7028`..`e41016c` (4 commits, **local, unpushed**) | **The board's order followed exactly: `#4`'s spec written and PAUSED for review, then `#1(a)+(b)` — `API_ONLY_KNOBS` 148 → 91, 27 skills → 14.** **`docs/stats-tables/spec.md`** widens `StatsTable | null` to `StatsTable | StatsTable[] | null` and rejects two alternatives: a sibling `tables:` field is a hand-maintained mirror (the shape removed from `seed.ts` last session), always-a-list breaks every persisted row and all 27 runners. The squeeze is **shipped, not hypothetical** — `lollipop`/`boxplot`/`violin` each DISCARD a computed table when `pairs=` is set — and the quieter form is worse: **`confusion`'s Cohen's κ and `qq`'s λ live in a TITLE STRING**, so for every machine consumer in this repo (CSV export, `lib/lineage/diff.ts`, the reproduction metric extractor — all of which read `columns`/`rows`) the headline number of the run **is not a result, it is prose**. **D2 was the Mobbin question and Mobbin ruled the obvious pattern OUT**: tabs (Databricks SQL results · Dub) fit tables that are alternative slices of ONE measure, while Selom's are complements and one is the **provenance of marks already drawn on the figure** — stars on the canvas with their p-values behind an unselected tab repeats the failure the one-table trade exists to avoid. Stacked titled panels (Fresha · Gorgias), first open. Two board numbers corrected by the inventory: `NATIVE` is **27 skills not ~18**, and `routers/figures.py` types `table_stats` `dict | None` so **Pydantic REJECTS a list — a two-table figure would 422 at save**; that one field is the whole persistence migration. **Then `#1(a)+(b)`, worked by cluster as instructed — and the instruction to verify before sharing paid for itself four times.** `normalize` appears in 14 skills under **three different meanings**: 11 share it byte-identically (`normalize_total(1e4)` + `log1p`), but **`pvca.normalize` divides each feature by its SD — it is `pca.scale` under another name, and the board had named `pvca` among the 8 that "mean the same thing"**; `scorecard.normalize` min–max scales metric columns; `confusion.normalize` is a str enum. `groupby` split the same way — 4 skills share the grouping column (wording taken from `heatmap`, the clearest of them) while **`pseudotime_genes.groupby` never reaches its figure at all**, only rooting the trajectory. **The rule: read the runner's BODY, not the guard line and not the key name** — a grep returns all fourteen and separates none of them. **Two guards extended rather than restated**: the mock mirror checked fixture keys in both directions but **never the VALUES**, so a fixture could name every key and still render a different control (bounds come from the spec; an unbounded range silently becomes 0–100) — it found `erg_bwave_bar.value_col` pinned to `"b_wave_uv"` where the backend defaults it blank, meaning *derive from `wave`*, which made the **`wave` knob look INERT in dev:mock**; and **`runFromWorkbench` can drive a SWITCH** (a `role="switch"` button — `fill()` threw, `.type` was undefined, so **every bool knob was undrivable**, and `normalize` alone is 11 skills), idempotent by comparing `aria-checked`. **Both reviews then ran (owner-requested) and both earned their keep — gauntlet 10 confirmed / 2 blockers, fe-review ~20 confirmed; every finding re-verified in code before acting, several refuted or downgraded on inspection.** The gauntlet's two blockers were **both in the spec's consumer inventory**: it named `reproduction/core.py`'s `table_extractor` as THE reproduction consumer when that function has **no production caller**, and missed `extract/readers.py` — the reader actually on the score's critical path, which would raise `AttributeError` on a list **outside** drive.py's try/except and take down a whole paper drive; and D1's normalizer would have silently killed the L3 synthesis gate, converting every tableless skill to `NEEDS_RECIPE`, a plumbing regression wearing the costume of an honest verdict. **Same lesson as `normalize`, one level up: a plausible name, a matching docstring, and no caller.** The sharpest catch was against my own reasoning — **D2 ruled tabs out for hiding the p-values behind a click, then specified "first open, rest collapsed", which hides them behind a click.** fe-review found two latent `param-control` defects that 14 new switches made load-bearing: `Boolean("false") === true` drew a string bool in the **opposite** state (worst case: an ON switch under an "AI-staged change" marker for a value the run treats as OFF), and the switch row was a `<label>` wrapping the ✨ AI-marker **button**, so clicking the label text fired **Revert instead of toggle** — proven by a real-Chrome DOM probe. Plus two printed-vs-computed lies this batch made user-facing (`pvca` claimed standardization the run skips; `cepo` described a gene filter that is really a cell-type filter), **both green only because the prose↔param guard is exact in one direction — now NEXT#10(a)**. Gates: `verify.sh` **9/9 raw, exit 0, corpus set** (1571 passed / 5 skipped) · **browser-verify 2/2 new green first run**, both asserting on the RENDERED figure, re-run after the switch change. |
 | **KNOBS-1** | 2026-08-05 | `main` `9a05608..23256ad` (**pushed, CI green**) | **NEXT#1's first pass: `API_ONLY_KNOBS` 171 → 148, 36 skills → 27, and the "no overlay at all" count 18 → 15.** Worked by what a knob DECIDES. **`volcano` first** — the panel said *"Tune the options"* and offered one text box for a gene-set panel while `fc_threshold` · `fdr_threshold` · `top_n` were API-only. `proteomics_de` took the same three plus its preparation knobs, `missing` above all: the default per-protein mean impute biases real MNAR fold-changes toward zero, so it moves a result further than the choice of test does. **The three over-representation skills share ONE declared pair of cutoffs** (`GENE_LIST_CUTOFFS`) rather than three retyped copies, because the same two keys mean something *different* there than on a volcano — they select the QUERY genes, they do not filter the terms drawn, and they are inert on a bare gene list. `pathway` · `go_graph` · `sankey` had no overlay whatsoever; **`sankey` is the one to remember — `max_links` is its ONLY knob, so that skill rendered a literally EMPTY parameter panel**, and nothing about a blank panel distinguishes "no options" from "options nobody wired". **The one judgement call: `fdr_threshold` is deliberately NOT a slider.** Its range is 0–1 while every value anyone uses (0.05 · 0.01 · 0.001) sits in the first tenth of that track, so a linear slider would make the conventional cutoffs fiddly and 0.001 unreachable at any usable step — a new reachability gap created by the fix for a reachability gap. **Two guards added in the same change, about the layer BELOW coverage — a control that renders but cannot express its knob:** a slider must be bounded by the backend spec (an absent min/max silently becomes HTML's **0–100**), and its default must land ON a step. The second **found a real defect on its first run**: `qq.max_points` (min 200, step 500, default 6000) drew its thumb at **5700** while the readout beside it said 6000. **Three harness capabilities**, each needed here and none a one-off: **`setRange`** (Playwright's `fill()` refuses `input[type=range]` outright, so every threshold knob was undrivable — it walks there by KEYBOARD rather than assigning `.value`, which would only prove React's handler works when called), **`overrideDataCheck`** (the QC block card's "Review & run anyway", a first-class path no check had ever taken; opt-in so an unexpected block still fails loudly), and **`/p/[id]` + `/store` added to route warming** — the warm-routes file already documents this exact class and names three false timeouts it fixed, but the route every check navigates to and the heaviest compile in the app **was never in the list**, and it cost three more 180s timeouts in one session. **Recorded, not worked around:** sankey's own corpus file is `gene,cell_type`, so QC blocks it with *"No numeric data to analyze"* and by its own rule is right — while being wrong about sankey, whose values are the pair COUNTS it derives itself. Gates: `verify.sh` **9/9** (raw, exit 0, **with the corpus set** — the first run had `SELOM_DATASETS_DIR` unset and said so) · **browser-verify 23 green / 2 skipped / 0 failed** across filtered passes, incl. the 2 new. |
 | **REACHABILITY-SWEEP** | 2026-08-04 | `main` `18c8cbd..<head>` (**pushed**) | **NEXT#1 closed on all three bullets, and the sweep found a THIRD layer of the same class.** The board asked for three things and each one turned up something bigger than itself. ⚑ **171 of 313 backend knobs render no control at all** — 37 skills, **18 with no presentation overlay whatsoever**. `paramFieldsFromSpec` iterates the OVERLAY, not the backend spec, so a skill without one renders zero controls and the panel says *"Runs with smart defaults — ready to apply"*, which reads as a product decision and is usually just an absent overlay. The sharpest case is **`volcano`, the flagship**: the panel says *"Tune the options"* while `fc_threshold` · `fdr_threshold` · `top_n` — the three knobs deciding what a volcano SHOWS — are API-only. That is now `API_ONLY_KNOBS`, a **named waiver list exact in BOTH directions** (a new knob cannot join it quietly; a knob that gains a control must leave it), the `test_reachability_guard.py` shape. **The progression is the point: 17 unreachable routes → 19 unrunnable skills → 171 untouchable knobs**, each invisible to every gate, each found by asking *can a user reach this* rather than *does it work*. **The seed is GENERATED, not refilled** — the board said "refill `seed.ts`", but refilling a hand-maintained mirror of a live registry only resets the clock, so `scripts/gen-catalog-seed.mjs` writes the Selom half from the backend's own `skill.json` and the drift guard re-runs the generator in memory. It found a live divergence at once: the seed named `umap_scrna` *"UMAP (single-cell)"* while the backend serves *"scRNA UMAP"* — and a test was pinning the seed's string, asserting a name **no user ever saw**. **`runFromWorkbench`** is new harness capability (Store install → real file → intake → **params set through the real controls** → Apply → rendered figure); `lollipop` · `slope` · `ridge` · `line` all reach a real figure on `erg_metrics_long.csv`. **Two defects the browser found in the SERVER LOG, which nobody had been reading:** (1) **5 requests died with a 500 on every cold start** — three repos each called `metadata.create_all` from a lazily-built constructor, and `checkfirst=True` reflects-then-CREATEs non-atomically, so the first concurrent burst against a fresh DB lost with `table analysis_jobs already exists`; hidden because the FE re-fetches and the retry finds the schema built. Fixed via `db.engine.ensure_schema` (lock + a post-condition-checked catch for the cross-process case), regression-tested with **threads on a barrier** because a race is a timing fact a mock cannot express. (2) A Radix **Select mounted uncontrolled and flipped to controlled on every upload** (`data-type-strip` passed `value={undefined}` until `qc.profileCode` landed) — not cosmetic, since Radix keeps its own selection while uncontrolled and silently overwrites an override chosen in that window. **The last board's `catalog.name` footnote was 21 skills, not one**: every one a lossy re-brand of the title it shadowed ("Box / strip plot" → "Selom Box Plot"), dropping exactly the searchable words; `title` is the one display name now and the key is **refused** rather than merely unread. Also: **`venn`/`upset` PASS smoke through a `membership` adapter no user path provides** (unlike `celeris`, which mirrors a real ingest) — recorded in `smoke.py`, not fixed, because a reshape step is a feature. Gates: `verify.sh` **9/9** (raw, exit 0 — BE 1571 fast + 392 slow, FE 704, fe-build green) · **browser-verify 21 green / 2 skipped by precondition / 0 failed**, but **only across two passes** — the shared box OOM-kills the Next dev server mid-suite, so a single 23-check run has not completed; see the LIVE block. |
 | **PICKERS** | 2026-08-04 | `main` `5aa9190..<head>` (**pushed**) | **NEXT#1 shipped: a column knob is a picker over the columns that exist, and `pairs=` is a row-list of real level names — and the live browser verify found a bug far bigger than the feature.** ⚑ **`getSkill(id)` read the STATIC SEED alone, so 19 of the 44 live skills were unreachable**: installed from the Store, they rendered in the Workbench as their **raw id, badged "Queued", with Apply DISABLED**. That is `boxplot` · `slope` · `lollipop` · `ridge` · `confusion` · `line` · `regression` · `qq` · `venn` · `forest` — **every plot type built in the preceding sessions** — plus cepo/pathway/ssgsea/pvca/diff_abundance/facs_gating/go_graph/mixing_metrics/pseudotime_genes. `registry.ts` already declared "the backend is the source of truth for what runs now", but only the **Store** honoured it (`useCatalog`); the ~20 other surfaces went through `getSkill`. **Invisible to all 9 gates** — the backend serves them, the param specs merge, the FE overlays exist — and visible in the first real browser [[selom-shipped-not-reachable]]. Fixed via `lib/catalog/live-skills.ts` (a shared cell so `getSkill` stays synchronous at 20 call sites and seed↔registry stays acyclic) + `useLiveSkills()` on the Workbench, whose Apply is gated on the tier `getSkill` returns; ratcheted into `registry-completeness.test.ts` (which already reads the real `skill.json` files) and **proven to bite — reverting `getSkill` fails it with all 19 named**. **The picker itself:** `paramFieldsFromSpec(id, spec, ctx?)` gains ONE optional input — the dataset's own schema, already fetched by `/data/inspect` and already persisted — so it stays the single place dataset knowledge enters and `visibleParamFields`/`isFieldDisabled` stay pure. `column`/`pairs` are **resolved** widgets: emitted only when the vocabulary exists, else byte-identical to the old text field (pinned by a test that a context perturbs *nothing else*). **The pair picker deliberately has NO fallback while the group column is blank** — blank means the backend's auto-detect, a dtype rule the FE cannot evaluate, and on the real ERG table it picks `sample_id` while `best_group` is `condition`, so a guess would offer levels from a column the run is not grouping by. **One backend change was needed and the board's premise was half wrong**: `design.group_candidates` was **empty for `generic_table`** — the exact kind a long-form CSV lands in, i.e. the only kind that uses `pairs=`. `engine/questionnaire._table_hints` fills it **without claiming a design** (`needs_design`/`source` untouched, or every dropped CSV grows an intake confirm-card). Mobbin was unanimous on the row-list (beehiiv · Confluence · ClickUp · Braintrust · AutoSend · Glide) and **ruled OUT** the drag-a-field-into-a-well pattern (Fibery/Sigma/Deputy) and Databricks' per-channel popover — both need a second surface. **Two more defects only the browser could show:** every control's accessible NAME swept in its whole help paragraph (implicit `<label>` wrapping), making two fields mutually ambiguous; and long arm names clip in a narrow select. Gates: `verify.sh` **9/9** (raw, exit 0) · **browser-verify 17/17** (14 + 3 new, real backend + real corpus) · **skill-smoke 43 pass / 0 fail**. |
@@ -48,7 +49,89 @@
 | **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
 | older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · KNOBS-1 · 2026-08-05 00:47 +1000 (Sydney) · branch `main` (**PUSHED — `origin/main` = `23256ad`, working tree clean, nothing local; CI green on both pushes, runs `30920091848` + `30920304922`**) · Claude (FE+BE, solo, lead)
+## ▸ LIVE · KNOBS-2 · 2026-08-05 02:04 +1000 (Sydney) · branch `main` (**LOCAL — `62c7028` · `98e29ce` · `703997a` · `e41016c` committed, NOT pushed; owner pushes**) · Claude (FE+BE, solo, lead)
+
+- **The board's recommended order was followed exactly: `#4` spec first and alone, then `#1(a)+(b)`
+  while it sits with the owner.** `docs/stats-tables/spec.md` is written and **awaiting review — no
+  code was written against it**, per the owner's spec-before-code direction. `API_ONLY_KNOBS` is
+  **148 → 91 knobs, 27 → 14 skills**.
+- **⚑ THE FINDING THAT MATTERS: sharing a vocabulary on a matching KEY NAME rather than a matching
+  MEANING would have mislabelled four knobs — and one of them was in the board's own list.** The
+  board said `normalize` "means the same thing in every one — verified in source, not assumed" and
+  named `pvca` among the 8. It does not: `pvca.normalize` divides each feature by its SD (unit
+  variance before PCA) — it is **`pca.scale` under another name**, and both were in this same batch.
+  Two more: `scorecard.normalize` min–max scales each METRIC COLUMN, `confusion.normalize` is a str
+  enum choosing the matrix reading. And `pseudotime_genes.groupby` **never reaches its figure at
+  all** — it only picks the cell the trajectory is rooted at while the axis is pseudotime bins.
+  **The rule that survives: verify by reading the runner's BODY, not the guard line and not the key.**
+  A grep for `params.get("normalize")` returns all fourteen and tells you nothing; the three lines
+  under it are what separate them. Eleven skills *do* share it byte-identically
+  (`normalize_total(1e4)` + `log1p`) and that is one block; four share the grouping column.
+- **The value half of the mock mirror was never guarded, and the guard found a live defect on its
+  first run.** `registry-completeness.test.ts` checked fixture keys in BOTH directions but never the
+  VALUES — so a fixture could name every key the live spec names and still render a **different
+  control**, because bounds come from the spec and an unbounded range silently becomes 0–100. It
+  caught `erg_bwave_bar.value_col`: pinned to `"b_wave_uv"` in the fixture while the backend
+  defaults it **blank**, where blank means *derive from `wave`*. So in `dev:mock` the `wave` knob
+  looked **inert** — switching a→b changed nothing, because an explicit `value_col` wins. Second
+  session running in which a newly-added sibling guard bites immediately (`qq.max_points` was the
+  first); expect a third.
+- **`runFromWorkbench` can drive a SWITCH now** [[compound-capability-each-task]] — it is a
+  `role="switch"` **button**, so `fill()` threw and `.type` was `undefined`; **every bool knob in the
+  product was undrivable**, and bools are the largest single class in the backend spec (`normalize`
+  alone is 11 skills). Idempotent by construction: it compares `aria-checked` and clicks only on a
+  difference, so passing `"true"` for a knob already on is a no-op rather than a silent toggle-off.
+  This is the switch peer of `setRange`, and no further batch of this backlog can be browser-proven
+  without it.
+- **Mobbin ruled the obvious pattern OUT for the spec's D2** [[selom-fe-review-framework]] — tabs
+  over a result region (Databricks' SQL editor; Dub) fit tables that are **alternative slices of one
+  measure**. Selom's are complements, and one of them is the **provenance of marks already drawn on
+  the figure**: stars on the canvas with their p-values behind an unselected tab repeats the exact
+  failure the current one-table trade exists to avoid. Stacked titled panels (Fresha, Gorgias),
+  first open and the rest collapsed. Three secondary costs of tabs are concrete here — per-panel CSV
+  export, `lib/lineage/diff.ts` compare, and find-in-page all see only the active tab.
+- **Two numbers the spec had to correct from the board.** `NATIVE` is **27 skills, not ~18** (the
+  board's count predates Lane B), and `routers/figures.py` types `table_stats` as `dict | None`, so
+  **Pydantic rejects a list and a two-table figure would 422 at save**. That one field is the entire
+  persistence migration — the JSON column and Alembic need nothing.
+- **Gates.** `verify.sh` **9/9 raw, exit 0, with `SELOM_DATASETS_DIR` exported** (1571 passed / 5
+  skipped — the corpus-set numbers). **browser-verify 2/2 new checks green on the first run**
+  (`shared-vocab-knobs.spec.ts`: pvca's factor list + variance threshold, pca's grouping regex + the
+  first switch ever driven), each asserting on the RENDERED figure.
+- **⚑ BOTH REVIEWS RAN AT THE END (owner-requested) AND BOTH EARNED THEIR KEEP —
+  `review-gauntlet` 10 confirmed / 2 blockers, `fe-review` ~20 confirmed across V·R·D·A·R·N.** Every
+  finding was re-verified in code before acting; several were refuted or downgraded on inspection,
+  and one was auto-refuted as *stale* because its fix had already landed while the review ran.
+  **The gauntlet's two blockers were both in the spec's consumer inventory** — it named
+  `reproduction/core.py`'s `table_extractor` as THE reproduction consumer when that function has
+  **no production caller at all**, and it missed `extract/readers.py`, which is the reader actually
+  on the score's critical path and would have raised `AttributeError` on a list *outside* drive.py's
+  try/except, taking down a whole paper drive. The second: D1's normalizer (`None → []`) would have
+  silently killed the L3 synthesis gate (`readers.py:326`), converting every tableless skill to
+  `NEEDS_RECIPE` — a plumbing regression wearing the costume of an honest verdict. **The lesson is
+  the same one as `normalize`: a plausible name + a matching docstring + no caller.** Fixed in
+  `703997a`; the inventory no longer claims completeness, it tells you to re-derive it.
+- **The sharpest single catch was against my own reasoning.** D2 ruled tabs out because they hide
+  the p-values behind a click — then specified *"first table open, the rest collapsed"*, which hides
+  them behind a click. A collapsed panel and an unselected tab conceal the same numbers. Now open by
+  default up to three, which the already-300px-capped scrolling panel body makes affordable.
+- **`fe-review` found two latent `param-control` defects that 14 new switches made load-bearing**
+  (fixed, `e41016c`): `Boolean("false") === true` drew a string-valued bool in the **opposite**
+  state — worst case an ON switch under an "AI-staged change" marker for a value the run treats as
+  OFF — and the switch row was a `<label>` wrapping the ✨ AI marker **button**, which became the
+  label's control, so clicking the label text fired **Revert instead of toggle**. That second one
+  was proven by a real-Chrome DOM probe, not by reading the markup.
+- **Two printed-vs-computed lies, both made user-facing by this batch** (fixed): `pvca`'s methods
+  said *"Features were standardized"* unconditionally while the runner only scales when `normalize`
+  is set, and `cepo`'s said *"genes detected in at least N cells"* while the runner filters **cell
+  types**. **The reason both were green is finding 10(a): the prose↔param guard is exact in only one
+  direction.** Fix that before the next overlay batch.
+- **Not done, and deliberately:** no code against the `StatsTable` spec (it is owed a review);
+  `deg` untouched — its `normalize` belongs to the shared block by meaning, but its panel is specced
+  whole at `#1(d)`, so spread the block in there rather than piecemeal; and the seven review
+  findings at **NEXT#10**, each confirmed and each bigger than the change that surfaced it.
+
+## ▸ (superseded) LIVE · KNOBS-1 · 2026-08-05 00:47 +1000 (Sydney) · branch `main` (**PUSHED — `origin/main` = `23256ad`, working tree clean, nothing local; CI green on both pushes, runs `30920091848` + `30920304922`**) · Claude (FE+BE, solo, lead)
 
 - **NEXT#1's first pass is done: 171 → 148 untouchable knobs, 36 → 27 skills, 18 → 15 with no
   overlay.** Ranked by what each knob DECIDES, per the board. Detail in the SESSIONS row; what
@@ -362,44 +445,43 @@
    ~~`API_ONLY_KNOBS` first pass~~ — **all DONE.** §3.2 is closed except rows 12–13.
    **Nothing is carried forward.**
 
-> **▶ RECOMMENDED ORDER FOR THE NEXT SESSION** (written 2026-08-05 with the backlog freshly
-> measured — re-derive if it looks stale, per [[verify-todo-not-already-shipped]]):
+> **▶ RECOMMENDED ORDER FOR THE NEXT SESSION** (rewritten 2026-08-05 after KNOBS-2 — re-derive if it
+> looks stale, per [[verify-todo-not-already-shipped]]):
 >
-> 1. **`#4` — the `StatsTable` spec, FIRST and alone.** It is the only **owner-directed** item on
->    this board (2026-08-04), it is explicitly **spec-before-code**, and nothing has started. It also
->    **gates two skills already built**: `lollipop` with `pairs=` and `boxplot` currently SWAP their
->    ranked-values table for the pairwise p-values because the contract carries exactly one table,
->    and `slope`/`confusion` have the same latent squeeze. Write it, then **pause for review** — do
->    not carry on into code in the same stroke.
-> 2. **`#1(a)+(b)` — the scRNA shared-vocabulary block and the cheap singles**, while the spec is
->    with the owner. ~57 knobs, needs no spec, and does not touch anything #4 will change.
-> 3. **`#1(d)` + `#2` together — the `deg` spec.** They have converged: `deg`'s 16 knobs and the
->    level widget `deg.reference`/`treatment` + `diff_abundance` need are one piece of work. Two
->    specs in one session is a lot; if #4 comes back with changes, this waits.
+> 1. **`#4`'s spec is WRITTEN and awaiting the owner** (`docs/stats-tables/spec.md`). If it comes
+>    back approved, **build slice 1 only** — the D1 normalizers + D6's one-field Pydantic widening +
+>    guards G1/G2/G3/G5 — and prove it a **no-op**: the whole product must behave identically before
+>    any skill emits two tables. Slices 3–5 (`lollipop`, then `boxplot`/`violin`, then
+>    `confusion`/`qq`) are independent and separately shippable. **Two open questions are owed an
+>    answer first** (spec §Open questions): whether κ leaves `confusion`'s title, and whether a
+>    headline number wants a one-row table or a metrics strip.
+> 2. **`#1(d)` + `#2` together — the `deg` spec.** Unchanged and now the largest single gap (16 of
+>    the 91 remaining knobs). **Spread `scrnaNormalize()` into it** — `deg.normalize` is the same
+>    knob as the other eleven, verified in source, and was left out only to avoid touching the panel
+>    piecemeal.
+> 3. **`#1` is no longer the headline item — 91 knobs remain but 25 are the ERG family and 11 are
+>    `facs_gating`, both explicitly WAIVE-or-last.** The genuinely useful remainder is `gsea` +
+>    `ssgsea` (13, item (c)), `normalization_qc` (6) and `integration`/`umap_scrna` (6).
 >
-> Everything below #4 is genuinely optional this session. **Do not open `facs_gating`** (blocked on
-> a real `.fcs` — DEFERRED) and **do not run the gauntlet / `fe-review` per task** — they are
-> milestone instruments [[review-cadence-phase-not-task]].
-1. **⇒ KEEP WORKING DOWN `API_ONLY_KNOBS` — first pass done 2026-08-05 (`f7d5756`): 171 → 148,
-   36 skills → 27, 18 → 15 with no overlay.** ~~`volcano`~~ · ~~the over-representation trio~~ ·
-   ~~`proteomics_de`~~ · ~~the cheap ones~~ **DONE.** `lib/catalog/registry-completeness.test.ts`
-   holds the list, exact in both directions.
-   **⚑ DO NOT WORK THE REST AS A FLAT LIST — it was MEASURED 2026-08-05 and it clusters. The right
-   move is the one that worked today: declare a shared vocabulary ONCE, and waive the internal ones
-   with a reason.** Ranked by yield, not by count:
-   - **(a) The scRNA shared vocabulary — ~40 knobs across 9 skills, and the cheapest real win.**
-     `normalize` is `bool`/default-`true` in **8** skills (`markers` · `pseudotime_genes` ·
-     `trajectory` · `mixing_metrics` · `annotate` · `violin` · `pvca` · `cepo`) and **means the same
-     thing in every one** — verified in source, not assumed: three of them carry the identical
-     comment *"skip if input is already normalized"*. That is a `GENE_LIST_CUTOFFS`-shaped block.
-     `groupby` (7 skills) and `n_genes`/`top_n` are the next two candidates — **but verify `groupby`
-     the same way before sharing it**, because the session that built the trio found `fc_threshold`
-     meaning two opposite things under one name, and `heatmap.groupby` already has wording to match
-     (it names the Leiden fallback).
-   - **(b) The genuinely cheap singles — 17 knobs, no shared anything:** `upset` (4) ·
-     `string_network` (4) · `corr_heatmap` (3) · `pca` (3) · `pvca` (3, minus its `normalize`).
-   - **(c) `gsea` + `ssgsea` (13)** share `gene_set`/`gene_sets`/`weight` — one block, and it should
-     reuse the `enrichment` library wording rather than invent a second vocabulary for the same idea.
+> **Do not open `facs_gating`** (blocked on a real `.fcs` — DEFERRED) and **do not run the gauntlet /
+> `fe-review` per task** — they are milestone instruments [[review-cadence-phase-not-task]].
+1. **⇒ KEEP WORKING DOWN `API_ONLY_KNOBS` — 171 → 148 (`f7d5756`) → 91 (`98e29ce`); 36 skills → 27
+   → 14.** ~~`volcano`~~ · ~~the over-representation trio~~ · ~~`proteomics_de`~~ · ~~the cheap
+   ones~~ · ~~**(a) the scRNA shared vocabulary**~~ · ~~**(b) the cheap singles**~~ **DONE.**
+   `lib/catalog/registry-completeness.test.ts` holds the list, exact in both directions.
+   **⚑ THE LESSON FROM (a), which the next block must apply: share on a matching MEANING, never a
+   matching KEY NAME — and establish the meaning by reading the runner's BODY.** `normalize` is
+   declared by 14 skills under **three** different meanings, and the board's own note asserting all
+   8 of its candidates agreed was **wrong about `pvca`** (it scales features to unit variance — it
+   is `pca.scale`, not the count normalization). `groupby` split the same way
+   (`pseudotime_genes.groupby` never reaches its figure). A grep for the key returns every one of
+   them and separates none. `scrnaNormalize()` / `scrnaGroupby()` in `params.ts` are the one home,
+   and both carry the exclusions **with the reason**, so the next person cannot re-add them.
+   - **(c) `gsea` + `ssgsea` (13) — now the best-value block left.** They share
+     `gene_set`/`gene_sets`/`weight` — one block, and it should reuse the `enrichment` library
+     wording rather than invent a second vocabulary for the same idea. **Verify the shared meaning
+     the (a) way before writing it**: `ssgsea` scores per-sample while `gsea` ranks a whole contrast,
+     so `weight` and `top_n` are the two to check first.
    - **(d) `deg` (16) — the largest single gap and the one that WANTS A SPEC, not an overlay.**
      `method`, `mode`, `group_col`/`group_val`, `covariate_col` change the RESULT. Fold NEXT#2's
      level widget into that spec: `deg.reference`/`treatment` and `diff_abundance`'s (7) are the
@@ -410,14 +492,19 @@
      pipeline-level, already named internal on the board. **`facs_gating` (11) is the second-largest
      gap and should be LAST**: it is the one skill the smoke matrix cannot run at all, because no
      `.fcs` is staged (see DEFERRED). Building controls for a skill nobody can run is motion.
-   - **The new sibling guards are the thing to extend, not restate**: a slider must be BOUNDED by
-     the backend spec and its default must land ON a step. Both live in the same describe block. If
-     a knob has no min/max in `skill.json`, render it as a `number` — do not give it a slider and
-     inherit HTML's silent 0–100. And **when a knob's useful values cluster at one end of its
-     declared range, a slider is the wrong instrument** (`fdr_threshold` is why).
-   - **Prove each batch in the browser, not just in the guard.** `e2e/browser-verify/
-     api-only-knobs.spec.ts` is the pattern: set the knob through the real control, assert on the
-     RENDERED figure. A guard-only pass repeats this backlog's founding mistake one level up.
+   - **The sibling guards are the thing to extend, not restate** — there are now THREE, all in the
+     same describe block: a slider must be BOUNDED by the backend spec, its default must land ON a
+     step, and **the dev:mock fixture must render the SAME control as live** (type/default/min/max/
+     options, not just the key — added 2026-08-05, and it found `erg_bwave_bar.value_col` on its
+     first run). If a knob has no min/max in `skill.json`, render it as a `number` — do not give it
+     a slider and inherit HTML's silent 0–100. And **when a knob's useful values cluster at one end
+     of its declared range, a slider is the wrong instrument** (`fdr_threshold` is why; `min_size`,
+     `known_min` and `exprs_pct` were all typed `number` for it this session).
+   - **Prove each batch in the browser, not just in the guard.** `api-only-knobs.spec.ts` and
+     `shared-vocab-knobs.spec.ts` are the pattern: set the knob through the real control, assert on
+     the RENDERED figure. A guard-only pass repeats this backlog's founding mistake one level up.
+     **`runFromWorkbench` now drives text · select · range · SWITCH**, so no widget class in the
+     remaining backlog is undrivable.
 2. **⇒ EXTEND THE PICKER WHERE IT STILL DOESN'T REACH** (small, additive, all fail-soft today).
    **⚑ Its level-widget half has CONVERGED with #1(d) — spec them together or build it twice.**
    - **A multi-column widget** — `venn.sets` (2–3 column names) and `heatmap.annotations` are
@@ -449,28 +536,19 @@
      `30914228111`, green in 8s) rather than waiting for Monday — which is the half a local check
      could not answer, because **zizmor catches too-many permissions and never too-few**: its
      `contents: read` is now *proven* sufficient to check out, install uv and run zizmor online.
-4. **⇒ SPEC THE MULTI-TABLE `StatsTable` CONTRACT — owner-directed 2026-08-04, spec FIRST.**
-   Write `docs/stats-tables/spec.md` and **pause for review before code** (playbook: consequential
-   contract change → forcing-questions → spec). Owner note: **"continue learning from cnsplots and
-   Mobbin to refine the spec as well"** — both are inputs, not afterthoughts.
-   - **The problem:** `contract.run_skill_with_table` → `StatsTable | None` and
-     `lib/skills/api.ts` `table?: StatsTable | null`. Exactly ONE table, so `lollipop` with
-     `pairs=` must SWAP its ranked values for the pairwise p-values (the trade `boxplot` already
-     makes). `slope` and `confusion` have the same latent squeeze.
-   - **Decisions the spec owes:** D1 wire shape (`StatsTable | StatsTable[] | null` is
-     backward-compatible and the obvious candidate — say why, or why not) · D2 **how the FE renders
-     N tables — stacked vs tabbed vs accordion. This is the Mobbin question**, and the standing rule
-     applies: look at how mature tools present several result tables under one figure before
-     choosing · D3 migration for the ~18 skills in `NATIVE` (must be a no-op for every one that
-     attaches a single table) · D4 which skills actually want 2+, and whether a table needs an
-     explicit `role`/`kind` so the FE can order them predictably.
-   - **cnsplots input:** it emits **no tables at all** — its `add_pvalue`/statistics overlay paints
-     numbers onto the AXES. So it is a source for *what numbers belong beside which figure* (and
-     `_validation.py`'s named-refusal pattern), NOT for the presentation. Say that in the spec
-     rather than implying parity where there is none.
-   - **Ratchet to extend, not restate:** `tests/test_skill_table_contract.py` already partitions
-     every skill into native ∪ L3 ∪ L4-only and proves `NATIVE` against source. Whatever shape D1
-     picks, that guard must still ground the classification in code.
+4. ~~**SPEC THE MULTI-TABLE `StatsTable` CONTRACT**~~ — **WRITTEN 2026-08-05 (`62c7028`),
+   `docs/stats-tables/spec.md`, AWAITING OWNER REVIEW. No code was written against it.** All four
+   decisions the board asked for are answered (D1 wire shape · D2 the Mobbin presentation question ·
+   D3 the 27-skill migration · D4 which skills want 2+ and whether a `role` field is needed — it is
+   not), plus D5 legend/caption and D6 persistence.
+   - **Read §7 first if it comes back approved** — five slices, of which **slice 1 must be provable
+     as a NO-OP** (contract + normalizers + guards, no skill changes).
+   - **Two questions are owed the owner before slice 5** (§Open questions): does κ leave
+     `confusion`'s title text, and is a one-row scalar table the right home for λ/κ or should Selom
+     grow a headline-metrics strip? Recommendations given for both; nothing else is blocked.
+   - **The `NATIVE_L3_BOTH` exception (`boxplot`/`violin`) is DISSOLVED BY this change but not IN
+     it** — its whole justification is that only one table fits. Rule recorded in D3: remove the
+     exception in the same change that makes it false, never before.
 5. **The audit's open rows 21–23** — long category labels colliding with the axis title, point-label
    collision on scatter/volcano (neither side applies `adjustText`), axis title vs long ticks under
    `automargin`. **Selom's own defects, which cnsplots does not solve either**, so this is where
@@ -493,9 +571,46 @@
    **Note it now has ~47 skills to sort**, and the four added today are all general-purpose chart
    types with no omics gate — exactly the case §6 says the flat Store list stops serving.
 9. **`OH-01`** (arq + Redis job store) — unblocked; contract is `docs/jobs-surface/spec.md` §4.
+10. **⇒ FROM THE 2026-08-05 REVIEWS — CONFIRMED, VERIFIED IN CODE, DELIBERATELY NOT FIXED.** Each is
+    real and each is bigger than the change that surfaced it. Ranked:
+    - **(a) The prose↔param guard is exact in ONE direction only** (`test_methods_param_spec_guard.py:94`
+      asserts `refs - declared`, never `declared - refs`) — **which is exactly why the two
+      printed-vs-computed lies fixed in `e41016c` were green**. Making it two-directional is the
+      right ratchet and will surface a real backlog (every param no prose mentions). **Do this
+      before the next overlay batch**, because a knob becoming reachable is precisely when its
+      methods sentence starts mattering.
+    - **(b) `violin`'s PubMed annotation is now reachable, degrades silently, and the degradation
+      is recorded nowhere.** The count is a **live network lookup at run time**, so a figure is not
+      reproducible as-of anything — and via L3 synthesis it can reach a score-eligible table. An
+      unreachable lookup leaves the figure unannotated with no note saying so. Owed: stamp the query
+      date + exact term into the annotation and the provenance bundle, and surface the degraded case
+      honestly. The help text now at least says the count is live. **A repro-integrity question, not
+      a polish one.**
+    - **(c) A typo'd `groupby` silently substitutes Leiden and draws a plausible, differently-grouped
+      figure** (`markers`/`trajectory`/`annotate`/`violin` run_real all recompute on a miss). `slope`
+      already sets the precedent — it labels its columns "(required)" and refuses to guess, because
+      *the wrong choice still looks right*. Nothing reports the substitution.
+    - **(d) The param grid has no reset-to-default and no per-knob revert** — and the AI half already
+      has one (`AiMarker onRevert`), so a manual edit is strictly worse served than an AI proposal.
+      The all-or-nothing Reset got much more expensive at 57 new knobs (`violin` is now 12 controls).
+      Precedent for the fix is in the same dock: `marks-editor.tsx:324` has a per-row reset.
+    - **(e) `scorecard.max_rows` silently truncates input rows** with no disclosure in the figure or
+      the record — newly reachable, and the same shape as the "silent filters instead of honest
+      verdicts" rule.
+    - **(f) The `column` picker cannot serve the scRNA skills at all** — `resolveColumns` reads
+      `ctx.columns`, which is `[]` for an h5ad by construction (`engine/compat.py:175`), so the seven
+      scRNA knobs are text boxes on exactly the files they consume. `design.group_candidates` (real
+      obs columns **with** their levels) is already threaded into both surfaces. **The honest widget
+      is a combobox (pick-or-type), not a select** — `leiden` does not exist until the run. Folds
+      into NEXT#2.
+    - **(g) `showWhen` shifts the grid with no cue** (`markers.method` vanishes on an effect-size
+      ranking; `violin.context`/`known_min` appear on `annotate=pubmed`). `enabledWhen` (render-but-
+      grey, "so its capability is discoverable") already exists for the ERG knobs. A verifier
+      **refuted** this for `markers` specifically — it is a documented decision there — so treat it
+      as a convention question, not a defect.
 
-**Owed follow-ups still open:** ~~the one-table `StatsTable` limit~~ **decided 2026-08-04 → NEXT#4
-(spec first, cnsplots + Mobbin as inputs)** · ~~the `zizmor@latest` pin policy~~ **decided
+**Owed follow-ups still open:** ~~the one-table `StatsTable` limit~~ **decided 2026-08-04 → NEXT#4;
+SPEC WRITTEN 2026-08-05, awaiting owner review** · ~~the `zizmor@latest` pin policy~~ **decided
 2026-08-04 → [[DECISIONS #14]], built at NEXT#3** · ~~the `pairs=` **pair-picker**~~ **BUILT 2026-08-04.** Note the correction to the correction:
 the levels were persisted for scRNA/bulk but **not for `generic_table`**, the only kind that uses
 `pairs=` — that needed a backend change (`_table_hints`) · there
@@ -575,6 +690,8 @@ journal's own author guidelines**, not cnsplots.
 
 ## ▸ READ FIRST
 
+**`docs/stats-tables/spec.md`** (**NEW 2026-08-05 — awaiting owner review; NEXT#4. Read §7 for the
+build slices and §Open questions for the two owner calls**) ·
 **`docs/auth-multitenancy/spec.md`** (**the entry point — steps 1–3 of §4 are DONE; steps 4–7 are the
 frontend half and are blocked on Clerk keys. §5's route-enumerating isolation guard is the one piece
 NOT built — see NEXT#7**) · **`docs/cnsplots-port/parity-audit.md`** (F1+F2 ledger; its §3 table is
