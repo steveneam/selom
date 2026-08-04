@@ -195,6 +195,30 @@ CASES: dict[str, Case | Skip] = {
     "qq": Case(HUMAN_DE, {"top_n": 10},
                "~21 k human genes with a raw P.Value column — exercises λ, the Beta null band "
                "and the tail-preserving thinning at real scale"),
+    "lollipop": Case(ERG_METRICS, {"group": "condition", "value": "b_wave_uv"},
+                     "b-wave amplitude ranked across the six treatment arms — genuinely long-form, "
+                     "so the bootstrap CI has real replicates to resample (n=21-56 per arm)"),
+    "ridge": Case(ERG_METRICS, {"group": "condition", "value": "b_wave_uv"},
+                  "the same six arms as a distribution rather than a ranking — the WT control's "
+                  "spread is an order of magnitude wider than the rd10 arms', which a box flattens"),
+    # `clusters` and `celltypes` are two labellings of the SAME cells, which is the omics use for a
+    # confusion matrix. Deliberately paired against `genotype` here instead: cluster-vs-celltype is
+    # 1:1 in this ShinyCell export and would draw a perfectly diagonal (and therefore untesting)
+    # matrix, while genotype x celltype has real off-diagonal mass. `clusters` are numeric STRINGS,
+    # so this case also stands guard over the D2 axis class on both the trace and annotation layers.
+    "confusion": Case(RPGRIP1_SCRNA,
+                      {"true": "genotype", "predicted": "celltypes", "normalize": "row"},
+                      "cell-type composition per genotype across 83 k cells, row-normalized — "
+                      "two label sets that do NOT match, so the kappa refusal path is the one "
+                      "exercised on real data"),
+    # sample_id is one eye; intensity_group is the flash level it was recorded at. The SAME eye
+    # measured at two intensities is a genuine paired design, which is what this skill needs and
+    # what no other corpus file here carries.
+    "slope": Case(ERG_METRICS,
+                  {"subject": "sample_id", "condition": "intensity_group", "value": "b_wave_uv",
+                   "levels": "Group1, Group4", "group": "condition"},
+                  "each eye's b-wave at flash Group1 vs Group4 — a real within-subject pairing, "
+                  "clustered by treatment arm, tested with a paired t"),
 
     # ---- ERG (proprietary) -------------------------------------------------------------------
     "erg_traces": Case(ERG_WAVEFORMS, {"role": "representative", "marks": True},
@@ -319,6 +343,42 @@ def _numeric_string_axes(figure) -> list[str]:
     return offenders
 
 
+def _numeric_string_annotations(figure) -> list[str]:
+    """Annotations pinned to a CATEGORY axis by a numeric-looking string coordinate, as
+    ``annotations[i].x`` strings — the same D2 class as :func:`_numeric_string_axes`, one layer up.
+
+    Declaring ``type: "category"`` fixes the TRACE but not the annotation layer: Plotly coerces a
+    numeric-looking string annotation coordinate to a NUMBER, and a category axis then reads that
+    number as a SLOT INDEX. So an annotation at ``x="7"`` lands at the 8th category rather than on
+    the one named "7". With cluster ids — numeric strings on every scRNA path — every label is
+    silently mislaid, and any id at or past the category count is drawn off the plot entirely.
+
+    Found in `confusion`, whose per-cell counts scrambled while the heatmap underneath them was
+    laid out correctly and every assertion on the spec passed. The fix is always the same: place
+    annotations by integer index, which IS the category position by definition.
+    """
+    layout = figure.get("layout") or {}
+    offenders = []
+    for i, anno in enumerate(layout.get("annotations") or []):
+        if not isinstance(anno, dict):
+            continue
+        for letter in ("x", "y"):
+            value = anno.get(letter)
+            if not isinstance(value, str):
+                continue
+            try:
+                int(value)
+            except ValueError:
+                continue  # a genuine text category name — Plotly matches those by name
+            ref = anno.get(f"{letter}ref") or letter
+            if str(ref).startswith("paper"):
+                continue
+            axis = layout.get(_axis_key(letter, ref)) or {}
+            if axis.get("type") == "category":
+                offenders.append(f"annotations[{i}].{letter} = {value!r}")
+    return offenders
+
+
 def check_figure(figure) -> str:
     """Validate one skill's output. Returns "" when it is a genuine editable figure, else the
     reason it is not. Mirrors the golden test's shape assertions plus the stub-leak check."""
@@ -350,7 +410,57 @@ def check_figure(figure) -> str:
             'type: "category" — Plotly will infer a LINEAR axis and lay the categories out at '
             "their numeric values, reordering and mislaying them (parity-audit D2)"
         )
+    bad_annos = _numeric_string_annotations(figure)
+    if bad_annos:
+        return (
+            f"{', '.join(bad_annos)} pins an annotation to a category axis by a numeric-looking "
+            "STRING — Plotly coerces it to a number and reads it as a SLOT INDEX, so the label "
+            'lands on the wrong category (or off the plot). Position by integer index instead; '
+            'declaring type: "category" fixes the trace but not this layer'
+        )
+    tiny = _invisible_markers(figure)
+    if tiny:
+        return (
+            f"{', '.join(tiny)} — a marker.size below {_MIN_MARKER_PX}px is invisible at any "
+            "export scale. Almost always the matplotlib-area-vs-Plotly-diameter confusion: "
+            "matplotlib's `s` is an AREA in points², Plotly's marker.size is a PIXEL DIAMETER, "
+            "so a raw count or a ported `s` value draws a dot 1-3px across (parity-audit F1.5, "
+            "which is how `enrichment` shipped an unreadable dot plot with a valid spec)"
+        )
     return ""
+
+
+# Below this a marker is not a small dot, it is an absent one. Deliberately loose: the point is to
+# catch a size that came from the WRONG UNIT, not to police design. The smallest size any skill
+# sets on purpose is volcano's 4.5.
+_MIN_MARKER_PX = 2.0
+
+
+def _invisible_markers(figure) -> list[str]:
+    """Traces whose ``marker.size`` resolves below :data:`_MIN_MARKER_PX`, as ``trace[i]`` strings.
+
+    A scalar size is checked directly. A size ARRAY is data-driven, so it is judged on its MAXIMUM:
+    a legitimate bubble encoding has small points at the bottom of its range, but if even the
+    largest point is sub-pixel then every point is, and the encoding is the unit bug rather than a
+    scale. ``sizeref``/``sizemin`` rescale the array, so a trace declaring either is left alone —
+    it has said how its numbers map to pixels.
+    """
+    out = []
+    for i, tr in enumerate(figure.get("data") or []):
+        if not isinstance(tr, dict):
+            continue
+        marker = tr.get("marker")
+        if not isinstance(marker, dict) or "size" not in marker:
+            continue
+        size = marker.get("size")
+        if marker.get("sizeref") is not None or marker.get("sizemin") is not None:
+            continue
+        if isinstance(size, list):
+            nums = [float(v) for v in size if isinstance(v, (int, float))]
+            size = max(nums) if nums else None
+        if isinstance(size, (int, float)) and 0 <= float(size) < _MIN_MARKER_PX:
+            out.append(f"trace[{i}].marker.size = {size}")
+    return out
 
 
 # Trace keys Plotly has REMOVED. They are still legal JSON and a spec carrying one renders

@@ -146,3 +146,110 @@ def test_no_style_declares_a_font_nothing_bundles():
             f"style {style.id!r} leads with {lead!r}, which is bundled by neither the frontend nor "
             "the render image — it will resolve differently on the two sides (parity-audit D3)"
         )
+
+
+# ------------------------------------------------ D2 again: the ANNOTATION layer (2026-08-04)
+# Declaring `type: "category"` fixes the TRACE and not the annotation layer, which is a separate
+# coordinate parser with the same numeric-string weakness. Found in `confusion`, whose per-cell
+# counts scrambled across a correctly-laid-out heatmap and pushed one label clean off the plot.
+def test_confusion_cell_labels_are_positioned_by_index_not_category_name():
+    """Cell text must be pinned by integer index, never by the category's name.
+
+    On a category axis Plotly coerces a numeric-looking STRING coordinate to a number and then
+    reads it as a SLOT INDEX — so an annotation at ``x="7"`` lands on the 8th category rather than
+    the one called "7". Cluster ids are numeric strings on every scRNA path, so naming the category
+    mislays every label; ids at or past the category count are drawn outside the plot entirely.
+    """
+    from skills.confusion.run import confusion_spec
+
+    spec = confusion_spec([[5, 1], [2, 9]], ["a", "b"], ["5", "7"], {},
+                          "reference", "predicted", "t")
+    annotations = spec["layout"]["annotations"]
+    assert annotations, "confusion must label its cells"
+    for anno in annotations:
+        assert isinstance(anno["x"], int), f"annotation x is {anno['x']!r}, not an index"
+        assert isinstance(anno["y"], int), f"annotation y is {anno['y']!r}, not an index"
+
+
+def test_check_figure_rejects_a_category_annotation_pinned_by_name():
+    """The ratchet, both directions: the guard fires on the defect and stays quiet without it."""
+    from skills.smoke import check_figure
+
+    def figure(anno_x):
+        return {
+            "data": [{"type": "heatmap", "z": [[1, 2]], "x": ["5", "7"], "y": ["a"]}],
+            "layout": {
+                "xaxis": {"type": "category"}, "yaxis": {"type": "category"},
+                "annotations": [{"x": anno_x, "y": 0, "text": "1", "showarrow": False}],
+            },
+        }
+
+    assert "SLOT INDEX" in check_figure(figure("7"))
+    assert check_figure(figure(1)) == ""
+
+
+# ------------------------------------------------ D1 again: marker size as a UNIT (2026-08-04)
+def test_check_figure_rejects_sub_pixel_marker_sizes():
+    """A marker.size under 2px is the matplotlib-area-vs-Plotly-diameter confusion, not a choice.
+
+    matplotlib's scatter ``s`` is an AREA in points²; Plotly's ``marker.size`` is a pixel DIAMETER.
+    Porting a value across (or passing a raw count, as `enrichment` did) draws dots 1-3px wide —
+    a figure that is valid, themed, exported, and unreadable. cnsplots' own ``lollipopplot``
+    defaults ``markersize=20`` in ``s`` units, so the trap is live on every port from it.
+    """
+    from skills.smoke import check_figure
+
+    def figure(size):
+        return {"data": [{"type": "scatter", "x": [1], "y": [1], "marker": {"size": size}}],
+                "layout": {}}
+
+    assert "marker.size" in check_figure(figure(1.5))
+    # An array is judged on its MAXIMUM: a real bubble encoding has small points at the bottom of
+    # its range, but if even the largest is sub-pixel the whole encoding is in the wrong unit.
+    assert "marker.size" in check_figure(figure([1, 1.8, 1.2]))
+    assert check_figure(figure(9)) == ""
+    assert check_figure(figure([1, 2, 14])) == ""               # a real bubble range is fine
+    # A trace that declares how its numbers map to pixels has said what it means — left alone.
+    assert check_figure({"data": [{"type": "scatter", "x": [1], "y": [1],
+                                   "marker": {"size": [1, 2], "sizeref": 0.01}}],
+                         "layout": {}}) == ""
+
+
+def test_lollipop_dot_is_a_visible_pixel_diameter():
+    """Ratchet on the port itself: the dot size must survive as pixels, not cnsplots' area."""
+    from skills.lollipop.run import _DOT_SIZE
+
+    assert 4 <= _DOT_SIZE <= 20, f"{_DOT_SIZE} is not a plausible pixel diameter"
+
+
+# ------------------------------------------------ colour that carries MEANING (2026-08-04)
+def test_lollipop_stem_declares_its_own_colour():
+    """The stem is furniture and must not consume a colourway slot.
+
+    Left to the theme, the stem trace takes the next colour in the sequence and the figure renders
+    a blue stem under an orange dot — one mark reading as two unrelated series. No assertion on the
+    spec can catch that, because nothing in the spec says which trace is furniture.
+    """
+    from skills.lollipop.run import lollipop_spec
+
+    spec = lollipop_spec({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]}, {}, "v", "g", "t")
+    stem = next(t for t in spec["data"] if t.get("name") == "stem")
+    assert stem["line"].get("color"), "the stem must set its own colour"
+
+
+def test_ridge_leaves_fill_and_line_colour_to_the_theme():
+    """A `fill: "toself"` scatter derives its FILL from the trace's line colour.
+
+    So pinning the outline silently repaints every ridge that colour and the colourway never
+    arrives — which is exactly what happened when the outline was set to a neutral grey to make the
+    stack read more clearly. Both keys must stay unset.
+    """
+    from skills.ridge.run import ridge_spec
+
+    values = {"a": [1.0, 1.4, 2.2, 2.9, 3.1], "b": [4.0, 4.6, 5.2, 5.8, 6.1]}
+    spec = ridge_spec(values, {}, "v", "g", "t")
+    ridges = [t for t in spec["data"] if t.get("fill") == "toself"]
+    assert len(ridges) == 2
+    for trace in ridges:
+        assert "fillcolor" not in trace
+        assert "color" not in trace.get("line", {})
