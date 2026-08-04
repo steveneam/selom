@@ -210,7 +210,44 @@
    - **Ratchet:** extend `params.test.ts` (it already guards the `pairs=` vocabulary is reachable) —
      assert a context-free merge is byte-identical to today's, and that a column field with a
      context yields the dataset's columns.
-2. **The audit's open rows 21–23** — long category labels colliding with the axis title, point-label
+2. **⇒ PIN ZIZMOR + ADD THE WEEKLY DRIFT JOB — owner-decided 2026-08-04, [[DECISIONS #14]].**
+   Small, and it closes a **live** risk: until it lands, an upstream zizmor release can turn `main`
+   red with no repo change (it already did once, on `ced7f31`/`8de5e39`).
+   - **Blocking, pinned:** `.github/workflows/ci.yml` `workflow-lint` **and** `scripts/verify.sh`'s
+     `wf-lint` both move `zizmor@latest` → an explicit version. **Current is `1.29.0`** (read off
+     this session's gate output — confirm before pinning, don't trust this line).
+   - **Non-blocking, latest:** a new weekly-cron workflow running `zizmor@latest` that REPORTS. A
+     finding is a signal to bump the pin, never a red `main`. Keep its permissions minimal — zizmor
+     catches too-many perms, never too-few [[verify-ci-in-its-target-event]].
+   - **Two traps already paid for, do not rediscover:** zizmor starts **OFFLINE without a token and
+     reports a FALSE "No findings"** — `wf-lint` already resolves `GH_TOKEN` (exported, never argv)
+     and reports NOT RUN rather than a pass; keep that. And **verify the change in its target
+     event** — a workflow edit is only verified after a real run on `main`/a PR, not locally.
+   - **Prove it bites:** reverting one `# v5.0.1` comment to `# v5` must still turn `wf-lint` FAIL
+     (exit 13) under the pin. That is the existing reproduction.
+3. **⇒ SPEC THE MULTI-TABLE `StatsTable` CONTRACT — owner-directed 2026-08-04, spec FIRST.**
+   Write `docs/stats-tables/spec.md` and **pause for review before code** (playbook: consequential
+   contract change → forcing-questions → spec). Owner note: **"continue learning from cnsplots and
+   Mobbin to refine the spec as well"** — both are inputs, not afterthoughts.
+   - **The problem:** `contract.run_skill_with_table` → `StatsTable | None` and
+     `lib/skills/api.ts` `table?: StatsTable | null`. Exactly ONE table, so `lollipop` with
+     `pairs=` must SWAP its ranked values for the pairwise p-values (the trade `boxplot` already
+     makes). `slope` and `confusion` have the same latent squeeze.
+   - **Decisions the spec owes:** D1 wire shape (`StatsTable | StatsTable[] | null` is
+     backward-compatible and the obvious candidate — say why, or why not) · D2 **how the FE renders
+     N tables — stacked vs tabbed vs accordion. This is the Mobbin question**, and the standing rule
+     applies: look at how mature tools present several result tables under one figure before
+     choosing · D3 migration for the ~18 skills in `NATIVE` (must be a no-op for every one that
+     attaches a single table) · D4 which skills actually want 2+, and whether a table needs an
+     explicit `role`/`kind` so the FE can order them predictably.
+   - **cnsplots input:** it emits **no tables at all** — its `add_pvalue`/statistics overlay paints
+     numbers onto the AXES. So it is a source for *what numbers belong beside which figure* (and
+     `_validation.py`'s named-refusal pattern), NOT for the presentation. Say that in the spec
+     rather than implying parity where there is none.
+   - **Ratchet to extend, not restate:** `tests/test_skill_table_contract.py` already partitions
+     every skill into native ∪ L3 ∪ L4-only and proves `NATIVE` against source. Whatever shape D1
+     picks, that guard must still ground the classification in code.
+4. **The audit's open rows 21–23** — long category labels colliding with the axis title, point-label
    collision on scatter/volcano (neither side applies `adjustText`), axis title vs long ticks under
    `automargin`. **Selom's own defects, which cnsplots does not solve either**, so this is where
    Selom can beat the reference rather than match it. Row 21 is now *visible on shipped output*:
@@ -218,27 +255,24 @@
    horizontal partly to dodge it.
    **Verify with `scripts/render_skill.py slope lollipop confusion` — the collision is a render
    fact, not a spec fact, and there is no assertion that can see it.**
-3. **§3.2 rows 12–13, if wanted**: `hist`/`kde`/`dist` as ONE skill with a mode (the review's own
+5. **§3.2 rows 12–13, if wanted**: `hist`/`kde`/`dist` as ONE skill with a mode (the review's own
    framing) — and `ridge` already ships the KDE + Silverman bandwidth to build it on, so this is a
    genuine reachability job now, not a build. Row 13 (`donut`/`pie`) the review itself rates low
    scientific value — build last or not at all.
-4. **The isolation-coverage guard** — spec §5's strongest form, and the one piece of Lane C not
+6. **The isolation-coverage guard** — spec §5's strongest form, and the one piece of Lane C not
    built. Enumerate private routes by AST, subtract the allow-list, and **fail on any private route
    with no isolation case**, carrying a NAMED shrinking backlog (the `test_reachability_guard.py`
    waiver shape). Turns "39 unaudited routes" into a tracked list instead of a memory.
-5. **F3 (the fit-scored SKILL picker)** — a different picker from NEXT#1: that one chooses a
+7. **F3 (the fit-scored SKILL picker)** — a different picker from NEXT#1: that one chooses a
    *column*, this one chooses a *skill*. Specced in source-review §6; Mobbin ruled OUT abstract
    illustration tiles. Run `fe-review` at the end. **F4** = the rest of the plot gaps.
    **Note it now has ~47 skills to sort**, and the four added today are all general-purpose chart
    types with no omics gate — exactly the case §6 says the flat Store list stops serving.
-6. **`OH-01`** (arq + Redis job store) — unblocked; contract is `docs/jobs-surface/spec.md` §4.
+8. **`OH-01`** (arq + Redis job store) — unblocked; contract is `docs/jobs-surface/spec.md` §4.
 
-**Owed follow-ups still open:** **a figure carries exactly ONE Statistics table**
-(`contract.run_skill_with_table` → `StatsTable | None`), so `lollipop` with `pairs=` swaps its
-ranked-values table for the pairwise p-values rather than showing both — the same trade `boxplot`
-already makes. Widening it to a list is an FE-contract change (`lib/skills/api.ts` `table?:
-StatsTable | null`), so it was NOT done unilaterally; it is cheap if a third skill wants it ·
-the `zizmor@latest` pin policy (owner call, small, no spend) · ~~the `pairs=` **pair-picker**~~
+**Owed follow-ups still open:** ~~the one-table `StatsTable` limit~~ **decided 2026-08-04 → NEXT#3
+(spec first, cnsplots + Mobbin as inputs)** · ~~the `zizmor@latest` pin policy~~ **decided
+2026-08-04 → [[DECISIONS #14]], built at NEXT#2** · ~~the `pairs=` **pair-picker**~~
 **promoted to NEXT#1 (2026-08-04)** — the "param controls cannot see the dataset's categories" half
 of that blocker was FALSE (`design.group_candidates[].levels` is already persisted on the dataset);
 only the `ParamField` list widget and the merge-time data thread are real · there
