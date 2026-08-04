@@ -127,6 +127,91 @@ def test_generic_table_needs_no_design():
     assert hints.needs_design is False
 
 
+# --- plain table: the categorical VOCABULARY the column/pair pickers offer ---------------------------
+# A long-form table (one row per measurement) is what boxplot/violin/lollipop/slope/ridge consume, and
+# it was the one kind with NO candidates — so the frontend pair-picker had no level names to offer on
+# exactly the data that uses `pairs=`. These candidates are vocabulary, NOT a design: `needs_design`
+# and `source` must stay untouched, or every dropped CSV grows an intake confirm-card.
+
+def _long_table() -> pd.DataFrame:
+    return pd.DataFrame({
+        "sample_id": [f"s{i}" for i in range(12)],          # 12 distinct ids
+        "condition": ["Control", "Treated", "Rescue"] * 4,
+        "eye": ["LE", "RE"] * 6,
+        "b_wave_uv": [float(i) for i in range(12)],         # continuous — never a factor
+    })
+
+
+def test_generic_table_offers_its_categorical_columns_as_grouping_vocabulary():
+    hints = suggest_design_hints(DataBundle(payload=_long_table(), kind=GENERIC_TABLE))
+    assert [c.key for c in hints.group_candidates] == ["condition", "eye"]
+    cond = hints.group_candidates[0]
+    assert {lv.name for lv in cond.levels} == {"Control", "Treated", "Rescue"}
+    assert cond.reference_guess == "Control"
+    # Replicates are counted in ROWS — a plain table declares no biological-replicate column.
+    assert {lv.n_replicates for lv in cond.levels} == {4}
+    assert all(lv.replicate_unit == "rows" for lv in cond.levels)
+
+
+def test_generic_table_vocabulary_does_not_claim_a_design():
+    # The whole point: levels WITHOUT a design. Flipping either of these puts an intake confirm-card
+    # in front of every dropped CSV, and makes `defaultDesignChoice` build a contrast nobody confirmed.
+    hints = suggest_design_hints(DataBundle(payload=_long_table(), kind=GENERIC_TABLE))
+    assert hints.needs_design is False
+    assert hints.source == "none"
+    assert hints.group_candidates != []          # …yet the vocabulary is there
+
+
+def test_generic_table_best_group_prefers_a_condition_alias_over_the_tightest_factor():
+    # `eye` has fewer levels, so the lowest-cardinality rule alone would pick it. The deg runner's
+    # condition aliases win first — the same priority the scRNA path uses.
+    hints = suggest_design_hints(DataBundle(payload=_long_table(), kind=GENERIC_TABLE))
+    assert hints.best_group == "condition"
+
+
+def test_generic_table_excludes_id_and_measurement_columns():
+    df = _long_table()
+    df["barcode"] = [f"bc{i}" for i in range(len(df))]      # 12 distinct — over nothing, but an id
+    hints = suggest_design_hints(DataBundle(payload=df, kind=GENERIC_TABLE))
+    keys = [c.key for c in hints.group_candidates]
+    assert "b_wave_uv" not in keys      # continuous — never a factor
+    assert "barcode" not in keys        # 12 distinct values, one per row
+    assert keys == ["condition", "eye"]
+
+
+def test_generic_table_excludes_the_sample_column_even_under_the_level_cap():
+    # `sample_id` here has only 12 distinct values, so the _MAX_LEVELS cap does NOT catch it — the
+    # deg runner's sample aliases must, or "group by sample_id" offers one box per row as a grouping.
+    # The COLUMN picker still reaches it: that widget reads data_fit.columns, not this list.
+    hints = suggest_design_hints(DataBundle(payload=_long_table(), kind=GENERIC_TABLE))
+    assert "sample_id" not in [c.key for c in hints.group_candidates]
+
+
+def test_generic_table_with_no_categorical_column_stays_empty():
+    df = pd.DataFrame({"x": [1.0, 2.0, 3.0], "y": [4.0, 5.0, 6.0]})
+    hints = suggest_design_hints(DataBundle(payload=df, kind=GENERIC_TABLE))
+    assert hints.group_candidates == []
+    assert hints.needs_design is False
+
+
+def test_inspect_serves_the_table_vocabulary_over_the_wire():
+    # Non-integral measurements on purpose: whole numbers classify as a counts matrix (bulk_counts),
+    # which takes the column-names design path instead. A real long-form measurement table has decimals.
+    csv = (b"sample_id,condition,eye,b_wave_uv\n"
+           b"s1,Control,LE,90.01\ns2,Control,RE,91.34\n"
+           b"s3,Treated,LE,150.77\ns4,Treated,RE,151.28\n")
+    r = client.post("/data/inspect", files={"matrix": ("erg_long.csv", csv, "text/csv")})
+    assert r.status_code == 200
+    body = r.json()
+    design = body["design"]
+    assert design["needs_design"] is False
+    assert design["best_group"] == "condition"
+    cand = next(c for c in design["group_candidates"] if c["key"] == "condition")
+    assert {lv["name"] for lv in cand["levels"]} == {"Control", "Treated"}
+    # The column picker's other half rides the SAME payload — both halves must arrive together.
+    assert body["data_fit"]["columns"] == ["sample_id", "condition", "eye", "b_wave_uv"]
+
+
 def test_fail_soft_on_bad_payload():
     # A bulk_counts kind whose payload is not a frame must NOT raise — fail-soft to no-design.
     hints = suggest_design_hints(DataBundle(payload=object(), kind=BULK_COUNTS))

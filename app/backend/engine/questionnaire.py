@@ -26,7 +26,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from engine.models import BULK_COUNTS, SC_COUNTS, UNKNOWN
+from engine.models import BULK_COUNTS, GENERIC_TABLE, SC_COUNTS, UNKNOWN
 
 # Control / reference keyword guess — the level a 2-group contrast should reference against. Word-ish
 # so a short token (``WT``) matches without false-positiving inside a longer word; a trailing replicate
@@ -139,7 +139,13 @@ def _suggest(bundle: Any, design_path: str | None) -> DesignHints:
         return _bulk_hints(bundle, kind)
     if kind == SC_COUNTS:
         return _scrna_hints(bundle, kind)
-    # de_results (already computed), proteomics/metabolomics (v1 defers), generic/unknown → no design.
+    if kind == GENERIC_TABLE:
+        return _table_hints(bundle, kind)
+    # de_results (already computed), proteomics/metabolomics (v1 defers), unknown → no design.
+    return _no_design(kind)
+
+
+def _no_design(kind: str) -> DesignHints:
     return DesignHints(needs_design=False, source="none", modality=kind,
                        note="no experimental design to capture for this data type")
 
@@ -248,6 +254,65 @@ def _obs_candidate(obs: Any, col: str, sample_col: str | None) -> GroupCandidate
     return GroupCandidate(
         key=col, label=col, levels=levels, n_levels=len(levels),
         reference_guess=_guess_reference([lv.name for lv in levels]))
+
+
+# --- plain table: the categorical VOCABULARY, not a design -------------------------------------------
+
+def _table_hints(bundle: Any, kind: str) -> DesignHints:
+    """Candidate grouping factors for a plain table: its low-cardinality categorical columns + levels.
+
+    ``needs_design`` stays **False** and ``source`` stays ``"none"`` — a generic table carries no ``deg``
+    contrast for the intake questionnaire to confirm, and flipping either would put a confirm-card in
+    front of every dropped CSV. What these candidates DO carry is the *vocabulary* a categorical figure
+    is built from: the group column and its level names. That is what the frontend's column / pair
+    pickers offer (``lib/catalog/params.ts``), and it is why the levels are worth detecting here even
+    though there is nothing to confirm — a long-form table (one row per measurement) is exactly the shape
+    ``boxplot`` / ``violin`` / ``lollipop`` / ``slope`` / ``ridge`` consume, and it was the ONE kind with
+    no candidates at all.
+
+    Ordered aliases-first (same priority as the scRNA path) so ``condition`` outranks ``eye``; the
+    ``_MAX_LEVELS`` cap keeps an id column (30 distinct sample ids) out, and ``_is_categorical_series``
+    keeps every measurement column out. The deg runner's SAMPLE aliases are excluded outright — the
+    scRNA path does the same, and a small table can hold few enough sample ids to slip under the cap,
+    where "group by sample_id" is one box per row rather than a grouping. (The column picker still
+    offers it: that widget reads every column from ``data_fit.columns``, not this list.)
+    """
+    df = getattr(bundle, "payload", None)
+    if not _is_dataframe(df) or df.shape[1] == 0:
+        return _no_design(kind)
+    cond_aliases, sample_aliases = _obs_aliases()
+    cols = [str(c) for c in df.columns if str(c) not in sample_aliases]
+    ordered: list[str] = [c for c in cond_aliases if c in cols]
+    ordered += [c for c in cols if c not in ordered]
+    candidates = [c for c in (_table_candidate(df, col) for col in ordered) if c is not None]
+    if not candidates:
+        return _no_design(kind)
+    # Best = the first alias hit (condition/genotype/…), else the tightest factor — the scRNA rule.
+    best = next((c for c in candidates if c.key in cond_aliases), None) or min(
+        candidates, key=lambda c: c.n_levels)
+    return DesignHints(
+        needs_design=False, source="none", modality=kind,
+        group_candidates=candidates, best_group=best.key,
+        note=f"no design to confirm for a plain table; {len(candidates)} categorical column(s) "
+             f"detected for the column/pair pickers")
+
+
+def _table_candidate(df: Any, col: str) -> GroupCandidate | None:
+    """One table column as a grouping factor, or None when it is continuous / too high-cardinality /
+    doesn't actually group. Replicates are counted in ROWS — a plain table has no declared
+    biological-replicate column, so saying "samples" would claim a structure nobody declared."""
+    series = df[col]
+    if not _is_categorical_series(series) or not (_MIN_LEVELS <= _nunique(series) <= _MAX_LEVELS):
+        return None
+    counts = series.astype(str).value_counts()
+    # A column whose every value is distinct is an id, not a factor — under the level cap a short
+    # table's barcode/id column passes cardinality but groups nothing (every level would be n=1).
+    if int(counts.max()) < 2:
+        return None
+    levels = sorted((LevelHint(name=str(name), n_replicates=int(n), replicate_unit="rows")
+                     for name, n in counts.items()), key=lambda lv: lv.name)
+    return GroupCandidate(key=col, label=col, levels=levels, n_levels=len(levels),
+                          reference_guess=_guess_reference([lv.name for lv in levels]))
 
 
 # --- design sheet -----------------------------------------------------------------------------------
