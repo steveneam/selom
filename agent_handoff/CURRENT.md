@@ -27,6 +27,7 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
+| **KNOBS-1** | 2026-08-05 | `main` `9a05608..a2dee4a` (**local — not pushed**) | **NEXT#1's first pass: `API_ONLY_KNOBS` 171 → 148, 36 skills → 27, and the "no overlay at all" count 18 → 15.** Worked by what a knob DECIDES. **`volcano` first** — the panel said *"Tune the options"* and offered one text box for a gene-set panel while `fc_threshold` · `fdr_threshold` · `top_n` were API-only. `proteomics_de` took the same three plus its preparation knobs, `missing` above all: the default per-protein mean impute biases real MNAR fold-changes toward zero, so it moves a result further than the choice of test does. **The three over-representation skills share ONE declared pair of cutoffs** (`GENE_LIST_CUTOFFS`) rather than three retyped copies, because the same two keys mean something *different* there than on a volcano — they select the QUERY genes, they do not filter the terms drawn, and they are inert on a bare gene list. `pathway` · `go_graph` · `sankey` had no overlay whatsoever; **`sankey` is the one to remember — `max_links` is its ONLY knob, so that skill rendered a literally EMPTY parameter panel**, and nothing about a blank panel distinguishes "no options" from "options nobody wired". **The one judgement call: `fdr_threshold` is deliberately NOT a slider.** Its range is 0–1 while every value anyone uses (0.05 · 0.01 · 0.001) sits in the first tenth of that track, so a linear slider would make the conventional cutoffs fiddly and 0.001 unreachable at any usable step — a new reachability gap created by the fix for a reachability gap. **Two guards added in the same change, about the layer BELOW coverage — a control that renders but cannot express its knob:** a slider must be bounded by the backend spec (an absent min/max silently becomes HTML's **0–100**), and its default must land ON a step. The second **found a real defect on its first run**: `qq.max_points` (min 200, step 500, default 6000) drew its thumb at **5700** while the readout beside it said 6000. **Three harness capabilities**, each needed here and none a one-off: **`setRange`** (Playwright's `fill()` refuses `input[type=range]` outright, so every threshold knob was undrivable — it walks there by KEYBOARD rather than assigning `.value`, which would only prove React's handler works when called), **`overrideDataCheck`** (the QC block card's "Review & run anyway", a first-class path no check had ever taken; opt-in so an unexpected block still fails loudly), and **`/p/[id]` + `/store` added to route warming** — the warm-routes file already documents this exact class and names three false timeouts it fixed, but the route every check navigates to and the heaviest compile in the app **was never in the list**, and it cost three more 180s timeouts in one session. **Recorded, not worked around:** sankey's own corpus file is `gene,cell_type`, so QC blocks it with *"No numeric data to analyze"* and by its own rule is right — while being wrong about sankey, whose values are the pair COUNTS it derives itself. Gates: `verify.sh` **9/9** (raw, exit 0, **with the corpus set** — the first run had `SELOM_DATASETS_DIR` unset and said so) · **browser-verify 23 green / 2 skipped / 0 failed** across filtered passes, incl. the 2 new. |
 | **REACHABILITY-SWEEP** | 2026-08-04 | `main` `18c8cbd..<head>` (**pushed**) | **NEXT#1 closed on all three bullets, and the sweep found a THIRD layer of the same class.** The board asked for three things and each one turned up something bigger than itself. ⚑ **171 of 313 backend knobs render no control at all** — 37 skills, **18 with no presentation overlay whatsoever**. `paramFieldsFromSpec` iterates the OVERLAY, not the backend spec, so a skill without one renders zero controls and the panel says *"Runs with smart defaults — ready to apply"*, which reads as a product decision and is usually just an absent overlay. The sharpest case is **`volcano`, the flagship**: the panel says *"Tune the options"* while `fc_threshold` · `fdr_threshold` · `top_n` — the three knobs deciding what a volcano SHOWS — are API-only. That is now `API_ONLY_KNOBS`, a **named waiver list exact in BOTH directions** (a new knob cannot join it quietly; a knob that gains a control must leave it), the `test_reachability_guard.py` shape. **The progression is the point: 17 unreachable routes → 19 unrunnable skills → 171 untouchable knobs**, each invisible to every gate, each found by asking *can a user reach this* rather than *does it work*. **The seed is GENERATED, not refilled** — the board said "refill `seed.ts`", but refilling a hand-maintained mirror of a live registry only resets the clock, so `scripts/gen-catalog-seed.mjs` writes the Selom half from the backend's own `skill.json` and the drift guard re-runs the generator in memory. It found a live divergence at once: the seed named `umap_scrna` *"UMAP (single-cell)"* while the backend serves *"scRNA UMAP"* — and a test was pinning the seed's string, asserting a name **no user ever saw**. **`runFromWorkbench`** is new harness capability (Store install → real file → intake → **params set through the real controls** → Apply → rendered figure); `lollipop` · `slope` · `ridge` · `line` all reach a real figure on `erg_metrics_long.csv`. **Two defects the browser found in the SERVER LOG, which nobody had been reading:** (1) **5 requests died with a 500 on every cold start** — three repos each called `metadata.create_all` from a lazily-built constructor, and `checkfirst=True` reflects-then-CREATEs non-atomically, so the first concurrent burst against a fresh DB lost with `table analysis_jobs already exists`; hidden because the FE re-fetches and the retry finds the schema built. Fixed via `db.engine.ensure_schema` (lock + a post-condition-checked catch for the cross-process case), regression-tested with **threads on a barrier** because a race is a timing fact a mock cannot express. (2) A Radix **Select mounted uncontrolled and flipped to controlled on every upload** (`data-type-strip` passed `value={undefined}` until `qc.profileCode` landed) — not cosmetic, since Radix keeps its own selection while uncontrolled and silently overwrites an override chosen in that window. **The last board's `catalog.name` footnote was 21 skills, not one**: every one a lossy re-brand of the title it shadowed ("Box / strip plot" → "Selom Box Plot"), dropping exactly the searchable words; `title` is the one display name now and the key is **refused** rather than merely unread. Also: **`venn`/`upset` PASS smoke through a `membership` adapter no user path provides** (unlike `celeris`, which mirrors a real ingest) — recorded in `smoke.py`, not fixed, because a reshape step is a feature. Gates: `verify.sh` **9/9** (raw, exit 0 — BE 1571 fast + 392 slow, FE 704, fe-build green) · **browser-verify 21 green / 2 skipped by precondition / 0 failed**, but **only across two passes** — the shared box OOM-kills the Next dev server mid-suite, so a single 23-check run has not completed; see the LIVE block. |
 | **PICKERS** | 2026-08-04 | `main` `5aa9190..<head>` (**pushed**) | **NEXT#1 shipped: a column knob is a picker over the columns that exist, and `pairs=` is a row-list of real level names — and the live browser verify found a bug far bigger than the feature.** ⚑ **`getSkill(id)` read the STATIC SEED alone, so 19 of the 44 live skills were unreachable**: installed from the Store, they rendered in the Workbench as their **raw id, badged "Queued", with Apply DISABLED**. That is `boxplot` · `slope` · `lollipop` · `ridge` · `confusion` · `line` · `regression` · `qq` · `venn` · `forest` — **every plot type built in the preceding sessions** — plus cepo/pathway/ssgsea/pvca/diff_abundance/facs_gating/go_graph/mixing_metrics/pseudotime_genes. `registry.ts` already declared "the backend is the source of truth for what runs now", but only the **Store** honoured it (`useCatalog`); the ~20 other surfaces went through `getSkill`. **Invisible to all 9 gates** — the backend serves them, the param specs merge, the FE overlays exist — and visible in the first real browser [[selom-shipped-not-reachable]]. Fixed via `lib/catalog/live-skills.ts` (a shared cell so `getSkill` stays synchronous at 20 call sites and seed↔registry stays acyclic) + `useLiveSkills()` on the Workbench, whose Apply is gated on the tier `getSkill` returns; ratcheted into `registry-completeness.test.ts` (which already reads the real `skill.json` files) and **proven to bite — reverting `getSkill` fails it with all 19 named**. **The picker itself:** `paramFieldsFromSpec(id, spec, ctx?)` gains ONE optional input — the dataset's own schema, already fetched by `/data/inspect` and already persisted — so it stays the single place dataset knowledge enters and `visibleParamFields`/`isFieldDisabled` stay pure. `column`/`pairs` are **resolved** widgets: emitted only when the vocabulary exists, else byte-identical to the old text field (pinned by a test that a context perturbs *nothing else*). **The pair picker deliberately has NO fallback while the group column is blank** — blank means the backend's auto-detect, a dtype rule the FE cannot evaluate, and on the real ERG table it picks `sample_id` while `best_group` is `condition`, so a guess would offer levels from a column the run is not grouping by. **One backend change was needed and the board's premise was half wrong**: `design.group_candidates` was **empty for `generic_table`** — the exact kind a long-form CSV lands in, i.e. the only kind that uses `pairs=`. `engine/questionnaire._table_hints` fills it **without claiming a design** (`needs_design`/`source` untouched, or every dropped CSV grows an intake confirm-card). Mobbin was unanimous on the row-list (beehiiv · Confluence · ClickUp · Braintrust · AutoSend · Glide) and **ruled OUT** the drag-a-field-into-a-well pattern (Fibery/Sigma/Deputy) and Databricks' per-channel popover — both need a second surface. **Two more defects only the browser could show:** every control's accessible NAME swept in its whole help paragraph (implicit `<label>` wrapping), making two fields mutually ambiguous; and long arm names clip in a narrow select. Gates: `verify.sh` **9/9** (raw, exit 0) · **browser-verify 17/17** (14 + 3 new, real backend + real corpus) · **skill-smoke 43 pass / 0 fail**. |
 | **PLOT-ROWS-DONE** | 2026-08-04 | `main` `9dd24ce..26af5a9` (**pushed**) | **§3.2 is CLOSED: `lollipop` · `ridge` · `slope` · `confusion` shipped, and this is the first row in five where the "missing" premise HELD** — no engine existed for any of them, so the grep-first rule cost minutes and correctly said *build*. The content is what each carries beyond its shape. **`lollipop`**: a bootstrap CI on the **median**, because `bar_figure` is mean±SEM *by construction* and a non-parametric interval could not ride a golden-pinned parametric spine; seeded, so it redraws byte-identically. A **pre-aggregated** table (one row per category — how a ranked list actually arrives) is n=1 everywhere, so it gets no interval, no brackets, **and no CI column header**, rather than `n/a` under a "95% CI" heading. **`confusion`**: two labellings of the SAME rows — how an annotation gets validated. Agreement + Cohen's κ **only when the label sets match**; against Leiden ids there is no diagonal, so it NAMES that instead of computing a number from an alignment nobody declared, and that refusal is the real-corpus path. **`slope`**: cnsplots draws this geometry and **computes nothing** — so Selom tests it, and tests it **paired** (`_stats.compare_paired`), because an unpaired Welch compares marginals and throws away the structure the picture is built on; it reports the **up/down split**, the finding a flat mean conceals, and refuses to guess `subject`/`condition` (the wrong guess pairs the wrong rows and still looks right). **`ridge`**: hand-rolled Gaussian KDE + Silverman so the dependency-free **stub draws the same curve as the real engine** (pinned against scipy), and it **discloses its bandwidth** — a curve is exactly as bimodal as its smoothing allows. **⚑ THE SESSION'S REAL YIELD IS THE THREE DEFECTS RENDERING FOUND, all of which passed every assertion**: (1) **the D2 numeric-string class lives in the ANNOTATION layer too** — `type:"category"` fixes the *trace*, but Plotly coerces a numeric-looking string annotation coordinate to a number and a category axis reads it as a **slot index**, so `confusion`'s cell counts scrambled across a correctly-laid-out heatmap and one label drew clean **off the plot**; (2) `lollipop`'s **stem took the next colourway slot**, rendering one mark as two unrelated series; (3) `ridge` went **entirely grey** when the outline was pinned — a `fill:"toself"` scatter derives its **fill from the line colour**. Classes 1 and the `marker.size` area-vs-diameter trap are now **standing invariants in `smoke.check_figure`** (every skill, every run, zero false positives across 43); 2 and 3 are named defect tests. **`scripts/render_skill.py`** turns the loop into one command with `pin_process()` — the render cache twice served the pre-fix figure at 0.00s, which is indistinguishable from the fix not working. Gates: `verify.sh` **9/9** (true exit 0, read raw), **skill-smoke 43 pass / 0 fail** (was 39). |
@@ -47,7 +48,69 @@
 | **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
 | older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · REACHABILITY-SWEEP · 2026-08-04 23:35 +1000 (Sydney) · branch `main` (**PUSHED — `origin/main` = `7b9c73c`+, working tree clean, nothing local**) · Claude (FE+BE, solo, lead)
+## ▸ LIVE · KNOBS-1 · 2026-08-05 00:29 +1000 (Sydney) · branch `main` (**2 commits LOCAL, not pushed — `f7d5756` + `a2dee4a` on top of `origin/main` = `9a05608`; working tree clean**) · Claude (FE+BE, solo, lead)
+
+- **NEXT#1's first pass is done: 171 → 148 untouchable knobs, 36 → 27 skills, 18 → 15 with no
+  overlay.** Ranked by what each knob DECIDES, per the board. Detail in the SESSIONS row; what
+  follows is what a next session needs and could not re-derive.
+- **⚑ THE FINDING THAT MATTERS: the layer below coverage is a control that RENDERS but cannot
+  express its knob.** `mergeField` takes `min`/`max` straight from the backend spec and hands them
+  to `<input type="range">`, which **silently falls back to 0–100** when either is absent — so a
+  float knob bounded 0–1 would render a slider whose whole meaningful range is the first 1% of the
+  track. Same class as the API-only knob (the user cannot reach the value), one layer further in,
+  and invisible to every gate because the field object is perfectly well-typed either way. Now two
+  guards, and the step one **found a live defect immediately**: `qq.max_points` (min 200, step 500,
+  default 6000) put its thumb at **5700** while the readout said 6000. Expect more of this shape —
+  the question "can the widget express the value?" has only just started being asked.
+- **`fdr_threshold` is a typed number, not a slider, and the reasoning generalizes.** 0–1 range,
+  conventional values 0.05 · 0.01 · 0.001 all inside the first tenth. A slider there would have
+  created a NEW reachability gap while closing one. **When a knob's useful values cluster at one end
+  of its declared range, the slider is the wrong instrument** — that is the rule, not the incident.
+- **The over-representation trio share one declared pair of cutoffs and that was not tidiness.**
+  `fdr_threshold`/`fc_threshold` on `enrichment`/`pathway`/`go_graph` select the QUERY GENE LIST;
+  the identical keys on `volcano`/`proteomics_de` ARE the significance test and are drawn as dashed
+  lines. Same names, opposite jobs. Retyping the help three times is how those two get conflated, so
+  `GENE_LIST_CUTOFFS` is the one home. Both are also **inert on a bare gene list** (no adjusted-p
+  column to filter on) and the help says so, rather than leaving a control that silently does
+  nothing on half the inputs.
+- **⚑ `sankey` PASSES skill-smoke on a file the real user path GATES — the venn/upset note again,
+  a second instance.** Its corpus case is `hani/mmc2_markers_long.csv`, which is `gene,cell_type`:
+  two text columns. QC blocks it with *"No numeric data to analyze"* and **by its own rule it is
+  right**; it is wrong about *sankey*, whose values are the pair COUNTS the engine derives itself —
+  an edge table has no numeric column by construction. smoke passes because it calls the engine
+  directly and never meets the ingest gate. The browser check takes the UI's own "Review & run
+  anyway", which is the honest user path here. **Not fixed:** whether QC should know a skill derives
+  its own numeric column is a real question, and bigger than this change.
+- **Three harness capabilities** [[compound-capability-each-task]] — `setRange` (keyboard-driven
+  sliders; `fill()` refuses `input[type=range]`, so every threshold knob was undrivable, and
+  assigning `.value` would only prove React's handler works when called), `overrideDataCheck` (the
+  QC block card's escape hatch, opt-in so an unexpected block still fails loudly), and **`/p/[id]` +
+  `/store` in route warming**.
+- **⚑ READ THIS BEFORE BELIEVING A BROWSER-VERIFY FAILURE — it is NOT the OOM signature.** Three
+  180s timeouts this session, in three different checks (`param-pickers` ×2, `cloud-export`'s Drive
+  leg ×1), **each on the FIRST check of its run, each dying at `getByLabel("Project name")` right
+  after navigating to `/p/<id>`, and every later check in the same run passing.** That last part is
+  what rules out the OOM mode (there, everything after dies in ~200 ms with
+  `ERR_CONNECTION_REFUSED`). Cause: `next dev` compiles per route on first request and **`/p/[id]`
+  was never in the warm list** — the route every check drives to. Fixed; the first check passes now.
+- **A SECOND, still-open harness flake, distinct from the above.** Once, in `openWorkbench` step 1:
+  `clickWhenLive(page, install, …)` spent its whole 180s clicking the Store's **Install** toggle
+  without `installed.count()` ever going > 0. Installs are account-wide + localStorage-backed, so
+  the toggle should already read "Installed" for every spec after the first, and the `count() === 0`
+  read appears to race the hydration that flips it. **One occurrence, not reproduced** — recorded
+  with the exact location (`fixtures.ts` step 1) rather than fixed blind, because guessing at a fix
+  for a race seen once is how a real cause gets papered over. Re-running the spec alone cleared it.
+- **`hasParamControls` is a DEAD EXPORT** — no call site anywhere; the workbench's "Runs with smart
+  defaults" copy branches on `schema.length`, not on it. Its test used to pin `go_graph` as the
+  false case, so giving that skill an overlay failed a test whose subject is the function, not the
+  backlog. It names an unknown id now. Left in place (one small pure function, legitimate question),
+  but a next session working this backlog should decide whether it earns its keep.
+- **Gates.** `verify.sh` **9/9 raw, exit 0** — and note the first run said *"SELOM_DATASETS_DIR is
+  unset — real-data tests SKIPPED, so be-test is a weaker gate than CI's."* It was re-run with the
+  corpus exported (1571 passed / 5 skipped, vs 1565 / 11). **Export it; the gate tells you when you
+  have not.** browser-verify **23 green / 2 skipped / 0 failed** across filtered passes.
+
+## ▸ (superseded) LIVE · REACHABILITY-SWEEP · 2026-08-04 23:35 +1000 (Sydney) · branch `main` (**PUSHED — `origin/main` = `7b9c73c`+, working tree clean, nothing local**) · Claude (FE+BE, solo, lead)
 
 - **NEXT#1 is closed on all three bullets, and the sweep found more than it was sent for.** The four
   newest plot types are driven to a rendered figure by a real user path; the seed is generated
@@ -298,23 +361,27 @@
    ~~the column / pair picker~~ · ~~sweep the reachability class~~ · ~~pin zizmor + the drift job~~
    — **all DONE, and #3 is verified in its target event** (CI `30914180768` green, drift
    `30914228111` green). §3.2 is closed except rows 12–13. **Nothing is carried forward.**
-1. **⇒ WORK DOWN `API_ONLY_KNOBS` — the backlog the reachability sweep turned up, now named and
-   guarded.** `lib/catalog/registry-completeness.test.ts` holds the list: **171 of 313 backend
-   knobs render no control at all**, across 37 skills, 18 of which have no overlay whatsoever. The
-   guard is exact in both directions, so the list can only shrink and nothing new joins it quietly.
-   Rank by what the knob DECIDES, not by count:
-   - **`volcano` first — it is the flagship and the worst case.** `fc_threshold`, `fdr_threshold`
-     and `top_n` are the three knobs that decide what a volcano SHOWS, all API-only, while the
-     panel says "Tune the options". `enrichment` · `go_graph` · `pathway` · `proteomics_de` carry
-     the same three and are the same one-overlay fix.
-   - **`deg` is the largest single gap (16 knobs)** and the most consequential — `method`, `mode`,
-     `group_col`/`group_val`, `covariate_col` change the RESULT, not the drawing. It probably wants
-     a spec, not a drive-by overlay. (`reference`/`treatment` are `diff_abundance`'s, also API-only.)
-   - **The cheap ones are one line each**: `ridge.order`, `slope.order`, `sankey.max_links`,
-     `heatmap.groupby`.
+1. **⇒ KEEP WORKING DOWN `API_ONLY_KNOBS` — first pass done 2026-08-05 (`f7d5756`): 171 → 148,
+   36 skills → 27, 18 → 15 with no overlay.** `lib/catalog/registry-completeness.test.ts` holds the
+   list, exact in both directions. ~~`volcano`~~ · ~~`enrichment`/`pathway`/`go_graph`~~ ·
+   ~~`proteomics_de`~~ · ~~the cheap ones~~ **all DONE.** What is left, still ranked by what the
+   knob DECIDES:
+   - **`deg` is now the largest single gap by far (16 knobs)** and the most consequential —
+     `method`, `mode`, `group_col`/`group_val`, `covariate_col` change the RESULT, not the drawing.
+     It wants a spec, not a drive-by overlay. (`reference`/`treatment` are `diff_abundance`'s, also
+     API-only, and are NEXT#2's level-widget shape rather than a text box.)
+   - **The 15 skills with no overlay at all** are where the remaining bulk sits: `cepo` ·
+     `corr_heatmap` · `diff_abundance` · `facs_gating` · `gsea` · `markers` · `mixing_metrics` ·
+     `normalization_qc` · `pca` · `pseudotime_genes` · `pvca` · `ssgsea` · `string_network` ·
+     `trajectory` · `upset`. Several are one obvious knob (`upset.sort_by`, `pca.scale`,
+     `corr_heatmap.method`) — same shape as the cheap ones just closed.
    - **Do NOT just add overlays to hit zero.** Some knobs are genuinely internal (`erg_*`'s
      `ab_detector`, `manual_marks`). Waiving those *with a reason* is the right answer; the list is
      a backlog, not a defect count.
+   - **The new sibling guards are the thing to extend, not restate**: a slider must be BOUNDED by
+     the backend spec and its default must land ON a step. Both live in the same describe block. If
+     a knob has no min/max in `skill.json`, render it as a `number` — do not give it a slider and
+     inherit HTML's silent 0–100.
 2. **⇒ EXTEND THE PICKER WHERE IT STILL DOESN'T REACH** (small, additive, all fail-soft today):
    - **A multi-column widget** — `venn.sets` (2–3 column names) and `heatmap.annotations` are
      comma-separated LISTS of columns, so the single-select `column` type does not fit. The row-list
@@ -449,6 +516,8 @@ journal's own author guidelines**, not cnsplots.
   the Next dev server gets OOM-killed partway through and every later check then fails in ~200 ms
   with `ERR_CONNECTION_REFUSED`. That wall of fast failures is ONE failure (the server), not many;
   look for Next's `[?25h` exit marker in the log before believing a regression.
+  **A slider is driven by KEYBOARD** (`setRange` — `fill()` refuses `input[type=range]`), and a
+  QC-blocked input needs `overrideDataCheck: true` to take the block card's "Review & run anyway".
   **Three** entry fixtures: `openRealFigure` drives to a rendered figure in the EDITOR;
   **`openWorkbench` stops one step short** — Store-install → project → real file → intake → skill
   SELECTED — the only state in which a skill's param panel renders; and **`runFromWorkbench` goes all
