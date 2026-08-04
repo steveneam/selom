@@ -113,6 +113,11 @@
   The 2 skips are correct and pre-existing: V-2's cloud imports skip unless
   `SELOM_BV_GDRIVE_REF`/`SELOM_BV_DROPBOX_REF` name a file, because both providers are sandboxed to
   what Selom itself created, so there is nothing to discover [[selom-cloud-scope-sandbox]].
+- **NEXT#3 also landed (`6bf12a6`): zizmor pinned at 1.29.0 in both blocking gates, `@latest` moved
+  to a weekly drift job.** Detail in NEXT#3, which is now the record of what was done rather than
+  what to do. Two things to carry: the `hygiene-scan` cross-file check means **the two pins can
+  never drift apart silently**, and **the workflow change is NOT yet verified in its target event** —
+  a real CI run is still owed [[verify-ci-in-its-target-event]].
 - **Two things I got wrong mid-session, both caught by the guards I was writing.** The
   `API_ONLY_KNOBS` list was first derived with a regex over `params.ts` and was wrong for
   `erg_traces` — the stale-waiver direction of my own guard caught it, which is the argument for
@@ -289,8 +294,9 @@
 ## ▸ NEXT
 
 0. ~~Gate the `slow` lane~~ · ~~Lane B~~ · ~~§3.2 rows 5/6/9~~ · ~~rows 7/8/10/11~~ ·
-   ~~the column / pair picker~~ · ~~sweep the reachability class~~ — **all DONE.** §3.2 is closed
-   except rows 12–13.
+   ~~the column / pair picker~~ · ~~sweep the reachability class~~ · ~~pin zizmor + the drift job~~
+   — **all DONE.** §3.2 is closed except rows 12–13. **The one thing carried forward from #3: the
+   workflow change still needs a real CI run to be verified — see #3's last bullet.**
 1. **⇒ WORK DOWN `API_ONLY_KNOBS` — the backlog the reachability sweep turned up, now named and
    guarded.** `lib/catalog/registry-completeness.test.ts` holds the list: **171 of 313 backend
    knobs render no control at all**, across 37 skills, 18 of which have no overlay whatsoever. The
@@ -318,21 +324,26 @@
      shape, not a pair.
    - **`violin` stays text on purpose** — its clusters do not exist before the run. If that ever
      changes, the honest source is a completed `cluster` run's own output, not `design`.
-3. **⇒ PIN ZIZMOR + ADD THE WEEKLY DRIFT JOB — owner-decided 2026-08-04, [[DECISIONS #14]].**
-   Small, and it closes a **live** risk: until it lands, an upstream zizmor release can turn `main`
-   red with no repo change (it already did once, on `ced7f31`/`8de5e39`).
-   - **Blocking, pinned:** `.github/workflows/ci.yml` `workflow-lint` **and** `scripts/verify.sh`'s
-     `wf-lint` both move `zizmor@latest` → an explicit version. **Current is `1.29.0`** (read off
-     this session's gate output — confirm before pinning, don't trust this line).
-   - **Non-blocking, latest:** a new weekly-cron workflow running `zizmor@latest` that REPORTS. A
-     finding is a signal to bump the pin, never a red `main`. Keep its permissions minimal — zizmor
-     catches too-many perms, never too-few [[verify-ci-in-its-target-event]].
-   - **Two traps already paid for, do not rediscover:** zizmor starts **OFFLINE without a token and
-     reports a FALSE "No findings"** — `wf-lint` already resolves `GH_TOKEN` (exported, never argv)
-     and reports NOT RUN rather than a pass; keep that. And **verify the change in its target
-     event** — a workflow edit is only verified after a real run on `main`/a PR, not locally.
-   - **Prove it bites:** reverting one `# v5.0.1` comment to `# v5` must still turn `wf-lint` FAIL
-     (exit 13) under the pin. That is the existing reproduction.
+3. ~~**PIN ZIZMOR + ADD THE WEEKLY DRIFT JOB**~~ — **BUILT 2026-08-04** (`6bf12a6`). Both blocking
+   gates pin **1.29.0** (confirmed off this session's own gate output, not taken from the board);
+   `.github/workflows/zizmor-drift.yml` runs `@latest` Mondays 02:00 UTC, `contents: read` only, and
+   is **not** in `ci`'s `needs:`, so it can never gate a merge. **One judgement call worth knowing:
+   the drift job DOES fail its own scheduled run on a finding.** "Non-blocking" is easy to implement
+   as "always exit 0", which is a report nobody reads and violates the repo's own rule that a guard
+   is a ratchet only when enforcement rides on the exit code. So the failure is a NOTIFICATION, never
+   a gate. Say so if that reading is wrong.
+   - **hygiene-scan gained the cross-file half**: the two pins must be explicit AND equal, matched on
+     the invocation (`uv tool run zizmor@…`) so prose neither trips nor satisfies it, plus an
+     intra-file check that catches verify.sh's `--help` echo drifting from the gated command. All
+     three fail by name at exit 1 (proven).
+   - **The original reproduction still holds under the pin**: reverting one `# v5.0.1` → `# v5` fails
+     zizmor 1.29.0 with `ref-version-mismatch` at **exit 13**. `verify.sh` 9/9.
+   - **⚑ STILL OWED — this is NOT verified in its target event** [[verify-ci-in-its-target-event]].
+     Everything above was proven locally. A workflow change is only verified after a real run: watch
+     `workflow-lint` on the next push to `main`/a PR, and trigger `zizmor-drift` once by hand
+     (`workflow_dispatch`, which exists for exactly this) rather than waiting for Monday. **zizmor
+     catches too-many permissions and never too-few**, so a green local lint says nothing about
+     whether the drift job's `contents: read` is actually sufficient for it to check out and run.
 4. **⇒ SPEC THE MULTI-TABLE `StatsTable` CONTRACT — owner-directed 2026-08-04, spec FIRST.**
    Write `docs/stats-tables/spec.md` and **pause for review before code** (playbook: consequential
    contract change → forcing-questions → spec). Owner note: **"continue learning from cnsplots and
