@@ -17,7 +17,7 @@
 #
 # GATES (CI parity -- .github/workflows/ci.yml is the source of truth for each command):
 #   hygiene  node scripts/guards/hygiene-scan.mjs --all
-#   wf-lint  zizmor --persona=regular .github/workflows/   (ONLINE -- see the note below)
+#   wf-lint  zizmor@1.29.0 --persona=regular .github/workflows/   (ONLINE + PINNED -- see below)
 #   be-lint  uv run ruff check .
 #   be-test  uv run pytest -m "not slow" -n "$SELOM_PYTEST_WORKERS"
 #   be-slow  env -u SELOM_DATASETS_DIR uv run pytest -m slow -n "$SELOM_PYTEST_WORKERS"
@@ -34,6 +34,12 @@
 # way CI fails. So this gate resolves a token (GH_TOKEN, else `gh auth token`) and reports NOT RUN
 # with the reason when it can't -- never a pass. No new credential is involved: an authenticated
 # `gh` already has one; zizmor simply does not look for it on its own.
+#
+# The version is PINNED (DECISIONS #14) and must match the one in `.github/workflows/ci.yml` --
+# hygiene-scan fails if the two drift, because a local gate on a different zizmor than CI's is the
+# same false green in a new costume. `@latest` let an upstream release turn `main` red with no repo
+# change; `.github/workflows/zizmor-drift.yml` runs `@latest` weekly so new audits still surface,
+# as a report rather than a blocked merge.
 #
 # be-slow deliberately runs with SELOM_DATASETS_DIR UNSET, which is the one place this script drops
 # coverage on purpose -- so read the reason. The `slow` lane (reproduction drives, golden renders,
@@ -95,7 +101,7 @@ WORKERS="${SELOM_PYTEST_WORKERS:-2}"
 
 if [ "$LIST_ONLY" -eq 1 ]; then
     echo "hygiene   node scripts/guards/hygiene-scan.mjs --all"
-    echo "wf-lint   uv tool run zizmor@latest --persona=regular .github/workflows/  (needs a token)"
+    echo "wf-lint   uv tool run zizmor@1.29.0 --persona=regular .github/workflows/  (needs a token)"
     echo "be-lint   uv run ruff check .                       (cwd: app/backend)"
     echo "be-test   uv run pytest -m 'not slow' -n $WORKERS   (cwd: app/backend)"
     echo "be-slow   uv run pytest -m slow -n $WORKERS         (cwd: app/backend, corpus-free)"
@@ -189,7 +195,7 @@ if [ "$WANT_HYGIENE" -eq 1 ]; then
     API-backed audits (ref-version-mismatch), reporting a PASS that CI does not agree with.
     Fix: 'gh auth login', or export GH_TOKEN."
     else
-        run_gate wf-lint "$ROOT" uv tool run zizmor@latest --persona=regular .github/workflows/
+        run_gate wf-lint "$ROOT" uv tool run zizmor@1.29.0 --persona=regular .github/workflows/
     fi
 fi
 

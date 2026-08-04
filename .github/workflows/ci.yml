@@ -181,8 +181,14 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+      # PINNED, not `@latest` (DECISIONS #14). A floating version means an upstream release can
+      # turn `main` red with NO repo change — which already happened once, on `ced7f31`/`8de5e39`,
+      # when a new `ref-version-mismatch` audit arrived and failed two doc-only commits. The cost of
+      # pinning is that new audits stop arriving for free, so `zizmor-drift.yml` runs `@latest`
+      # weekly and reports; a finding there is the signal to bump this line.
+      # Keep in lockstep with `scripts/verify.sh` — hygiene-scan fails if the two disagree.
       - name: zizmor (workflow supply-chain lint)
-        run: uv tool run zizmor@latest --persona=regular .github/workflows/
+        run: uv tool run zizmor@1.29.0 --persona=regular .github/workflows/
         env:
           GH_TOKEN: ${{ github.token }}
 

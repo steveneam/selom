@@ -1,0 +1,48 @@
+# Weekly zizmor drift check — the counterweight to the pin (DECISIONS #14).
+#
+# WHY THIS EXISTS. `ci.yml`'s workflow-lint and `scripts/verify.sh`'s wf-lint both run a PINNED
+# zizmor, because a floating `@latest` let an upstream release turn `main` red with NO repo change:
+# a new `ref-version-mismatch` audit arrived and failed two doc-only commits (`ced7f31`, `8de5e39`)
+# while the local check said "No findings. Good job!" the whole time.
+#
+# Pinning buys reproducibility and costs discovery — new audits stop arriving for free. This job is
+# how they keep arriving: it runs `@latest` on a schedule, against the same workflows, so a new
+# audit shows up here FIRST. A finding is the signal to bump the pin in both places, not a broken
+# build for whoever happened to push that day.
+#
+# BLOCKING vs REPORTING — the distinction that matters. This workflow is NOT in `ci`'s `needs:`
+# list, so it can never gate a merge or fail a PR. It does fail its own scheduled run when zizmor
+# finds something, and that is deliberate: a check that always exits 0 is a report nobody reads, and
+# the repo's own doctrine is that a guard is only a ratchet when enforcement rides on the exit code.
+# So the failure is a notification, never a gate. (`workflow_dispatch` is here so the drift can be
+# checked on demand before bumping the pin, rather than waiting for Monday.)
+#
+# Permissions are minimal on purpose: zizmor catches too-MANY permissions and never too-few, so its
+# own workflow has to be right by hand.
+name: zizmor-drift
+
+on:
+  schedule:
+    # Mondays 02:00 UTC — a fresh finding is waiting at the start of the week, not mid-sprint.
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+      - name: zizmor @latest (drift vs the pinned version)
+        # GH_TOKEN is not optional: without one zizmor starts OFFLINE and skips the API-backed
+        # audits while still exiting 0 — reporting "No findings. Good job!" for the exact class of
+        # drift this job exists to catch.
+        run: uv tool run zizmor@latest --persona=regular .github/workflows/
+        env:
+          GH_TOKEN: ${{ github.token }}

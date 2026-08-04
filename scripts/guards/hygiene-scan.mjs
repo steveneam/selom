@@ -29,6 +29,7 @@
 // Exit: 0 = clean, 1 = one or more hits, 2 = usage/error. Per-hit lines are `file:line: [class] msg`.
 
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
 const argv = process.argv.slice(2);
 const MODE = argv.includes('--staged') ? 'staged' : argv.includes('--all') ? 'all' : null;
@@ -175,6 +176,63 @@ for (const path of files) {
         counts['workflow-invariant']++;
       }
     }
+  }
+}
+
+// 7. zizmor pin parity (DECISIONS #14) — a CROSS-FILE invariant, so it runs after the per-file loop.
+//
+// The blocking gates (`ci.yml` workflow-lint and `scripts/verify.sh` wf-lint) must run the SAME
+// explicitly-pinned zizmor. Two reasons, both already paid for:
+//   · `@latest` in a blocking gate lets an upstream release turn `main` red with no repo change —
+//     it did, on `ced7f31`/`8de5e39`, failing two doc-only commits;
+//   · a local gate on a DIFFERENT zizmor than CI's is the same false green in a new costume, which
+//     is the whole reason wf-lint exists.
+// `zizmor-drift.yml` is exempt and must float — reporting new audits is its entire job.
+//
+// Reads from disk rather than the scanned set so the check holds in --staged mode too, where only
+// one of the two files may be in the index.
+{
+  // Match the INVOCATION (`uv tool run zizmor@…`), not any mention: prose that names a version
+  // must not be able to satisfy or trip this. Every invocation in a file must agree, which also
+  // catches verify.sh's `--help` echo drifting away from the command it advertises.
+  const pinOf = (p) => {
+    let text;
+    try {
+      text = readFileSync(p, 'utf8');
+    } catch {
+      return null; // absent in this checkout — nothing to compare
+    }
+    const found = [...text.matchAll(/uv tool run zizmor@(\S+)/g)].map((m) => m[1]);
+    if (!found.length) return null;
+    const uniq = [...new Set(found)];
+    if (uniq.length > 1) {
+      hits.push(
+        `${p}: [workflow-invariant] zizmor invoked at more than one version in the same file ` +
+          `(${uniq.join(', ')}) — the advertised command and the gated one must match.`,
+      );
+      counts['workflow-invariant']++;
+    }
+    return uniq[0];
+  };
+  const ciPin = pinOf(CI_WORKFLOW);
+  const vfPin = pinOf('scripts/verify.sh');
+  const bad = (where, v) =>
+    `${where}: [workflow-invariant] zizmor is pinned to '@${v}' — a blocking gate must name an ` +
+    `explicit version (DECISIONS #14); '@latest' turns main red on an upstream release. The weekly ` +
+    `.github/workflows/zizmor-drift.yml is what tracks new audits.`;
+  for (const [where, v] of [[CI_WORKFLOW, ciPin], ['scripts/verify.sh', vfPin]]) {
+    if (v === 'latest') {
+      hits.push(bad(where, v));
+      counts['workflow-invariant']++;
+    }
+  }
+  if (ciPin && vfPin && ciPin !== vfPin) {
+    hits.push(
+      `scripts/verify.sh: [workflow-invariant] zizmor pin drift — ${CI_WORKFLOW} runs '@${ciPin}' ` +
+        `but verify.sh runs '@${vfPin}'. A local gate on a different zizmor than CI's cannot fail ` +
+        `the way CI fails; bump both together.`,
+    );
+    counts['workflow-invariant']++;
   }
 }
 
