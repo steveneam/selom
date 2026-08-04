@@ -27,6 +27,7 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
+| **PLOT-ROWS-DONE** | 2026-08-04 | `main` `9dd24ce..26af5a9` (**unpushed — owner pushes**) | **§3.2 is CLOSED: `lollipop` · `ridge` · `slope` · `confusion` shipped, and this is the first row in five where the "missing" premise HELD** — no engine existed for any of them, so the grep-first rule cost minutes and correctly said *build*. The content is what each carries beyond its shape. **`lollipop`**: a bootstrap CI on the **median**, because `bar_figure` is mean±SEM *by construction* and a non-parametric interval could not ride a golden-pinned parametric spine; seeded, so it redraws byte-identically. A **pre-aggregated** table (one row per category — how a ranked list actually arrives) is n=1 everywhere, so it gets no interval, no brackets, **and no CI column header**, rather than `n/a` under a "95% CI" heading. **`confusion`**: two labellings of the SAME rows — how an annotation gets validated. Agreement + Cohen's κ **only when the label sets match**; against Leiden ids there is no diagonal, so it NAMES that instead of computing a number from an alignment nobody declared, and that refusal is the real-corpus path. **`slope`**: cnsplots draws this geometry and **computes nothing** — so Selom tests it, and tests it **paired** (`_stats.compare_paired`), because an unpaired Welch compares marginals and throws away the structure the picture is built on; it reports the **up/down split**, the finding a flat mean conceals, and refuses to guess `subject`/`condition` (the wrong guess pairs the wrong rows and still looks right). **`ridge`**: hand-rolled Gaussian KDE + Silverman so the dependency-free **stub draws the same curve as the real engine** (pinned against scipy), and it **discloses its bandwidth** — a curve is exactly as bimodal as its smoothing allows. **⚑ THE SESSION'S REAL YIELD IS THE THREE DEFECTS RENDERING FOUND, all of which passed every assertion**: (1) **the D2 numeric-string class lives in the ANNOTATION layer too** — `type:"category"` fixes the *trace*, but Plotly coerces a numeric-looking string annotation coordinate to a number and a category axis reads it as a **slot index**, so `confusion`'s cell counts scrambled across a correctly-laid-out heatmap and one label drew clean **off the plot**; (2) `lollipop`'s **stem took the next colourway slot**, rendering one mark as two unrelated series; (3) `ridge` went **entirely grey** when the outline was pinned — a `fill:"toself"` scatter derives its **fill from the line colour**. Classes 1 and the `marker.size` area-vs-diameter trap are now **standing invariants in `smoke.check_figure`** (every skill, every run, zero false positives across 43); 2 and 3 are named defect tests. **`scripts/render_skill.py`** turns the loop into one command with `pin_process()` — the render cache twice served the pre-fix figure at 0.00s, which is indistinguishable from the fix not working. Gates: `verify.sh` **9/9** (true exit 0, read raw), **skill-smoke 43 pass / 0 fail** (was 39). |
 | **STRIP** | 2026-08-03 | `main` `62e2bcc..1d1176a` (**pushed**) | **§3.2 row 9 `strip` was the FOURTH wrong premise** — Plotly's own box trace draws a strip (`boxpoints="all"` + a hidden box) and `boxplot` already exposed the points knob, so it is a **`style` mode, not a skill**. Mode for a concrete reason: a strip must keep the shared categorical vocabulary (`order` · `add_count` · `pairs` + brackets from `_stats.py`), and a sibling skill would have had to re-import all of it and could then drift from the box it is the companion to. **The bug worth knowing: hiding the box with a transparent LINE COLOUR renders the panel completely empty** — a box trace's points inherit the trace colour, so the markers vanish with it; correct axes, correct `n=` labels, not one point drawn, and every spec assertion still green. Hide it by zero **width** instead. Pinned by a named defect test. Retitled "Box / strip plot" for discoverability (same fix `regression` needed). Golden byte-identical. `verify.sh` **9/9**. |
 | **SCATTER-LINE** | 2026-08-03 | `main` `c63275d..88ae4b1` (**pushed**) | **Lane B continued, and the review's premise was wrong twice more.** `scatter` (§3.2 row 5, "the most-requested shape Selom cannot draw") **already existed as `regression`** — x/y/group/label were all there; only the mandatory OLS separated it from a generic scatter. So it became a `fit` flag, not a second skill that would have duplicated the column resolution, grouping, labelling and point cap for one boolean. **The bug found on the way is the real content**: `group` emitted `transforms:[{type:groupby}]`, which **Plotly removed in plotly.js 3 / plotly.py 6** — this repo runs plotly.js 3.6.0 and plotly.py 6.8, and the latter *refuses the key outright* — but skills return raw dicts so nothing validated it. The figure shipped, rendered, and drew **every point one flat colour**: an advertised knob that silently did nothing. That is a CLASS (valid JSON, correct-looking, encodes nothing), so `smoke.check_figure` now fails any trace carrying a removed-from-Plotly key, on every skill every run — the same treatment the numeric-string-axis class got, with a test asserting both directions. `regression` also had **no FE overlay at all** (API-only knobs, the `boxplot` gap again) and is retitled so a user searching "scatter" finds it. `line` (row 6, "the ERG skills each hand-roll one") was **also already built** — `_charts.line_figure` is explicitly "the line analogue of `bar_figure`" and is not ERG-specific; only a CSV front end was missing. It now shares the ERG grid's exact spread vocabulary because it is the same code, takes long-form x/y/series where repeated rows ARE replicates, never auto-detects `series` (the one guess that changes what the figure MEANS), and carries **n per point** — the number that tells a reader whether to believe the band and which is nowhere on the canvas. Gates: `verify.sh` **9/9**, **skill-smoke 39 pass / 0 fail** (was 38). |
 | **SLOW-GATE-LANE-B** | 2026-08-03 | `main` `ced7f31..454b974` (**pushed**) | **The slow lane is gated, then Lane B shipped its three plot types.** **STEP 0**: the `slow` lane was enforced NOWHERE — 385 of 1907 tests. The blocker was *assumed*: "slow" reads as "needs the real corpus", which would have made it a real question about what CI can run. Measured in a throwaway venv built with CI's own light closure, corpus-free: **352 pass / 21 skip / 0 fail in 16s** — the 21 skips are the omics-gated tests, and they skip cleanly rather than error. So it needed no new extras, no new job, no nightly, no self-hosted runner: one step in the existing backend job, plus `be-slow` in `verify.sh` (8 gates now, 70s → 95s), because gating only CI would leave the pre-commit gate of record still green on the exact class of breakage it exists to catch. **Proven to bite**: a failing assertion injected into a slow-marked test leaves the fast lane green at exit 0 (1511 passed) while `be-slow` goes red and `verify.sh` exits 1. `!cancelled()` on the CI step so a fast failure cannot hide a slow one. **Lane B**: `venn` · `forest` · `qq`, each closing all seven §5 wiring points. `venn` takes the SAME membership matrix as `upset` and draws circles as **filled traces, not `layout.shapes`** — a shapes-only diagram renders identically and fails `check_figure`'s non-empty-`data` rule, correctly, because it would be a picture rather than an editable figure; above 3 sets it refuses and names `upset`. `forest`'s interval IS the plot, so its provenance is never silent: explicit CI columns → standard error → **t-statistic (`se = effect/t`, the limma identity)**, with the table stating which, and a raise rather than an invented bar when none exist. `qq` carries λ + the Beta(i, n−i+1) null band and catches what a volcano *hides* — an inflated test makes a volcano look better. **λ forced the one real contract decision**: every DE runner wants the adjusted p and `resolve_significance` is tiered to guarantee it, but an adjusted p is a monotone transform whose quantiles are not uniform, so λ would read "conservative" no matter how inflated the test — the raw-first read went into `engine/columns.py` as `pick_raw_significance` beside its twin, not forked in the skill (the drift guard caught that fork and was right). **Rendering found what no assertion did**: `qq` drew `y = x` to `max(observed)`, so on real data (λ=2.14: observed 12.6 vs expected 4.5) the line trailed into an empty half and stretched the x-axis; and the first re-render looked byte-identical because **the C1 cache served the pre-fix figure** — `smoke.pin_process()` exists for exactly that. **Two pre-existing gaps found while wiring**: the golden list was hand-maintained *and duplicated* in `regen_golden.py` (a new skill could ship unpinned, silently) — it lives once now with a completeness test; and that test immediately found **`umap_scrna`, the flagship P0 skill, has never had a golden** (its own `SELOM_UMAP_ENGINE` selector was never pinned by the fixture, so it hit the real scanpy engine and raised). Gates: `verify.sh` **8/8**, **skill-smoke 38 pass / 0 fail** on the real corpus (was 35). |
@@ -44,7 +45,43 @@
 | **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
 | older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · STRIP · 2026-08-03 · branch `main` (**PUSHED — `origin/main` = `1d1176a`, nothing local**) · Claude (FE+BE, solo, lead)
+## ▸ LIVE · PLOT-ROWS-DONE · 2026-08-04 16:27 +1000 (Sydney) · branch `main` (**3 UNPUSHED — owner pushes**) · Claude (FE+BE, solo, lead)
+
+- **§3.2 is fully closed.** Rows 7/8/10/11 (`confusion` · `ridge` · `slope` · `lollipop`) are built,
+  wired through all seven §5 points, reachable, and green. `docs/cnsplots-port/source-review.md`
+  §3.2 now has only rows **12 (`hist`/`kde`/`dist` as one skill)** and **13 (`donut`/`pie`, low
+  scientific value)** left, both explicitly ranked last.
+- **The premise pattern has ENDED — and knowing that is itself the result.** It was wrong four times
+  running (`pairs=`, `scatter`, `line`, `strip`: capability existed, reachability didn't). This time
+  the grep took minutes and said *build*: nothing in `_charts.py` does a stem, a paired line, a
+  contingency table or a 1-D KDE. **Keep grepping first — the rule is cheap and it now has a
+  negative result to calibrate against, not just four positives.**
+- **⚑ THE FINDING THAT SHOULD CHANGE THE NEXT BUILD: three of this session's defects were invisible
+  to every gate and visible in the first render.** Not a new lesson in kind, but the *sharpest*
+  instance yet, because two were in code that had just been written to fix a rendering problem —
+  the grey-ridge bug was CAUSED by a fix for the stacking order. **Render after every visual change,
+  including the ones that are themselves visual fixes.** `scripts/render_skill.py <skill>` is now
+  one command and turns the caches off.
+- **The annotation-layer D2 finding generalizes beyond these four skills.** Any skill that labels
+  cells or points on a category axis by NAME is exposed, and cluster ids reach a figure as numeric
+  strings on every scRNA path. `check_figure` now fails it everywhere, but **existing skills were
+  only proven clean by the 43-skill smoke run** — if a new labelled-matrix skill appears, this is
+  the first thing to check.
+- **The render cache cost two debugging rounds.** It served the pre-fix `confusion` twice at 0.00 s
+  while I inspected `theme.py` for a rewrite that never happened. `smoke.pin_process()` is the fix
+  and it is now baked into `render_skill.py`; the documentary form (a board note from the `qq`
+  session) did **not** hold, which is why it became a script.
+- **One contract limit found, not fixed:** `contract.run_skill_with_table` returns `StatsTable |
+  None` — exactly ONE table. So `lollipop` with `pairs=` swaps its ranked-values table for the
+  pairwise p-values (the same trade `boxplot` makes) rather than showing both. Recorded below.
+- **Mobbin ruled a pattern OUT, and it is the SAME wall as the `pairs=` pair-picker.** Databricks ·
+  Confluence · Better Stack · Glide · GitHub Insights all populate their column pickers from the
+  dataset's **live schema**; `ParamField` cannot see the dataset's columns at render time, so typed
+  column selects are impossible here today. What transferred is GitHub Insights' explicit
+  "(optional)" convention **inverted** — `slope` marks its REQUIRED columns in the label, because a
+  free-text field that silently fails at run time is the worst of both.
+
+## ▸ (superseded) LIVE · STRIP · 2026-08-03 · branch `main` (**PUSHED — `origin/main` = `1d1176a`, nothing local**) · Claude (FE+BE, solo, lead)
 
 - **NEXT#0 and NEXT#1 are DONE, and Lane B continued into rows 5-6.** The slow lane is gated in
   CI *and* `verify.sh`; `venn`/`forest`/`qq`/`line` are built, wired and reachable, and `scatter`
@@ -120,39 +157,37 @@
 
 ## ▸ NEXT
 
-0. ~~Gate the `slow` lane~~ · ~~Lane B (`venn`/`forest`/`qq`)~~ — **both DONE 2026-08-03.**
-1. **Lane B continued — §3.2 rows 7, 8, 10, 11 remain**: `confusion` · `ridge` · `slope` ·
-   `lollipop`. (~~`scatter` row 5~~, ~~`line` row 6~~, ~~`strip` row 9~~ **DONE 2026-08-03.**)
-   **Likely shapes, from the greps already done:** `confusion` the review itself calls a "trivial
-   heatmap variant" (→ `heatmap`) · `lollipop` is `bar_figure` with a thin line + dot and brings
-   the bootstrap-median CI with it · `slope` needs PAIRED before/after points, which is the one
-   genuinely new bit of geometry · **`ridge` looks like the only real build** (KDE + vertical
-   offsets; nothing in `_charts.py` does it).
-   **Read the premise before building — it has now been wrong FOUR times in a row.** `pairs=` was
-   already in `_charts`; `scatter` was already `regression` (it only lacked a `fit` toggle, and its
-   `group` knob was silently dead); `line` was already `_charts.line_figure` (it only lacked a CSV
-   front end). The pattern is that the *capability* exists and the *reachability* does not, so the
-   first move on each remaining row is to grep for the engine, not to write one. Specifically:
-   `strip` is probably `boxplot`'s `points` path + `_stats.py`, and `lollipop`/`slope` are close
-   cousins of `bar_figure`. The seven-point checklist (§5) is still the contract, and item 3 is now
-   **enforced** — a new skill with no golden fails `test_every_installed_skill_has_a_golden`.
-   Note `forest`'s `_pick` holds SE/CI/t column spellings **locally on purpose**: the shared
-   resolver has no role for them and `forest` is the only consumer. **The second consumer moves it
-   into `engine/columns.py`** — do not copy it.
-2. **The isolation-coverage guard** — spec §5's strongest form, and the one piece of Lane C not
-   built. It should enumerate private routes by AST, subtract the allow-list, and **fail on any
-   private route with no isolation case**, carrying a NAMED shrinking backlog for the ones that do
-   not have one yet (the `test_reachability_guard.py` waiver shape). That turns "39 unaudited
-   routes" into a tracked list instead of a memory.
-3. **The audit's open rows 21–23** — long category labels colliding with the axis title, point-label
-   collision on scatter/volcano (neither side applies `adjustText`), axis title vs long ticks under
-   `automargin`. Selom's own defects, which **cnsplots does not solve either** — where Selom can beat
-   the reference rather than match it.
+0. ~~Gate the `slow` lane~~ · ~~Lane B (`venn`/`forest`/`qq`)~~ · ~~§3.2 rows 5/6/9~~ ·
+   ~~rows 7/8/10/11~~ — **all DONE. §3.2 is closed except rows 12–13.**
+1. **The audit's open rows 21–23** (was NEXT#3) — long category labels colliding with the axis
+   title, point-label collision on scatter/volcano (neither side applies `adjustText`), axis title
+   vs long ticks under `automargin`. **Selom's own defects, which cnsplots does not solve either**,
+   so this is where Selom can beat the reference rather than match it. Promoted because §3.2 is
+   done and row 21 is now *visible on shipped output*: `slope`'s grouped x-axis rotates six long
+   treatment-arm names, and `lollipop` defaults to horizontal partly to dodge it.
+   **Verify with `scripts/render_skill.py slope lollipop confusion` — the collision is a render
+   fact, not a spec fact, and there is no assertion that can see it.**
+2. **§3.2 rows 12–13, if wanted**: `hist`/`kde`/`dist` as ONE skill with a mode (the review's own
+   framing) — and `ridge` already ships the KDE + Silverman bandwidth to build it on, so this is a
+   genuine reachability job now, not a build. Row 13 (`donut`/`pie`) the review itself rates low
+   scientific value — build last or not at all.
+3. **The isolation-coverage guard** — spec §5's strongest form, and the one piece of Lane C not
+   built. Enumerate private routes by AST, subtract the allow-list, and **fail on any private route
+   with no isolation case**, carrying a NAMED shrinking backlog (the `test_reachability_guard.py`
+   waiver shape). Turns "39 unaudited routes" into a tracked list instead of a memory.
 4. **F3 (the fit-scored picker)** — specced in source-review §6; Mobbin ruled OUT abstract
    illustration tiles. Run `fe-review` at the end. **F4** = the rest of the plot gaps.
+   **Note the picker now has ~47 skills to sort**, and the four added today are all
+   general-purpose chart types with no omics gate — which is exactly the case §6 says the flat
+   Store list stops serving.
 5. **`OH-01`** (arq + Redis job store) — unblocked; contract is `docs/jobs-surface/spec.md` §4.
 
-**Owed follow-ups still open:** the CI slow-lane decision above · the `pairs=` **pair-picker**
+**Owed follow-ups still open:** **a figure carries exactly ONE Statistics table**
+(`contract.run_skill_with_table` → `StatsTable | None`), so `lollipop` with `pairs=` swaps its
+ranked-values table for the pairwise p-values rather than showing both — the same trade `boxplot`
+already makes. Widening it to a list is an FE-contract change (`lib/skills/api.ts` `table?:
+StatsTable | null`), so it was NOT done unilaterally; it is cheap if a third skill wants it ·
+the `zizmor@latest` pin policy (owner call, small, no spend) · the `pairs=` **pair-picker**
 (a repeatable row-list of typed selects — blocked on a `ParamField` list widget AND on param
 controls being able to see the dataset's categories; note left in `lib/catalog/params.ts`) · there
 is **no run-scoped legends route** (`/papers/{slug}/legends` is published-paper scoped;
@@ -197,6 +232,12 @@ journal's own author guidelines**, not cnsplots.
 
 - **selom-data IS here** at `/home/deploy/migration/selom-migration-staging/selom-data/` → `SELOM_DATASETS_DIR`. **Docker installed** — in a fresh shell use `sudo docker` until the `deploy` docker-group login refreshes.
 - **Gate of record = `scripts/verify.sh`** (7 gates, 70s, raw + exit-code gated). Do NOT hand-assemble gates and do NOT pipe it through `| tail` — a pipe returns tail's status and discards the failure [[read-gate-output-raw-not-piped]]. Servers: backend `uv run uvicorn main:app --reload`; frontend `npm install --legacy-peer-deps` **in the MAIN checkout only**. Derive the FE dev-lane port (Selom FE=3152) to avoid the shared-box `:3000` collision; `:8000` is eamos — never bind it.
+- **Look at a plot = `uv run python scripts/render_skill.py <skill> [<skill>…]`** (in `app/backend`,
+  needs `SELOM_DATASETS_DIR` + `SELOM_SKILLS_ENGINE=real SELOM_UMAP_ENGINE=scanpy`). Renders each
+  skill's declared real-corpus smoke case to PNG with **`pin_process()`: engines pinned real, C1 +
+  render caches OFF**. Use it after ANY visual change — including a change that is itself a visual
+  fix, which is how the grey-ridge defect got in. A stale cache hit is 0.00 s and looks exactly
+  like the fix not working.
 - **Browser checks = `scripts/browser-verify.sh`** (needs `SELOM_DATASETS_DIR`). It owns its servers
   (BE `:8152` + FE `:3152`) and stops them on exit, and **resets its own SQLite store each run** —
   without that, reconcile drags every prior figure spec in and the drive blows the 180s timeout.
