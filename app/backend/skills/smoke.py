@@ -45,11 +45,21 @@ class Case:
     params that make the real engine do genuine work on it. ``note`` says why this pairing is the
     honest one (which is the part a reader cannot re-derive).
 
-    ``adapter`` names a declared, in-repo conversion applied to the corpus file first — the same
-    conversion Selom's own ingest does (``engine.ingest`` reads a Diagnosys ``.TXT`` through
-    ``skills._celeris``). It is recorded in the matrix so nobody mistakes an adapted input for a
-    file that dropped straight in. ``requires`` lists backend-relative build artefacts the real
-    engine needs on disk; a missing one is reported as NOT-RUN with the reason, never as a pass.
+    ``adapter`` names a declared, in-repo conversion applied to the corpus file first. It is
+    recorded in the matrix so nobody mistakes an adapted input for a file that dropped straight in
+    — and the two adapters are NOT equivalent on that point, which is the part worth knowing:
+
+    * ``celeris`` mirrors a real user path — ``engine.ingest`` reads a Diagnosys ``.TXT`` through
+      ``skills._celeris``, so a user dropping that file gets the same conversion.
+    * ``membership`` does NOT. Nothing in ``engine.ingest`` crosstabs a long ``(element, group)``
+      table into the boolean matrix ``venn``/``upset`` require, and the frontend has no reshape
+      step either. So a PASS on those two proves the ENGINE against real data and says nothing
+      about whether a user holding *this* corpus file could run them; they are reachable only for
+      someone who already has a membership matrix. Checked 2026-08-04 — do not read the adapted
+      PASS as reachability [[selom-shipped-not-reachable]].
+
+    ``requires`` lists backend-relative build artefacts the real engine needs on disk; a missing
+    one is reported as NOT-RUN with the reason, never as a pass.
     """
 
     dataset: str

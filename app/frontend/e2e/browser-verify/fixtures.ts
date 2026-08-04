@@ -189,7 +189,19 @@ export async function openWorkbench(
     csvRelPath,
     /** Catalog display name, e.g. "Box / strip plot". */
     skillName,
-  }: { projectName: string; csvRelPath?: string; skillName: string },
+    /**
+     * A control that proves this skill's param panel has actually rendered — its own, not a
+     * generic one. "Apply skill" appears as soon as a skill is selected, including before the live
+     * `GET /skills/{id}` describe lands, so waiting on that alone can return a panel with no
+     * controls in it. Defaults to boxplot's pair, which is what the picker checks use.
+     */
+    awaitControl = ["Category order", "Value column"],
+  }: {
+    projectName: string;
+    csvRelPath?: string;
+    skillName: string;
+    awaitControl?: string[];
+  },
 ) {
   const csv = csvRelPath ? join(DATASETS_DIR, csvRelPath) : FIXTURE_CSV;
 
@@ -255,8 +267,61 @@ export async function openWorkbench(
 
   // The params come from a live `GET /skills/{id}` describe, so wait for a real control, not a tick.
   await expect(page.getByRole("button", { name: "Apply skill" })).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByLabel("Category order").or(page.getByLabel("Value column")).first())
-    .toBeVisible({ timeout: 60_000 });
+  const [first, ...rest] = awaitControl;
+  let control = page.getByLabel(first);
+  for (const name of rest) control = control.or(page.getByLabel(name));
+  await expect(control.first()).toBeVisible({ timeout: 60_000 });
+  return projectId;
+}
+
+/**
+ * Drive a skill from the Store all the way to a RENDERED FIGURE, setting its params on the way.
+ *
+ * This is {@link openWorkbench} + the Apply that {@link openRealFigure} gets for free from the
+ * engine's "Recommended for your data" chip. Neither existing fixture covers it: `openRealFigure`
+ * runs whatever routing proposes (in practice `volcano`) and cannot set a parameter, and
+ * `openWorkbench` deliberately stops before Apply so the panel stays on screen.
+ *
+ * WHY IT IS WORTH ITS OWN FIXTURE. The picker session found 19 of 44 shipped skills unrunnable —
+ * installable from the Store, then dead behind a disabled Apply — and no gate could see it, because
+ * `skill-smoke` proves each ENGINE on real data and says nothing about the path a user takes to it
+ * [[selom-shipped-not-reachable]]. This is the instrument for that second half: it exercises Store
+ * install → real file → intake → param controls → Apply → a figure on the canvas, which is the
+ * whole claim "this skill ships" makes.
+ *
+ * `params` are set through the REAL controls by accessible name, so a knob whose widget never
+ * renders fails here rather than being silently defaulted — the difference between a skill that is
+ * reachable and one that merely runs.
+ */
+export async function runFromWorkbench(
+  page: Page,
+  opts: {
+    projectName: string;
+    csvRelPath?: string;
+    skillName: string;
+    awaitControl?: string[];
+    /** Accessible label → value, applied in declaration order (later knobs can depend on earlier). */
+    params?: Record<string, string>;
+  },
+) {
+  const projectId = await openWorkbench(page, opts);
+
+  for (const [label, value] of Object.entries(opts.params ?? {})) {
+    const field = page.getByLabel(label, { exact: true });
+    await expect(field, `no control labelled "${label}" — the knob is API-only`).toBeVisible({
+      timeout: 30_000,
+    });
+    const tag = await field.evaluate((el) => el.tagName);
+    if (tag === "SELECT") await field.selectOption(value);
+    else await field.fill(value);
+  }
+
+  await page.getByRole("button", { name: "Apply skill" }).click();
+
+  // A rendered Plotly canvas is the only proof. A run that raises leaves the workbench standing
+  // with an error banner, which is what this times out on — so the failure names the skill.
+  await expect(page.locator(".js-plotly-plot")).toBeVisible({ timeout: 180_000 });
+  await settle(page);
   return projectId;
 }
 

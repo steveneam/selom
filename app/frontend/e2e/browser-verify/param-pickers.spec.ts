@@ -18,9 +18,9 @@ import { openWorkbench } from "./fixtures";
 
 const CSV = "erg-fig1e/erg_metrics_long.csv";
 
-/** The CATALOG name (`catalog.name` in skill.json), which is what the Store and the workbench
- *  display — not the skill `title` ("Box / strip plot"). */
-const BOXPLOT = "Selom Box Plot";
+/** The display name — which is the skill's `title`, and only its title. A `catalog.name` used to
+ *  shadow it, so this constant read "Selom Box Plot" while the skill had been retitled. */
+const BOXPLOT = "Box / strip plot";
 
 /** Every column the real file has, in file order. */
 const REAL_COLUMNS = [
