@@ -1,3 +1,4 @@
+import { liveSkill } from "./live-skills";
 import type { SkillCatalogEntry } from "./types";
 
 /**
@@ -535,8 +536,19 @@ export const CATALOG: SkillCatalogEntry[] = [
   }),
 ];
 
+/**
+ * Resolve a skill by catalog id — the LIVE registry first, the static seed second.
+ *
+ * The live lookup is not a nicety: the seed is hand-maintained and runs behind the backend, and
+ * `registry.ts`'s stated contract is that the backend is the source of truth for what runs now. Seed-
+ * only resolution silently rendered every post-seed skill as its raw id with a "Queued" badge and a
+ * disabled Apply — see `live-skills.ts` for the measurement and why the overlay is a separate module.
+ *
+ * A component that NAMES or GATES a skill through this should call `useLiveSkills()` so it re-renders
+ * when the registry lands; otherwise it can keep a first paint taken before the fetch resolved.
+ */
 export function getSkill(id: string): SkillCatalogEntry | undefined {
-  return CATALOG.find((s) => s.id === id);
+  return liveSkill(id) ?? CATALOG.find((s) => s.id === id);
 }
 
 /** Distinct categories present in the seed, alphabetized. */

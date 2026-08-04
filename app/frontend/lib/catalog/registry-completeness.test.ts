@@ -105,3 +105,56 @@ describe("dev:mock param-spec fixture ↔ backend param_spec", () => {
     expect(stale, `fixture keys removed/renamed in the backend param_spec: ${stale.join(", ")}`).toEqual([]);
   });
 });
+
+/**
+ * Reachability: a skill the backend RUNS must be nameable and runnable from the app.
+ *
+ * `getSkill(id)` is how ~20 surfaces resolve a skill's name, tier and icon — and the Workbench gates
+ * its Apply button on `getSkill(id)?.tier === "verified"`. It used to read the static seed alone, so
+ * a skill present in `GET /skills` but never hand-added to `seed.ts` rendered as its RAW ID with a
+ * "Queued" badge and a DISABLED Apply: installable from the Store, then dead. Measured 2026-08-04:
+ * 19 of 44 live skills, including every plot type built in the preceding sessions.
+ *
+ * Nothing could see it — the backend serves them, the param specs merge, the overlays exist — until a
+ * real browser drove the real Workbench [[selom-shipped-not-reachable]]. `getSkill` now prefers the
+ * live registry, and this is the executable form of that guarantee: it reads the same on-disk
+ * `skill.json` files the rest of this file does, so the drift cannot come back silently.
+ */
+describe("reachability — every backend skill can be resolved by the app", () => {
+  /** Catalog ids the backend actually serves as runnable (registry.py prefixes them `selom.`). */
+  function backendCatalogIds(): string[] {
+    const out: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(p);
+        else if (entry.name === "skill.json") {
+          const json = JSON.parse(fs.readFileSync(p, "utf8"));
+          if (json?.id) out.push(`selom.${json.id}`);
+        }
+      }
+    };
+    walk(SKILLS_DIR);
+    return out;
+  }
+
+  it("resolves every backend skill once the live registry is published", async () => {
+    const { setLiveSkills } = await import("./live-skills");
+    const { getSkill } = await import("./seed");
+    const ids = backendCatalogIds();
+    expect(ids.length).toBeGreaterThan(20);
+
+    // Simulate what `loadCatalog()` does on a live backend: publish the registry.
+    setLiveSkills(ids.map((id) => ({ id, name: id, tier: "verified" }) as never));
+    const unresolved = ids.filter((id) => !getSkill(id));
+    expect(unresolved, `skills the app cannot name or run: ${unresolved.join(", ")}`).toEqual([]);
+  });
+
+  it("falls back to the seed when the registry is unavailable (offline is not a crash)", async () => {
+    const { setLiveSkills } = await import("./live-skills");
+    const { getSkill } = await import("./seed");
+    setLiveSkills([]); // backend down → `loadCatalog` keeps the seed
+    // A seeded skill still resolves; a post-seed one honestly does not (there is nothing to say).
+    expect(getSkill("selom.volcano")?.name).toBeTruthy();
+  });
+});

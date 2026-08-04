@@ -11,6 +11,7 @@
 
 import * as React from "react";
 
+import { setLiveSkills } from "./live-skills";
 import { CATALOG } from "./seed";
 import type { SkillCatalogEntry } from "./types";
 
@@ -45,7 +46,13 @@ let cache: Promise<SkillCatalogEntry[]> | null = null;
 export function loadCatalog(): Promise<SkillCatalogEntry[]> {
   if (!cache) {
     cache = fetchLiveSkills()
-      .then(mergeCatalog)
+      .then((live) => {
+        // Publish to the overlay BEFORE merging, so every synchronous `getSkill(id)` on every other
+        // surface resolves against the backend too — not just the Store, which is what `useCatalog`
+        // serves. Without this a post-seed skill renders as its raw id (see live-skills.ts).
+        setLiveSkills(live);
+        return mergeCatalog(live);
+      })
       .catch(() => CATALOG); // backend unreachable -> browsable static seed, unchanged
   }
   return cache;
