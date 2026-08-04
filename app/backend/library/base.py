@@ -18,7 +18,7 @@ from datetime import datetime
 
 import sqlalchemy as sa
 
-from db.engine import make_engine
+from db.engine import ensure_schema, make_engine
 
 
 def iso(dt) -> str | None:
@@ -48,6 +48,4 @@ class TenantRepo:
     def __init__(self, engine: sa.Engine | None = None, url: str = "", create: bool = False) -> None:
         self.engine = engine if engine is not None else make_engine(url)
         if create:  # dev/test convenience (SQLite); prod applies the Alembic migration instead
-            from db.schema import metadata
-
-            metadata.create_all(self.engine)
+            ensure_schema(self.engine)

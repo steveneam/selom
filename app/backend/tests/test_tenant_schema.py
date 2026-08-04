@@ -116,6 +116,47 @@ def test_alembic_and_create_all_agree(tmp_path):
     assert alembic_tables == create_all_tables == _ALL_TABLES
 
 
+def test_ensure_schema_survives_a_concurrent_cold_start(tmp_path):
+    """Three repos building the schema at once on a COLD database must not 500.
+
+    `UploadRepo`, `LibraryRepo` and `SqlJobStore` are each constructed lazily by a FastAPI
+    dependency, and each used to call `metadata.create_all` itself. `create_all(checkfirst=True)`
+    reflects and then issues CREATE, and that pair is not atomic — so the first burst of concurrent
+    requests against a fresh store raced and lost with `table analysis_jobs already exists`.
+    Measured on the browser harness (which deletes its store each run): **5 requests died with a
+    500 on every first page load**, invisible because the frontend re-fetches and the retry finds
+    the schema already built.
+
+    Threads, not mocks: the race is a timing fact, so a fake would prove nothing. Verified to bite —
+    swapping `ensure_schema` back for a bare `metadata.create_all` fails this with the production
+    error verbatim.
+    """
+    import threading
+
+    from db.engine import ensure_schema
+
+    url = _sqlite_url(tmp_path, "cold_start.db")
+    barrier = threading.Barrier(8)  # every thread reaches create_all in the same instant
+    errors: list[BaseException] = []
+
+    def build() -> None:
+        try:
+            eng = sa.create_engine(url)
+            barrier.wait(timeout=10)
+            ensure_schema(eng)
+        except BaseException as exc:  # noqa: BLE001 — the assertion is "nothing escaped"
+            errors.append(exc)
+
+    threads = [threading.Thread(target=build) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=30)
+
+    assert errors == [], f"concurrent cold start raised: {errors!r}"
+    assert set(sa.inspect(sa.create_engine(url)).get_table_names()) == _ALL_TABLES
+
+
 def test_downgrade_is_reversible(tmp_path):
     url = _sqlite_url(tmp_path)
     cfg = _alembic_cfg(url)

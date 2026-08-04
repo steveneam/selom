@@ -24,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 
 import sqlalchemy as sa
 
-from db.engine import make_engine
+from db.engine import ensure_schema, make_engine
 from db.retry import run_with_db_retry
 from db.schema import datasets, projects, users, workspaces
 from db.tenant import TenantQuery, set_tenant, upsert_user
@@ -76,9 +76,7 @@ class UploadRepo:
     def __init__(self, engine: sa.Engine | None = None, url: str = "", create: bool = False) -> None:
         self.engine = engine if engine is not None else make_engine(url)
         if create:  # dev/test convenience (SQLite); prod applies the Alembic migration instead
-            from db.schema import metadata
-
-            metadata.create_all(self.engine)
+            ensure_schema(self.engine)
 
     # --- quota helpers (tenant-scoped reads) --------------------------------------------------
     def _quota(self, conn: sa.Connection, user_id: str) -> sa.Row:

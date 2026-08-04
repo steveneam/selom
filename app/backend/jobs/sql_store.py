@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 
 import sqlalchemy as sa
 
-from db.engine import make_engine
+from db.engine import ensure_schema, make_engine
 from db.schema import analysis_jobs
 from db.tenant import set_tenant, upsert_user
 from jobs.store import Job, JobStatus
@@ -60,9 +60,7 @@ class SqlJobStore:
         self.engine = engine if engine is not None else make_engine(url)
         if create:
             # Dev/test convenience (e.g. SQLite) — prod applies the Alembic migration instead.
-            from db.schema import metadata
-
-            metadata.create_all(self.engine)
+            ensure_schema(self.engine)
 
     def create(
         self,
