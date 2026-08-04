@@ -11,7 +11,7 @@ import { DataFitVerdict } from "@/components/reproduction/data-fit-panel";
 import { Button } from "@/components/ui/button";
 import { PaneShell } from "@/components/ui/pane-shell";
 import { AiMarker } from "@/components/ai/ai-marker";
-import { isFieldDisabled, visibleParamFields, type ParamField } from "@/lib/catalog/params";
+import { isFieldDisabled, visibleParamFields, type ParamDataContext, type ParamField } from "@/lib/catalog/params";
 import { useSkillParams, type ParamSpecSeed } from "@/lib/catalog/use-skill-params";
 import { authorOf, authorOfKeys } from "@/lib/ai/proposals";
 import { changedRingClass } from "@/lib/ui/changed-ring";
@@ -41,6 +41,7 @@ export function FigureDataPanel({
   running,
   dataCheck,
   dataFit,
+  paramContext = null,
   seededMarks = [],
   canEditMarks = false,
   canEditThresholds = false,
@@ -65,6 +66,9 @@ export function FigureDataPanel({
   running: boolean;
   dataCheck?: Figure["dataCheck"];
   dataFit?: Figure["dataFit"];
+  /** The SOURCE dataset's schema (columns + categorical levels), so a column input is picked from
+   *  what the data has rather than typed. Optional + fail-soft: absent → the plain text fields. */
+  paramContext?: ParamDataContext | null;
   /** Skill-seeded ERG landmark marks (meta.selom.marks) — the rows the Marks editor renders. */
   seededMarks?: SeededMark[];
   /** Whether this figure declares the landmarkMarks capability (docs/figure-data-capabilities/spec.md
@@ -98,7 +102,7 @@ export function FigureDataPanel({
   /** From the data-check routing card: take over and pick a skill manually. */
   onPickManually: () => void;
 }) {
-  const { fields: schema, status: paramsStatus, retry: retryParams } = useSkillParams(skillId, specSeed);
+  const { fields: schema, status: paramsStatus, retry: retryParams } = useSkillParams(skillId, specSeed, paramContext);
   // Params are CONTROLLED by the parent (so a dot drag and this panel write the same staged params).
   const setParams = onParamsChange;
   // The Inputs pane as a stable PaneState (Task B3): loading → skeleton (not a vanished pane); a

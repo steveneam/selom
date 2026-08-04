@@ -41,7 +41,14 @@ export function SkillView({
       proposal={proposal}
       route={
         workbenchDataset
-          ? { routing: workbenchDataset.routing ?? null, dataFit: workbenchDataset.dataFit ?? null }
+          ? {
+              routing: workbenchDataset.routing ?? null,
+              dataFit: workbenchDataset.dataFit ?? null,
+              // `design` rides along for the inline param pickers: `dataFit.columns` fills a column
+              // select, `design.group_candidates[].levels` fills the pair picker. Both are already
+              // persisted on the dataset from `/data/inspect`, so this costs nothing.
+              design: workbenchDataset.design ?? null,
+            }
           : null
       }
       modality={workbenchDataset?.modality ?? null}

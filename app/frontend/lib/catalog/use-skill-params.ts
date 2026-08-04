@@ -18,7 +18,7 @@
 import * as React from "react";
 
 import { runtimeSkillId } from "@/lib/skills/api";
-import { paramFieldsFromSpec, type BackendParamSpec, type ParamField } from "./params";
+import { paramFieldsFromSpec, type BackendParamSpec, type ParamDataContext, type ParamField } from "./params";
 import { readCachedSpec, writeCachedSpec } from "./param-spec-cache";
 
 const DESCRIBE_URL = (runtimeId: string) => `/api/skills/${encodeURIComponent(runtimeId)}`;
@@ -108,10 +108,17 @@ function seedSpecOf(seed: ParamSpecSeed | null | undefined): BackendParamSpec | 
  * — the inputs render from it immediately with no describe round-trip, and stay tunable with no
  * backend. Absent a seed, a spec persisted by a prior fetch (param-spec-cache) still seeds an instant
  * render and an offline fallback; only with neither does B3's loading→error/Retry floor apply.
+ *
+ * `ctx` is the loaded dataset's schema ({@link ParamDataContext}) — it turns a "type the column name"
+ * field into a picker over the columns that exist. It never triggers a fetch (the payload is already
+ * persisted on the dataset) and it is optional: with none, the fields are exactly what they were.
+ * **Memoize it at the call site** — it participates in the field memo, so a fresh object every render
+ * would rebuild the schema every render.
  */
 export function useSkillParams(
   catalogOrRuntimeId: string | null | undefined,
   seed?: ParamSpecSeed | null,
+  ctx?: ParamDataContext | null,
 ): {
   fields: ParamField[];
   loading: boolean;
@@ -166,8 +173,8 @@ export function useSkillParams(
   const fetchedSpec = ready && loaded!.ok ? loaded!.spec : null;
   const spec = fetchedSpec ?? seededSpec;
   const fields = React.useMemo(
-    () => (runtimeId && spec ? paramFieldsFromSpec(runtimeId, spec) : []),
-    [runtimeId, spec],
+    () => (runtimeId && spec ? paramFieldsFromSpec(runtimeId, spec, ctx ?? undefined) : []),
+    [runtimeId, spec, ctx],
   );
 
   const retry = React.useCallback(() => setAttempt((n) => n + 1), []);

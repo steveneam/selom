@@ -12,9 +12,13 @@ import { describe, expect, it } from "vitest";
 import {
   hasParamControls,
   isFieldDisabled,
+  overlayParamKeys,
   paramFieldsFromSpec,
+  parsePairs,
+  serializePairs,
   visibleParamFields,
   type BackendParamSpec,
+  type ParamDataContext,
   type ParamField,
 } from "./params";
 import { SKILL_PARAM_SPECS } from "@/mocks/skill-spec-fixture";
@@ -226,5 +230,171 @@ describe("distribution-comparison controls (boxplot · violin)", () => {
     const fields = paramFieldsFromSpec("boxplot", SKILL_PARAM_SPECS.boxplot);
     expect(fields.find((f) => f.key === "correction")!.default).toBe("none");
     expect(fields.find((f) => f.key === "add_count")!.default).toBe(false);
+  });
+});
+
+/**
+ * The column / pair pickers (NEXT#1). The whole feature is a THIRD, OPTIONAL input to the merge —
+ * the loaded dataset's own schema, already fetched by `/data/inspect` and already persisted on the
+ * dataset. These prove the two halves that matter: with no context nothing whatsoever changes
+ * (`dataFit`/`design` are legitimately null for demo data, a failed inspect, and every h5ad — where
+ * `columns` is empty by construction), and with a context the fields offer what the data actually has.
+ */
+describe("data-aware param fields — no context means no change", () => {
+  const OLD_TYPES = ["range", "number", "text", "switch", "select"];
+
+  it("a context perturbs ONLY the fields that name a column — every other knob is untouched", () => {
+    // The real invariant: threading the dataset in must not move a label, a default, a range, a
+    // select's options or a showWhen gate anywhere. If it does, the context is not additive.
+    const ctx: ParamDataContext = { columns: ["condition", "value"], groups: [] };
+    for (const id of Object.keys(overlayParamKeys())) {
+      const spec = SKILL_PARAM_SPECS[id];
+      if (!spec) continue;
+      const bare = paramFieldsFromSpec(id, spec);
+      const rich = paramFieldsFromSpec(id, spec, ctx);
+      expect(rich.map((f) => f.key)).toEqual(bare.map((f) => f.key)); // same fields, same order
+      for (const [i, before] of bare.entries()) {
+        const after = rich[i];
+        // Strip what the picker is ALLOWED to change; the rest must match exactly.
+        const { type: _t, columns: _c, levelsByGroup: _l, levelsFrom: _lf, ...restBefore } = before;
+        const { type: _t2, columns: _c2, levelsByGroup: _l2, levelsFrom: _lf2, ...restAfter } = after;
+        expect(restAfter).toEqual(restBefore);
+        // And the widget only ever changes text → column/pairs, never anything else.
+        if (after.type !== before.type) {
+          expect(before.type).toBe("text");
+          expect(["column", "pairs"]).toContain(after.type);
+        }
+      }
+    }
+  });
+
+  it("no skill renders a picker widget without a context — every field stays one of the original five", () => {
+    // The guard against a half-wired picker shipping as an empty select: `column`/`pairs` are
+    // RESOLVED widgets, emitted only when the vocabulary to fill them exists.
+    for (const id of Object.keys(overlayParamKeys())) {
+      const spec = SKILL_PARAM_SPECS[id];
+      if (!spec) continue;
+      for (const f of paramFieldsFromSpec(id, spec)) expect(OLD_TYPES).toContain(f.type);
+    }
+  });
+
+  it("an empty column list is the same as no context (an h5ad has no columns by construction)", () => {
+    const empty: ParamDataContext = { columns: [], groups: [] };
+    expect(paramFieldsFromSpec("slope", SKILL_PARAM_SPECS.slope, empty)).toEqual(
+      paramFieldsFromSpec("slope", SKILL_PARAM_SPECS.slope),
+    );
+  });
+});
+
+describe("column picker", () => {
+  // The real erg_metrics_long.csv shape (verified against the live engine 2026-08-04).
+  const ctx: ParamDataContext = {
+    columns: ["sample_id", "condition", "eye", "intensity_group", "b_wave_uv", "a_wave_uv"],
+    groups: [
+      { key: "condition", label: "condition", n_levels: 6, reference_guess: "Control", levels:
+        ["AAV8-CMV-GFP", "AAV8-RK-GFP-polyA-stuffer", "AAV8-RK-PDE6B", "AAV8-RK-PDE6B-3UTR", "Control", "Untreated"]
+          .map((name) => ({ name, n_replicates: 5, replicate_unit: "rows" })) },
+      { key: "eye", label: "eye", n_levels: 2, reference_guess: null, levels:
+        ["LE", "RE"].map((name) => ({ name, n_replicates: 105, replicate_unit: "rows" })) },
+    ],
+  };
+
+  it("offers the dataset's real columns on the fields that name a column", () => {
+    const fields = paramFieldsFromSpec("slope", SKILL_PARAM_SPECS.slope, ctx);
+    const subject = fields.find((f) => f.key === "subject")!;
+    expect(subject.type).toBe("column");
+    expect(subject.columns?.map((c) => c.value)).toEqual(ctx.columns);
+  });
+
+  it("annotates the categorical columns with their level count, and leaves the rest bare", () => {
+    // The honest form of the type glyph mature builders show (Snowflake `A`, Glide `123`): the
+    // inspect payload carries no per-column dtype, but it does carry level counts for the
+    // categorical ones — which is the distinction that decides group-column vs value-column.
+    const cols = paramFieldsFromSpec("slope", SKILL_PARAM_SPECS.slope, ctx)
+      .find((f) => f.key === "condition")!.columns!;
+    expect(cols.find((c) => c.value === "condition")!.label).toBe("condition — 6 levels");
+    expect(cols.find((c) => c.value === "b_wave_uv")!.label).toBe("b_wave_uv");
+  });
+
+  it("leaves a NON-column field alone (order stays free text — it is a list, not one column)", () => {
+    const fields = paramFieldsFromSpec("boxplot", SKILL_PARAM_SPECS.boxplot, ctx);
+    expect(fields.find((f) => f.key === "order")!.type).toBe("text");
+    expect(fields.find((f) => f.key === "group")!.type).toBe("column");
+  });
+});
+
+describe("pair picker", () => {
+  const ctx: ParamDataContext = {
+    columns: ["condition", "eye", "b_wave_uv"],
+    groups: [
+      { key: "condition", label: "condition", n_levels: 3, reference_guess: "Control", levels:
+        ["Control", "Treated", "Rescue"].map((name) => ({ name, n_replicates: 4, replicate_unit: "rows" })) },
+      { key: "eye", label: "eye", n_levels: 2, reference_guess: null, levels:
+        ["LE", "RE"].map((name) => ({ name, n_replicates: 6, replicate_unit: "rows" })) },
+    ],
+  };
+  const fields = paramFieldsFromSpec("boxplot", SKILL_PARAM_SPECS.boxplot, ctx);
+  const pairsWith = (params: Record<string, string>) =>
+    visibleParamFields(fields, params).find((f) => f.key === "pairs")!;
+
+  it("stays a text field while the group column is on auto-detect", () => {
+    // Blank = the backend's auto-detect (first non-numeric column), a rule the frontend cannot
+    // evaluate. Guessing would offer levels from a column the run is not grouping by.
+    expect(pairsWith({}).type).toBe("text");
+  });
+
+  it("becomes a row-list of the CHOSEN column's levels once a group column is picked", () => {
+    const pairs = pairsWith({ group: "condition" });
+    expect(pairs.type).toBe("pairs");
+    expect(pairs.options?.map((o) => o.value)).toEqual(["Control", "Treated", "Rescue"]);
+  });
+
+  it("follows the group column — picking `eye` offers LE/RE, never the condition levels", () => {
+    expect(pairsWith({ group: "eye" }).options?.map((o) => o.value)).toEqual(["LE", "RE"]);
+  });
+
+  it("falls back to text for a column with no known levels (a value column, or a typo)", () => {
+    expect(pairsWith({ group: "b_wave_uv" }).type).toBe("text");
+    expect(pairsWith({ group: "nope" }).type).toBe("text");
+  });
+
+  it("violin keeps the vocabulary but NOT the widget — its clusters don't exist until the run", () => {
+    const violin = paramFieldsFromSpec("violin", SKILL_PARAM_SPECS.violin, ctx);
+    expect(violin.find((f) => f.key === "pairs")!.type).toBe("text");
+    // …and the shared vocabulary is still all there, in the same order as boxplot.
+    const shared = (s: ParamField[]) =>
+      s.map((f) => f.key).filter((k) => ["order", "add_count", "pairs", "sig_test", "correction"].includes(k));
+    expect(shared(violin)).toEqual(shared(fields));
+  });
+});
+
+describe("pairs wire format — the picker authors the SAME string the backend already parses", () => {
+  it("round-trips a complete list", () => {
+    expect(parsePairs("Control~Treated, Control~Rescue")).toEqual([
+      ["Control", "Treated"],
+      ["Control", "Rescue"],
+    ]);
+    expect(serializePairs([["Control", "Treated"], ["Control", "Rescue"]])).toBe(
+      "Control~Treated, Control~Rescue",
+    );
+  });
+
+  it("round-trips an INCOMPLETE row, which is what lets the picker hold no local state", () => {
+    // "+ Add" emits an empty row; the user fills it in. `parse_pairs` on the backend requires both
+    // sides non-empty and documents that it skips empty chunks, so a half-built row draws no
+    // bracket rather than failing the run.
+    expect(serializePairs([["Control", ""], ["", ""]])).toBe("Control~, ~");
+    expect(parsePairs("Control~, ~")).toEqual([["Control", ""], ["", ""]]);
+  });
+
+  it("ignores a chunk that is not a pair at all (a hand-typed stray survives as nothing)", () => {
+    expect(parsePairs("Control, ,Treated~Rescue")).toEqual([["Treated", "Rescue"]]);
+  });
+
+  it("tolerates the spacing a hand-typed value arrives with", () => {
+    expect(parsePairs(" Control ~ Treated ,Control~Rescue ")).toEqual([
+      ["Control", "Treated"],
+      ["Control", "Rescue"],
+    ]);
   });
 });

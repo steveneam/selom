@@ -1,5 +1,6 @@
 import { runtimeSkillId } from "@/lib/skills/api";
 import type { SkillParams } from "@/lib/skills/api";
+import type { GroupCandidate } from "@/lib/intake/design";
 
 /**
  * Skill parameter controls — derived from the backend, decorated by the frontend.
@@ -13,10 +14,23 @@ import type { SkillParams } from "@/lib/skills/api";
  * branded `select` options, and conditional `showWhen` reveals — the polish the
  * spec doesn't carry.
  *
- * `paramFieldsFromSpec(id, spec)` merges the two into the rendered `ParamField[]`.
+ * `paramFieldsFromSpec(id, spec, ctx?)` merges the two into the rendered `ParamField[]`.
  * It is pure (no fetch); `useSkillParams` (lib/catalog/use-skill-params) loads the
  * spec and calls it. Skills with no overlay entry simply render no inline controls
  * and run with their backend defaults.
+ *
+ * `ctx` (a {@link ParamDataContext}) is the OPTIONAL third input: the loaded dataset's own
+ * schema — its columns and its categorical levels, both already fetched by `/data/inspect` and
+ * persisted on the dataset. It is what turns a "type the column name" text box into a picker
+ * over the columns that actually exist. It is the ONE place dataset knowledge enters this
+ * module: `visibleParamFields` / `isFieldDisabled` stay pure over (schema, params), because the
+ * merge has already baked the vocabulary onto the field.
+ *
+ * **Fail-soft is the contract, not a nicety.** `ctx` is legitimately absent — demo/sample data, a
+ * dataset whose inspect failed, a matrix (h5ad) where `columns` is empty by construction, the
+ * Figure-data panel on a figure whose dataset was deleted. With no usable context a `column` /
+ * `pairs` field renders as the plain text field it always was, and the merge is byte-identical to
+ * a context-free one. `params.test.ts` pins that.
  */
 
 /** One backend `param_spec` entry (skills/<id>/skill.json → SkillSpec.param_spec). */
@@ -32,11 +46,39 @@ export interface BackendParam {
 }
 export type BackendParamSpec = Record<string, BackendParam>;
 
+/**
+ * The loaded dataset's own schema, threaded into the merge so a column knob can be PICKED rather
+ * than typed. Every field maps 1:1 onto something `/data/inspect` already returns and the FE
+ * already persists on the `Dataset` (`lib/projects/types.ts`), so this costs no request:
+ *
+ *   - `columns`      ← `data_fit.columns`          (every column in the table)
+ *   - `groups`       ← `design.group_candidates[]` (categorical columns + their level names)
+ *
+ * Both optional: a matrix (h5ad) has no `columns` by construction, and a dataset whose inspect
+ * failed has neither. Absent → the fields render exactly as they did before any of this existed.
+ *
+ * `design.best_group` is deliberately NOT threaded. It is the engine's pick for a *deg contrast*,
+ * and a chart skill's auto-detect is a different rule (boxplot's blank `group` takes the first
+ * non-numeric column — `sample_id` on the real ERG table, where `best_group` is `condition`). Using
+ * it as the pair picker's fallback would offer levels from a column the run is not grouping by:
+ * confident, wrong, and indistinguishable from correct on screen.
+ */
+export interface ParamDataContext {
+  columns?: string[] | null;
+  groups?: GroupCandidate[] | null;
+}
+
 /** A rendered parameter control (what `ParamControl` consumes). */
 export interface ParamField {
   key: string;
   label: string;
-  type: "range" | "number" | "text" | "switch" | "select";
+  /**
+   * `column` — a picker over the dataset's real columns (falls back to `text` with no context).
+   * `pairs`  — the repeatable "compare A vs B" row-list (falls back to `text` with no levels).
+   * Both are *resolved* widgets: they are only emitted when the vocabulary to fill them exists,
+   * so `ParamControl` never has to render an empty picker.
+   */
+  type: "range" | "number" | "text" | "switch" | "select" | "column" | "pairs";
   default: number | string | boolean;
   min?: number;
   max?: number;
@@ -63,6 +105,22 @@ export interface ParamField {
    * See `isFieldDisabled`.
    */
   enabledWhen?: { key: string; equals: string | number | boolean };
+  /**
+   * `column` fields only — the dataset's columns, annotated where the engine also told us the
+   * column is categorical (`condition — 6 levels`). That annotation is the honest Selom form of the
+   * type glyph mature builders show beside a field (Snowflake's `A`, Glide's `123`): the inspect
+   * payload carries no per-column dtype, but it DOES carry level counts for the categorical ones,
+   * which is the distinction that actually matters when choosing a group vs a value column.
+   */
+  columns?: { value: string; label: string }[];
+  /**
+   * `pairs` fields only — level names per candidate group column, and which sibling field names
+   * the group column in play. The pair vocabulary depends on a param the user picks at RUN time,
+   * so the options can't be frozen at merge time; `visibleParamFields` resolves them per render
+   * (and drops the field back to `text` when the chosen column has no known levels).
+   */
+  levelsByGroup?: Record<string, string[]>;
+  levelsFrom?: string;
 }
 
 /**
@@ -86,6 +144,9 @@ export interface ParamPresentation {
   /** Show-but-disable gate (see `ParamField.enabledWhen`): the control always renders, greyed
    *  until the named field matches `equals`. For discoverable-but-inert capability controls. */
   enabledWhen?: { key: string; equals: string | number | boolean };
+  /** `pairs` only — the sibling field naming the group column whose levels this picker offers
+   *  (e.g. boxplot's `group`). Omitted → the engine's `best_group` is the only source. */
+  levelsFrom?: string;
 }
 
 const PRESENTATION: Record<string, ParamPresentation[]> = {
@@ -136,31 +197,26 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   // lists in the same order and wording — a user who learns the knobs on a box plot should not
   // have to relearn them on a violin.
   //
-  // `pairs` is a TEXT field and that is a known compromise, not the intended affordance. Mobbin
-  // (Rows / Glide / Databricks / Hex chart builders) is unanimous that "add another structural
-  // thing" is a repeatable row-list of typed selects with an explicit "+ Add" — nobody asks the
-  // user to type a mini-DSL.
+  // `pairs` is the repeatable row-list Mobbin is unanimous about (beehiiv "+ Condition" · Braintrust
+  // / Confluence / ClickUp / AutoSend "+ Add filter" · Glide's numbered ITEM blocks with "+ Add item"
+  // — every one a row of typed selects with a per-row delete and an explicit "+ Add" beneath). It
+  // renders as that row-list once the group column is chosen, and as the old text field until then,
+  // because the levels come from the CHOSEN column and blank means backend auto-detect.
   //
-  // CORRECTION (2026-08-04): this note used to give TWO blockers, and the second one was WRONG.
-  // "A param control has no access to the dataset's category values at render time" is false —
-  // `/data/inspect` already returns `design.group_candidates[]`, each carrying its `levels`, and
-  // the FE PERSISTS it on the dataset (`lib/projects/types.ts` → `DesignHints`). Levels are exactly
-  // the vocabulary a pair is built from, so the data a pair-picker needs is already fetched and
-  // already client-side. The real blocker is ONE thing: `paramFieldsFromSpec` is pure over the
-  // backend spec alone, so nothing threads the dataset into the merge — even though
-  // `workbench-panel.tsx`, which calls `useSkillParams`, already holds `route.dataFit` in its own
-  // props. Plus the missing repeatable-list widget, which is real.
-  // Do not re-derive "it's impossible" from this comment: see agent_handoff/CURRENT.md NEXT#1.
+  // The vocabulary needed one backend change to exist at all: `design.group_candidates` was empty
+  // for `generic_table` — the exact kind a long-form CSV lands in, i.e. the only kind that uses
+  // `pairs=`. `engine/questionnaire._table_hints` now fills it WITHOUT claiming a design
+  // (`needs_design` stays false, so no intake confirm-card appears for a dropped CSV).
   boxplot: [
     { key: "style", label: "Chart style", type: "select", help: "Strip hides the box and shows every individual value — honest when n is small, where a box implies more data than you have.", options: [
       { value: "box", label: "Box plot (quartiles + whiskers)" },
       { value: "strip", label: "Strip plot (individual points only)" },
     ] },
-    { key: "group", label: "Group column", type: "text", placeholder: "auto-detect", help: "Column holding the category. Blank = first non-numeric column." },
-    { key: "value", label: "Value column", type: "text", placeholder: "auto-detect", help: "Column holding the measurement. Blank = first numeric column." },
+    { key: "group", label: "Group column", type: "column", placeholder: "auto-detect", help: "Column holding the category. Blank = first non-numeric column." },
+    { key: "value", label: "Value column", type: "column", placeholder: "auto-detect", help: "Column holding the measurement. Blank = first numeric column." },
     { key: "order", label: "Category order", type: "text", placeholder: "e.g. Control, Low, High", help: "Comma-separated. Named categories lead, in this order; the rest follow unchanged." },
     { key: "add_count", label: "Show n per group", type: "switch", help: "Append n= to each category label." },
-    { key: "pairs", label: "Compare groups", type: "text", placeholder: "e.g. Control~Treated, Control~Rescue", help: "Comma-separated pairs joined by ~. Each draws a bracket with significance stars, and the p-values appear in the Statistics table. A name that doesn't match a group is skipped." },
+    { key: "pairs", label: "Compare groups", type: "pairs", levelsFrom: "group", placeholder: "e.g. Control~Treated, Control~Rescue", help: "Each pair draws a bracket with significance stars, and its p-value appears in the Statistics table. Pick the group column above to choose from its real levels." },
     { key: "sig_test", label: "Significance test", type: "select", help: "Applied to every pair above.", options: [
       { value: "welch", label: "Welch t-test (unequal variance)" },
       { value: "student", label: "Student t-test (equal variance)" },
@@ -187,18 +243,18 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   // group/label were API-only — the same gap boxplot had. `fit` is last because the fit is the
   // default reading of this figure; turning it off is the deliberate act, not the common one.
   regression: [
-    { key: "x", label: "X column", type: "text", placeholder: "auto-detect", help: "Blank = the first numeric column." },
-    { key: "y", label: "Y column", type: "text", placeholder: "auto-detect", help: "Blank = the second numeric column." },
-    { key: "group", label: "Colour by", type: "text", placeholder: "e.g. condition, genotype", help: "A category column. Each value becomes its own colour and legend entry." },
-    { key: "label", label: "Label points with", type: "text", placeholder: "e.g. sample_id", help: "Annotates every point — best on small tables." },
+    { key: "x", label: "X column", type: "column", placeholder: "auto-detect", help: "Blank = the first numeric column." },
+    { key: "y", label: "Y column", type: "column", placeholder: "auto-detect", help: "Blank = the second numeric column." },
+    { key: "group", label: "Colour by", type: "column", placeholder: "e.g. condition, genotype", help: "A category column. Each value becomes its own colour and legend entry." },
+    { key: "label", label: "Label points with", type: "column", placeholder: "e.g. sample_id", help: "Annotates every point — best on small tables." },
     { key: "fit", label: "Show trend line", type: "switch", help: "Ordinary-least-squares fit with R², slope and p. Off draws a plain scatter and computes no fit." },
   ],
   // Lollipop — a ranked value per category. The estimator/CI wording says what the interval IS,
   // because a bootstrap interval and a mean±SEM are different claims and the figure draws one bar
   // for either.
   lollipop: [
-    { key: "group", label: "Category column", type: "text", placeholder: "auto-detect", help: "Blank = the first non-numeric column." },
-    { key: "value", label: "Value column", type: "text", placeholder: "auto-detect", help: "Blank = the first numeric column." },
+    { key: "group", label: "Category column", type: "column", placeholder: "auto-detect", help: "Blank = the first non-numeric column." },
+    { key: "value", label: "Value column", type: "column", placeholder: "auto-detect", help: "Blank = the first numeric column." },
     { key: "estimator", label: "Dot shows", type: "select", options: [
       { value: "median", label: "Median" },
       { value: "mean", label: "Mean" },
@@ -220,8 +276,8 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   // normalization is the ridgeline convention AND the thing that makes a 5-point group look like
   // a 5000-point one, so the control has to state that trade rather than just name the modes.
   ridge: [
-    { key: "group", label: "Category column", type: "text", placeholder: "auto-detect", help: "One ridge per level. Blank = the first non-numeric column." },
-    { key: "value", label: "Value column", type: "text", placeholder: "auto-detect", help: "Blank = the first numeric column." },
+    { key: "group", label: "Category column", type: "column", placeholder: "auto-detect", help: "One ridge per level. Blank = the first non-numeric column." },
+    { key: "value", label: "Value column", type: "column", placeholder: "auto-detect", help: "Blank = the first numeric column." },
     { key: "scale", label: "Ridge height", type: "select", options: [
       { value: "peak", label: "Normalized per group (compare shapes)" },
       { value: "common", label: "Shared density scale (compare heights)" },
@@ -233,8 +289,8 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   // Confusion — two labellings of the same rows. `normalize` leads because it changes what the
   // reader is looking at (counts vs per-class recall), not merely how it looks.
   confusion: [
-    { key: "true", label: "Reference labels (rows)", type: "text", placeholder: "auto-detect", help: "The ground-truth or reference annotation. Blank = the first categorical column." },
-    { key: "predicted", label: "Compared labels (columns)", type: "text", placeholder: "auto-detect", help: "The predicted or second annotation. Blank = the next categorical column." },
+    { key: "true", label: "Reference labels (rows)", type: "column", placeholder: "auto-detect", help: "The ground-truth or reference annotation. Blank = the first categorical column." },
+    { key: "predicted", label: "Compared labels (columns)", type: "column", placeholder: "auto-detect", help: "The predicted or second annotation. Blank = the next categorical column." },
     { key: "normalize", label: "Cells show", type: "select", options: [
       { value: "none", label: "Counts" },
       { value: "row", label: "% of each reference label (recall)" },
@@ -244,23 +300,18 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     { key: "annotate", label: "Print values in cells", type: "switch", help: "Dropped automatically above 400 cells." },
   ],
   // Slope — the ONLY skill here that refuses to auto-detect its key columns, because pairing the
-  // wrong rows produces a confident and completely wrong figure. Mobbin (Databricks / Confluence /
-  // Better Stack / GitHub Insights) shows the mature pattern is a typed select populated from the
-  // dataset's live schema.
+  // wrong rows produces a confident and completely wrong figure. That refusal is exactly why it
+  // gains the most from the picker: the required columns are now chosen from the ones the dataset
+  // actually has, instead of typed and silently failing at run time.
   //
-  // These are text fields as an INTERIM, not because the pattern is out of reach — the first cut of
-  // this comment claimed it was ruled out, and that was wrong the same way the `pairs=` note above
-  // was. `dataset.dataFit.columns` is already fetched, already persisted, and already in scope in
-  // `workbench-panel.tsx`; only the thread into `paramFieldsFromSpec` is missing. Until that lands,
-  // the one thing that survives a free-text field is GitHub Insights' explicit "(optional)"
-  // convention INVERTED — mark the REQUIRED ones, because a text field that silently fails at run
-  // time is the worst of both worlds. That marking stays useful after the picker ships.
+  // The "(required)" marking is GitHub Insights' explicit "(optional)" convention INVERTED, and it
+  // stays useful after the picker: a picker makes the value valid, not necessarily the one meant.
   slope: [
-    { key: "subject", label: "Subject column (required)", type: "text", placeholder: "e.g. sample_id, animal, patient", help: "What makes two rows the same individual. Never guessed — the wrong choice pairs the wrong rows and the figure still looks right." },
-    { key: "condition", label: "Condition column (required)", type: "text", placeholder: "e.g. timepoint, intensity_group", help: "The column holding the two states being compared." },
+    { key: "subject", label: "Subject column (required)", type: "column", placeholder: "e.g. sample_id, animal, patient", help: "What makes two rows the same individual. Never guessed — the wrong choice pairs the wrong rows and the figure still looks right." },
+    { key: "condition", label: "Condition column (required)", type: "column", placeholder: "e.g. timepoint, intensity_group", help: "The column holding the two states being compared." },
     { key: "levels", label: "Which two, in order", type: "text", placeholder: "e.g. before, after", help: "Required when the condition column has more than two levels — picking two silently would decide the whole result." },
-    { key: "value", label: "Value column", type: "text", placeholder: "auto-detect", help: "Blank = the first numeric column." },
-    { key: "group", label: "Cluster by", type: "text", placeholder: "optional", help: "Draws one before/after pair per group along the x-axis." },
+    { key: "value", label: "Value column", type: "column", placeholder: "auto-detect", help: "Blank = the first numeric column." },
+    { key: "group", label: "Cluster by", type: "column", placeholder: "optional", help: "Draws one before/after pair per group along the x-axis." },
     { key: "summary", label: "Summary line", type: "select", options: [
       { value: "mean", label: "Mean" },
       { value: "median", label: "Median" },
@@ -276,9 +327,9 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   // (skills/_charts.py), because it is the same code. Keep the wording identical to those so a
   // user who learns "Spread shows" once does not relearn it per chart type.
   line: [
-    { key: "x", label: "X column", type: "text", placeholder: "auto-detect", help: "Blank = the first numeric column." },
-    { key: "y", label: "Y column", type: "text", placeholder: "auto-detect", help: "Blank = the second numeric column." },
-    { key: "series", label: "One line per", type: "text", placeholder: "e.g. condition, genotype", help: "A category column. Never auto-detected — guessing it would silently change what the figure means." },
+    { key: "x", label: "X column", type: "column", placeholder: "auto-detect", help: "Blank = the first numeric column." },
+    { key: "y", label: "Y column", type: "column", placeholder: "auto-detect", help: "Blank = the second numeric column." },
+    { key: "series", label: "One line per", type: "column", placeholder: "e.g. condition, genotype", help: "A category column. Never auto-detected — guessing it would silently change what the figure means." },
     { key: "spread", label: "Spread shows", type: "select", options: [
       { value: "band", label: "Shaded band" },
       { value: "error_bars", label: "Error bars" },
@@ -326,11 +377,17 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   // REFUSES adjusted columns (an adjusted p is monotone-transformed, so λ and the quantiles
   // would be meaningless), and a table whose only p-column is adjusted needs the user to say so.
   qq: [
-    { key: "p_col", label: "P-value column", type: "text", placeholder: "auto-detect", help: "Must be RAW p-values. Adjusted/FDR columns are skipped by auto-detect on purpose — their quantiles and λ are not interpretable." },
+    { key: "p_col", label: "P-value column", type: "column", placeholder: "auto-detect", help: "Must be RAW p-values. Adjusted/FDR columns are skipped by auto-detect on purpose — their quantiles and λ are not interpretable." },
     { key: "band", label: "Show 95% null band", type: "switch", help: "The pointwise interval a calibrated test should stay inside." },
     { key: "top_n", label: "Points in the table", type: "range", step: 1, help: "How many of the most extreme features to list in the Statistics table." },
     { key: "max_points", label: "Plotted-point budget", type: "range", step: 500, help: "Large tables are thinned to keep the figure editable. The significant tail is always kept whole; λ and n always use every p-value." },
   ],
+  // Violin keeps the SAME vocabulary, order and wording as boxplot — but its `pairs` stays a text
+  // field, and that asymmetry is deliberate. A violin's categories are Leiden clusters, which do not
+  // exist until the run produces them, so there is no pre-run level list to offer; `/data/inspect`
+  // reads an h5ad's obs, never its future clustering. A picker here would have to source levels from
+  // some other factor, which is the "confident and wrong" failure the whole design refuses. The
+  // widget differs because the data does; the vocabulary is identical.
   violin: [
     { key: "gene", label: "Marker gene", type: "text", placeholder: "e.g. MS4A1" },
     { key: "order", label: "Category order", type: "text", placeholder: "e.g. cluster 2, cluster 0", help: "Comma-separated. Named categories lead, in this order; the rest follow unchanged." },
@@ -352,7 +409,7 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   // app/backend/skills/composition/run.py.
   composition: [
     { key: "order", label: "Category order", type: "text", placeholder: "e.g. Rods, Bipolar", help: "Comma-separated. Named categories lead, in this order; the rest follow unchanged." },
-    { key: "sort_by", label: "Sort by series", type: "text", placeholder: "a value column", help: "Sort categories by one series' values. Applied before Category order." },
+    { key: "sort_by", label: "Sort by series", type: "column", placeholder: "a value column", help: "Sort categories by one series' values. Applied before Category order." },
     { key: "mode", label: "Bar mode", type: "select", options: [
       { value: "grouped", label: "Grouped" },
       { value: "stacked", label: "Stacked" },
@@ -728,11 +785,42 @@ function resolveOptions(pres: ParamPresentation, ps: BackendParam): ParamField["
   return ps.options?.map((v) => ({ value: v, label: v }));
 }
 
-function mergeField(pres: ParamPresentation, ps: BackendParam): ParamField {
+/**
+ * The column choices for a `column` field: every column the table has, with the categorical ones
+ * annotated by their level count. Returns undefined when there is nothing to pick from — which is
+ * how the field falls back to a plain text box.
+ */
+function resolveColumns(ctx: ParamDataContext | undefined): ParamField["columns"] {
+  const cols = ctx?.columns;
+  if (!cols || cols.length === 0) return undefined;
+  const levels = new Map((ctx?.groups ?? []).map((g) => [g.key, g.n_levels]));
+  return cols.map((c) => {
+    const n = levels.get(c);
+    return { value: c, label: n ? `${c} — ${n} levels` : c };
+  });
+}
+
+/** Level names per candidate group column — the pair picker's vocabulary. */
+function resolveLevels(ctx: ParamDataContext | undefined): Record<string, string[]> | undefined {
+  const groups = (ctx?.groups ?? []).filter((g) => g.levels.length > 0);
+  if (groups.length === 0) return undefined;
+  return Object.fromEntries(groups.map((g) => [g.key, g.levels.map((l) => l.name)]));
+}
+
+function mergeField(pres: ParamPresentation, ps: BackendParam, ctx?: ParamDataContext): ParamField {
+  // A `column`/`pairs` widget is only emitted when its vocabulary exists; otherwise the field
+  // degrades to the text box it has always been. That keeps a context-free merge byte-identical
+  // to today's and spares `ParamControl` an empty-picker branch.
+  const columns = pres.type === "column" ? resolveColumns(ctx) : undefined;
+  const levelsByGroup = pres.type === "pairs" ? resolveLevels(ctx) : undefined;
+  const type: ParamField["type"] =
+    (pres.type === "column" && !columns) || (pres.type === "pairs" && !levelsByGroup)
+      ? "text"
+      : pres.type;
   return {
     key: pres.key,
     label: pres.label,
-    type: pres.type,
+    type,
     default: ps.default, // contract: the default/range come from the backend spec, never the overlay
     min: ps.min,
     max: ps.max,
@@ -742,6 +830,9 @@ function mergeField(pres: ParamPresentation, ps: BackendParam): ParamField {
     options: resolveOptions(pres, ps),
     showWhen: pres.showWhen,
     enabledWhen: pres.enabledWhen,
+    columns,
+    levelsByGroup,
+    levelsFrom: levelsByGroup ? pres.levelsFrom : undefined,
   };
 }
 
@@ -751,8 +842,15 @@ function mergeField(pres: ParamPresentation, ps: BackendParam): ParamField {
  * field SET, types, defaults, and min/max come from `spec`; labels/help/widget/step/
  * options/showWhen from the overlay. An overlay key not in the spec is dropped (logged
  * in dev) so the UI can never offer a knob the runner doesn't accept.
+ *
+ * `ctx` is the loaded dataset's schema (see {@link ParamDataContext}) — optional, and omitting it
+ * yields exactly the field list this function returned before pickers existed.
  */
-export function paramFieldsFromSpec(catalogOrRuntimeId: string, spec: BackendParamSpec): ParamField[] {
+export function paramFieldsFromSpec(
+  catalogOrRuntimeId: string,
+  spec: BackendParamSpec,
+  ctx?: ParamDataContext,
+): ParamField[] {
   const overlay = PRESENTATION[runtimeSkillId(catalogOrRuntimeId)] ?? [];
   const out: ParamField[] = [];
   for (const pres of overlay) {
@@ -761,7 +859,7 @@ export function paramFieldsFromSpec(catalogOrRuntimeId: string, spec: BackendPar
       warnDeadKnob(catalogOrRuntimeId, pres.key);
       continue;
     }
-    out.push(mergeField(pres, ps));
+    out.push(mergeField(pres, ps, ctx));
   }
   return out;
 }
@@ -794,7 +892,57 @@ export function overlayParamKeys(): Record<string, string[]> {
  * bool `false` and the select's string `"false"` are the same gate value).
  */
 export function visibleParamFields(schema: ParamField[], params: SkillParams): ParamField[] {
-  return schema.filter((f) => !f.showWhen || gateMatches(f.showWhen, schema, params));
+  return schema
+    .filter((f) => !f.showWhen || gateMatches(f.showWhen, schema, params))
+    .map((f) => (f.type === "pairs" ? resolvePairsField(f, schema, params) : f));
+}
+
+/**
+ * A `pairs` field's options depend on ANOTHER param — the group column the user picked this render
+ * (boxplot's `group`) — so they resolve here, not at merge time.
+ *
+ * There is deliberately NO fallback when that field is blank. Blank means "auto-detect", and the
+ * detection is a backend rule over the table's dtypes that the frontend cannot evaluate; guessing
+ * would offer level names from a column the run is not grouping by. So the picker appears once the
+ * group column is chosen, and until then the field is the free-text box it always was. Same drop
+ * back to text when the chosen column has no known levels — a column the design layer didn't
+ * classify, or a skill whose categories only exist after the run (violin's Leiden clusters).
+ */
+function resolvePairsField(field: ParamField, schema: ParamField[], params: SkillParams): ParamField {
+  const byGroup = field.levelsByGroup ?? {};
+  const chosen = field.levelsFrom
+    ? String(params[field.levelsFrom] ?? schema.find((x) => x.key === field.levelsFrom)?.default ?? "")
+    : "";
+  const levels = byGroup[chosen];
+  if (!levels || levels.length < 2) return { ...field, type: "text" };
+  return { ...field, options: levels.map((l) => ({ value: l, label: l })) };
+}
+
+/**
+ * Parse / serialize the `pairs` wire format — the SAME `"A~B, C~D"` string the backend already
+ * reads (`skills/_stats.parse_pairs`). The picker is a nicer way to author that string, not a new
+ * contract: a figure saved from the text field opens in the picker and vice versa, nothing on the
+ * backend changed, and no provenance moved.
+ *
+ * These round-trip an INCOMPLETE row (`"~"`, `"A~"`) instead of dropping it. That is what lets the
+ * picker be fully controlled with no local draft state: "+ Add" emits an empty row, the user fills
+ * it in, and nothing has to reconcile a local list against the parent's string. It is safe on the
+ * wire because `parse_pairs` requires both sides to be non-empty and documents that it skips
+ * empty/malformed chunks — a half-built row draws no bracket rather than failing the run.
+ */
+export function parsePairs(value: string): [string, string][] {
+  return value
+    .split(",")
+    .map((chunk) => chunk.trim())
+    .filter((chunk) => chunk.includes("~"))
+    .map((chunk) => {
+      const [a = "", b = ""] = chunk.split("~").map((s) => s.trim());
+      return [a, b] as [string, string];
+    });
+}
+
+export function serializePairs(pairs: [string, string][]): string {
+  return pairs.map(([a, b]) => `${a}~${b}`).join(", ");
 }
 
 /**

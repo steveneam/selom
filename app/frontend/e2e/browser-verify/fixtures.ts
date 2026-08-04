@@ -1,6 +1,8 @@
+import { join } from "node:path";
+
 import { expect, test as base, type Page } from "@playwright/test";
 
-import { FIXTURE_CSV } from "../../scripts/browser-verify/paths.mjs";
+import { DATASETS_DIR, FIXTURE_CSV } from "../../scripts/browser-verify/paths.mjs";
 
 /**
  * The harness: drive a REAL run through the UI until a real figure is open in the editor.
@@ -163,6 +165,98 @@ export async function openRealFigure(
   // Step 4 — a real figure, really rendered.
   await expect(page.locator(".js-plotly-plot")).toBeVisible({ timeout: 120_000 });
   await settle(page);
+  return projectId;
+}
+
+/**
+ * Drive as far as the WORKBENCH with one skill selected and its inline params rendered — one step
+ * short of {@link openRealFigure}, which runs the skill and lands in the editor.
+ *
+ * That stopping point is the whole reason this exists: a skill's parameter panel only renders while
+ * a skill is SELECTED and un-applied, so every claim about the inputs (a picker vs a text box, what
+ * a select offers) is unobservable from the editor. Installs start empty, so the skill is installed
+ * through the real Store UI rather than injected — `workspaceStore` is localStorage-first and a
+ * hand-written entry is lost to the store's own seed/reconcile on load, the same trap that defeated
+ * four shortcuts on the figure path.
+ *
+ * Named projects only — never "Untitled" (owner rule, stated twice) [[selom-name-test-projects]].
+ */
+export async function openWorkbench(
+  page: Page,
+  {
+    projectName,
+    /** Corpus-relative input. Defaults to the harness's standard DE table. */
+    csvRelPath,
+    /** Catalog display name, e.g. "Box / strip plot". */
+    skillName,
+  }: { projectName: string; csvRelPath?: string; skillName: string },
+) {
+  const csv = csvRelPath ? join(DATASETS_DIR, csvRelPath) : FIXTURE_CSV;
+
+  // Step 1 — install the skill through the Store, so it appears in the workbench's installed list.
+  await page.goto("/store");
+  const search = page.getByLabel("Search skills");
+  await search.waitFor();
+  await search.fill(skillName);
+  // Innermost div that holds BOTH the skill's name and its install toggle — the same idiom
+  // `openRealFigure` uses for the workbench row, and it survives the button's Install→Installed flip.
+  const card = page
+    .locator("div")
+    .filter({ has: page.getByText(skillName, { exact: true }) })
+    .filter({ has: page.getByRole("button", { name: /^(Install|Installed)$/ }) })
+    .last();
+  const installed = card.getByRole("button", { name: /^Installed$/ });
+  const install = card.getByRole("button", { name: /^Install$/ });
+  // Installs are ACCOUNT-WIDE and localStorage-backed, so they survive between specs in a run — the
+  // toggle is already "Installed" for every spec after the first. Clicking it then would UNINSTALL.
+  await expect(install.or(installed).first()).toBeVisible({ timeout: 60_000 });
+  if ((await installed.count()) === 0) {
+    // Hydration: the first click on a freshly-loaded route is swallowed (see `clickWhenLive`).
+    await clickWhenLive(page, install, async () => (await installed.count()) > 0);
+  }
+
+  // Step 2 — a real project with the real file, through the same dropzone a drag-and-drop uses.
+  await page.goto("/");
+  await clickWhenLive(
+    page,
+    page.getByRole("main").getByRole("button", { name: "New project" }).first(),
+    () => /\/p\/.+/.test(page.url()),
+  );
+  const projectId = new URL(page.url()).pathname.split("/p/")[1];
+
+  const nameInput = page.getByLabel("Project name");
+  await nameInput.waitFor();
+  await nameInput.fill(projectName);
+  await nameInput.blur();
+
+  await page.locator('input[type="file"]').first().setInputFiles(csv);
+
+  // Step 3 — clear the intake questionnaire. A long-form table has no deg contrast to confirm, so
+  // this is normally the Skip path; both are handled because routing decides which appears.
+  const confirm = page.getByRole("button", { name: /Confirm & run/i });
+  const skip = page.getByRole("button", { name: /Skip — I.ll pick skills/i });
+  await expect(confirm.or(skip).first()).toBeVisible({ timeout: 120_000 });
+  if (await confirm.isVisible().catch(() => false)) {
+    await expect(confirm).toBeEnabled({ timeout: 60_000 });
+    await confirm.click();
+  } else {
+    await skip.click();
+  }
+
+  // Step 4 — SELECT the skill (click the installed card), never Apply: applying runs it and leaves
+  // for the editor, taking the param panel with it.
+  const row = page
+    .locator("div")
+    .filter({ has: page.getByText(skillName, { exact: true }) })
+    .filter({ has: page.getByRole("button", { name: "Apply", exact: true }) })
+    .last();
+  await expect(row).toBeVisible({ timeout: 60_000 });
+  await row.getByText(skillName, { exact: true }).click();
+
+  // The params come from a live `GET /skills/{id}` describe, so wait for a real control, not a tick.
+  await expect(page.getByRole("button", { name: "Apply skill" })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByLabel("Category order").or(page.getByLabel("Value column")).first())
+    .toBeVisible({ timeout: 60_000 });
   return projectId;
 }
 

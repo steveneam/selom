@@ -13,9 +13,11 @@ import { skillColor, skillIcon } from "@/lib/catalog/modality";
 import { isFieldDisabled, visibleParamFields } from "@/lib/catalog/params";
 import { useSkillParams } from "@/lib/catalog/use-skill-params";
 import { getSkill } from "@/lib/catalog/seed";
+import { useLiveSkills } from "@/lib/catalog/live-skills";
 import { isDataAwareRecommendation, notAFitSkills, recommendedSkills } from "@/lib/catalog/quick-apply";
 import type { DataRouting, SkillParams } from "@/lib/skills/api";
 import type { DataFitSummary } from "@/lib/intake/inspect";
+import type { DesignHints } from "@/lib/intake/design";
 import type { Modality } from "@/lib/projects/types";
 import type { IntakeProposal, ProposedStep } from "@/lib/intake/mock";
 
@@ -45,8 +47,13 @@ export function WorkbenchPanel({
   installs: { id: string; skillId: string }[];
   proposal: IntakeProposal | null;
   /** The active dataset's persisted data-aware route (Slice 2) — the source of the data-fit
-   *  "Recommended for your data" chips for an inspected dataset. */
-  route?: { routing: DataRouting | null; dataFit: DataFitSummary | null } | null;
+   *  "Recommended for your data" chips for an inspected dataset, and (via `dataFit.columns` +
+   *  `design.group_candidates`) the vocabulary the inline column / pair pickers offer. */
+  route?: {
+    routing: DataRouting | null;
+    dataFit: DataFitSummary | null;
+    design?: DesignHints | null;
+  } | null;
   /** The active dataset's modality — the mock-chip fallback for demo/sample data with no route. */
   modality?: Modality | null;
   running: string | null;
@@ -57,6 +64,10 @@ export function WorkbenchPanel({
   /** Optional AI route composer rendered at the top of the left column (Layer A, Phase 1). */
   routeComposer?: React.ReactNode;
 }) {
+  // Names + the Verified gate below both resolve through `getSkill`, so this surface must re-render
+  // when the live registry lands. Without it a skill that postdates the static seed renders as its
+  // raw id with a disabled Apply — it can be installed from the Store and then never run.
+  useLiveSkills();
   const [selected, setSelected] = React.useState<string | null>(null);
   const [dragOver, setDragOver] = React.useState(false);
   const [params, setParams] = React.useState<SkillParams>({});
@@ -100,7 +111,14 @@ export function WorkbenchPanel({
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const selectedSkill = selected ? getSkill(selected) : undefined;
-  const { fields: schema, loading: paramsLoading } = useSkillParams(selected);
+  // The dataset's own schema, so a column knob is PICKED from the columns that exist rather than
+  // typed. Both halves already rode `/data/inspect` and are persisted on the dataset — no request.
+  // Memoized because it participates in the field memo inside `useSkillParams`.
+  const paramContext = React.useMemo(
+    () => ({ columns: route?.dataFit?.columns ?? null, groups: route?.design?.group_candidates ?? null }),
+    [route?.dataFit?.columns, route?.design?.group_candidates],
+  );
+  const { fields: schema, loading: paramsLoading } = useSkillParams(selected, null, paramContext);
 
   // The "Recommended for your data" chips = the skills the engine RECOMMENDED for this dataset.
   // Data-fit-ranked from the inspected route when present (survives reload — read off the dataset),

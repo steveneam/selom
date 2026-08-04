@@ -100,6 +100,14 @@ const AXES: Record<string, [string, string]> = {
 // mock can infer — bulk condition labels from the sample column names. scRNA design needs the obs
 // table (not in the header), so dev:mock returns no design for it; verify scRNA design on the live
 // backend ([[selom-mock-is-wire-only-verify-real]]).
+//
+// The same limit now covers `generic_table`: the engine's `_table_hints` reads the column VALUES to
+// find the categorical factors and their levels, and a header-only mock has no values to read. So
+// dev:mock deliberately returns NO group candidates for a plain table — a fail-soft mock degrades
+// structure, never fabricates data ([[mock-fallback-never-fabricates-data]]). Consequence to know
+// before debugging: in `dev:mock` the inline COLUMN picker works (its columns come from the real
+// header) but the PAIR picker stays a text field. That is the mock being honest, not a regression —
+// verify pairs against a live backend.
 const COLUMN_NAMES_KEY = "__column_names__";
 const REP_RE = /_\d+$/;
 const CONTROL_RE = /\b(wt|ctrl|control|wild[\s_-]?type|vehicle|dmso|untreated|naive|baseline|mock|sham|0h|day0|d0)\b/i;

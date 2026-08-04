@@ -102,6 +102,17 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // The open figure (owns the AI-proposal queue + the staged figure-data base) and its source dataset.
   const activeFigure = activeFigureId ? figures.find((f) => f.id === activeFigureId) : undefined;
   const activeDataset = activeFigure?.datasetId ? datasets.find((d) => d.id === activeFigure.datasetId) : undefined;
+  // The open figure's SOURCE dataset schema, for the Figure-data inputs' column / pair pickers — the
+  // same vocabulary the Workbench gets, so re-running a figure with a different column is the same
+  // gesture as running it the first time. Undefined dataset (deleted, or a demo figure) → text
+  // fields, exactly as before. Memoized: it feeds the field memo in `useSkillParams`.
+  const fdParamContext = React.useMemo(
+    () => ({
+      columns: activeDataset?.dataFit?.columns ?? null,
+      groups: activeDataset?.design?.group_candidates ?? null,
+    }),
+    [activeDataset?.dataFit?.columns, activeDataset?.design?.group_candidates],
+  );
   // Figure-data staging (§3C decomposition) — the STAGED inputs (a dot drag + the numeric Marks/Threshold
   // editors all write one `fdParams`), the live preview, the a/b-label toggle, and the deterministic
   // Auto-tune, lifted into a cohesive hook. Behaviour is this root's verbatim; the scope-reset happens
@@ -651,6 +662,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
               setFdParams={setFdParams}
               fdDirty={fdDirty}
               fdScope={fdScope}
+              paramContext={fdParamContext}
               previewSpec={previewSpec}
               markLabelsShown={markLabelsShown}
               setMarkLabelsShown={setMarkLabelsShown}

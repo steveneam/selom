@@ -12,6 +12,7 @@ import { AskAi, type AutoTuneOutcome } from "@/components/ai/ask-ai";
 import { getSkill } from "@/lib/catalog/seed";
 import { deriveFigureModel } from "@/lib/figure/figure-model";
 import { readSeededMarks } from "@/lib/erg/marks";
+import type { ParamDataContext } from "@/lib/catalog/params";
 import type { FigureSpec } from "@/lib/figure/figure-spec";
 import type { SkillParams } from "@/lib/skills/api";
 import type { AiProposal } from "@/lib/ai/types";
@@ -34,6 +35,7 @@ export function FigureDataView({
   setFdParams,
   fdDirty,
   fdScope,
+  paramContext,
   previewSpec,
   markLabelsShown,
   setMarkLabelsShown,
@@ -61,6 +63,9 @@ export function FigureDataView({
   setFdParams: React.Dispatch<React.SetStateAction<SkillParams>>;
   fdDirty: boolean;
   fdScope: string;
+  /** The source dataset's schema — makes the Inputs' column / pair knobs pickers instead of text
+   *  fields. Optional and fail-soft (a deleted or never-inspected dataset renders text fields). */
+  paramContext?: ParamDataContext | null;
   previewSpec: FigureSpec | null | undefined;
   markLabelsShown: boolean;
   setMarkLabelsShown: React.Dispatch<React.SetStateAction<boolean>>;
@@ -280,6 +285,7 @@ export function FigureDataView({
           running={running != null}
           dataCheck={activeFigure.dataCheck}
           dataFit={activeFigure.dataFit}
+          paramContext={paramContext}
           seededMarks={readSeededMarks(figure.spec ?? activeFigure.spec)}
           canEditMarks={deriveFigureModel(figure.spec ?? activeFigure.spec).capabilities.landmarkMarks}
           canEditThresholds={deriveFigureModel(figure.spec ?? activeFigure.spec).capabilities.thresholds}

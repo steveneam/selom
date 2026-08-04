@@ -1,15 +1,20 @@
 "use client";
 
 import * as React from "react";
+import { Plus, X } from "lucide-react";
 import { cn } from "@/lib/ui/cn";
-import type { ParamField } from "@/lib/catalog/params";
+import { parsePairs, serializePairs, type ParamField } from "@/lib/catalog/params";
 import type { SkillParams } from "@/lib/skills/api";
 
 /**
- * One inline parameter control (range / number / text / switch / select), driven by a
- * declarative `ParamField` from `lib/catalog/params`. Shared by the Workbench (run a
- * skill) and the Figure-data stage (re-run the active figure's skill with new inputs),
- * so the same knobs render identically wherever a skill is parameterised.
+ * One inline parameter control (range / number / text / switch / select / column / pairs), driven
+ * by a declarative `ParamField` from `lib/catalog/params`. Shared by the Workbench (run a skill)
+ * and the Figure-data stage (re-run the active figure's skill with new inputs), so the same knobs
+ * render identically wherever a skill is parameterised.
+ *
+ * `column` and `pairs` are the data-aware widgets: they only ever arrive here already carrying the
+ * dataset's real vocabulary (the merge in `lib/catalog/params` downgrades them to `text` when there
+ * is none), so there is no empty-picker state to render.
  */
 export function ParamControl({
   field,
@@ -71,6 +76,10 @@ export function ParamControl({
         <select
           value={String(v)}
           disabled={disabled}
+          // Explicit, or the wrapping <label> folds the help paragraph into the accessible NAME —
+          // a screen reader then announces the whole sentence as the field's name, and two fields
+          // whose help mentions each other become mutually ambiguous.
+          aria-label={field.label}
           onChange={(e) => onChange(e.target.value)}
           className={cn(
             "mt-1 h-9 w-full rounded-md border border-input bg-background/60 px-2.5 text-sm text-foreground outline-none focus-visible:border-ring/60 focus-visible:ring-2 focus-visible:ring-ring/30",
@@ -86,6 +95,47 @@ export function ParamControl({
         {field.help && <span className="mt-1 block text-[11px] text-muted-foreground">{field.help}</span>}
       </label>
     );
+  }
+
+  if (field.type === "column") {
+    return (
+      <label className={cn("block", disabledWrap)}>
+        <span className="flex min-h-8 items-start gap-1.5 text-xs font-medium leading-4 text-foreground">{field.label}{badge}</span>
+        <select
+          value={String(v)}
+          disabled={disabled}
+          aria-label={field.label}
+          // A native select clips rather than wraps, and real column / level names are long
+          // ("AAV8-RK-GFP-polyA-stuffer"). Hover recovers the full value at no layout cost.
+          title={String(v) || undefined}
+          onChange={(e) => onChange(e.target.value)}
+          className={cn(
+            "mt-1 h-9 w-full rounded-md border border-input bg-background/60 px-2.5 text-sm text-foreground outline-none focus-visible:border-ring/60 focus-visible:ring-2 focus-visible:ring-ring/30",
+            disabled && "cursor-not-allowed",
+          )}
+        >
+          {/* The blank choice is the backend's auto-detect, named rather than left as an empty row. */}
+          <option value="" className="bg-card text-foreground">{field.placeholder ?? "auto-detect"}</option>
+          {/* A saved figure can name a column THIS dataset lacks. Keep it selectable and say so —
+              silently dropping it would rewrite the user's spec on open. */}
+          {String(v) && !field.columns?.some((c) => c.value === String(v)) && (
+            <option value={String(v)} className="bg-card text-foreground">
+              {String(v)} — not in this dataset
+            </option>
+          )}
+          {field.columns?.map((c) => (
+            <option key={c.value} value={c.value} className="bg-card text-foreground">
+              {c.label}
+            </option>
+          ))}
+        </select>
+        {field.help && <span className="mt-1 block text-[11px] text-muted-foreground">{field.help}</span>}
+      </label>
+    );
+  }
+
+  if (field.type === "pairs") {
+    return <PairsControl field={field} value={v} onChange={onChange} disabled={disabled} badge={badge} />;
   }
 
   if (field.type === "range") {
@@ -123,6 +173,7 @@ export function ParamControl({
       <input
         type={field.type === "number" ? "number" : "text"}
         value={String(v)}
+        aria-label={field.label}
         min={field.min}
         max={field.max}
         step={field.step}
@@ -136,5 +187,116 @@ export function ParamControl({
       />
       {field.help && <span className="mt-1 block text-[11px] text-muted-foreground">{field.help}</span>}
     </label>
+  );
+}
+
+/**
+ * The `pairs` row-list: one "A vs B" comparison per row, each a pair of level selects with its own
+ * remove control, and an explicit "+ Add comparison" beneath — the shape every mature filter/series
+ * builder converges on (beehiiv "+ Condition" · Confluence / ClickUp / Braintrust "+ Add filter" ·
+ * Glide's numbered ITEM blocks with a per-item trash and "+ Add item").
+ *
+ * Fully controlled: the rows ARE `parsePairs(value)`, and every edit serializes straight back to the
+ * same `"A~B, C~D"` string the backend already parses. No local draft list, so nothing can drift out
+ * of sync with a Reset, an accepted AI proposal, or a figure switch.
+ */
+function PairsControl({
+  field,
+  value,
+  onChange,
+  disabled,
+  badge,
+}: {
+  field: ParamField;
+  value: SkillParams[string];
+  onChange: (v: SkillParams[string]) => void;
+  disabled: boolean;
+  badge?: React.ReactNode;
+}) {
+  const rows = parsePairs(String(value ?? ""));
+  const levels = field.options ?? [];
+  const emit = (next: [string, string][]) => onChange(serializePairs(next));
+  const setSide = (i: number, side: 0 | 1, v: string) =>
+    emit(rows.map((r, j) => (j === i ? (side === 0 ? [v, r[1]] : [r[0], v]) : r)));
+
+  const selectCls = cn(
+    "h-8 min-w-0 flex-1 rounded-md border border-input bg-background/60 px-2 text-xs text-foreground outline-none focus-visible:border-ring/60 focus-visible:ring-2 focus-visible:ring-ring/30",
+    disabled && "cursor-not-allowed",
+  );
+  // A saved pair can name a level this dataset lacks (a renamed group, a different export). Keep it
+  // selectable and labelled rather than snapping the row to some other level behind the user's back.
+  const optionsFor = (current: string) => (
+    <>
+      <option value="">Choose…</option>
+      {current && !levels.some((o) => o.value === current) && (
+        <option value={current}>{current} — not in this dataset</option>
+      )}
+      {levels.map((o) => (
+        <option key={o.value} value={o.value} className="bg-card text-foreground">
+          {o.label}
+        </option>
+      ))}
+    </>
+  );
+
+  return (
+    // A composite control, so it carries its own group role + name — a wrapping <label> would
+    // associate the whole row-list with only its first select.
+    <div role="group" aria-label={field.label} className={cn("sm:col-span-2", disabled && "opacity-50")}>
+      <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">{field.label}{badge}</span>
+      {rows.length > 0 && (
+        <ul className="mt-1.5 space-y-1.5">
+          {rows.map(([a, b], i) => (
+            <li key={i} className="flex items-center gap-1.5">
+              <select
+                value={a}
+                disabled={disabled}
+                title={a || undefined}
+                aria-label={`Comparison ${i + 1}, first group`}
+                onChange={(e) => setSide(i, 0, e.target.value)}
+                className={selectCls}
+              >
+                {optionsFor(a)}
+              </select>
+              <span aria-hidden className="shrink-0 text-[11px] text-muted-foreground">vs</span>
+              <select
+                value={b}
+                disabled={disabled}
+                title={b || undefined}
+                aria-label={`Comparison ${i + 1}, second group`}
+                onChange={(e) => setSide(i, 1, e.target.value)}
+                className={selectCls}
+              >
+                {optionsFor(b)}
+              </select>
+              <button
+                type="button"
+                disabled={disabled}
+                aria-label={`Remove comparison ${i + 1}`}
+                onClick={() => emit(rows.filter((_, j) => j !== i))}
+                className={cn(
+                  "grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground [&_svg]:size-3.5",
+                  disabled && "cursor-not-allowed",
+                )}
+              >
+                <X />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => emit([...rows, ["", ""]])}
+        className={cn(
+          "mt-1.5 inline-flex items-center gap-1 rounded-md border border-dashed border-input px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground [&_svg]:size-3",
+          disabled && "cursor-not-allowed",
+        )}
+      >
+        <Plus /> Add comparison
+      </button>
+      {field.help && <span className="mt-1 block text-[11px] text-muted-foreground">{field.help}</span>}
+    </div>
   );
 }
