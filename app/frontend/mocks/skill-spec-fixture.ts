@@ -170,6 +170,20 @@ export const SKILL_PARAM_SPECS: Record<string, BackendParamSpec> = {
     fdr_threshold: { type: "float", default: 0.05, min: 0.0, max: 1.0 },
     fc_threshold: { type: "float", default: 0.0, min: 0.0, max: 5.0 },
   },
+  pathway: {
+    top_n: { type: "int", default: 18, min: 5, max: 40 },
+    fdr_threshold: { type: "float", default: 0.05, min: 0.0, max: 1.0 },
+    fc_threshold: { type: "float", default: 0.0, min: 0.0, max: 5.0 },
+  },
+  go_graph: {
+    top_n: { type: "int", default: 20, min: 5, max: 40 },
+    namespace: { type: "str", default: "" },
+    fdr_threshold: { type: "float", default: 0.05, min: 0.0, max: 1.0 },
+    fc_threshold: { type: "float", default: 0.0, min: 0.0, max: 5.0 },
+  },
+  sankey: {
+    max_links: { type: "int", default: 60, min: 1, max: 500 },
+  },
   volcano: {
     fc_threshold: { type: "float", default: 1.0, min: 0.0, max: 5.0 },
     fdr_threshold: { type: "float", default: 0.05, min: 0.0, max: 1.0 },
@@ -190,6 +204,9 @@ export const SKILL_PARAM_SPECS: Record<string, BackendParamSpec> = {
     fdr_threshold: { type: "float", default: 0.05, min: 0.0, max: 1.0 },
     top_n: { type: "int", default: 10, min: 0, max: 50 },
     stats: { type: "str", default: "welch", options: ["welch", "moderated"] },
+    min_valid: { type: "float", default: 0.5, min: 0.0, max: 1.0 },
+    log_input: { type: "bool", default: false },
+    missing: { type: "str", default: "mean", options: ["mean", "mindet", "minprob"] },
   },
   erg_traces: {
     role: { type: "str", default: "representative" },

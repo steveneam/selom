@@ -149,6 +149,29 @@ export interface ParamPresentation {
   levelsFrom?: string;
 }
 
+/**
+ * The two gene-list cutoffs shared by every over-representation skill (`enrichment` · `pathway` ·
+ * `go_graph`). Declared ONCE because the semantics are easy to misread and easier to let drift
+ * across three panels: these do **not** filter the terms the figure draws — each term carries its
+ * own enrichment p — they decide which rows of the input DE table become the QUERY gene list that
+ * gets tested. Both are inert on a bare gene list (there is no adjusted-p column to filter on), so
+ * the help says that rather than leaving a control that silently does nothing on half the inputs.
+ *
+ * Contrast `volcano`/`proteomics_de`, where the SAME two keys are the significance test itself and
+ * are drawn on the canvas as dashed lines. Same names, different jobs — which is exactly why the
+ * wording lives here instead of being retyped per skill.
+ */
+const GENE_LIST_CUTOFFS: ParamPresentation[] = [
+  {
+    key: "fdr_threshold", label: "Gene-list cutoff (adjusted p)", type: "number", step: 0.001,
+    help: "Which rows of your DE table become the query gene list. Not a cutoff on the terms drawn — each of those carries its own p. Ignored for a bare gene list.",
+  },
+  {
+    key: "fc_threshold", label: "Gene-list fold-change cutoff (log₂)", type: "range", step: 0.1,
+    help: "Require |log₂FC| ≥ this as well, narrowing the query list by effect size. 0 = no fold-change filter, so the adjusted p alone decides it.",
+  },
+];
+
 const PRESENTATION: Record<string, ParamPresentation[]> = {
   // scRNA UMAP — the prep/QC + embedding knobs the runner honours. Resolution lives on
   // `cluster`, not here, so it isn't surfaced (the UMAP runner's Leiden uses the default).
@@ -278,6 +301,7 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   ridge: [
     { key: "group", label: "Category column", type: "column", placeholder: "auto-detect", help: "One ridge per level. Blank = the first non-numeric column." },
     { key: "value", label: "Value column", type: "column", placeholder: "auto-detect", help: "Blank = the first numeric column." },
+    { key: "order", label: "Ridge order", type: "text", placeholder: "e.g. Control, Treated", help: "Comma-separated. Named groups lead, in this order; the rest follow by descending median, which is the default for all of them." },
     { key: "scale", label: "Ridge height", type: "select", options: [
       { value: "peak", label: "Normalized per group (compare shapes)" },
       { value: "common", label: "Shared density scale (compare heights)" },
@@ -312,6 +336,7 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     { key: "levels", label: "Which two, in order", type: "text", placeholder: "e.g. before, after", help: "Required when the condition column has more than two levels — picking two silently would decide the whole result." },
     { key: "value", label: "Value column", type: "column", placeholder: "auto-detect", help: "Blank = the first numeric column." },
     { key: "group", label: "Cluster by", type: "column", placeholder: "optional", help: "Draws one before/after pair per group along the x-axis." },
+    { key: "order", label: "Group order", type: "text", placeholder: "e.g. Control, Treated", help: "Comma-separated. Named groups lead along the x-axis, in this order; the rest follow unchanged. Needs Cluster by." },
     { key: "summary", label: "Summary line", type: "select", options: [
       { value: "mean", label: "Mean" },
       { value: "median", label: "Median" },
@@ -380,7 +405,10 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     { key: "p_col", label: "P-value column", type: "column", placeholder: "auto-detect", help: "Must be RAW p-values. Adjusted/FDR columns are skipped by auto-detect on purpose — their quantiles and λ are not interpretable." },
     { key: "band", label: "Show 95% null band", type: "switch", help: "The pointwise interval a calibrated test should stay inside." },
     { key: "top_n", label: "Points in the table", type: "range", step: 1, help: "How many of the most extreme features to list in the Statistics table." },
-    { key: "max_points", label: "Plotted-point budget", type: "range", step: 500, help: "Large tables are thinned to keep the figure editable. The significant tail is always kept whole; λ and n always use every p-value." },
+    // step 100, not 500: a range input snaps to `min + k*step`, and with min 200 the 500-step
+    // lattice does not contain the spec's own 6000 default — the thumb sat at 5700 while the
+    // readout beside it said 6000. Caught by the slider-step guard in registry-completeness.
+    { key: "max_points", label: "Plotted-point budget", type: "range", step: 100, help: "Large tables are thinned to keep the figure editable. The significant tail is always kept whole; λ and n always use every p-value." },
   ],
   // Violin keeps the SAME vocabulary, order and wording as boxplot — but its `pairs` stays a text
   // field, and that asymmetry is deliberate. A violin's categories are Leiden clusters, which do not
@@ -420,6 +448,10 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     ] },
   ],
   heatmap: [
+    {
+      key: "groupby", label: "Group cells by", type: "text", placeholder: "leiden",
+      help: "The cell-annotation column to take marker genes per group from — e.g. cell_type if your file carries one. If the file has no such column, Selom clusters the cells itself (Leiden) and groups by that.",
+    },
     { key: "n_genes", label: "Genes shown", type: "range", step: 5, help: "Top genes by variance (bulk) or markers per cluster (scRNA)." },
     {
       key: "cluster", label: "Clustering", type: "select",
@@ -480,8 +512,72 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       ],
       help: "Split scores up- and down-regulated genes separately (diverging dotplot). Needs a fold-change column.",
     },
+    {
+      key: "top_n", label: "Terms shown", type: "range", step: 1,
+      help: "How many of the most enriched terms to draw. Under a split, this many per direction.",
+    },
+    ...GENE_LIST_CUTOFFS,
   ],
+  // Pathway map — a live Reactome over-representation drawn as a parent→child node-link, so
+  // `top_n` sets how many pathway nodes the map holds, not just how many rows a list shows.
+  pathway: [
+    {
+      key: "top_n", label: "Pathways shown", type: "range", step: 1,
+      help: "How many of the most enriched Reactome pathways become nodes. The parent→child edges are drawn among these.",
+    },
+    ...GENE_LIST_CUTOFFS,
+  ],
+  // GO enrichment graph — same query-set contract as `enrichment`, plus the one knob that is
+  // specific to GO: which of the three ontologies to keep. The backend declares `namespace` as a
+  // free string, but the DAG only ever holds BP / MF / CC, so the control offers those and names
+  // blank as "all three" instead of leaving a text box the user has to guess the tokens for.
+  go_graph: [
+    {
+      key: "top_n", label: "GO terms shown", type: "range", step: 1,
+      help: "How many of the most enriched terms become nodes, before the parent→child edges are wired.",
+    },
+    {
+      key: "namespace", label: "Ontology", type: "select",
+      options: [
+        { value: "", label: "All three" },
+        { value: "BP", label: "Biological process" },
+        { value: "MF", label: "Molecular function" },
+        { value: "CC", label: "Cellular component" },
+      ],
+      help: "GO's three branches answer different questions. Mixing them in one graph is usually why it reads as unrelated clusters.",
+    },
+    ...GENE_LIST_CUTOFFS,
+  ],
+  // Sankey — one knob, and it was API-only, so this skill rendered an EMPTY parameter panel.
+  sankey: [
+    {
+      key: "max_links", label: "Flows drawn", type: "range", step: 1,
+      help: "Keeps this many of the largest flows. A Sankey with every small link drawn is unreadable; the dropped ones are the smallest by value.",
+    },
+  ],
+  // Volcano — the first three knobs ARE the figure's claim: which points read as up or down, where
+  // the dashed lines sit, and which genes get named. They were API-only until 2026-08-04, so the
+  // panel invited the user to "tune the options" and then rendered one text box for a gene panel
+  // (`API_ONLY_KNOBS`, registry-completeness.test.ts). Ordered by what each DECIDES, so `highlight`
+  // — an overlay applied on top of an already-decided figure — comes last.
+  //
+  // `fdr_threshold` is the one number here that is NOT a slider, and deliberately: its range is
+  // 0–1 while every value anyone uses (0.05 · 0.01 · 0.001) sits inside the first tenth of that
+  // track, so a linear slider would make the conventional cutoffs fiddly and 0.001 unreachable at
+  // any usable step. A typed field reaches all of them exactly.
   volcano: [
+    {
+      key: "fc_threshold", label: "Fold-change cutoff (log₂)", type: "range", step: 0.1,
+      help: "A point counts as changed at |log₂FC| ≥ this — 1 is a doubling. Drawn as the two vertical dashed lines.",
+    },
+    {
+      key: "fdr_threshold", label: "Significance cutoff (adjusted p)", type: "number", step: 0.001,
+      help: "The horizontal dashed line, and the other half of the up/down test. 0.05 by convention; 0.01 or 0.001 for a stricter call.",
+    },
+    {
+      key: "top_n", label: "Genes labelled", type: "range", step: 1,
+      help: "The most significant genes that clear BOTH cutoffs get a label. 0 labels none — any point can still be clicked to label it.",
+    },
     {
       key: "highlight", label: "Highlight genes", type: "text",
       placeholder: "e.g. RHO, GNAT1, PDE6B",
@@ -502,9 +598,30 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       help: "Comma-separated metrics where lower is better — inverted so higher always reads as better.",
     },
   ],
+  // Proteomics DE — ordered along the pipeline the runner actually walks: which samples → how the
+  // matrix is prepared → which test → where the volcano's lines fall. The preparation knobs are not
+  // cosmetic: `missing` picks between an impute that shrinks real MNAR fold-changes and the
+  // left-censored treatment that preserves them, which changes the result more than the test does.
   proteomics_de: [
     { key: "group_a", label: "Group A", type: "text", placeholder: "e.g. infected", help: "Sample-name substring for the first group." },
     { key: "group_b", label: "Group B", type: "text", placeholder: "e.g. control", help: "Sample-name substring for the second group." },
+    {
+      key: "log_input", label: "Intensities are already log₂", type: "switch",
+      help: "Off log₂-transforms and median-normalizes the matrix first. Turn on only if your export is already logged — doing it twice flattens every fold-change.",
+    },
+    {
+      key: "min_valid", label: "Measured in at least", type: "range", step: 0.05,
+      help: "A protein must be present in this fraction of the samples in EACH group, or it is dropped before testing. 0.5 = half.",
+    },
+    {
+      key: "missing", label: "Fill missing values with", type: "select",
+      options: [
+        { value: "mean", label: "Per-protein mean (simple)" },
+        { value: "mindet", label: "Detection limit (left-censored)" },
+        { value: "minprob", label: "Downshifted normal (Perseus)" },
+      ],
+      help: "Proteomics dropouts are mostly below the run's detection limit, so the mean fill biases real fold-changes toward zero. The two left-censored modes fill from each sample's low tail instead. Mean is the default so existing outputs are unchanged.",
+    },
     {
       key: "stats", label: "Statistics", type: "select",
       options: [
@@ -512,6 +629,18 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
         { value: "moderated", label: "Moderated (limma-style)" },
       ],
       help: "Moderated borrows variance across proteins for better power at small N.",
+    },
+    {
+      key: "fc_threshold", label: "Fold-change cutoff (log₂)", type: "range", step: 0.1,
+      help: "A protein counts as changed at |log₂FC| ≥ this — 1 is a doubling. Drawn as the two vertical dashed lines.",
+    },
+    {
+      key: "fdr_threshold", label: "Significance cutoff (adjusted p)", type: "number", step: 0.001,
+      help: "The horizontal dashed line, and the other half of the up/down test. 0.05 by convention; 0.01 or 0.001 for a stricter call.",
+    },
+    {
+      key: "top_n", label: "Proteins labelled", type: "range", step: 1,
+      help: "The most significant proteins that clear BOTH cutoffs get a label. 0 labels none.",
     },
   ],
   // Proprietary ERG module — the few knobs a vision scientist reaches for before publishing:

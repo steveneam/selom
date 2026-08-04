@@ -3,7 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { overlayParamKeys } from "./params";
+import { overlayParamKeys, paramFieldsFromSpec } from "./params";
+import type { BackendParamSpec, ParamField } from "./params";
 import { SKILL_PARAM_SPECS } from "@/mocks/skill-spec-fixture";
 
 /**
@@ -48,7 +49,30 @@ function loadParamSpecs(): Record<string, Set<string>> {
   return out;
 }
 
+/**
+ * The same walk, keeping each param_spec ENTRY rather than just its key — the merge's real input,
+ * so a test can assert what `ParamControl` will actually be handed (bounds, options, defaults)
+ * instead of only which keys exist.
+ */
+function loadFullParamSpecs(): Record<string, BackendParamSpec> {
+  const out: Record<string, BackendParamSpec> = {};
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(p);
+      } else if (entry.name === "skill.json") {
+        const json = JSON.parse(fs.readFileSync(p, "utf8"));
+        if (json?.id) out[json.id] = (json.param_spec ?? {}) as BackendParamSpec;
+      }
+    }
+  };
+  walk(SKILLS_DIR);
+  return out;
+}
+
 const SPECS = loadParamSpecs();
+const FULL_SPECS = loadFullParamSpecs();
 const OVERLAYS = overlayParamKeys();
 
 describe("registry-completeness — backend skill.json is reachable", () => {
@@ -171,11 +195,19 @@ describe("reachability — every backend skill can be resolved by the app", () =
  * the next layer down — a skill that resolves, installs and runs, whose KNOBS the user cannot touch.
  *
  * `paramFieldsFromSpec` iterates the presentation OVERLAY, not the backend spec, so a skill with no
- * overlay renders exactly zero controls. Measured 2026-08-04: **171 of 313 knobs across 37 skills**,
- * and 18 skills with no overlay at all. The workbench then tells the user "Runs with smart defaults
- * — ready to apply", which reads as a product decision and is usually just an absent overlay. The
- * sharpest case is `volcano`, the flagship: it says "Tune the options" while `fc_threshold`,
- * `fdr_threshold` and `top_n` — the three knobs that decide what the volcano SHOWS — are API-only.
+ * overlay renders exactly zero controls. First measured 2026-08-04: **171 of 313 knobs across 36
+ * skills**, 18 of them with no overlay at all. The workbench then tells the user "Runs with smart
+ * defaults — ready to apply", which reads as a product decision and is usually just an absent
+ * overlay. The sharpest case was `volcano`, the flagship: it said "Tune the options" while
+ * `fc_threshold`, `fdr_threshold` and `top_n` — the three knobs that decide what the volcano SHOWS
+ * — were API-only.
+ *
+ * Worked down the same day to **148 of 313 across 27 skills** (15 with no overlay): `volcano` and
+ * `proteomics_de` (both cutoffs + the labelled-gene count, and proteomics' imputation strategy,
+ * which moves a result further than the test choice does), the three over-representation skills
+ * that share one gene-list contract (`enrichment` · `pathway` · `go_graph`), and the one-line
+ * gaps (`ridge.order` · `slope.order` · `sankey.max_links` · `heatmap.groupby`). `sankey` is worth
+ * naming: `max_links` is its ONLY knob, so that skill rendered an empty parameter panel.
  *
  * WHY A WAIVER LIST AND NOT A THRESHOLD. A count ratchets down and tells you nothing about what is
  * missing; this names every gap, so the backlog is readable and a new skill cannot quietly join it.
@@ -192,7 +224,6 @@ const API_ONLY_KNOBS: Record<string, string[]> = {
     "label", "min_cells"],
   diff_abundance: ["sample_col", "condition_col", "label_col", "reference", "treatment",
     "normalization", "min_cells"],
-  enrichment: ["top_n", "fdr_threshold", "fc_threshold"],
   erg_bwave_bar: ["value_col", "stimulus_type", "manual_marks", "ab_detector"],
   erg_flicker: ["mark_labels", "manual_marks", "fourier"],
   erg_intensity_response: ["value_col", "stimulus_type", "error", "spread", "points", "band_alpha",
@@ -201,31 +232,23 @@ const API_ONLY_KNOBS: Record<string, string[]> = {
     "ab_detector", "oscillatory_potentials", "phnr"],
   facs_gating: ["x_channel", "y_channel", "plot", "compensate", "comp_matrix", "transform",
     "transform_t", "cofactor", "bins", "max_events", "gates"],
-  go_graph: ["top_n", "namespace", "fdr_threshold", "fc_threshold"],
   gsea: ["gene_set", "gene_sets", "engine", "set_name", "weight", "n_perm"],
-  heatmap: ["groupby"],
   integration: ["n_neighbors", "n_pcs", "color_by", "max_iter_harmony"],
   lollipop: ["baseline", "order", "pairs", "sig_test", "correction"],
   markers: ["groupby", "n_genes", "rank_by", "method", "standard_scale", "normalize"],
   mixing_metrics: ["batch_key", "label_key", "embedding_key", "n_neighbors", "perplexity",
     "normalize", "n_pcs"],
   normalization_qc: ["groupby", "max_cells", "filter", "nmads", "doublets", "doublet_threshold"],
-  pathway: ["top_n", "fdr_threshold", "fc_threshold"],
   pca: ["group_regex", "scale", "label_points"],
-  proteomics_de: ["fc_threshold", "fdr_threshold", "top_n", "min_valid", "log_input", "missing"],
   pseudotime_genes: ["top_n", "groupby", "root", "n_bins", "normalize"],
   pvca: ["factors", "pct_threshold", "normalize"],
-  ridge: ["order"],
-  sankey: ["max_links"],
   scorecard: ["normalize", "fill", "max_rows"],
-  slope: ["order"],
   ssgsea: ["gene_set", "gene_sets", "top_n", "min_size", "max_size", "weight", "zscore"],
   string_network: ["species", "required_score", "max_genes", "fdr_threshold"],
   trajectory: ["groupby", "root", "embedding", "threshold", "normalize"],
   umap_scrna: ["color_by", "embedding"],
   upset: ["mode", "min_size", "max_intersections", "sort_by"],
   violin: ["groupby", "resolution", "normalize", "annotate", "context", "known_min"],
-  volcano: ["fc_threshold", "fdr_threshold", "top_n"],
 };
 
 describe("control coverage — a knob the backend accepts is a knob the user can reach", () => {
@@ -263,6 +286,69 @@ describe("control coverage — a knob the backend accepts is a knob the user can
       stale,
       `waived knobs that now HAVE a control (or no longer exist) — delete them from ` +
         `API_ONLY_KNOBS so the backlog stays honest: ${stale.join(", ")}`,
+    ).toEqual([]);
+  });
+});
+
+/**
+ * The other half of reachability: a control that RENDERS but misstates its own value.
+ *
+ * Coverage above proves a knob has a control. It cannot see whether that control can express the
+ * knob. `mergeField` takes `min`/`max` straight from the backend spec and hands them to
+ * `<input type="range">`, which silently falls back to **0–100** when either is absent — so a
+ * float knob bounded 0–1 would render a slider whose whole meaningful range is the first 1% of the
+ * track, and an unbounded int would clamp at 100 with nothing saying so. Same class as the API-only
+ * knob (the user cannot reach the value), one layer further in, and invisible to every other gate
+ * because the field object is perfectly well-typed either way.
+ *
+ * The step check is the same failure from the other side: a range input snaps its thumb to
+ * `min + k*step`, so a default that is not on that lattice renders a thumb that disagrees with the
+ * number printed beside it. It caught `qq.max_points` (min 200, step 500, default 6000 → the thumb
+ * sits at 5700 while the readout says 6000) the first time it ran.
+ */
+describe("rendered controls — a slider must be able to express its own knob", () => {
+  /** The merged fields for every overlay skill, keyed by runtime slug. */
+  function renderedFields() {
+    const out: Record<string, ParamField[]> = {};
+    for (const [id, spec] of Object.entries(FULL_SPECS)) {
+      if (!OVERLAYS[id]?.length) continue;
+      out[id] = paramFieldsFromSpec(id, spec);
+    }
+    return out;
+  }
+
+  it("every slider is bounded by the backend spec (no silent 0–100 fallback)", () => {
+    const unbounded: string[] = [];
+    for (const [id, fields] of Object.entries(renderedFields())) {
+      for (const f of fields) {
+        if (f.type !== "range") continue;
+        if (f.min == null || f.max == null) unbounded.push(`${id}.${f.key}`);
+      }
+    }
+    expect(
+      unbounded,
+      `range controls whose skill.json declares no min/max — give the param bounds in the backend ` +
+        `spec, or render it as a "number" instead: ${unbounded.join(", ")}`,
+    ).toEqual([]);
+  });
+
+  it("every slider's default lands ON a step (the thumb agrees with the readout)", () => {
+    const offStep: string[] = [];
+    for (const [id, fields] of Object.entries(renderedFields())) {
+      for (const f of fields) {
+        if (f.type !== "range" || f.step == null || f.min == null) continue;
+        const steps = (Number(f.default) - f.min) / f.step;
+        // Float params carry binary-representation dust (0.55 - 0 over 0.05), so compare against
+        // the nearest integer rather than demanding an exact modulo of zero.
+        if (Math.abs(steps - Math.round(steps)) > 1e-6) {
+          offStep.push(`${id}.${f.key} (default ${f.default}, min ${f.min}, step ${f.step})`);
+        }
+      }
+    }
+    expect(
+      offStep,
+      `range defaults the browser will snap away from — change the overlay step so the default is ` +
+        `reachable: ${offStep.join(", ")}`,
     ).toEqual([]);
   });
 });

@@ -179,7 +179,11 @@ describe("hasParamControls", () => {
   it("is true for skills with a presentation overlay, false otherwise", () => {
     expect(hasParamControls("selom.integration")).toBe(true);
     expect(hasParamControls("umap_scrna")).toBe(true);
-    expect(hasParamControls("selom.go_graph")).toBe(false);
+    // The false case is an id with no overlay — deliberately an UNKNOWN one rather than a real
+    // skill that happens to lack controls today. This assertion used to name `go_graph`, and
+    // giving that skill its overlay (working down `API_ONLY_KNOBS`) failed a test whose subject
+    // is this function, not the backlog. The backlog has its own guard, exact in both directions.
+    expect(hasParamControls("selom.not_a_skill")).toBe(false);
   });
 });
 
