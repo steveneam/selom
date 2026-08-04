@@ -15,7 +15,6 @@
     { "name": "figure", "kind": "plotly_spec" }
   ],
   "catalog": {
-    "name": "Selom PVCA",
     "summary": "Principal Variance Component Analysis — apportions total expression variance across known sample factors (batch, cell type, dataset) to quantify batch effect before/after integration. Per-PC ANOVA variance components weighted by eigenvalue.",
     "category": "quality-control",
     "tier": "verified",

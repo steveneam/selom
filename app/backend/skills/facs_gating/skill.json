@@ -33,7 +33,6 @@
     { "type": "standard", "title": "Gating-ML 2.0: International Society for Advancement of Cytometry (ISAC) standard for representing gating descriptions in flow cytometry", "url": "https://isac-net.org/page/Data-Standards", "note": "Defines the rectangle / polygon / quadrant gate + transform semantics Selom's clean-room gating implements." }
   ],
   "catalog": {
-    "name": "Selom Flow-Cytometry Gating",
     "summary": "Drop an FCS file, compensate + transform, and get an editable density / contour / histogram / scatter view with a rectangle/polygon/quadrant gate tree and a population table (count, %parent, %total, median MFI). Built on the BSD-3 FlowIO + FlowUtils stack for compute (the high-level FlowKit toolkit pins pandas<3 and is deliberately not used), with clean-room numpy gating; the figure is native editable Plotly.",
     "category": "flow-cytometry",
     "tier": "verified",

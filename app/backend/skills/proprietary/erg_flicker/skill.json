@@ -30,7 +30,6 @@
     { "type": "publication", "title": "Cone ERG changes during light adaptation in two all-cone mutant mice", "authors": "Bush RA, Tanikawa A, Zeng Y, Sieving PA", "year": 2019, "doi": "10.1167/iovs.19-27242", "note": "Cone-driven light-adapted ERG timing in the mouse." }
   ],
   "catalog": {
-    "name": "Selom ERG Flicker",
     "summary": "Light-adapted flicker ERG as a publication figure — steady-state waveform small-multiples (flicker frequency down the rows, conditions across the columns, one shared scale bar) or the N1→P1 amplitude-versus-frequency summary. The periodic-response figure the flash trace grid can't make: the N1→P1 amplitude (trough-to-peak) + P1 implicit time are measured from the phase-averaged steady-state cycle, with no a-/b-wave or Naka-Rushton language. Reads the long ERG waveform table; condition colours + order match the trace grid; attaches a per-condition N1/P1 table.",
     "category": "electrophysiology",
     "tier": "verified",

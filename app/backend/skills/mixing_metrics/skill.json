@@ -24,7 +24,6 @@
     { "type": "tool", "title": "scikit-learn", "note": "ARI / NMI / silhouette (BSD-3)." }
   ],
   "catalog": {
-    "name": "Integration mixing metrics",
     "summary": "Score how well a batch-correction / integration mixed the batches while preserving cell-type structure: iLISI, cLISI, kBET, ARI, NMI and silhouette computed from an embedding + a batch (and optional cell-type) label. The numbers the integration-benchmark papers print. Chains after Melody integration (reads the corrected embedding) or runs standalone (computes PCA). LISI/kBET are clean-room, no GPL dependency.",
     "category": "single-cell",
     "tier": "verified",

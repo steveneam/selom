@@ -24,7 +24,6 @@
     { "type": "repo", "title": "PYangLab/Cepo — reference R implementation", "url": "https://github.com/PYangLab/Cepo", "note": "MIT-licensed R package; Selom's reimplementation is validated against its output." }
   ],
   "catalog": {
-    "name": "Selom Cepo",
     "summary": "Cepo differential-stability cell-type markers — genes that are highly AND stably expressed within a type vs. the rest. Clean-room Python reimplementation (no upstream Python port); catches identity genes mean-difference tests miss.",
     "category": "single-cell",
     "tier": "verified",

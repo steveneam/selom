@@ -27,7 +27,6 @@
     { "type": "repo", "title": "blitzGSEA — fast prerank GSEA with Loess p-value estimation", "url": "https://github.com/MaayanLab/blitzgsea", "note": "Opt-in alternate engine for finer p-values on small libraries." }
   ],
   "catalog": {
-    "name": "Selom GSEA",
     "summary": "Gene Set Enrichment Analysis — running enrichment-score curve with leading-edge hits + NES/p/FDR. Runs against the license-clean GO library (or a pasted set) via gseapy.prerank / blitzgsea, with an in-house weighted-KS fallback.",
     "category": "pathway-analysis",
     "tier": "verified",

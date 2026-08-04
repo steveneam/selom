@@ -25,7 +25,6 @@
     { "type": "publication", "title": "Fast, sensitive and accurate integration of single-cell data with Harmony", "authors": "Korsunsky I, Millard N, Fan J, et al.", "year": 2019, "doi": "10.1038/s41592-019-0619-0", "note": "Clean-room reimplementation — algorithm derived from the paper, no GPL code (the Harmony/harmonypy lineage is GPL-3.0)." }
   ],
   "catalog": {
-    "name": "Selom Melody",
     "summary": "Batch-correct and co-embed multiple single-cell libraries with Selom Melody — our clean-room, pure-numpy implementation of the Harmony integration method (Korsunsky et al. 2019), with no GPL dependency. QC → normalize → PCA → Melody on the chosen batch key → neighbours/Leiden/UMAP on the corrected embedding. Mixes batches while preserving cell-type structure — the prerequisite for building or benchmarking against a reference atlas. Emits the before→after batch-mixing score as provenance. Optional harmony2=true folds in the Harmony2 (2026) anti-over-integration improvements for large, heterogeneous data.",
     "category": "single-cell",
     "tier": "verified",

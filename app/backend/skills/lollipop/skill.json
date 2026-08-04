@@ -26,7 +26,6 @@
     { "name": "figure", "kind": "plotly_spec" }
   ],
   "catalog": {
-    "name": "Selom Lollipop Chart",
     "summary": "Ranked stem-and-dot chart of one value per category — the cleaner alternative to a bar chart when the point of the figure is the ordering. Carries a 95% bootstrap confidence interval on the median (a bar chart's mean±SEM has no non-parametric equivalent), and refuses to invent one on an already-aggregated table. Optional significance brackets between named pairs.",
     "category": "visualization",
     "tier": "verified",

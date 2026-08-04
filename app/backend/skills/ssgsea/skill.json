@@ -21,7 +21,6 @@
     { "name": "table",  "kind": "csv" }
   ],
   "catalog": {
-    "name": "Selom ssGSEA",
     "summary": "Single-sample GSEA — scores every sample independently against a gene-set library, giving one enrichment score per pathway per sample, drawn as a sample x pathway heatmap. Needs no differential test, only an expression matrix; runs against the license-clean GO library (or a pasted set) via gseapy.ssgsea, with the top variable pathways shown.",
     "category": "pathway-analysis",
     "tier": "verified",

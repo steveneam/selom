@@ -48,7 +48,12 @@ def to_catalog_entry(spec: SkillSpec) -> dict:
     references = clean_references(spec.references)
     entry = {
         "id": f"selom.{spec.id}",
-        "name": cat.get("name") or spec.title,
+        # `title` is the ONE display name. A second `catalog.name` used to override it, and every
+        # one of the 21 that existed was a lossy re-brand of the title it shadowed ("Box / strip
+        # plot" → "Selom Box Plot", "Ridge plot (joyplot)" → "Selom Ridge Plot"). So a retitle
+        # never reached the Store or the workbench, and the dropped words were the searchable ones.
+        # The `source: "selom"` badge already carries the branding; the name carries the meaning.
+        "name": spec.title,
         "summary": cat.get("summary") or spec.title,
         "source": "selom",
         # Open-core split marker (DECISIONS #8) — the FE Store can badge proprietary skills.

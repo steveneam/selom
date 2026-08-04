@@ -37,9 +37,11 @@ class SkillSpec(BaseModel):
     # transcriptomics-first), set explicitly only when it differs — the same default-and-
     # override convention as `origin`. Surfaced via GET /skills as `omicsType`; zero runner change.
     omics_type: list[str] = ["transcriptomics"]
-    # Optional Skill-Store display metadata (name/summary/category/tier/status/license/…).
-    # Presentation only — the execution contract above is what the runner needs. `catalog.name`
-    # carries the branded display name. The registry (skills/registry.py) reads this to serve GET /skills.
+    # Optional Skill-Store display metadata (summary/category/tier/status/license/…).
+    # Presentation only — the execution contract above is what the runner needs. The DISPLAY NAME is
+    # `title` above and only `title`: a `catalog.name` key is refused by `test_skill_catalog.py`,
+    # because the 21 that once existed silently shadowed the title (so a retitle never reached the
+    # user). The registry (skills/registry.py) reads this block to serve GET /skills.
     catalog: dict | None = None
     # Provenance block (docs/skill-references/spec.md) — peer to `origin`/`license`, surfaced as the
     # Store "Skill Information" card. `background` = 1-3 plain sentences ("what this skill is and where

@@ -20,7 +20,6 @@
   ],
   "origin": "proprietary",
   "catalog": {
-    "name": "Selom Enrichment",
     "summary": "In-house hypergeometric ORA + BH-FDR over GO & Reactome; dotplot output.",
     "category": "pathway-analysis",
     "tier": "verified",

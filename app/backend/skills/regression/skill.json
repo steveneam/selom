@@ -18,7 +18,6 @@
     { "name": "figure", "kind": "plotly_spec" }
   ],
   "catalog": {
-    "name": "Selom Scatter",
     "summary": "Scatter plot of two continuous variables, coloured by an optional group and annotated with optional point labels — the generic x/y/hue panel. Keep the ordinary-least-squares fit line with its R²/slope/p for a 'does A track B?' figure (e.g. identity score vs developmental age, Kim 2023 Fig 4C), or turn it off for a plain scatter.",
     "category": "visualization",
     "tier": "verified",

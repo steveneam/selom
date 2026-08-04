@@ -40,7 +40,6 @@
     { "type": "publication", "title": "The scotopic threshold response of the dark-adapted electroretinogram of the mouse", "authors": "Saszik SM, Robson JG, Frishman LJ", "year": 2002, "doi": "10.1113/jphysiol.2002.019703", "note": "Rod/dim-flash b-wave timing — distinguishes the rod late peak from the cone window." }
   ],
   "catalog": {
-    "name": "Selom ERG a/b-wave Bar",
     "summary": "Peak a-wave or b-wave at one flash intensity per condition (scotopic or photopic) — bar of the group mean ± SEM with every eye overlaid as an individual point (the reviewer ask for quantitative graphs). Runs straight off the dropped recording: reads the device markers when present, else measures the peak from the same traces the grid draws, at the intensity you pick. Condition colours + order match the trace grid; attaches a per-condition n / mean / SEM table.",
     "category": "electrophysiology",
     "tier": "verified",

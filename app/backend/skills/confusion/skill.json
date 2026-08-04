@@ -19,7 +19,6 @@
     { "name": "figure", "kind": "plotly_spec" }
   ],
   "catalog": {
-    "name": "Selom Confusion Matrix",
     "summary": "Cross-tabulation of two labellings of the same rows — predicted vs true, or (the omics use) a cluster assignment against a reference cell-type annotation, which is how an annotation gets validated. Optional row / column / total normalization, with the raw counts kept reachable. Reports overall agreement and Cohen's kappa only when the two label sets actually match, and names the reason when they do not.",
     "category": "visualization",
     "tier": "verified",

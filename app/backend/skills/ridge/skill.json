@@ -20,7 +20,6 @@
     { "name": "figure", "kind": "plotly_spec" }
   ],
   "catalog": {
-    "name": "Selom Ridge Plot",
     "summary": "Stacked kernel-density curves, one per group — the distribution-shape companion to box and violin. Shows what a five-number summary hides: two separated modes and one broad spread produce near-identical boxes but obviously different ridges. Discloses its own smoothing bandwidth, and names any group excluded for having too few values to estimate a density from.",
     "category": "visualization",
     "tier": "verified",
