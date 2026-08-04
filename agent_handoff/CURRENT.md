@@ -180,9 +180,15 @@
    - **Thread a data context into the merge.** `paramFieldsFromSpec(id, spec)` →
      `paramFieldsFromSpec(id, spec, ctx?)` where `ctx` = `{ columns?: string[]; groups?:
      GroupCandidate[] }`, and `useSkillParams(skillId, seed, ctx?)` passes it through.
-     `workbench-panel.tsx` already has `route.dataFit` in props — pass `dataFit.columns`; for the
-     pair-picker also thread `dataset.design` (NOT currently passed to workbench-panel — one more
-     prop off the same dataset object).
+   - **The exact wiring, checked 2026-08-04 — the precedent is already in the file you must edit.**
+     `components/project/views/skill-view.tsx` receives the whole `workbenchDataset: Dataset | null`
+     and **already reads `workbenchDataset?.dataFit?.columns`** (~line 64) to feed the `AskAi` route
+     composer's `dataColumns`. So the data is not merely available, it is already being *read and
+     threaded* — just to the AI composer instead of to the param panel, ~15 lines away. Copy that
+     line. **`design` is confirmed NOT passed down**: `route` is built as `{ routing, dataFit }`
+     (~line 44), so add `design: workbenchDataset.design ?? null` there — `design?: DesignHints |
+     null` is already on the `Dataset` type (`lib/projects/types.ts:147`), so nothing else changes.
+     `WorkbenchPanel`'s `route` prop type widens by one field.
    - **Keep it PURE and FAIL-SOFT.** `ctx` is optional; with none, a field renders exactly as it
      does today. That is not a nicety — `dataFit`/`design` are legitimately null for demo/sample
      data and for a dataset whose inspect failed, so a text fallback is the correct behaviour, not
