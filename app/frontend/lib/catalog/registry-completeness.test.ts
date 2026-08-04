@@ -128,6 +128,43 @@ describe("dev:mock param-spec fixture ↔ backend param_spec", () => {
     }
     expect(stale, `fixture keys removed/renamed in the backend param_spec: ${stale.join(", ")}`).toEqual([]);
   });
+
+  /**
+   * Key presence in both directions is not enough. The fixture can name every key the live spec
+   * names and still render a DIFFERENT control, because the widget's bounds come from the spec:
+   * `mergeField` reads `min`/`max`/`default`/`options` straight through, and an `<input
+   * type="range">` with no min/max silently falls back to 0–100. So a fixture drifting only in its
+   * numbers gives `dev:mock` a slider that cannot express the knob while live renders one that can
+   * — the exact defect class this file's slider guards exist for, in the one environment those
+   * guards never look at (they read the real specs, not the fixture).
+   *
+   * `note` is deliberately not compared: it is help-text fallback (`help: pres.help ?? ps.note`),
+   * so a divergence there is cosmetic in a dev-only mock and would make this guard noisy.
+   */
+  it("renders the SAME control as live (bounds, default and options match, not just the key)", () => {
+    const drift: string[] = [];
+    for (const [id, fixture] of Object.entries(SKILL_PARAM_SPECS)) {
+      const real = FULL_SPECS[id];
+      if (!real) continue; // reported by the test above
+      for (const [key, fx] of Object.entries(fixture)) {
+        const rl = real[key];
+        if (!rl) continue; // stale-key case handled above
+        for (const field of ["type", "default", "min", "max"] as const) {
+          if (fx[field] !== rl[field]) {
+            drift.push(`${id}.${key}.${field} (fixture ${JSON.stringify(fx[field])} vs live ${JSON.stringify(rl[field])})`);
+          }
+        }
+        if (JSON.stringify(fx.options ?? null) !== JSON.stringify(rl.options ?? null)) {
+          drift.push(`${id}.${key}.options (fixture ${JSON.stringify(fx.options ?? null)} vs live ${JSON.stringify(rl.options ?? null)})`);
+        }
+      }
+    }
+    expect(
+      drift,
+      `fixture params whose rendered control would differ from live — copy the value from the ` +
+        `backend skill.json: ${drift.join("; ")}`,
+    ).toEqual([]);
+  });
 });
 
 /**
@@ -209,16 +246,22 @@ describe("reachability — every backend skill can be resolved by the app", () =
  * gaps (`ridge.order` · `slope.order` · `sankey.max_links` · `heatmap.groupby`). `sankey` is worth
  * naming: `max_links` is its ONLY knob, so that skill rendered an empty parameter panel.
  *
+ * Second pass 2026-08-05, worked by CLUSTER rather than down the list: the scRNA prep vocabulary
+ * (`markers` · `trajectory` · `pseudotime_genes` · `mixing_metrics` · `annotate` · `violin` ·
+ * `cepo`) plus the singles (`upset` · `string_network` · `corr_heatmap` · `pca` · `pvca` ·
+ * `scorecard`). Two shared blocks in `params.ts` carry the vocabulary — and the interesting part is
+ * what they EXCLUDE. Four skills declare a `normalize` that is not the scRNA one (`pvca` scales to
+ * unit variance, `scorecard` min–max scales metric columns, `confusion` is a str enum) and
+ * `pseudotime_genes.groupby` never reaches its figure at all. Sharing on a matching key name rather
+ * than a matching meaning would have mislabelled all four.
+ *
  * WHY A WAIVER LIST AND NOT A THRESHOLD. A count ratchets down and tells you nothing about what is
  * missing; this names every gap, so the backlog is readable and a new skill cannot quietly join it.
  * Same shape as `test_reachability_guard.py`. It is exact in BOTH directions on purpose: adding a
  * control fails until the waiver is deleted, so the list cannot rot into fiction.
  */
 const API_ONLY_KNOBS: Record<string, string[]> = {
-  annotate: ["groupby", "embedding", "normalize"],
-  cepo: ["group_key", "n_genes", "min_cells", "exprs_pct", "normalize"],
   confusion: ["true_order", "predicted_order"],
-  corr_heatmap: ["axis", "method", "cluster"],
   deg: ["mode", "groupby", "method", "top_n", "normalize", "group_col", "group_val", "time_col",
     "covariate_col", "min_count", "normalization", "sample_col", "condition_col", "label_col",
     "label", "min_cells"],
@@ -235,20 +278,9 @@ const API_ONLY_KNOBS: Record<string, string[]> = {
   gsea: ["gene_set", "gene_sets", "engine", "set_name", "weight", "n_perm"],
   integration: ["n_neighbors", "n_pcs", "color_by", "max_iter_harmony"],
   lollipop: ["baseline", "order", "pairs", "sig_test", "correction"],
-  markers: ["groupby", "n_genes", "rank_by", "method", "standard_scale", "normalize"],
-  mixing_metrics: ["batch_key", "label_key", "embedding_key", "n_neighbors", "perplexity",
-    "normalize", "n_pcs"],
   normalization_qc: ["groupby", "max_cells", "filter", "nmads", "doublets", "doublet_threshold"],
-  pca: ["group_regex", "scale", "label_points"],
-  pseudotime_genes: ["top_n", "groupby", "root", "n_bins", "normalize"],
-  pvca: ["factors", "pct_threshold", "normalize"],
-  scorecard: ["normalize", "fill", "max_rows"],
   ssgsea: ["gene_set", "gene_sets", "top_n", "min_size", "max_size", "weight", "zscore"],
-  string_network: ["species", "required_score", "max_genes", "fdr_threshold"],
-  trajectory: ["groupby", "root", "embedding", "threshold", "normalize"],
   umap_scrna: ["color_by", "embedding"],
-  upset: ["mode", "min_size", "max_intersections", "sort_by"],
-  violin: ["groupby", "resolution", "normalize", "annotate", "context", "known_min"],
 };
 
 describe("control coverage — a knob the backend accepts is a knob the user can reach", () => {

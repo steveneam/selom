@@ -172,11 +172,57 @@ const GENE_LIST_CUTOFFS: ParamPresentation[] = [
   },
 ];
 
+/**
+ * `normalize` — the scRNA preparation switch. ELEVEN skills declare it and mean exactly one thing:
+ * `to_bool(params.get("normalize", True))` gating `sc.pp.normalize_total(target_sum=1e4)` +
+ * `sc.pp.log1p`. That was confirmed by reading each runner's BODY, not by matching the key name —
+ * which is the whole reason this block exists, because **three other skills declare a param called
+ * `normalize` that is a different knob**:
+ *
+ *   - `pvca.normalize`      — divides each feature by its SD (unit variance before PCA). It is the
+ *                             twin of `pca.scale`, not of this. (`skills/pvca/run_real.py:40`)
+ *   - `scorecard.normalize` — min–max scales each METRIC COLUMN so radar axes are comparable.
+ *   - `confusion.normalize` — a `str` enum (none/row/column/all): which matrix reading to show.
+ *
+ * Same name, different job — the collision `fc_threshold` already has between `volcano` (where it
+ * IS the significance test, drawn as a dashed line) and the over-representation trio (where it
+ * selects the query gene list). A shared block is only correct where the MEANING is shared, so
+ * those three are deliberately absent below and keep their own wording.
+ *
+ * `deg` belongs to this block by meaning (`skills/deg/run_real.py:92`, same call, same comment) and
+ * is left out only because its panel is specced as a whole (board NEXT#1(d)) — spread it in there.
+ */
+const scrnaNormalize = (extra = ""): ParamPresentation => ({
+  key: "normalize", label: "Normalize input", type: "switch",
+  help:
+    "Log-normalize raw counts (counts-per-10k, then log1p) before the analysis. Turn this OFF only " +
+    "if your file is already normalized — doing it twice compresses the differences you are looking for." +
+    (extra ? ` ${extra}` : ""),
+});
+
+/**
+ * `groupby` — the cell-grouping column, for the skills where it names the levels the figure is
+ * DRAWN over: `markers` (dotplot rows) · `violin` (categories) · `annotate` (the unit scored) ·
+ * `trajectory` (PAGA nodes) · `heatmap` (marker genes per group). All five resolve it identically —
+ * the named obs column if the file carries one, else Leiden clusters computed on the spot — and the
+ * fallback sentence is `heatmap`'s, which had the clearest wording of the five and is now its one home.
+ *
+ * **`pseudotime_genes.groupby` is NOT in this block**, and that exclusion is the point of having
+ * one: there the column never reaches the figure at all. `compute_pseudotime(adata, root, groupby)`
+ * uses it ONLY to pick the cell the trajectory is rooted at (`skills/_scrna.py:28`) while the axis
+ * is pseudotime bins, and its own `note` in `skill.json` says so. Same key, different job — as with
+ * `normalize` above, three times over.
+ */
+const scrnaGroupby = (purpose: string): ParamPresentation => ({
+  key: "groupby", label: "Group cells by", type: "text", placeholder: "leiden",
+  help: `${purpose} If your file has no such column, Selom clusters the cells itself (Leiden) and groups by that.`,
+});
+
 const PRESENTATION: Record<string, ParamPresentation[]> = {
   // scRNA UMAP — the prep/QC + embedding knobs the runner honours. Resolution lives on
   // `cluster`, not here, so it isn't surfaced (the UMAP runner's Leiden uses the default).
   umap_scrna: [
-    { key: "normalize", label: "Normalize input", type: "switch", help: "Log-normalize raw counts. Off for already-normalized data." },
+    scrnaNormalize(),
     { key: "n_hvg", label: "Highly variable genes", type: "range", step: 250, help: "Top-N variable genes used for PCA (0 = all genes; ~2000 is the standard choice)." },
     { key: "n_neighbors", label: "Neighbours (kNN)", type: "range", step: 1, help: "Local neighbourhood size for the graph + UMAP." },
     { key: "n_pcs", label: "Principal components", type: "range", step: 1, help: "PCs that build the neighbour graph." },
@@ -186,7 +232,7 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     { key: "resolution", label: "Cluster resolution", type: "range", step: 0.1, help: "Higher = more, finer clusters." },
     { key: "n_neighbors", label: "Neighbours (kNN)", type: "range", step: 1, help: "Local neighbourhood size for the graph." },
     { key: "n_pcs", label: "Principal components", type: "range", step: 1, help: "PCs that build the neighbour graph." },
-    { key: "normalize", label: "Normalize input", type: "switch", help: "Log-normalize raw counts. Off for already-normalized data." },
+    scrnaNormalize(),
   ],
   // scRNA batch integration — Selom Melody, our clean-room Harmony-method engine (no GPL; see
   // skills/integration/melody.py). The engine select reveals Harmony2-only knobs (alpha) when in
@@ -209,7 +255,7 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       showWhen: { key: "harmony2", equals: "true" },
     },
     { key: "n_hvg", label: "Highly variable genes", type: "range", step: 250, help: "Top-N variable genes for PCA before integration (0 = all; ~2000–5000 is standard for multi-batch)." },
-    { key: "normalize", label: "Normalize input", type: "switch", help: "Log-normalize raw counts. Off for already-normalized data." },
+    scrnaNormalize(),
   ],
   deg: [
     { key: "reference", label: "Reference group", type: "text", placeholder: "e.g. control", help: "Baseline condition for the contrast." },
@@ -418,6 +464,7 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   // widget differs because the data does; the vocabulary is identical.
   violin: [
     { key: "gene", label: "Marker gene", type: "text", placeholder: "e.g. MS4A1" },
+    scrnaGroupby("The cell-annotation column whose levels become one violin each — e.g. cell_type."),
     { key: "order", label: "Category order", type: "text", placeholder: "e.g. cluster 2, cluster 0", help: "Comma-separated. Named categories lead, in this order; the rest follow unchanged." },
     { key: "add_count", label: "Show n per group", type: "switch", help: "Append n= to each category label." },
     { key: "pairs", label: "Compare groups", type: "text", placeholder: "e.g. cluster 0~cluster 1", help: "Comma-separated pairs joined by ~. Each draws a bracket with significance stars, and the p-values appear in the Statistics table. A name that doesn't match a group is skipped." },
@@ -431,6 +478,19 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       { value: "bonferroni", label: "Bonferroni" },
       { value: "bh", label: "Benjamini-Hochberg (FDR)" },
     ] },
+    // The PubMed annotation block. `context` and `known_min` do nothing unless the annotation is on,
+    // so they are gated on it rather than left as two controls that silently no-op.
+    { key: "annotate", label: "Annotate with literature", type: "select", options: [
+      { value: "none", label: "None" },
+      { value: "pubmed", label: "PubMed hit count" },
+    ], help: "Look the gene up in PubMed and note how well studied it is. Best-effort — an unreachable lookup leaves the figure unannotated rather than failing the run." },
+    { key: "context", label: "Literature context", type: "text", placeholder: "e.g. retina, macrophage", showWhen: { key: "annotate", equals: "pubmed" },
+      help: "Narrows the PubMed query to this field, so a gene famous elsewhere is not counted as well studied here." },
+    { key: "known_min", label: "“Well studied” threshold (papers)", type: "number", step: 5, showWhen: { key: "annotate", equals: "pubmed" },
+      help: "At or above this many hits, the gene is called well studied. Below it, novel." },
+    { key: "resolution", label: "Cluster resolution", type: "range", step: 0.1,
+      help: "Only used when Selom has to cluster the cells itself (no grouping column in the file). Higher = more, finer clusters." },
+    scrnaNormalize(),
   ],
   // Composition takes the ordering half of the vocabulary only — it holds one value per
   // category x condition cell, so there is no distribution to test. See the note at the top of
@@ -448,10 +508,7 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     ] },
   ],
   heatmap: [
-    {
-      key: "groupby", label: "Group cells by", type: "text", placeholder: "leiden",
-      help: "The cell-annotation column to take marker genes per group from — e.g. cell_type if your file carries one. If the file has no such column, Selom clusters the cells itself (Leiden) and groups by that.",
-    },
+    scrnaGroupby("The cell-annotation column to take marker genes per group from — e.g. cell_type if your file carries one."),
     { key: "n_genes", label: "Genes shown", type: "range", step: 5, help: "Top genes by variance (bulk) or markers per cluster (scRNA)." },
     {
       key: "cluster", label: "Clustering", type: "select",
@@ -597,6 +654,14 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       key: "invert_metrics", label: "Lower-is-better metrics", type: "text", placeholder: "e.g. off_target, error_rate",
       help: "Comma-separated metrics where lower is better — inverted so higher always reads as better.",
     },
+    // `normalize` here is NOT the scRNA switch — see the scrnaNormalize block. It rescales each
+    // metric COLUMN so metrics in different units share one axis.
+    {
+      key: "normalize", label: "Rescale each metric", type: "switch",
+      help: "Min–max scale every metric to 0–1 across the conditions, so metrics in different units share one axis. Off plots the raw values, which only reads well when they already share a scale.",
+    },
+    { key: "fill", label: "Fill the radar area", type: "switch", help: "Shade the area inside each condition's outline. Off leaves outlines only, which is easier to read once several conditions overlap.", showWhen: { key: "layout", equals: "radar" } },
+    { key: "max_rows", label: "Conditions shown", type: "range", step: 1, help: "How many rows of the input to draw, from the top." },
   ],
   // Proteomics DE — ordered along the pipeline the runner actually walks: which samples → how the
   // matrix is prepared → which test → where the volcano's lines fall. The preparation knobs are not
@@ -888,6 +953,143 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       ],
       help: "Curated marker panel scored per cluster to assign cell types.",
     },
+    scrnaGroupby("The cell-annotation column whose levels each get a cell-type call — e.g. leiden."),
+    { key: "embedding", label: "Embedding", type: "text", placeholder: "X_umap",
+      help: "The obsm key holding the 2-D coordinates to draw the labelled cells on." },
+    scrnaNormalize(),
+  ],
+  // Marker dotplot. `rank_by` decides HOW markers are chosen and `method` only applies to the
+  // p-value route — an effect-size ranking never calls a test, so the test select is hidden there
+  // rather than left visible and inert (`skills/markers/run_real.py:46`).
+  markers: [
+    scrnaGroupby("The cell-annotation column whose levels become the dotplot's rows — e.g. cell_type."),
+    { key: "n_genes", label: "Genes per group", type: "range", step: 1,
+      help: "Top markers drawn for each group. A gene that ranks in two groups is drawn once." },
+    { key: "rank_by", label: "Rank markers by", type: "select", options: [
+      { value: "wilcoxon", label: "Wilcoxon p-value (classic)" },
+      { value: "cohens_d", label: "Cohen's d (effect size)" },
+      { value: "auc", label: "AUC (effect size)" },
+    ], help: "An effect size ranks by how separated the groups actually are. The Wilcoxon p-value is the classic choice, but it is circular when the groups came from clustering this same data — so it flatters itself." },
+    { key: "method", label: "Statistical test", type: "select", options: [
+      { value: "wilcoxon", label: "Wilcoxon rank-sum" },
+      { value: "t-test", label: "t-test" },
+      { value: "t-test_overestim_var", label: "t-test (overestimated variance)" },
+      { value: "logreg", label: "Logistic regression" },
+    ], showWhen: { key: "rank_by", equals: "wilcoxon" },
+      help: "The test behind the ranking. Not used by the effect-size rankings." },
+    { key: "standard_scale", label: "Scale colour per gene", type: "switch",
+      help: "Scale each gene to 0–1 across the groups, so colour shows WHERE a gene is highest rather than how abundant it is. Off = mean log1p expression, where one loud gene can wash out the rest." },
+    scrnaNormalize(),
+  ],
+  trajectory: [
+    scrnaGroupby("The cell-annotation column whose levels become the trajectory's nodes — e.g. cell_type."),
+    { key: "root", label: "Start from", type: "text", placeholder: "auto",
+      help: "The group the trajectory is rooted at. Blank = the cell furthest along the first diffusion component, which is a guess about direction, not a finding." },
+    { key: "embedding", label: "Embedding", type: "text", placeholder: "X_umap",
+      help: "The obsm key holding the 2-D coordinates the nodes are positioned on." },
+    { key: "threshold", label: "Edge threshold (connectivity)", type: "range", step: 0.01,
+      help: "PAGA connectivity below this is not drawn. Higher = a sparser, more confident skeleton; low values connect almost everything to everything." },
+    scrnaNormalize(),
+  ],
+  // `groupby` here is deliberately NOT the shared one — see the scrnaGroupby block: this column
+  // never reaches the figure, it only chooses where the trajectory starts.
+  pseudotime_genes: [
+    { key: "top_n", label: "Genes shown", type: "range", step: 1,
+      help: "How many of the most pseudotime-varying genes to draw." },
+    { key: "groupby", label: "Root cluster column", type: "text", placeholder: "leiden",
+      help: "Used ONLY to place the start of the trajectory — the figure's x-axis is pseudotime, not this column. Pair it with Start from below." },
+    { key: "root", label: "Start from", type: "text", placeholder: "auto",
+      help: "Which level of the column above the trajectory begins at. Blank = the extreme of the first diffusion component." },
+    { key: "n_bins", label: "Pseudotime bins", type: "range", step: 5,
+      help: "Cells are averaged into this many bins along pseudotime before smoothing. Fewer = smoother curves and less visible noise." },
+    scrnaNormalize(),
+  ],
+  mixing_metrics: [
+    { key: "batch_key", label: "Batch column", type: "text", placeholder: "e.g. sample, donor, batch",
+      help: "The obs column naming each library/batch — the thing integration is supposed to mix. Falls back to a known alias when absent." },
+    { key: "label_key", label: "Cell-type column", type: "text", placeholder: "e.g. cell_type",
+      help: "The obs column with biological labels. Without it the label-aware metrics (cLISI, ARI, NMI, ASW-label) are reported N/A rather than guessed." },
+    { key: "embedding_key", label: "Embedding", type: "text", placeholder: "auto",
+      help: "The obsm key to score. Blank resolves the corrected embedding first (Melody → Harmony → X_emb → X_pca), and computes a PCA only if none exists." },
+    { key: "n_neighbors", label: "Neighbours (kBET)", type: "range", step: 5,
+      help: "Neighbourhood size for the kBET test. Larger = a coarser, more forgiving verdict on local mixing." },
+    { key: "perplexity", label: "LISI perplexity", type: "range", step: 5,
+      help: "Kernel width for the LISI scores (uses roughly 3× this many neighbours)." },
+    { key: "n_pcs", label: "Principal components", type: "range", step: 1,
+      help: "PCs used when an embedding has to be computed. Ignored when your file already has one." },
+    scrnaNormalize("Only applies when no embedding is present and one must be computed from counts."),
+  ],
+  cepo: [
+    { key: "group_key", label: "Cell-type column", type: "text", placeholder: "auto",
+      help: "The obs column holding the cell-type labels to find stable markers for. Blank = resolved from the usual names." },
+    { key: "n_genes", label: "Genes per cell type", type: "range", step: 1,
+      help: "Top stable markers drawn for each cell type." },
+    { key: "min_cells", label: "Minimum cells per type", type: "number", step: 5,
+      help: "Cell types with fewer cells than this are dropped — a stability score from a handful of cells is noise wearing a number." },
+    { key: "exprs_pct", label: "Minimum detection rate", type: "number", step: 0.01,
+      help: "Genes detected in a smaller fraction of cells than this are excluded before scoring (0.05 = 5%)." },
+    scrnaNormalize(),
+  ],
+  // `normalize` here is NOT the scRNA switch — see the scrnaNormalize block. It scales each feature
+  // to unit variance before the PCA, which is `pca.scale` under a different name.
+  pvca: [
+    { key: "factors", label: "Factors", type: "text", placeholder: "e.g. batch, condition, sex",
+      help: "Comma-separated categorical columns to apportion the variance across. Blank = every non-numeric column in the file." },
+    { key: "pct_threshold", label: "Variance retained", type: "range", step: 0.05,
+      help: "How much of the total variance the kept principal components must cover before the apportionment is computed." },
+    { key: "normalize", label: "Scale features", type: "switch",
+      help: "Divide each feature by its standard deviation before the PCA, so a high-variance feature cannot dominate purely because of its units. This is a scaling choice, not the count normalization of the scRNA skills." },
+  ],
+  upset: [
+    { key: "mode", label: "Intersection mode", type: "select", options: [
+      { value: "distinct", label: "Distinct (in these sets and no others)" },
+      { value: "inclusive", label: "Inclusive (in at least these sets)" },
+    ], help: "Distinct partitions the items so every one is counted exactly once — the standard UpSet reading. Inclusive lets an item count towards several bars." },
+    { key: "min_size", label: "Minimum intersection size", type: "number", step: 1,
+      help: "Intersections smaller than this are dropped before sorting." },
+    { key: "max_intersections", label: "Bars shown", type: "range", step: 1,
+      help: "How many intersections to draw, after sorting." },
+    { key: "sort_by", label: "Sort bars by", type: "select", options: [
+      { value: "size", label: "Size (largest first)" },
+      { value: "degree", label: "Degree (most sets first)" },
+    ], help: "Size answers “what overlaps most”; degree groups the bars by how many sets each intersection spans." },
+  ],
+  string_network: [
+    { key: "species", label: "Species", type: "select", options: [
+      { value: "9606", label: "Human (9606)" },
+      { value: "10090", label: "Mouse (10090)" },
+      { value: "10116", label: "Rat (10116)" },
+      { value: "7955", label: "Zebrafish (7955)" },
+      { value: "7227", label: "Fly (7227)" },
+      { value: "6239", label: "C. elegans (6239)" },
+      { value: "4932", label: "Yeast (4932)" },
+    ], help: "NCBI taxon the gene symbols are looked up against. The wrong species returns few edges rather than an error." },
+    { key: "required_score", label: "Minimum confidence", type: "range", step: 50,
+      help: "STRING's combined score, 0–1000. The published bands are 150 low · 400 medium · 700 high · 900 highest — below 400 the network fills with weak, mostly text-mined links." },
+    { key: "max_genes", label: "Genes requested", type: "range", step: 1,
+      help: "How many of your genes to send. A larger network is denser, not clearer." },
+    { key: "fdr_threshold", label: "Gene-list cutoff (adjusted p)", type: "number", step: 0.001,
+      help: "Which rows of a DE table become the query gene list. Ignored for a bare gene list." },
+  ],
+  corr_heatmap: [
+    { key: "axis", label: "Correlate", type: "select", options: [
+      { value: "samples", label: "Samples (columns)" },
+      { value: "features", label: "Features (rows)" },
+    ], help: "Samples answers “do my replicates agree”; features answers “which genes move together”." },
+    { key: "method", label: "Correlation", type: "select", options: [
+      { value: "pearson", label: "Pearson (linear)" },
+      { value: "spearman", label: "Spearman (rank)" },
+    ], help: "Spearman is the safer default on skewed expression data — it judges monotone agreement, so one outlier cannot manufacture a correlation." },
+    { key: "cluster", label: "Cluster the matrix", type: "switch",
+      help: "Reorder rows and columns by hierarchical clustering, so blocks of similar samples sit together. Off keeps the file's own order." },
+  ],
+  pca: [
+    { key: "group_regex", label: "Group name pattern", type: "text", placeholder: "\\d+$",
+      help: "A regex REMOVED from each sample name; what remains is the group. The default strips trailing digits, so ctrl1/ctrl2/ctrl3 all become ctrl." },
+    { key: "scale", label: "Scale features", type: "switch",
+      help: "Divide each feature by its standard deviation first, so a high-variance feature cannot dominate the components purely because of its units." },
+    { key: "label_points", label: "Label points", type: "switch",
+      help: "Print each sample's name beside its point. Best on small sets — it collides on large ones." },
   ],
 };
 

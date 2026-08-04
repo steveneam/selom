@@ -354,10 +354,28 @@ export async function runFromWorkbench(
     await expect(field, `no control labelled "${label}" — the knob is API-only`).toBeVisible({
       timeout: 30_000,
     });
+    // A switch is a `role="switch"` BUTTON (param-control.tsx), not an input — `fill()` throws on
+    // it and `.type` is undefined, so every bool knob was undrivable here. It is set by comparing
+    // the wanted state to `aria-checked` and clicking only on a difference, which makes the call
+    // idempotent: passing "true" for a knob already on is a no-op rather than a silent toggle-off.
+    // Bool knobs are the largest single class in the backend spec (`normalize` alone is 11 skills),
+    // so this is the switch peer of `setRange`.
     const kind = await field.evaluate((el) =>
-      el.tagName === "SELECT" ? "select" : (el as HTMLInputElement).type,
+      el.getAttribute("role") === "switch"
+        ? "switch"
+        : el.tagName === "SELECT"
+          ? "select"
+          : (el as HTMLInputElement).type,
     );
-    if (kind === "select") await field.selectOption(value);
+    if (kind === "switch") {
+      const want = ["true", "1", "on", "yes"].includes(value.trim().toLowerCase());
+      const now = (await field.getAttribute("aria-checked")) === "true";
+      if (want !== now) await field.click();
+      await expect(field, `switch "${label}" did not settle on ${want}`).toHaveAttribute(
+        "aria-checked",
+        String(want),
+      );
+    } else if (kind === "select") await field.selectOption(value);
     else if (kind === "range") await setRange(page, field, Number(value), label);
     else await field.fill(value);
   }
