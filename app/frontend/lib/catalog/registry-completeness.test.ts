@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { overlayParamKeys, paramFieldsFromSpec } from "./params";
+import { SCRNA_NORMALIZE_HELP, overlayParamKeys, paramFieldsFromSpec } from "./params";
 import type { BackendParamSpec, ParamField } from "./params";
 import { SKILL_PARAM_SPECS } from "@/mocks/skill-spec-fixture";
 
@@ -364,11 +364,19 @@ describe("rendered controls — a slider must be able to express its own knob", 
     ).toEqual([]);
   });
 
-  it("every slider's default lands ON a step (the thumb agrees with the readout)", () => {
+  /**
+   * Scoped to `range` AND `number`, because the lattice is a property of the INPUT, not of the
+   * widget: `<input type="number">` validates `min + k*step` exactly as a range snaps to it, so an
+   * off-lattice default is a `stepMismatch` the browser marks invalid rather than a thumb that
+   * merely disagrees with its readout. Widened 2026-08-05 after two new number fields
+   * (`violin.known_min` min 1/step 5/default 5, `cepo.min_cells` min 2/step 5/default 20) shipped
+   * off-lattice under a guard that only looked at sliders.
+   */
+  it("every stepped control's default lands ON a step (the value is one the input accepts)", () => {
     const offStep: string[] = [];
     for (const [id, fields] of Object.entries(renderedFields())) {
       for (const f of fields) {
-        if (f.type !== "range" || f.step == null || f.min == null) continue;
+        if ((f.type !== "range" && f.type !== "number") || f.step == null || f.min == null) continue;
         const steps = (Number(f.default) - f.min) / f.step;
         // Float params carry binary-representation dust (0.55 - 0 over 0.05), so compare against
         // the nearest integer rather than demanding an exact modulo of zero.
@@ -379,8 +387,58 @@ describe("rendered controls — a slider must be able to express its own knob", 
     }
     expect(
       offStep,
-      `range defaults the browser will snap away from — change the overlay step so the default is ` +
-        `reachable: ${offStep.join(", ")}`,
+      `defaults the browser will snap away from or reject — change the overlay step so the default ` +
+        `is reachable: ${offStep.join(", ")}`,
+    ).toEqual([]);
+  });
+
+  /**
+   * The shared-vocabulary rule, made executable instead of asserted in a comment.
+   *
+   * `normalize` is declared by fourteen skills under THREE different meanings. Eleven gate the same
+   * `sc.pp.normalize_total(1e4)` + `log1p`; the three below do something else entirely, and telling
+   * them apart needs the runner's body — the key, the declared `bool` type and the `true` default
+   * are identical either way. A previous board asserted all its candidates agreed and was wrong
+   * about `pvca` [[share-vocabulary-by-meaning-not-name]].
+   *
+   * So: a rendered `normalize` control either carries the shared help, or is named here WITH the
+   * reason it differs. Exact in both directions, the `API_ONLY_KNOBS` shape — a new skill cannot
+   * quietly diverge, and a waiver cannot outlive the divergence that justified it.
+   */
+  it("every `normalize` control shares the block, or is a named exception with a reason", () => {
+    const NORMALIZE_IS_NOT_SCRNA: Record<string, string> = {
+      pvca: "divides each feature by its SD (unit variance before PCA) — it is `pca.scale` under another name",
+      scorecard: "min–max scales each METRIC COLUMN so radar axes are comparable",
+      confusion: "a str enum (none/row/column/all) choosing which matrix reading to show",
+    };
+    const diverged: string[] = [];
+    const stale: string[] = [];
+    const seen = new Set<string>();
+
+    for (const [id, fields] of Object.entries(renderedFields())) {
+      const f = fields.find((x) => x.key === "normalize");
+      if (!f) continue; // no rendered control — tracked by API_ONLY_KNOBS instead
+      seen.add(id);
+      const shared = (f.help ?? "").startsWith(SCRNA_NORMALIZE_HELP);
+      if (shared && id in NORMALIZE_IS_NOT_SCRNA) stale.push(id);
+      if (!shared && !(id in NORMALIZE_IS_NOT_SCRNA)) diverged.push(id);
+    }
+
+    expect(
+      diverged,
+      `skills whose "normalize" control neither uses scrnaNormalize() nor is a declared exception — ` +
+        `read the RUNNER's body: if it gates normalize_total+log1p, spread the shared block; if not, ` +
+        `add it to NORMALIZE_IS_NOT_SCRNA with the reason: ${diverged.join(", ")}`,
+    ).toEqual([]);
+    expect(
+      stale,
+      `declared exceptions that now carry the shared help — delete them from NORMALIZE_IS_NOT_SCRNA: ` +
+        `${stale.join(", ")}`,
+    ).toEqual([]);
+    expect(
+      Object.keys(NORMALIZE_IS_NOT_SCRNA).filter((id) => !seen.has(id)),
+      `declared exceptions with no rendered "normalize" control at all — the waiver describes ` +
+        `nothing`,
     ).toEqual([]);
   });
 });

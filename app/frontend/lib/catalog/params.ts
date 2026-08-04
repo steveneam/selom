@@ -161,11 +161,20 @@ export interface ParamPresentation {
  * are drawn on the canvas as dashed lines. Same names, different jobs — which is exactly why the
  * wording lives here instead of being retyped per skill.
  */
+/**
+ * The gene-list adjusted-p cutoff, as its own factory because FOUR skills take it and only three of
+ * them draw terms. `string_network` draws EDGES, each carrying a STRING confidence score rather than
+ * an enrichment p — so the "not a cutoff on the X drawn" clause is the one part that varies, and it
+ * is the part most worth saying. It was hand-copied here once and had already drifted (the clause
+ * was simply dropped), which is the failure this file's shared blocks exist to prevent.
+ */
+const geneListFdr = (notACutoffOn: string): ParamPresentation => ({
+  key: "fdr_threshold", label: "Gene-list cutoff (adjusted p)", type: "number", step: 0.001,
+  help: `Which rows of your DE table become the query gene list. ${notACutoffOn} Ignored for a bare gene list.`,
+});
+
 const GENE_LIST_CUTOFFS: ParamPresentation[] = [
-  {
-    key: "fdr_threshold", label: "Gene-list cutoff (adjusted p)", type: "number", step: 0.001,
-    help: "Which rows of your DE table become the query gene list. Not a cutoff on the terms drawn — each of those carries its own p. Ignored for a bare gene list.",
-  },
+  geneListFdr("Not a cutoff on the terms drawn — each of those carries its own p."),
   {
     key: "fc_threshold", label: "Gene-list fold-change cutoff (log₂)", type: "range", step: 0.1,
     help: "Require |log₂FC| ≥ this as well, narrowing the query list by effect size. 0 = no fold-change filter, so the adjusted p alone decides it.",
@@ -192,12 +201,14 @@ const GENE_LIST_CUTOFFS: ParamPresentation[] = [
  * `deg` belongs to this block by meaning (`skills/deg/run_real.py:92`, same call, same comment) and
  * is left out only because its panel is specced as a whole (board NEXT#1(d)) — spread it in there.
  */
+/** The shared sentence itself, exported so the guard can assert membership rather than trust prose. */
+export const SCRNA_NORMALIZE_HELP =
+  "Log-normalize raw counts (counts-per-10k, then log1p) before the analysis. Turn this OFF only " +
+  "if your file is already normalized — doing it twice compresses the differences you are looking for.";
+
 const scrnaNormalize = (extra = ""): ParamPresentation => ({
   key: "normalize", label: "Normalize input", type: "switch",
-  help:
-    "Log-normalize raw counts (counts-per-10k, then log1p) before the analysis. Turn this OFF only " +
-    "if your file is already normalized — doing it twice compresses the differences you are looking for." +
-    (extra ? ` ${extra}` : ""),
+  help: SCRNA_NORMALIZE_HELP + (extra ? ` ${extra}` : ""),
 });
 
 /**
@@ -486,8 +497,10 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     ], help: "Look the gene up in PubMed and note how well studied it is. Best-effort — an unreachable lookup leaves the figure unannotated rather than failing the run." },
     { key: "context", label: "Literature context", type: "text", placeholder: "e.g. retina, macrophage", showWhen: { key: "annotate", equals: "pubmed" },
       help: "Narrows the PubMed query to this field, so a gene famous elsewhere is not counted as well studied here." },
-    { key: "known_min", label: "“Well studied” threshold (papers)", type: "number", step: 5, showWhen: { key: "annotate", equals: "pubmed" },
-      help: "At or above this many hits, the gene is called well studied. Below it, novel." },
+    // step 1, not 5: a `number` input snaps to `min + k*step` exactly as a range does, and min 1 /
+    // step 5 would make the default 5 an INVALID value the browser rejects.
+    { key: "known_min", label: "“Well studied” threshold (papers)", type: "number", step: 1, showWhen: { key: "annotate", equals: "pubmed" },
+      help: "At or above this many hits, the gene is called well studied. Below it, novel. The count is a LIVE PubMed lookup made when the figure runs, so re-running later can move it." },
     { key: "resolution", label: "Cluster resolution", type: "range", step: 0.1,
       help: "Only used when Selom has to cluster the cells itself (no grouping column in the file). Higher = more, finer clusters." },
     scrnaNormalize(),
@@ -941,8 +954,11 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       ],
       help: "Amplitude unit for the waveforms, scale bar, and N1/P1 table — a pure rescale (nothing re-measured). Auto picks the unit that reads cleanest for the (small) flicker signal.",
     },
-    { key: "scale_uv", label: "Scale bar — amplitude (µV)", type: "number", step: 5, help: "Vertical scale-bar length, set in µV (flicker amplitudes are small — ~20 µV is a good default)." },
-    { key: "scale_ms", label: "Scale bar — time (ms)", type: "number", step: 10, help: "Horizontal scale-bar length (a 10 Hz cycle is 100 ms, a 30 Hz cycle ~33 ms)." },
+    // Steps divide (default − min), or the default is a value the input itself rejects: min 1 /
+    // default 20 admits only step 1, and min 5 / default 50 admits 5 but not 10. Both shipped
+    // off-lattice under a step guard that looked at sliders only.
+    { key: "scale_uv", label: "Scale bar — amplitude (µV)", type: "number", step: 1, help: "Vertical scale-bar length, set in µV (flicker amplitudes are small — ~20 µV is a good default)." },
+    { key: "scale_ms", label: "Scale bar — time (ms)", type: "number", step: 5, help: "Horizontal scale-bar length (a 10 Hz cycle is 100 ms, a 30 Hz cycle ~33 ms)." },
   ],
   annotate: [
     {
@@ -1024,7 +1040,8 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       help: "The obs column holding the cell-type labels to find stable markers for. Blank = resolved from the usual names." },
     { key: "n_genes", label: "Genes per cell type", type: "range", step: 1,
       help: "Top stable markers drawn for each cell type." },
-    { key: "min_cells", label: "Minimum cells per type", type: "number", step: 5,
+    // step 2, not 5: min 2 / step 5 would put the default 20 off the lattice (see `known_min`).
+    { key: "min_cells", label: "Minimum cells per type", type: "number", step: 2,
       help: "Cell types with fewer cells than this are dropped — a stability score from a handful of cells is noise wearing a number." },
     { key: "exprs_pct", label: "Minimum detection rate", type: "number", step: 0.01,
       help: "Genes detected in a smaller fraction of cells than this are excluded before scoring (0.05 = 5%)." },
@@ -1068,8 +1085,7 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       help: "STRING's combined score, 0–1000. The published bands are 150 low · 400 medium · 700 high · 900 highest — below 400 the network fills with weak, mostly text-mined links." },
     { key: "max_genes", label: "Genes requested", type: "range", step: 1,
       help: "How many of your genes to send. A larger network is denser, not clearer." },
-    { key: "fdr_threshold", label: "Gene-list cutoff (adjusted p)", type: "number", step: 0.001,
-      help: "Which rows of a DE table become the query gene list. Ignored for a bare gene list." },
+    geneListFdr("Not a cutoff on the edges drawn — each of those carries its own STRING confidence score."),
   ],
   corr_heatmap: [
     { key: "axis", label: "Correlate", type: "select", options: [

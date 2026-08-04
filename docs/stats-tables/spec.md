@@ -4,6 +4,15 @@ Status: **written, awaiting owner review** (owner-directed 2026-08-04: spec firs
 learning from cnsplots and Mobbin to refine the spec as well"*). Board row: `NEXT#4` in
 `agent_handoff/CURRENT.md`. **No code has been written against this.**
 
+> **Revised 2026-08-05 after `review-gauntlet`**, which confirmed two blockers and a design
+> inconsistency against the first draft. All are fixed below, each marked where it landed: the
+> consumer inventory named a **test-only** function as the reproduction consumer and missed
+> `extract/readers.py`, the reader actually on the score's critical path (D4 correction +
+> inventory); D1's normalizer would have silently disabled the **L3 synthesis gate**, converting
+> every tableless skill to `NEEDS_RECIPE` (inventory + G2b); D6's "one field" was **two**
+> (`ReproRun.table`); and D2 collapsed tables 2..N by default — which hides the p-values behind a
+> click, *the exact failure D2 cites to rule tabs out*.
+
 ## What
 
 `contract.run_skill_with_table` returns `(figure, StatsTable | None)` and the wire carries
@@ -111,10 +120,19 @@ Three secondary costs of tabs, all concrete in this codebase:
 **Chosen presentation.** The Statistics surface renders **one `StatsPanel` per table, stacked in
 array order**, each keeping the collapsible header, sort, and CSV export it already has.
 
-- **The first table is open by default; the rest are collapsed.** `StatsPanel` already takes
-  `defaultOpen` — no new component state. This keeps the default view from becoming a wall while
-  leaving every table one click, not one navigation, away.
-- Each collapsed header already shows `title · N rows · M columns`, so a collapsed table still
+- **Every table is open by default, up to three; a fourth and beyond start collapsed.** The obvious
+  alternative — open the first, collapse the rest — was in an earlier draft and is **wrong for the
+  reason that ruled tabs out**: it puts the p-values behind a click. A collapsed panel and an
+  unselected tab hide the same numbers; only the gesture differs. If the argument is that the
+  pairwise table must be visible in the same glance as the stars it explains, then it must actually
+  be visible.
+  - This is affordable because `StatsPanel`'s body is already height-capped
+    (`max-h-[300px] overflow-auto`, `stats-panel.tsx:133`) and its rows are already capped at
+    `MAX_RENDER = 200`. Two or three open tables are a scrollable report — which is exactly what the
+    Fresha/Gorgias precedent looks like — not a wall.
+  - The cap at three is a wall-guard, not a preference: no skill in D4 wants more than two, so it
+    only ever fires on something unforeseen.
+- Each collapsed header still shows `title · N rows · M columns`, so a table beyond the cap
   announces what it holds. That is the affordance tabs would otherwise be buying.
 - The `StatsView` heading (`stats-view.tsx:73`) currently prints the single table's title. With N it
   prints `Statistics` and a `N tables` count; each table's own title stays on its panel.
@@ -165,11 +183,22 @@ The board asked whether a table needs an explicit role so the FE can order N pre
 - **Labelling** — `title` already exists, is already rendered in the panel header, and is already
   how a user tells `Enrichment results` from `Enrichment (up / down)`. A multi-table runner **must**
   title each table (§6 G4).
-- **Selection by meaning** is a real need in exactly one consumer, and it is already solved without
-  a role: `reproduction/core.py`'s `table_extractor` selects by `key_col`/`key`/`value_col` — a
-  content-based selector. Generalized to N tables it searches them **in array order and takes the
-  first match**, which is deterministic and needs no new field. Where two tables share a column
-  name, first-in-order wins; the spec names this rather than leaving it to discovery.
+- **Selection by meaning** is a real need in the reproduction reader, and it is met by **content**,
+  not by a role. The live reader is `extract/readers.py` (`panel_extractor` → `read_metric` →
+  `_read_count` / `_read_named_cell` → `_table_parts`), and it selects by **heuristics over the
+  table's own contents** — the first string column is the key, the first numeric column is the
+  value, `_direction_col` guesses a header then votes on content. Generalized to N tables it tries
+  them **in array order and takes the first that yields the metric**, which is deterministic and
+  needs no new field. Where two tables would both answer, first-in-order wins; the spec names this
+  rather than leaving it to discovery.
+
+  > **Correction, 2026-08-05.** An earlier draft cited `reproduction/core.py`'s `table_extractor`
+  > (a `key_col`/`value_col` selector) as the reproduction consumer. **It has no production caller
+  > — only `tests/test_reproduction.py`.** The live path is `routers/reproduction.py` →
+  > `reproduction/runs.py` → `drive.py:140` → `extract/readers.py`. Generalizing `table_extractor`
+  > would have generalized a function nothing calls while leaving the real reader to crash. Recorded
+  > rather than quietly edited, because "a plausible-looking function with a matching docstring and
+  > no caller" is the trap, and the same one this session hit twice.
 
 If a future consumer needs to select a table by *meaning* rather than by content or position, that
 is when `role` earns its keep. Adding it now is speculative.
@@ -196,15 +225,16 @@ table (`_facts`). A caption is one sentence about one figure, so it reads `as_ta
 "handle a list" has a non-obvious right answer and silently reading table 1 of 3 would look like a
 bug later.
 
-### D6 — persistence: one Pydantic field is the whole migration
+### D6 — persistence: no DB migration, but TWO Pydantic fields reject a list
 
-The durable path is already list-safe **except in one place**, which is exactly the kind of thing a
-spec exists to find before code:
+The durable path is already list-safe **except in two typed models** — the storage layer needs
+nothing, which is exactly the kind of thing a spec exists to establish before code:
 
 | Seam | Shape today | Change |
 |---|---|---|
 | `db/schema.py:232` · `alembic/0002:171` — `table_stats` | `JSON`, nullable | **None.** A JSON column stores a list. **No DB migration.** |
-| `routers/figures.py:113` — `FigureIn.table_stats` | `dict \| None` | **`dict \| list \| None`.** Pydantic **rejects a list today** — a two-table figure would 422 at save. This is the whole migration, and without it the feature is silently un-persistable. |
+| `routers/figures.py:113` — `FigureIn.table_stats` | `dict \| None` | **`dict \| list \| None`.** Pydantic **rejects a list today** — a two-table figure would 422 at save, so without this the feature is silently un-persistable. |
+| **`reproduction/core.py:283` — `ReproRun.table`** | `dict \| None` | **`dict \| list \| None`.** The second one, and it lands on the **ledger**: `drive.py:142` builds every `ReproRun` with `table=table`, so a two-table skill fails validation mid-drive rather than at an API boundary. |
 | `library/figures.py:23,36` | passthrough by key | None. |
 | `library/import_state.py:77` | `table_stats=f.get("table")` | None. |
 | `lib/projects/sync.ts:105,133` | `table_stats` ↔ `Figure["table"]` | Type widens with `Figure["table"]`; no logic change. |
@@ -215,8 +245,12 @@ Reconcile keeps its rule: `table` is a **server** field, so reconcile stays auth
 
 ## Consumer inventory — every place the union is narrowed
 
-Each entry calls its side's normalizer (D1). This is the complete list; anything not here does not
-touch a table.
+Each entry calls its side's normalizer (D1). **This list is the implementation checklist, so treat
+it as a starting point to re-derive rather than a proof of completeness** — the first draft called
+itself complete, named a test-only function as the reproduction consumer, and missed
+`extract/readers.py`, which is the reader actually on the score's critical path. Before building,
+re-run the sweep (`grep -rn 'table' --include=*.py` over the backend plus the FE inventory below) and
+confirm each hit is either here or genuinely table-free.
 
 **Backend**
 - `skills/contract.py:74,110,123` — `_execute` / `run_skill_with_table` / `run_bundle_with_table`:
@@ -224,8 +258,26 @@ touch a table.
   runner decides the shape, the contract just carries it.
 - `routers/_run.py:309` — L3 fill-when-absent (D3), `:336` legend (D5), `:338` the response.
 - `engine/frame_schema.py:156` — validate every element (D3).
-- `reproduction/core.py:853` — extractor searches in order (D4); `:908` `run_panel` passes through.
+- **`extract/readers.py` — the reproduction metric reader, and the one on the score's critical
+  path.** `_table_parts:68` does `table.get("columns")`, so a list raises `AttributeError`;
+  `_title_total:134` does `(table or {}).get("title")`, and a non-empty list is truthy. All of
+  `panel_extractor` · `read_metric` · `_read_generic` · `_read_count` · `_read_named_cell` ·
+  `_title_total` · `_direction_col` · `_table_parts` take `list[StatsTable]` after `as_tables`.
+  **⚑ `read_metric:326` gates L3 synthesis on `if table is None and skill_id:` — under the
+  normalizer that is permanently False**, which would silently kill synthesis for every tableless
+  skill and land them on `NEEDS_RECIPE`, a verdict `readers.py:19` declares reproducibility-axis
+  with zero Selom-confidence defects. So it must be restated in normalized terms —
+  `if not as_tables(table) and skill_id:` — and `[]` must behave exactly as `None` did.
+- **`reproduction/drive.py:140`** — `computed = panel_extractor(panel, figure, table)` sits
+  **outside** the `try` that ends at `:138`, and `drive_bundle` builds its panels in a bare list
+  comprehension. So an extraction failure aborts the whole paper drive instead of degrading to the
+  honest `RUN_FAILED` this module is built around. Move the call inside the `try` in the same slice.
+- `reproduction/core.py:853` `table_extractor` — **test-only, no production caller** (see the D4
+  correction). Widen it for consistency, but it is not the live path.
 - `jobs/queue.py:47`, `ai/execute.py:207` — pass-through; no narrowing needed.
+- `scripts/render_skill.py:127` — prints `table.get('title')` / `len(table.get('rows'))`. Not
+  product code, but it is the standing "look at a plot" instrument and would break on the first
+  two-table skill: `as_tables` + one line per table.
 - `skills/_result_cache.py` — stores `table` opaquely. **Note:** the cache key covers
   (skill+version, params, input), so a runner that starts emitting two tables **must bump its
   `skill.json` version** or a warm cache serves the old single-table result. This is the existing
@@ -259,23 +311,35 @@ Each extends an existing test file rather than adding a parallel one, per the ra
 - **G1 — every element validates.** `test_frame_schema.py`: a list whose second element is ragged
   fails with the same code as a ragged first element. *(extends the existing result-seam test)*
 - **G2 — one narrowing site per side.** A structural test in the shape of
-  `lib/structure.guard.test.ts`: outside `lib/skills/stats-tables.ts`, no `lib/` module narrows a
-  `StatsTable` union inline; the backend twin asserts `as_tables` is the only definition of the
-  three-case narrowing. Prevents D1's known failure mode from arriving one call site at a time.
+  `lib/structure.guard.test.ts`, scoped to **every FE source root this spec's own inventory touches
+  — `app/`, `components/`, `hooks/`, `lib/`** (the `stats-view` and `project-workspace` narrowing
+  sites are in `components/`, so a `lib/`-only scan would miss the ones most likely to drift):
+  outside `lib/skills/stats-tables.ts`, nothing narrows a `StatsTable` union inline. The backend
+  twin asserts `as_tables` is the only definition of the three-case narrowing. Prevents D1's known
+  failure mode from arriving one call site at a time.
+- **G2b — the L3 synthesis gate survives the union.** A tableless skill with a synthesizer still
+  yields an `L3`/`synthesized` reading after the normalizer lands, and `[]` behaves exactly as
+  `None` did (extends `tests/test_readers.py`). Without this, D1 silently converts every tableless
+  skill's score into `NEEDS_RECIPE` — a plumbing regression wearing the costume of an honest
+  verdict, which is the one failure mode this product cannot tolerate quietly.
 - **G3 — the single-table path is byte-identical.** For a one-table run: the wire is a bare object
   (not a one-element list), and the Statistics view renders one open panel with the table's title in
   the heading. This is the no-op claim of D3, made executable.
 - **G4 — a multi-table runner titles every table.** A list whose elements are not all titled fails.
   Untitled tables under a stacked presentation are indistinguishable — the presentation and the
   requirement are the same decision.
-- **G5 — a two-table figure round-trips.** Save → load via `routers/figures.py` and get both tables
-  back. This is the test that would have caught D6's Pydantic field, and it is the reason to write
-  it before the runner change rather than after.
+- **G5 — a two-table run round-trips through BOTH typed models.** Save → load via
+  `routers/figures.py` and get both tables back, **and** a two-table run survives `ReproRun` and
+  comes back out of the persisted ledger intact. This is the test that would have caught D6's two
+  Pydantic fields, and it is the reason to write it before the runner change rather than after.
 
 ## §7 Build slices (after review — not part of this spec's approval)
 
-1. **The contract**: D1 normalizers + D6's Pydantic widening + G1/G2/G3/G5. No skill changes; the
-   whole product behaves identically. *This slice should be provable as a no-op.*
+1. **The contract**: D1 normalizers + D6's **two** Pydantic widenings + the `extract/readers.py`
+   consumer (including the restated L3 gate and moving `drive.py:140` inside its `try`) +
+   G1/G2/G2b/G3/G5. No skill changes; the whole product behaves identically. *This slice should be
+   provable as a no-op* — and the reproduction reader is the part of it most worth proving, because
+   its failure mode is a silently lowered score rather than an error.
 2. **The FE stack**: D2 + the mock fixture. Still no skill changes — driven by the fixture, then by
    a hand-built two-table response.
 3. **`lollipop` unsqueezed** (rank 1): attach both, delete the swap, bump `skill.json` version.
