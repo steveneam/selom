@@ -74,12 +74,27 @@
 - **One contract limit found, not fixed:** `contract.run_skill_with_table` returns `StatsTable |
   None` — exactly ONE table. So `lollipop` with `pairs=` swaps its ranked-values table for the
   pairwise p-values (the same trade `boxplot` makes) rather than showing both. Recorded below.
-- **Mobbin ruled a pattern OUT, and it is the SAME wall as the `pairs=` pair-picker.** Databricks ·
-  Confluence · Better Stack · Glide · GitHub Insights all populate their column pickers from the
-  dataset's **live schema**; `ParamField` cannot see the dataset's columns at render time, so typed
-  column selects are impossible here today. What transferred is GitHub Insights' explicit
-  "(optional)" convention **inverted** — `slope` marks its REQUIRED columns in the label, because a
-  free-text field that silently fails at run time is the worst of both.
+- **⚑ CORRECTION, same session (2026-08-04): I recorded the live-schema column picker as "ruled
+  out / impossible" and that was WRONG — it is the premise pattern again, this time in my own note.**
+  Databricks · Confluence · Better Stack · Glide · GitHub Insights all populate column pickers from
+  the dataset's live schema, and I wrote that `ParamField` cannot see the dataset's columns. It
+  can — or rather, the data is already there and nobody threads it:
+  - `POST /data/inspect` **already** returns `data_fit.columns` (every column + `n_numeric_cols`)
+    and `design.group_candidates[]`, **each carrying its `levels`, `n_levels` and a
+    `reference_guess`**. Both are **persisted on the dataset** in the FE store
+    (`lib/projects/types.ts` → `dataFit` / `design`) and survive reload.
+  - **`components/project/workbench-panel.tsx` already holds `route.dataFit` in its props (line ~49)
+    and calls `useSkillParams` at line ~103.** The columns are in scope in the very component that
+    renders the controls.
+  - The ONLY real blockers are (a) `paramFieldsFromSpec(id, spec)` is pure over the backend spec, so
+    nothing threads a data context into the merge, and (b) `ParamField` has no repeatable-list
+    widget (needed for `pairs=`, not for a single-column select).
+  **So `pairs=` is not blocked on data either** — pairs are between LEVELS, and levels are exactly
+  what `group_candidates[].levels` carries. The stale "impossible" claim has been corrected in
+  `lib/catalog/params.ts` at both notes; do not re-derive it from an older comment.
+  What still transfers from Mobbin regardless: GitHub Insights' explicit "(optional)" convention
+  **inverted** — `slope` marks its REQUIRED columns, because a text field that silently fails at run
+  time is the worst of both. That marking stays useful after the picker ships.
 
 ## ▸ (superseded) LIVE · STRIP · 2026-08-03 · branch `main` (**PUSHED — `origin/main` = `1d1176a`, nothing local**) · Claude (FE+BE, solo, lead)
 
@@ -159,37 +174,68 @@
 
 0. ~~Gate the `slow` lane~~ · ~~Lane B (`venn`/`forest`/`qq`)~~ · ~~§3.2 rows 5/6/9~~ ·
    ~~rows 7/8/10/11~~ — **all DONE. §3.2 is closed except rows 12–13.**
-1. **The audit's open rows 21–23** (was NEXT#3) — long category labels colliding with the axis
-   title, point-label collision on scatter/volcano (neither side applies `adjustText`), axis title
-   vs long ticks under `automargin`. **Selom's own defects, which cnsplots does not solve either**,
-   so this is where Selom can beat the reference rather than match it. Promoted because §3.2 is
-   done and row 21 is now *visible on shipped output*: `slope`'s grouped x-axis rotates six long
-   treatment-arm names, and `lollipop` defaults to horizontal partly to dodge it.
+1. **⇒ BUILD THE COLUMN / PAIR PICKER (owner-directed 2026-08-04: "build the picker next
+   session").** Promoted from a parked gap because the investigation above showed it is **plumbing,
+   not a capability gap** — no backend change, no new endpoint, nothing external. Shape:
+   - **Thread a data context into the merge.** `paramFieldsFromSpec(id, spec)` →
+     `paramFieldsFromSpec(id, spec, ctx?)` where `ctx` = `{ columns?: string[]; groups?:
+     GroupCandidate[] }`, and `useSkillParams(skillId, seed, ctx?)` passes it through.
+     `workbench-panel.tsx` already has `route.dataFit` in props — pass `dataFit.columns`; for the
+     pair-picker also thread `dataset.design` (NOT currently passed to workbench-panel — one more
+     prop off the same dataset object).
+   - **Keep it PURE and FAIL-SOFT.** `ctx` is optional; with none, a field renders exactly as it
+     does today. That is not a nicety — `dataFit`/`design` are legitimately null for demo/sample
+     data and for a dataset whose inspect failed, so a text fallback is the correct behaviour, not
+     a degradation. **The existing `params.test.ts` suite must stay green untouched** — if it
+     doesn't, the context is not optional enough.
+   - **Widget 1 — `type: "column"`**: a select over `ctx.columns` with a free-text escape hatch
+     (a saved figure spec can name a column this dataset lacks; reorder-what-you-can, never fail).
+     Retarget the text fields on `slope` (`subject`/`condition`/`value`/`group`), `lollipop`,
+     `ridge`, `confusion`, `line`, `regression`, `boxplot`.
+   - **Widget 2 — `type: "pairs"`**: the repeatable row-list Mobbin is unanimous about (two typed
+     selects + "+ Add"), options = `group_candidates[key].levels` for the currently-chosen group
+     column. Serializes to the SAME `"A~B, C~D"` string the backend already parses
+     (`_stats.parse_pairs`) — **the wire format does not change**, so no backend work and no
+     contract churn. Falls back to the text field when no levels are known.
+   - **Verify on real data + a live backend, not `dev:mock`** [[verify-on-real-data-not-mock]]: the
+     whole feature IS the inspect payload, and MSW would prove only the wire. Drop the real
+     `erg_metrics_long.csv`, confirm the `slope` subject/condition selects list its actual columns
+     and that `pairs` offers the six real treatment-arm levels.
+   - **Ratchet:** extend `params.test.ts` (it already guards the `pairs=` vocabulary is reachable) —
+     assert a context-free merge is byte-identical to today's, and that a column field with a
+     context yields the dataset's columns.
+2. **The audit's open rows 21–23** — long category labels colliding with the axis title, point-label
+   collision on scatter/volcano (neither side applies `adjustText`), axis title vs long ticks under
+   `automargin`. **Selom's own defects, which cnsplots does not solve either**, so this is where
+   Selom can beat the reference rather than match it. Row 21 is now *visible on shipped output*:
+   `slope`'s grouped x-axis rotates six long treatment-arm names, and `lollipop` defaults to
+   horizontal partly to dodge it.
    **Verify with `scripts/render_skill.py slope lollipop confusion` — the collision is a render
    fact, not a spec fact, and there is no assertion that can see it.**
-2. **§3.2 rows 12–13, if wanted**: `hist`/`kde`/`dist` as ONE skill with a mode (the review's own
+3. **§3.2 rows 12–13, if wanted**: `hist`/`kde`/`dist` as ONE skill with a mode (the review's own
    framing) — and `ridge` already ships the KDE + Silverman bandwidth to build it on, so this is a
    genuine reachability job now, not a build. Row 13 (`donut`/`pie`) the review itself rates low
    scientific value — build last or not at all.
-3. **The isolation-coverage guard** — spec §5's strongest form, and the one piece of Lane C not
+4. **The isolation-coverage guard** — spec §5's strongest form, and the one piece of Lane C not
    built. Enumerate private routes by AST, subtract the allow-list, and **fail on any private route
    with no isolation case**, carrying a NAMED shrinking backlog (the `test_reachability_guard.py`
    waiver shape). Turns "39 unaudited routes" into a tracked list instead of a memory.
-4. **F3 (the fit-scored picker)** — specced in source-review §6; Mobbin ruled OUT abstract
+5. **F3 (the fit-scored SKILL picker)** — a different picker from NEXT#1: that one chooses a
+   *column*, this one chooses a *skill*. Specced in source-review §6; Mobbin ruled OUT abstract
    illustration tiles. Run `fe-review` at the end. **F4** = the rest of the plot gaps.
-   **Note the picker now has ~47 skills to sort**, and the four added today are all
-   general-purpose chart types with no omics gate — which is exactly the case §6 says the flat
-   Store list stops serving.
-5. **`OH-01`** (arq + Redis job store) — unblocked; contract is `docs/jobs-surface/spec.md` §4.
+   **Note it now has ~47 skills to sort**, and the four added today are all general-purpose chart
+   types with no omics gate — exactly the case §6 says the flat Store list stops serving.
+6. **`OH-01`** (arq + Redis job store) — unblocked; contract is `docs/jobs-surface/spec.md` §4.
 
 **Owed follow-ups still open:** **a figure carries exactly ONE Statistics table**
 (`contract.run_skill_with_table` → `StatsTable | None`), so `lollipop` with `pairs=` swaps its
 ranked-values table for the pairwise p-values rather than showing both — the same trade `boxplot`
 already makes. Widening it to a list is an FE-contract change (`lib/skills/api.ts` `table?:
 StatsTable | null`), so it was NOT done unilaterally; it is cheap if a third skill wants it ·
-the `zizmor@latest` pin policy (owner call, small, no spend) · the `pairs=` **pair-picker**
-(a repeatable row-list of typed selects — blocked on a `ParamField` list widget AND on param
-controls being able to see the dataset's categories; note left in `lib/catalog/params.ts`) · there
+the `zizmor@latest` pin policy (owner call, small, no spend) · ~~the `pairs=` **pair-picker**~~
+**promoted to NEXT#1 (2026-08-04)** — the "param controls cannot see the dataset's categories" half
+of that blocker was FALSE (`design.group_candidates[].levels` is already persisted on the dataset);
+only the `ParamField` list widget and the merge-time data thread are real · there
 is **no run-scoped legends route** (`/papers/{slug}/legends` is published-paper scoped;
 `compose_ledger_legends(ledger)` already does the work) · **`mocks/handlers.ts` has no handlers for
 the six newer routes** (harmless — MSW bypasses) · the audit's CHECK rows 13/24 need **each

@@ -139,10 +139,18 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   // `pairs` is a TEXT field and that is a known compromise, not the intended affordance. Mobbin
   // (Rows / Glide / Databricks / Hex chart builders) is unanimous that "add another structural
   // thing" is a repeatable row-list of typed selects with an explicit "+ Add" — nobody asks the
-  // user to type a mini-DSL. Selom cannot render that yet for two concrete reasons: ParamField has
-  // no repeatable-list widget, and a param control has no access to the dataset's category values
-  // at render time (the spec is static; the group names only exist after the data is loaded). So
-  // the help text carries the syntax and names the failure mode instead. Captured as a gap.
+  // user to type a mini-DSL.
+  //
+  // CORRECTION (2026-08-04): this note used to give TWO blockers, and the second one was WRONG.
+  // "A param control has no access to the dataset's category values at render time" is false —
+  // `/data/inspect` already returns `design.group_candidates[]`, each carrying its `levels`, and
+  // the FE PERSISTS it on the dataset (`lib/projects/types.ts` → `DesignHints`). Levels are exactly
+  // the vocabulary a pair is built from, so the data a pair-picker needs is already fetched and
+  // already client-side. The real blocker is ONE thing: `paramFieldsFromSpec` is pure over the
+  // backend spec alone, so nothing threads the dataset into the merge — even though
+  // `workbench-panel.tsx`, which calls `useSkillParams`, already holds `route.dataFit` in its own
+  // props. Plus the missing repeatable-list widget, which is real.
+  // Do not re-derive "it's impossible" from this comment: see agent_handoff/CURRENT.md NEXT#1.
   boxplot: [
     { key: "style", label: "Chart style", type: "select", help: "Strip hides the box and shows every individual value — honest when n is small, where a box implies more data than you have.", options: [
       { value: "box", label: "Box plot (quartiles + whiskers)" },
@@ -238,10 +246,15 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   // Slope — the ONLY skill here that refuses to auto-detect its key columns, because pairing the
   // wrong rows produces a confident and completely wrong figure. Mobbin (Databricks / Confluence /
   // Better Stack / GitHub Insights) shows the mature pattern is a typed select populated from the
-  // dataset's live schema — RULED OUT here, and for the same reason the `pairs=` pair-picker is:
-  // a ParamField cannot see the dataset's columns at render time. What survives that constraint is
-  // GitHub Insights' explicit "(optional)" convention, inverted — mark the REQUIRED ones, since a
-  // free-text field that silently fails at run time is the worst of both worlds.
+  // dataset's live schema.
+  //
+  // These are text fields as an INTERIM, not because the pattern is out of reach — the first cut of
+  // this comment claimed it was ruled out, and that was wrong the same way the `pairs=` note above
+  // was. `dataset.dataFit.columns` is already fetched, already persisted, and already in scope in
+  // `workbench-panel.tsx`; only the thread into `paramFieldsFromSpec` is missing. Until that lands,
+  // the one thing that survives a free-text field is GitHub Insights' explicit "(optional)"
+  // convention INVERTED — mark the REQUIRED ones, because a text field that silently fails at run
+  // time is the worst of both worlds. That marking stays useful after the picker ships.
   slope: [
     { key: "subject", label: "Subject column (required)", type: "text", placeholder: "e.g. sample_id, animal, patient", help: "What makes two rows the same individual. Never guessed — the wrong choice pairs the wrong rows and the figure still looks right." },
     { key: "condition", label: "Condition column (required)", type: "text", placeholder: "e.g. timepoint, intensity_group", help: "The column holding the two states being compared." },
