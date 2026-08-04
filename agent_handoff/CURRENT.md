@@ -27,6 +27,7 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
+| **PICKERS** | 2026-08-04 | `main` `5aa9190..<head>` (**4 unpushed — owner pushes**) | **NEXT#1 shipped: a column knob is a picker over the columns that exist, and `pairs=` is a row-list of real level names — and the live browser verify found a bug far bigger than the feature.** ⚑ **`getSkill(id)` read the STATIC SEED alone, so 19 of the 44 live skills were unreachable**: installed from the Store, they rendered in the Workbench as their **raw id, badged "Queued", with Apply DISABLED**. That is `boxplot` · `slope` · `lollipop` · `ridge` · `confusion` · `line` · `regression` · `qq` · `venn` · `forest` — **every plot type built in the preceding sessions** — plus cepo/pathway/ssgsea/pvca/diff_abundance/facs_gating/go_graph/mixing_metrics/pseudotime_genes. `registry.ts` already declared "the backend is the source of truth for what runs now", but only the **Store** honoured it (`useCatalog`); the ~20 other surfaces went through `getSkill`. **Invisible to all 9 gates** — the backend serves them, the param specs merge, the FE overlays exist — and visible in the first real browser [[selom-shipped-not-reachable]]. Fixed via `lib/catalog/live-skills.ts` (a shared cell so `getSkill` stays synchronous at 20 call sites and seed↔registry stays acyclic) + `useLiveSkills()` on the Workbench, whose Apply is gated on the tier `getSkill` returns; ratcheted into `registry-completeness.test.ts` (which already reads the real `skill.json` files) and **proven to bite — reverting `getSkill` fails it with all 19 named**. **The picker itself:** `paramFieldsFromSpec(id, spec, ctx?)` gains ONE optional input — the dataset's own schema, already fetched by `/data/inspect` and already persisted — so it stays the single place dataset knowledge enters and `visibleParamFields`/`isFieldDisabled` stay pure. `column`/`pairs` are **resolved** widgets: emitted only when the vocabulary exists, else byte-identical to the old text field (pinned by a test that a context perturbs *nothing else*). **The pair picker deliberately has NO fallback while the group column is blank** — blank means the backend's auto-detect, a dtype rule the FE cannot evaluate, and on the real ERG table it picks `sample_id` while `best_group` is `condition`, so a guess would offer levels from a column the run is not grouping by. **One backend change was needed and the board's premise was half wrong**: `design.group_candidates` was **empty for `generic_table`** — the exact kind a long-form CSV lands in, i.e. the only kind that uses `pairs=`. `engine/questionnaire._table_hints` fills it **without claiming a design** (`needs_design`/`source` untouched, or every dropped CSV grows an intake confirm-card). Mobbin was unanimous on the row-list (beehiiv · Confluence · ClickUp · Braintrust · AutoSend · Glide) and **ruled OUT** the drag-a-field-into-a-well pattern (Fibery/Sigma/Deputy) and Databricks' per-channel popover — both need a second surface. **Two more defects only the browser could show:** every control's accessible NAME swept in its whole help paragraph (implicit `<label>` wrapping), making two fields mutually ambiguous; and long arm names clip in a narrow select. Gates: `verify.sh` **9/9** (raw, exit 0) · **browser-verify 17/17** (14 + 3 new, real backend + real corpus) · **skill-smoke 43 pass / 0 fail**. |
 | **PLOT-ROWS-DONE** | 2026-08-04 | `main` `9dd24ce..26af5a9` (**unpushed — owner pushes**) | **§3.2 is CLOSED: `lollipop` · `ridge` · `slope` · `confusion` shipped, and this is the first row in five where the "missing" premise HELD** — no engine existed for any of them, so the grep-first rule cost minutes and correctly said *build*. The content is what each carries beyond its shape. **`lollipop`**: a bootstrap CI on the **median**, because `bar_figure` is mean±SEM *by construction* and a non-parametric interval could not ride a golden-pinned parametric spine; seeded, so it redraws byte-identically. A **pre-aggregated** table (one row per category — how a ranked list actually arrives) is n=1 everywhere, so it gets no interval, no brackets, **and no CI column header**, rather than `n/a` under a "95% CI" heading. **`confusion`**: two labellings of the SAME rows — how an annotation gets validated. Agreement + Cohen's κ **only when the label sets match**; against Leiden ids there is no diagonal, so it NAMES that instead of computing a number from an alignment nobody declared, and that refusal is the real-corpus path. **`slope`**: cnsplots draws this geometry and **computes nothing** — so Selom tests it, and tests it **paired** (`_stats.compare_paired`), because an unpaired Welch compares marginals and throws away the structure the picture is built on; it reports the **up/down split**, the finding a flat mean conceals, and refuses to guess `subject`/`condition` (the wrong guess pairs the wrong rows and still looks right). **`ridge`**: hand-rolled Gaussian KDE + Silverman so the dependency-free **stub draws the same curve as the real engine** (pinned against scipy), and it **discloses its bandwidth** — a curve is exactly as bimodal as its smoothing allows. **⚑ THE SESSION'S REAL YIELD IS THE THREE DEFECTS RENDERING FOUND, all of which passed every assertion**: (1) **the D2 numeric-string class lives in the ANNOTATION layer too** — `type:"category"` fixes the *trace*, but Plotly coerces a numeric-looking string annotation coordinate to a number and a category axis reads it as a **slot index**, so `confusion`'s cell counts scrambled across a correctly-laid-out heatmap and one label drew clean **off the plot**; (2) `lollipop`'s **stem took the next colourway slot**, rendering one mark as two unrelated series; (3) `ridge` went **entirely grey** when the outline was pinned — a `fill:"toself"` scatter derives its **fill from the line colour**. Classes 1 and the `marker.size` area-vs-diameter trap are now **standing invariants in `smoke.check_figure`** (every skill, every run, zero false positives across 43); 2 and 3 are named defect tests. **`scripts/render_skill.py`** turns the loop into one command with `pin_process()` — the render cache twice served the pre-fix figure at 0.00s, which is indistinguishable from the fix not working. Gates: `verify.sh` **9/9** (true exit 0, read raw), **skill-smoke 43 pass / 0 fail** (was 39). |
 | **STRIP** | 2026-08-03 | `main` `62e2bcc..1d1176a` (**pushed**) | **§3.2 row 9 `strip` was the FOURTH wrong premise** — Plotly's own box trace draws a strip (`boxpoints="all"` + a hidden box) and `boxplot` already exposed the points knob, so it is a **`style` mode, not a skill**. Mode for a concrete reason: a strip must keep the shared categorical vocabulary (`order` · `add_count` · `pairs` + brackets from `_stats.py`), and a sibling skill would have had to re-import all of it and could then drift from the box it is the companion to. **The bug worth knowing: hiding the box with a transparent LINE COLOUR renders the panel completely empty** — a box trace's points inherit the trace colour, so the markers vanish with it; correct axes, correct `n=` labels, not one point drawn, and every spec assertion still green. Hide it by zero **width** instead. Pinned by a named defect test. Retitled "Box / strip plot" for discoverability (same fix `regression` needed). Golden byte-identical. `verify.sh` **9/9**. |
 | **SCATTER-LINE** | 2026-08-03 | `main` `c63275d..88ae4b1` (**pushed**) | **Lane B continued, and the review's premise was wrong twice more.** `scatter` (§3.2 row 5, "the most-requested shape Selom cannot draw") **already existed as `regression`** — x/y/group/label were all there; only the mandatory OLS separated it from a generic scatter. So it became a `fit` flag, not a second skill that would have duplicated the column resolution, grouping, labelling and point cap for one boolean. **The bug found on the way is the real content**: `group` emitted `transforms:[{type:groupby}]`, which **Plotly removed in plotly.js 3 / plotly.py 6** — this repo runs plotly.js 3.6.0 and plotly.py 6.8, and the latter *refuses the key outright* — but skills return raw dicts so nothing validated it. The figure shipped, rendered, and drew **every point one flat colour**: an advertised knob that silently did nothing. That is a CLASS (valid JSON, correct-looking, encodes nothing), so `smoke.check_figure` now fails any trace carrying a removed-from-Plotly key, on every skill every run — the same treatment the numeric-string-axis class got, with a test asserting both directions. `regression` also had **no FE overlay at all** (API-only knobs, the `boxplot` gap again) and is retitled so a user searching "scatter" finds it. `line` (row 6, "the ERG skills each hand-roll one") was **also already built** — `_charts.line_figure` is explicitly "the line analogue of `bar_figure`" and is not ERG-specific; only a CSV front end was missing. It now shares the ERG grid's exact spread vocabulary because it is the same code, takes long-form x/y/series where repeated rows ARE replicates, never auto-detects `series` (the one guess that changes what the figure MEANS), and carries **n per point** — the number that tells a reader whether to believe the band and which is nowhere on the canvas. Gates: `verify.sh` **9/9**, **skill-smoke 39 pass / 0 fail** (was 38). |
@@ -45,7 +46,48 @@
 | **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
 | older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · PLOT-ROWS-DONE · 2026-08-04 16:27 +1000 (Sydney) · branch `main` (**3 UNPUSHED — owner pushes**) · Claude (FE+BE, solo, lead)
+## ▸ LIVE · PICKERS · 2026-08-04 19:17 +1000 (Sydney) · branch `main` (**4 UNPUSHED — owner pushes**) · Claude (FE+BE, solo, lead)
+
+- **NEXT#1 is DONE and reachable.** Column pickers on `boxplot` · `slope` · `lollipop` · `ridge` ·
+  `confusion` · `line` · `regression` · `qq` · `composition`; the pair row-list on `boxplot`. Both
+  surfaces carry it — the Workbench (run a skill) and Figure-data (re-run with different columns),
+  so changing a column on an existing figure is the same gesture as choosing it the first time.
+- **⚑ THE FINDING THAT MATTERS MOST IS NOT THE FEATURE: 19 of 44 live skills could not be run at
+  all.** Detail in the SESSIONS row. Three things to carry:
+  1. **A green `verify.sh` says nothing about reachability.** All 9 gates passed while ten shipped
+     plot types sat behind a disabled button. Only driving the real Workbench in a real browser
+     showed it.
+  2. **The previous board predicted this and it was not acted on.** STRIP's LIVE block says
+     *"reachability was verified against a live backend… **I did not click through the Store in a
+     browser** — the contract half is proven, the visual half is not."* The visual half was broken.
+     **When a wrap says a half is unproven, that IS the next action, not a footnote.**
+  3. **The seed is still hand-maintained.** `getSkill` now prefers the live registry so the drift
+     cannot hide, but `lib/catalog/seed.ts` still lists only 25 Selom skills. The guard makes that
+     safe, not correct — a backend-down session shows the seed, and it is 19 skills stale.
+- **The premise pattern is 5-for-6 now, and this time it was MY board note that was half wrong.**
+  NEXT#1 said the pair vocabulary was already client-side because `design.group_candidates[].levels`
+  is persisted. True in general, **false for `generic_table`** — where it was empty, which is the
+  only kind that uses `pairs=`. **Grepping the FE was not enough; the payload had to be run.** One
+  `uv run python` against the real file settled in seconds what the note had asserted.
+- **Three defects came out of writing the tests and driving the browser, not from design:** a column
+  whose every value is distinct passes the cardinality cap but groups nothing; `sample_id` sat
+  *exactly* on the 12-level cap so it needed the deg alias rule, not the cap; and every param
+  control's accessible NAME included its whole help paragraph, which made "Group column" and
+  "Compare groups" mutually ambiguous to `getByLabel` — and to a screen reader.
+- **`openWorkbench` is new harness capability, not a one-off** [[compound-capability-each-task]] —
+  it drives Store-install → project → real file → intake → skill SELECTED, stopping one step short
+  of `openRealFigure` because a param panel only renders while a skill is selected and un-applied.
+  Any future check about *inputs* (rather than the figure) starts here.
+- **`dev:mock` cannot show the pair picker, and that is correct.** The mock is header-only, so it has
+  no row values to derive levels from; it returns no group candidates rather than inventing any
+  [[mock-fallback-never-fabricates-data]]. The COLUMN picker does work there (real header). Recorded
+  in `mocks/data-inspect-fixture.ts` so it is not debugged as a regression.
+- **Small finding, not fixed (out of scope):** `catalog.name` in `skill.json` overrides `title`, so
+  the STRIP session's retitle to *"Box / strip plot"* never reached the Store or the Workbench —
+  both display **"Selom Box Plot"**. Discoverability survives only because the summary contains
+  "strip plot" and the search covers it.
+
+## ▸ (superseded) LIVE · PLOT-ROWS-DONE · 2026-08-04 16:27 +1000 (Sydney) · branch `main` · Claude (FE+BE, solo, lead)
 
 - **§3.2 is fully closed.** Rows 7/8/10/11 (`confusion` · `ridge` · `slope` · `lollipop`) are built,
   wired through all seven §5 points, reachable, and green. `docs/cnsplots-port/source-review.md`
@@ -172,45 +214,34 @@
 
 ## ▸ NEXT
 
-0. ~~Gate the `slow` lane~~ · ~~Lane B (`venn`/`forest`/`qq`)~~ · ~~§3.2 rows 5/6/9~~ ·
-   ~~rows 7/8/10/11~~ — **all DONE. §3.2 is closed except rows 12–13.**
-1. **⇒ BUILD THE COLUMN / PAIR PICKER (owner-directed 2026-08-04: "build the picker next
-   session").** Promoted from a parked gap because the investigation above showed it is **plumbing,
-   not a capability gap** — no backend change, no new endpoint, nothing external. Shape:
-   - **Thread a data context into the merge.** `paramFieldsFromSpec(id, spec)` →
-     `paramFieldsFromSpec(id, spec, ctx?)` where `ctx` = `{ columns?: string[]; groups?:
-     GroupCandidate[] }`, and `useSkillParams(skillId, seed, ctx?)` passes it through.
-   - **The exact wiring, checked 2026-08-04 — the precedent is already in the file you must edit.**
-     `components/project/views/skill-view.tsx` receives the whole `workbenchDataset: Dataset | null`
-     and **already reads `workbenchDataset?.dataFit?.columns`** (~line 64) to feed the `AskAi` route
-     composer's `dataColumns`. So the data is not merely available, it is already being *read and
-     threaded* — just to the AI composer instead of to the param panel, ~15 lines away. Copy that
-     line. **`design` is confirmed NOT passed down**: `route` is built as `{ routing, dataFit }`
-     (~line 44), so add `design: workbenchDataset.design ?? null` there — `design?: DesignHints |
-     null` is already on the `Dataset` type (`lib/projects/types.ts:147`), so nothing else changes.
-     `WorkbenchPanel`'s `route` prop type widens by one field.
-   - **Keep it PURE and FAIL-SOFT.** `ctx` is optional; with none, a field renders exactly as it
-     does today. That is not a nicety — `dataFit`/`design` are legitimately null for demo/sample
-     data and for a dataset whose inspect failed, so a text fallback is the correct behaviour, not
-     a degradation. **The existing `params.test.ts` suite must stay green untouched** — if it
-     doesn't, the context is not optional enough.
-   - **Widget 1 — `type: "column"`**: a select over `ctx.columns` with a free-text escape hatch
-     (a saved figure spec can name a column this dataset lacks; reorder-what-you-can, never fail).
-     Retarget the text fields on `slope` (`subject`/`condition`/`value`/`group`), `lollipop`,
-     `ridge`, `confusion`, `line`, `regression`, `boxplot`.
-   - **Widget 2 — `type: "pairs"`**: the repeatable row-list Mobbin is unanimous about (two typed
-     selects + "+ Add"), options = `group_candidates[key].levels` for the currently-chosen group
-     column. Serializes to the SAME `"A~B, C~D"` string the backend already parses
-     (`_stats.parse_pairs`) — **the wire format does not change**, so no backend work and no
-     contract churn. Falls back to the text field when no levels are known.
-   - **Verify on real data + a live backend, not `dev:mock`** [[verify-on-real-data-not-mock]]: the
-     whole feature IS the inspect payload, and MSW would prove only the wire. Drop the real
-     `erg_metrics_long.csv`, confirm the `slope` subject/condition selects list its actual columns
-     and that `pairs` offers the six real treatment-arm levels.
-   - **Ratchet:** extend `params.test.ts` (it already guards the `pairs=` vocabulary is reachable) —
-     assert a context-free merge is byte-identical to today's, and that a column field with a
-     context yields the dataset's columns.
-2. **⇒ PIN ZIZMOR + ADD THE WEEKLY DRIFT JOB — owner-decided 2026-08-04, [[DECISIONS #14]].**
+0. ~~Gate the `slow` lane~~ · ~~Lane B~~ · ~~§3.2 rows 5/6/9~~ · ~~rows 7/8/10/11~~ ·
+   ~~the column / pair picker~~ — **all DONE.** §3.2 is closed except rows 12–13.
+1. **⇒ SWEEP THE REACHABILITY CLASS THE PICKER SESSION EXPOSED — highest value on this board.**
+   `getSkill` is fixed and guarded, but that guard only proves a skill can be *resolved*. The
+   session showed the gates cannot see whether a shipped thing is *usable*, and the same blind spot
+   has now produced two findings in two sessions (17 unreachable routes, then 19 unrunnable skills).
+   - **Take the 19 newly-runnable skills seriously as UNTESTED SURFACE.** They have never been
+     applied from the Workbench by anyone. `skill-smoke` proves each ENGINE on real data; it says
+     nothing about the run path through the FE. Pick 3–4 (`slope`, `lollipop`, `confusion`, `venn`)
+     and drive each to a rendered figure with `openWorkbench` + an Apply.
+   - **Refill `lib/catalog/seed.ts` from the live registry**, so a backend-down session is not 19
+     skills stale, and so the Store's Community/Verified split stops drifting. Mechanical; the new
+     guard already names exactly which are missing.
+   - **Then ask what else is "shipped but unusable".** The reachability guard
+     (`test_reachability_guard.py`) covers routes, the new one covers skills. Nothing covers a
+     rendered CONTROL — e.g. `heatmap`'s `annotations`/`split_by` and `venn`'s `sets` are still
+     free-text lists with no widget, and `erg_bwave_bar`'s `comparisons` still takes a mini-DSL.
+2. **⇒ EXTEND THE PICKER WHERE IT STILL DOESN'T REACH** (small, additive, all fail-soft today):
+   - **A multi-column widget** — `venn.sets` (2–3 column names) and `heatmap.annotations` are
+     comma-separated LISTS of columns, so the single-select `column` type does not fit. The row-list
+     built for `pairs` is most of the answer.
+   - **A level widget for the ones that take a level, not a column** — `slope.levels` ("which two,
+     in order"), `deg.reference`/`treatment`. `group_candidates[].levels` already carries these, and
+     `resolvePairsField` is the pattern; `slope.levels` is an ORDERED two-of-N, so it is its own
+     shape, not a pair.
+   - **`violin` stays text on purpose** — its clusters do not exist before the run. If that ever
+     changes, the honest source is a completed `cluster` run's own output, not `design`.
+3. **⇒ PIN ZIZMOR + ADD THE WEEKLY DRIFT JOB — owner-decided 2026-08-04, [[DECISIONS #14]].**
    Small, and it closes a **live** risk: until it lands, an upstream zizmor release can turn `main`
    red with no repo change (it already did once, on `ced7f31`/`8de5e39`).
    - **Blocking, pinned:** `.github/workflows/ci.yml` `workflow-lint` **and** `scripts/verify.sh`'s
@@ -225,7 +256,7 @@
      event** — a workflow edit is only verified after a real run on `main`/a PR, not locally.
    - **Prove it bites:** reverting one `# v5.0.1` comment to `# v5` must still turn `wf-lint` FAIL
      (exit 13) under the pin. That is the existing reproduction.
-3. **⇒ SPEC THE MULTI-TABLE `StatsTable` CONTRACT — owner-directed 2026-08-04, spec FIRST.**
+4. **⇒ SPEC THE MULTI-TABLE `StatsTable` CONTRACT — owner-directed 2026-08-04, spec FIRST.**
    Write `docs/stats-tables/spec.md` and **pause for review before code** (playbook: consequential
    contract change → forcing-questions → spec). Owner note: **"continue learning from cnsplots and
    Mobbin to refine the spec as well"** — both are inputs, not afterthoughts.
@@ -247,7 +278,7 @@
    - **Ratchet to extend, not restate:** `tests/test_skill_table_contract.py` already partitions
      every skill into native ∪ L3 ∪ L4-only and proves `NATIVE` against source. Whatever shape D1
      picks, that guard must still ground the classification in code.
-4. **The audit's open rows 21–23** — long category labels colliding with the axis title, point-label
+5. **The audit's open rows 21–23** — long category labels colliding with the axis title, point-label
    collision on scatter/volcano (neither side applies `adjustText`), axis title vs long ticks under
    `automargin`. **Selom's own defects, which cnsplots does not solve either**, so this is where
    Selom can beat the reference rather than match it. Row 21 is now *visible on shipped output*:
@@ -255,27 +286,26 @@
    horizontal partly to dodge it.
    **Verify with `scripts/render_skill.py slope lollipop confusion` — the collision is a render
    fact, not a spec fact, and there is no assertion that can see it.**
-5. **§3.2 rows 12–13, if wanted**: `hist`/`kde`/`dist` as ONE skill with a mode (the review's own
+6. **§3.2 rows 12–13, if wanted**: `hist`/`kde`/`dist` as ONE skill with a mode (the review's own
    framing) — and `ridge` already ships the KDE + Silverman bandwidth to build it on, so this is a
    genuine reachability job now, not a build. Row 13 (`donut`/`pie`) the review itself rates low
    scientific value — build last or not at all.
-6. **The isolation-coverage guard** — spec §5's strongest form, and the one piece of Lane C not
+7. **The isolation-coverage guard** — spec §5's strongest form, and the one piece of Lane C not
    built. Enumerate private routes by AST, subtract the allow-list, and **fail on any private route
    with no isolation case**, carrying a NAMED shrinking backlog (the `test_reachability_guard.py`
    waiver shape). Turns "39 unaudited routes" into a tracked list instead of a memory.
-7. **F3 (the fit-scored SKILL picker)** — a different picker from NEXT#1: that one chooses a
+8. **F3 (the fit-scored SKILL picker)** — a different picker from the column one: that chooses a
    *column*, this one chooses a *skill*. Specced in source-review §6; Mobbin ruled OUT abstract
    illustration tiles. Run `fe-review` at the end. **F4** = the rest of the plot gaps.
    **Note it now has ~47 skills to sort**, and the four added today are all general-purpose chart
    types with no omics gate — exactly the case §6 says the flat Store list stops serving.
-8. **`OH-01`** (arq + Redis job store) — unblocked; contract is `docs/jobs-surface/spec.md` §4.
+9. **`OH-01`** (arq + Redis job store) — unblocked; contract is `docs/jobs-surface/spec.md` §4.
 
-**Owed follow-ups still open:** ~~the one-table `StatsTable` limit~~ **decided 2026-08-04 → NEXT#3
+**Owed follow-ups still open:** ~~the one-table `StatsTable` limit~~ **decided 2026-08-04 → NEXT#4
 (spec first, cnsplots + Mobbin as inputs)** · ~~the `zizmor@latest` pin policy~~ **decided
-2026-08-04 → [[DECISIONS #14]], built at NEXT#2** · ~~the `pairs=` **pair-picker**~~
-**promoted to NEXT#1 (2026-08-04)** — the "param controls cannot see the dataset's categories" half
-of that blocker was FALSE (`design.group_candidates[].levels` is already persisted on the dataset);
-only the `ParamField` list widget and the merge-time data thread are real · there
+2026-08-04 → [[DECISIONS #14]], built at NEXT#3** · ~~the `pairs=` **pair-picker**~~ **BUILT 2026-08-04.** Note the correction to the correction:
+the levels were persisted for scRNA/bulk but **not for `generic_table`**, the only kind that uses
+`pairs=` — that needed a backend change (`_table_hints`) · there
 is **no run-scoped legends route** (`/papers/{slug}/legends` is published-paper scoped;
 `compose_ledger_legends(ledger)` already does the work) · **`mocks/handlers.ts` has no handlers for
 the six newer routes** (harmless — MSW bypasses) · the audit's CHECK rows 13/24 need **each
@@ -317,14 +347,18 @@ journal's own author guidelines**, not cnsplots.
 ## ▸ ENV / landmines (Linux · syd4)
 
 - **selom-data IS here** at `/home/deploy/migration/selom-migration-staging/selom-data/` → `SELOM_DATASETS_DIR`. **Docker installed** — in a fresh shell use `sudo docker` until the `deploy` docker-group login refreshes.
-- **Gate of record = `scripts/verify.sh`** (7 gates, 70s, raw + exit-code gated). Do NOT hand-assemble gates and do NOT pipe it through `| tail` — a pipe returns tail's status and discards the failure [[read-gate-output-raw-not-piped]]. Servers: backend `uv run uvicorn main:app --reload`; frontend `npm install --legacy-peer-deps` **in the MAIN checkout only**. Derive the FE dev-lane port (Selom FE=3152) to avoid the shared-box `:3000` collision; `:8000` is eamos — never bind it.
+- **Gate of record = `scripts/verify.sh`** (**9 gates**, ~100–160s, raw + exit-code gated). **It cannot see reachability** — all 9 were green while 19 skills sat behind a disabled Apply. For anything user-facing, `browser-verify` is the second half of the gate, not an optional extra. Do NOT hand-assemble gates and do NOT pipe it through `| tail` — a pipe returns tail's status and discards the failure [[read-gate-output-raw-not-piped]]. Servers: backend `uv run uvicorn main:app --reload`; frontend `npm install --legacy-peer-deps` **in the MAIN checkout only**. Derive the FE dev-lane port (Selom FE=3152) to avoid the shared-box `:3000` collision; `:8000` is eamos — never bind it.
 - **Look at a plot = `uv run python scripts/render_skill.py <skill> [<skill>…]`** (in `app/backend`,
   needs `SELOM_DATASETS_DIR` + `SELOM_SKILLS_ENGINE=real SELOM_UMAP_ENGINE=scanpy`). Renders each
   skill's declared real-corpus smoke case to PNG with **`pin_process()`: engines pinned real, C1 +
   render caches OFF**. Use it after ANY visual change — including a change that is itself a visual
   fix, which is how the grey-ridge defect got in. A stale cache hit is 0.00 s and looks exactly
   like the fix not working.
-- **Browser checks = `scripts/browser-verify.sh`** (needs `SELOM_DATASETS_DIR`). It owns its servers
+- **Browser checks = `scripts/browser-verify.sh`** (needs `SELOM_DATASETS_DIR`; **17 checks**). Two
+  entry fixtures: `openRealFigure` drives to a rendered figure in the EDITOR, and **`openWorkbench`
+  stops one step short** — Store-install → project → real file → intake → skill SELECTED — which is
+  the only state in which a skill's param panel renders. Adding a check is a new `.spec.ts`.
+  It owns its servers
   (BE `:8152` + FE `:3152`) and stops them on exit, and **resets its own SQLite store each run** —
   without that, reconcile drags every prior figure spec in and the drive blows the 180s timeout.
   **Serve the dev app on `localhost`, NEVER `127.0.0.1`:** Next 16 blocks its own dev resources
@@ -339,8 +373,8 @@ journal's own author guidelines**, not cnsplots.
 
 **`docs/auth-multitenancy/spec.md`** (**the entry point — steps 1–3 of §4 are DONE; steps 4–7 are the
 frontend half and are blocked on Clerk keys. §5's route-enumerating isolation guard is the one piece
-NOT built — see NEXT#2**) · **`docs/cnsplots-port/parity-audit.md`** (F1+F2 ledger; its §3 table is
-the remaining styling work, rows 21–23 are NEXT#3) · `docs/cnsplots-port/source-review.md` §3.2 +
+NOT built — see NEXT#7**) · **`docs/cnsplots-port/parity-audit.md`** (F1+F2 ledger; its §3 table is
+the remaining styling work, rows 21–23 are NEXT#5) · `docs/cnsplots-port/source-review.md` §3.2 +
 §5 (**Lane B's three plot types and the seven-point wiring checklist they must close**) ·
 `docs/cnsplots-port/{plan,spec}.md` · **`docs/skill-coverage/matrix.md`** (35/36, re-run with
 `scripts/skill-smoke.sh`) · **`docs/reproduction-engine/skill-table-contract.md`** (now documents the
