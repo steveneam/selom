@@ -358,31 +358,68 @@
 ## ▸ NEXT
 
 0. ~~Gate the `slow` lane~~ · ~~Lane B~~ · ~~§3.2 rows 5/6/9~~ · ~~rows 7/8/10/11~~ ·
-   ~~the column / pair picker~~ · ~~sweep the reachability class~~ · ~~pin zizmor + the drift job~~
-   — **all DONE, and #3 is verified in its target event** (CI `30914180768` green, drift
-   `30914228111` green). §3.2 is closed except rows 12–13. **Nothing is carried forward.**
+   ~~the column / pair picker~~ · ~~sweep the reachability class~~ · ~~pin zizmor + the drift job~~ ·
+   ~~`API_ONLY_KNOBS` first pass~~ — **all DONE.** §3.2 is closed except rows 12–13.
+   **Nothing is carried forward.**
+
+> **▶ RECOMMENDED ORDER FOR THE NEXT SESSION** (written 2026-08-05 with the backlog freshly
+> measured — re-derive if it looks stale, per [[verify-todo-not-already-shipped]]):
+>
+> 1. **`#4` — the `StatsTable` spec, FIRST and alone.** It is the only **owner-directed** item on
+>    this board (2026-08-04), it is explicitly **spec-before-code**, and nothing has started. It also
+>    **gates two skills already built**: `lollipop` with `pairs=` and `boxplot` currently SWAP their
+>    ranked-values table for the pairwise p-values because the contract carries exactly one table,
+>    and `slope`/`confusion` have the same latent squeeze. Write it, then **pause for review** — do
+>    not carry on into code in the same stroke.
+> 2. **`#1(a)+(b)` — the scRNA shared-vocabulary block and the cheap singles**, while the spec is
+>    with the owner. ~57 knobs, needs no spec, and does not touch anything #4 will change.
+> 3. **`#1(d)` + `#2` together — the `deg` spec.** They have converged: `deg`'s 16 knobs and the
+>    level widget `deg.reference`/`treatment` + `diff_abundance` need are one piece of work. Two
+>    specs in one session is a lot; if #4 comes back with changes, this waits.
+>
+> Everything below #4 is genuinely optional this session. **Do not open `facs_gating`** (blocked on
+> a real `.fcs` — DEFERRED) and **do not run the gauntlet / `fe-review` per task** — they are
+> milestone instruments [[review-cadence-phase-not-task]].
 1. **⇒ KEEP WORKING DOWN `API_ONLY_KNOBS` — first pass done 2026-08-05 (`f7d5756`): 171 → 148,
-   36 skills → 27, 18 → 15 with no overlay.** `lib/catalog/registry-completeness.test.ts` holds the
-   list, exact in both directions. ~~`volcano`~~ · ~~`enrichment`/`pathway`/`go_graph`~~ ·
-   ~~`proteomics_de`~~ · ~~the cheap ones~~ **all DONE.** What is left, still ranked by what the
-   knob DECIDES:
-   - **`deg` is now the largest single gap by far (16 knobs)** and the most consequential —
-     `method`, `mode`, `group_col`/`group_val`, `covariate_col` change the RESULT, not the drawing.
-     It wants a spec, not a drive-by overlay. (`reference`/`treatment` are `diff_abundance`'s, also
-     API-only, and are NEXT#2's level-widget shape rather than a text box.)
-   - **The 15 skills with no overlay at all** are where the remaining bulk sits: `cepo` ·
-     `corr_heatmap` · `diff_abundance` · `facs_gating` · `gsea` · `markers` · `mixing_metrics` ·
-     `normalization_qc` · `pca` · `pseudotime_genes` · `pvca` · `ssgsea` · `string_network` ·
-     `trajectory` · `upset`. Several are one obvious knob (`upset.sort_by`, `pca.scale`,
-     `corr_heatmap.method`) — same shape as the cheap ones just closed.
-   - **Do NOT just add overlays to hit zero.** Some knobs are genuinely internal (`erg_*`'s
-     `ab_detector`, `manual_marks`). Waiving those *with a reason* is the right answer; the list is
-     a backlog, not a defect count.
+   36 skills → 27, 18 → 15 with no overlay.** ~~`volcano`~~ · ~~the over-representation trio~~ ·
+   ~~`proteomics_de`~~ · ~~the cheap ones~~ **DONE.** `lib/catalog/registry-completeness.test.ts`
+   holds the list, exact in both directions.
+   **⚑ DO NOT WORK THE REST AS A FLAT LIST — it was MEASURED 2026-08-05 and it clusters. The right
+   move is the one that worked today: declare a shared vocabulary ONCE, and waive the internal ones
+   with a reason.** Ranked by yield, not by count:
+   - **(a) The scRNA shared vocabulary — ~40 knobs across 9 skills, and the cheapest real win.**
+     `normalize` is `bool`/default-`true` in **8** skills (`markers` · `pseudotime_genes` ·
+     `trajectory` · `mixing_metrics` · `annotate` · `violin` · `pvca` · `cepo`) and **means the same
+     thing in every one** — verified in source, not assumed: three of them carry the identical
+     comment *"skip if input is already normalized"*. That is a `GENE_LIST_CUTOFFS`-shaped block.
+     `groupby` (7 skills) and `n_genes`/`top_n` are the next two candidates — **but verify `groupby`
+     the same way before sharing it**, because the session that built the trio found `fc_threshold`
+     meaning two opposite things under one name, and `heatmap.groupby` already has wording to match
+     (it names the Leiden fallback).
+   - **(b) The genuinely cheap singles — 17 knobs, no shared anything:** `upset` (4) ·
+     `string_network` (4) · `corr_heatmap` (3) · `pca` (3) · `pvca` (3, minus its `normalize`).
+   - **(c) `gsea` + `ssgsea` (13)** share `gene_set`/`gene_sets`/`weight` — one block, and it should
+     reuse the `enrichment` library wording rather than invent a second vocabulary for the same idea.
+   - **(d) `deg` (16) — the largest single gap and the one that WANTS A SPEC, not an overlay.**
+     `method`, `mode`, `group_col`/`group_val`, `covariate_col` change the RESULT. Fold NEXT#2's
+     level widget into that spec: `deg.reference`/`treatment` and `diff_abundance`'s (7) are the
+     same "pick a level, not a column" shape, so the two items have converged — spec them together
+     or build the widget twice.
+   - **(e) WAIVE, do not build:** the ERG family's 25 (`erg_intensity_response` 10 · `erg_traces` 8 ·
+     `erg_bwave_bar` 4 · `erg_flicker` 3) is mostly `manual_marks`/`ab_detector`/`stimulus_type` —
+     pipeline-level, already named internal on the board. **`facs_gating` (11) is the second-largest
+     gap and should be LAST**: it is the one skill the smoke matrix cannot run at all, because no
+     `.fcs` is staged (see DEFERRED). Building controls for a skill nobody can run is motion.
    - **The new sibling guards are the thing to extend, not restate**: a slider must be BOUNDED by
      the backend spec and its default must land ON a step. Both live in the same describe block. If
      a knob has no min/max in `skill.json`, render it as a `number` — do not give it a slider and
-     inherit HTML's silent 0–100.
-2. **⇒ EXTEND THE PICKER WHERE IT STILL DOESN'T REACH** (small, additive, all fail-soft today):
+     inherit HTML's silent 0–100. And **when a knob's useful values cluster at one end of its
+     declared range, a slider is the wrong instrument** (`fdr_threshold` is why).
+   - **Prove each batch in the browser, not just in the guard.** `e2e/browser-verify/
+     api-only-knobs.spec.ts` is the pattern: set the knob through the real control, assert on the
+     RENDERED figure. A guard-only pass repeats this backlog's founding mistake one level up.
+2. **⇒ EXTEND THE PICKER WHERE IT STILL DOESN'T REACH** (small, additive, all fail-soft today).
+   **⚑ Its level-widget half has CONVERGED with #1(d) — spec them together or build it twice.**
    - **A multi-column widget** — `venn.sets` (2–3 column names) and `heatmap.annotations` are
      comma-separated LISTS of columns, so the single-select `column` type does not fit. The row-list
      built for `pairs` is most of the answer.
