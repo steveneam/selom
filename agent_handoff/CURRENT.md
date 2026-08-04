@@ -27,6 +27,7 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
+| **REACHABILITY-SWEEP** | 2026-08-04 | `main` `18c8cbd..<head>` (**unpushed — owner pushes**) | **NEXT#1 closed on all three bullets, and the sweep found a THIRD layer of the same class.** The board asked for three things and each one turned up something bigger than itself. ⚑ **171 of 313 backend knobs render no control at all** — 37 skills, **18 with no presentation overlay whatsoever**. `paramFieldsFromSpec` iterates the OVERLAY, not the backend spec, so a skill without one renders zero controls and the panel says *"Runs with smart defaults — ready to apply"*, which reads as a product decision and is usually just an absent overlay. The sharpest case is **`volcano`, the flagship**: the panel says *"Tune the options"* while `fc_threshold` · `fdr_threshold` · `top_n` — the three knobs deciding what a volcano SHOWS — are API-only. That is now `API_ONLY_KNOBS`, a **named waiver list exact in BOTH directions** (a new knob cannot join it quietly; a knob that gains a control must leave it), the `test_reachability_guard.py` shape. **The progression is the point: 17 unreachable routes → 19 unrunnable skills → 171 untouchable knobs**, each invisible to every gate, each found by asking *can a user reach this* rather than *does it work*. **The seed is GENERATED, not refilled** — the board said "refill `seed.ts`", but refilling a hand-maintained mirror of a live registry only resets the clock, so `scripts/gen-catalog-seed.mjs` writes the Selom half from the backend's own `skill.json` and the drift guard re-runs the generator in memory. It found a live divergence at once: the seed named `umap_scrna` *"UMAP (single-cell)"* while the backend serves *"scRNA UMAP"* — and a test was pinning the seed's string, asserting a name **no user ever saw**. **`runFromWorkbench`** is new harness capability (Store install → real file → intake → **params set through the real controls** → Apply → rendered figure); `lollipop` · `slope` · `ridge` · `line` all reach a real figure on `erg_metrics_long.csv`. **Two defects the browser found in the SERVER LOG, which nobody had been reading:** (1) **5 requests died with a 500 on every cold start** — three repos each called `metadata.create_all` from a lazily-built constructor, and `checkfirst=True` reflects-then-CREATEs non-atomically, so the first concurrent burst against a fresh DB lost with `table analysis_jobs already exists`; hidden because the FE re-fetches and the retry finds the schema built. Fixed via `db.engine.ensure_schema` (lock + a post-condition-checked catch for the cross-process case), regression-tested with **threads on a barrier** because a race is a timing fact a mock cannot express. (2) A Radix **Select mounted uncontrolled and flipped to controlled on every upload** (`data-type-strip` passed `value={undefined}` until `qc.profileCode` landed) — not cosmetic, since Radix keeps its own selection while uncontrolled and silently overwrites an override chosen in that window. **The last board's `catalog.name` footnote was 21 skills, not one**: every one a lossy re-brand of the title it shadowed ("Box / strip plot" → "Selom Box Plot"), dropping exactly the searchable words; `title` is the one display name now and the key is **refused** rather than merely unread. Also: **`venn`/`upset` PASS smoke through a `membership` adapter no user path provides** (unlike `celeris`, which mirrors a real ingest) — recorded in `smoke.py`, not fixed, because a reshape step is a feature. Gates: `verify.sh` **9/9** (raw, exit 0 — BE 1571 fast + 392 slow, FE 704, fe-build green) · **browser-verify 21 green / 2 skipped by precondition / 0 failed**, but **only across two passes** — the shared box OOM-kills the Next dev server mid-suite, so a single 23-check run has not completed; see the LIVE block. |
 | **PICKERS** | 2026-08-04 | `main` `5aa9190..<head>` (**4 unpushed — owner pushes**) | **NEXT#1 shipped: a column knob is a picker over the columns that exist, and `pairs=` is a row-list of real level names — and the live browser verify found a bug far bigger than the feature.** ⚑ **`getSkill(id)` read the STATIC SEED alone, so 19 of the 44 live skills were unreachable**: installed from the Store, they rendered in the Workbench as their **raw id, badged "Queued", with Apply DISABLED**. That is `boxplot` · `slope` · `lollipop` · `ridge` · `confusion` · `line` · `regression` · `qq` · `venn` · `forest` — **every plot type built in the preceding sessions** — plus cepo/pathway/ssgsea/pvca/diff_abundance/facs_gating/go_graph/mixing_metrics/pseudotime_genes. `registry.ts` already declared "the backend is the source of truth for what runs now", but only the **Store** honoured it (`useCatalog`); the ~20 other surfaces went through `getSkill`. **Invisible to all 9 gates** — the backend serves them, the param specs merge, the FE overlays exist — and visible in the first real browser [[selom-shipped-not-reachable]]. Fixed via `lib/catalog/live-skills.ts` (a shared cell so `getSkill` stays synchronous at 20 call sites and seed↔registry stays acyclic) + `useLiveSkills()` on the Workbench, whose Apply is gated on the tier `getSkill` returns; ratcheted into `registry-completeness.test.ts` (which already reads the real `skill.json` files) and **proven to bite — reverting `getSkill` fails it with all 19 named**. **The picker itself:** `paramFieldsFromSpec(id, spec, ctx?)` gains ONE optional input — the dataset's own schema, already fetched by `/data/inspect` and already persisted — so it stays the single place dataset knowledge enters and `visibleParamFields`/`isFieldDisabled` stay pure. `column`/`pairs` are **resolved** widgets: emitted only when the vocabulary exists, else byte-identical to the old text field (pinned by a test that a context perturbs *nothing else*). **The pair picker deliberately has NO fallback while the group column is blank** — blank means the backend's auto-detect, a dtype rule the FE cannot evaluate, and on the real ERG table it picks `sample_id` while `best_group` is `condition`, so a guess would offer levels from a column the run is not grouping by. **One backend change was needed and the board's premise was half wrong**: `design.group_candidates` was **empty for `generic_table`** — the exact kind a long-form CSV lands in, i.e. the only kind that uses `pairs=`. `engine/questionnaire._table_hints` fills it **without claiming a design** (`needs_design`/`source` untouched, or every dropped CSV grows an intake confirm-card). Mobbin was unanimous on the row-list (beehiiv · Confluence · ClickUp · Braintrust · AutoSend · Glide) and **ruled OUT** the drag-a-field-into-a-well pattern (Fibery/Sigma/Deputy) and Databricks' per-channel popover — both need a second surface. **Two more defects only the browser could show:** every control's accessible NAME swept in its whole help paragraph (implicit `<label>` wrapping), making two fields mutually ambiguous; and long arm names clip in a narrow select. Gates: `verify.sh` **9/9** (raw, exit 0) · **browser-verify 17/17** (14 + 3 new, real backend + real corpus) · **skill-smoke 43 pass / 0 fail**. |
 | **PLOT-ROWS-DONE** | 2026-08-04 | `main` `9dd24ce..26af5a9` (**unpushed — owner pushes**) | **§3.2 is CLOSED: `lollipop` · `ridge` · `slope` · `confusion` shipped, and this is the first row in five where the "missing" premise HELD** — no engine existed for any of them, so the grep-first rule cost minutes and correctly said *build*. The content is what each carries beyond its shape. **`lollipop`**: a bootstrap CI on the **median**, because `bar_figure` is mean±SEM *by construction* and a non-parametric interval could not ride a golden-pinned parametric spine; seeded, so it redraws byte-identically. A **pre-aggregated** table (one row per category — how a ranked list actually arrives) is n=1 everywhere, so it gets no interval, no brackets, **and no CI column header**, rather than `n/a` under a "95% CI" heading. **`confusion`**: two labellings of the SAME rows — how an annotation gets validated. Agreement + Cohen's κ **only when the label sets match**; against Leiden ids there is no diagonal, so it NAMES that instead of computing a number from an alignment nobody declared, and that refusal is the real-corpus path. **`slope`**: cnsplots draws this geometry and **computes nothing** — so Selom tests it, and tests it **paired** (`_stats.compare_paired`), because an unpaired Welch compares marginals and throws away the structure the picture is built on; it reports the **up/down split**, the finding a flat mean conceals, and refuses to guess `subject`/`condition` (the wrong guess pairs the wrong rows and still looks right). **`ridge`**: hand-rolled Gaussian KDE + Silverman so the dependency-free **stub draws the same curve as the real engine** (pinned against scipy), and it **discloses its bandwidth** — a curve is exactly as bimodal as its smoothing allows. **⚑ THE SESSION'S REAL YIELD IS THE THREE DEFECTS RENDERING FOUND, all of which passed every assertion**: (1) **the D2 numeric-string class lives in the ANNOTATION layer too** — `type:"category"` fixes the *trace*, but Plotly coerces a numeric-looking string annotation coordinate to a number and a category axis reads it as a **slot index**, so `confusion`'s cell counts scrambled across a correctly-laid-out heatmap and one label drew clean **off the plot**; (2) `lollipop`'s **stem took the next colourway slot**, rendering one mark as two unrelated series; (3) `ridge` went **entirely grey** when the outline was pinned — a `fill:"toself"` scatter derives its **fill from the line colour**. Classes 1 and the `marker.size` area-vs-diameter trap are now **standing invariants in `smoke.check_figure`** (every skill, every run, zero false positives across 43); 2 and 3 are named defect tests. **`scripts/render_skill.py`** turns the loop into one command with `pin_process()` — the render cache twice served the pre-fix figure at 0.00s, which is indistinguishable from the fix not working. Gates: `verify.sh` **9/9** (true exit 0, read raw), **skill-smoke 43 pass / 0 fail** (was 39). |
 | **STRIP** | 2026-08-03 | `main` `62e2bcc..1d1176a` (**pushed**) | **§3.2 row 9 `strip` was the FOURTH wrong premise** — Plotly's own box trace draws a strip (`boxpoints="all"` + a hidden box) and `boxplot` already exposed the points knob, so it is a **`style` mode, not a skill**. Mode for a concrete reason: a strip must keep the shared categorical vocabulary (`order` · `add_count` · `pairs` + brackets from `_stats.py`), and a sibling skill would have had to re-import all of it and could then drift from the box it is the companion to. **The bug worth knowing: hiding the box with a transparent LINE COLOUR renders the panel completely empty** — a box trace's points inherit the trace colour, so the markers vanish with it; correct axes, correct `n=` labels, not one point drawn, and every spec assertion still green. Hide it by zero **width** instead. Pinned by a named defect test. Retitled "Box / strip plot" for discoverability (same fix `regression` needed). Golden byte-identical. `verify.sh` **9/9**. |
@@ -46,7 +47,80 @@
 | **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
 | older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · PICKERS · 2026-08-04 19:17 +1000 (Sydney) · branch `main` (**4 UNPUSHED — owner pushes**) · Claude (FE+BE, solo, lead)
+## ▸ LIVE · REACHABILITY-SWEEP · 2026-08-04 19:57 +1000 (Sydney) · branch `main` (**UNPUSHED — owner pushes**) · Claude (FE+BE, solo, lead)
+
+- **NEXT#1 is closed on all three bullets, and the sweep found more than it was sent for.** The four
+  newest plot types are driven to a rendered figure by a real user path; the seed is generated
+  instead of hand-listed; and the "what else is unusable?" question has a number and a guard.
+- **⚑ THE FINDING THAT MATTERS: 171 of 313 backend knobs render NO control at all** — 37 skills,
+  18 of them with no overlay whatsoever. `paramFieldsFromSpec` iterates the presentation OVERLAY,
+  not the backend spec, so a skill without one shows zero controls and the panel says *"Runs with
+  smart defaults — ready to apply"* — which reads as a product decision and is usually just an
+  absent overlay. **The sharpest case is `volcano`, the flagship**: the panel says *"Tune the
+  options"* while `fc_threshold`, `fdr_threshold` and `top_n` — the three knobs that decide what a
+  volcano SHOWS — are unreachable. Now a named, two-directional waiver list (`API_ONLY_KNOBS`) so it
+  can only shrink and nothing new joins it silently. **This is the third layer of the same class:**
+  17 unreachable routes → 19 unrunnable skills → 171 untouchable knobs. Each was invisible to every
+  gate and each was found by asking "can a user actually reach this?" rather than "does it work?"
+- **The seed is GENERATED now, not refilled.** The board said "refill `seed.ts` from the live
+  registry", and refilling by hand would only reset the clock — a hand-maintained mirror of a live
+  registry goes stale again, which is the lesson rather than the incident. `npm run gen:seed` writes
+  the Selom half from the backend's own `skill.json`; the drift guard re-runs the generator in memory
+  and fails on any difference. **It caught a live divergence immediately:** the seed named
+  `umap_scrna` "UMAP (single-cell)" while the backend serves "scRNA UMAP" — and a test was pinning
+  the seed's string, i.e. asserting a name no user ever saw.
+- **Two defects the browser found that no gate could — again, and this time in the SERVER log rather
+  than on screen.** Both were sitting in plain sight in `browser-verify` output that nobody read:
+  1. **5 requests died with a 500 on every cold start.** `UploadRepo`/`LibraryRepo`/`SqlJobStore`
+     each called `metadata.create_all` from their own lazily-built constructor, and
+     `create_all(checkfirst=True)` reflects-then-CREATEs non-atomically — so the first burst of
+     concurrent requests against a fresh database raced and lost with `table analysis_jobs already
+     exists`. Invisible because the frontend re-fetches and the retry finds the schema built. Fixed
+     with `db.engine.ensure_schema` (lock + a post-condition-checked catch for the cross-process
+     case); the regression test uses **threads on a barrier**, because the race is a timing fact a
+     mock cannot express.
+  2. **A Radix Select mounted uncontrolled and flipped to controlled on every single upload.**
+     `data-type-strip` passed `value={undefined}` until `qc.profileCode` landed. Not cosmetic: while
+     uncontrolled Radix keeps its own selection, so a data-type override chosen in that window is
+     silently overwritten when the prop takes over. `""` is Radix's own "no selection".
+- **`runFromWorkbench` is the new harness capability** [[compound-capability-each-task]] — Store
+  install → real file → intake → **set params through the real controls** → Apply → a rendered
+  figure. `openWorkbench` stops before Apply and `openRealFigure` cannot set a parameter, so neither
+  could make the claim "this skill ships" in full. Params are set by ACCESSIBLE NAME, so a knob whose
+  widget never renders fails the check instead of being silently defaulted.
+- **The `catalog.name` note from the last board turned out to be 21 skills, not one.** Every one was
+  a lossy re-brand of the title beneath it ("Box / strip plot" → "Selom Box Plot", "Ridge plot
+  (joyplot)" → "Selom Ridge Plot"), and the dropped words were the searchable ones. Removed; `title`
+  is the one display name, and the key is now REFUSED rather than merely unread — an unread key that
+  still parses invites someone to re-add one and wonder why the title does not move.
+- **`venn`/`upset` PASS the smoke matrix through an adapter no user path provides.** The `membership`
+  crosstab has no equivalent in `engine.ingest` or the frontend, unlike `celeris` which mirrors a real
+  ingest. So that PASS proves the engine and says nothing about reachability; `smoke.py`'s docstring
+  claimed parity for both adapters and now distinguishes them. Not fixed — a reshape step is a
+  feature, not a patch.
+- **⚑ ENV, NOT CODE — but read this before trusting a browser-verify number.** `verify.sh` is a
+  clean **9/9** (raw, exit 0). The 23-check browser suite is **21 green / 2 skipped / 0 failed**,
+  and that is a UNION OF TWO PASSES, not one run: **syd4 OOM-kills the Next dev server partway
+  through**, and it did so twice at different points (once at check #4, once at #18). The signature
+  is unmistakable and worth recognising instantly — one check dies slowly (a 37 s or 3 min timeout
+  while the server is going), then **every remaining check fails in ~200 ms with
+  `ERR_CONNECTION_REFUSED`**, and the log shows Next's `[?25h` cursor-restore where the process
+  exited. **Those are not 20 failures; they are one.** Re-running the survivors as a smaller filtered
+  pass cleared all of them. The box is shared (a thalon dev server holds 1.6 GB, plus
+  chrome-devtools-mcp and several agent sessions) and sits on ~2–3 GB of swap; nothing of mine is
+  orphaned — `:3152`/`:8152` are released on exit. **So: split the suite when the box is loaded, and
+  never read a wall of fast failures as a regression without checking for the server's exit first.**
+  The 2 skips are correct and pre-existing: V-2's cloud imports skip unless
+  `SELOM_BV_GDRIVE_REF`/`SELOM_BV_DROPBOX_REF` name a file, because both providers are sandboxed to
+  what Selom itself created, so there is nothing to discover [[selom-cloud-scope-sandbox]].
+- **Two things I got wrong mid-session, both caught by the guards I was writing.** The
+  `API_ONLY_KNOBS` list was first derived with a regex over `params.ts` and was wrong for
+  `erg_traces` — the stale-waiver direction of my own guard caught it, which is the argument for
+  making it exact in both directions. And a `git checkout` to revert an experiment silently wiped an
+  uncommitted test in the same file; **revert an experiment with a targeted edit, never `git
+  checkout <path>` on a file that has uncommitted work.**
+
+## ▸ (superseded) LIVE · PICKERS · 2026-08-04 19:17 +1000 (Sydney) · branch `main` · Claude (FE+BE, solo, lead)
 
 - **NEXT#1 is DONE and reachable.** Column pickers on `boxplot` · `slope` · `lollipop` · `ridge` ·
   `confusion` · `line` · `regression` · `qq` · `composition`; the pair row-list on `boxplot`. Both
@@ -215,22 +289,25 @@
 ## ▸ NEXT
 
 0. ~~Gate the `slow` lane~~ · ~~Lane B~~ · ~~§3.2 rows 5/6/9~~ · ~~rows 7/8/10/11~~ ·
-   ~~the column / pair picker~~ — **all DONE.** §3.2 is closed except rows 12–13.
-1. **⇒ SWEEP THE REACHABILITY CLASS THE PICKER SESSION EXPOSED — highest value on this board.**
-   `getSkill` is fixed and guarded, but that guard only proves a skill can be *resolved*. The
-   session showed the gates cannot see whether a shipped thing is *usable*, and the same blind spot
-   has now produced two findings in two sessions (17 unreachable routes, then 19 unrunnable skills).
-   - **Take the 19 newly-runnable skills seriously as UNTESTED SURFACE.** They have never been
-     applied from the Workbench by anyone. `skill-smoke` proves each ENGINE on real data; it says
-     nothing about the run path through the FE. Pick 3–4 (`slope`, `lollipop`, `confusion`, `venn`)
-     and drive each to a rendered figure with `openWorkbench` + an Apply.
-   - **Refill `lib/catalog/seed.ts` from the live registry**, so a backend-down session is not 19
-     skills stale, and so the Store's Community/Verified split stops drifting. Mechanical; the new
-     guard already names exactly which are missing.
-   - **Then ask what else is "shipped but unusable".** The reachability guard
-     (`test_reachability_guard.py`) covers routes, the new one covers skills. Nothing covers a
-     rendered CONTROL — e.g. `heatmap`'s `annotations`/`split_by` and `venn`'s `sets` are still
-     free-text lists with no widget, and `erg_bwave_bar`'s `comparisons` still takes a mini-DSL.
+   ~~the column / pair picker~~ · ~~sweep the reachability class~~ — **all DONE.** §3.2 is closed
+   except rows 12–13.
+1. **⇒ WORK DOWN `API_ONLY_KNOBS` — the backlog the reachability sweep turned up, now named and
+   guarded.** `lib/catalog/registry-completeness.test.ts` holds the list: **171 of 313 backend
+   knobs render no control at all**, across 37 skills, 18 of which have no overlay whatsoever. The
+   guard is exact in both directions, so the list can only shrink and nothing new joins it quietly.
+   Rank by what the knob DECIDES, not by count:
+   - **`volcano` first — it is the flagship and the worst case.** `fc_threshold`, `fdr_threshold`
+     and `top_n` are the three knobs that decide what a volcano SHOWS, all API-only, while the
+     panel says "Tune the options". `enrichment` · `go_graph` · `pathway` · `proteomics_de` carry
+     the same three and are the same one-overlay fix.
+   - **`deg` is the largest single gap (16 knobs)** and the most consequential — `method`, `mode`,
+     `group_col`/`group_val`, `covariate_col` change the RESULT, not the drawing. It probably wants
+     a spec, not a drive-by overlay. (`reference`/`treatment` are `diff_abundance`'s, also API-only.)
+   - **The cheap ones are one line each**: `ridge.order`, `slope.order`, `sankey.max_links`,
+     `heatmap.groupby`.
+   - **Do NOT just add overlays to hit zero.** Some knobs are genuinely internal (`erg_*`'s
+     `ab_detector`, `manual_marks`). Waiving those *with a reason* is the right answer; the list is
+     a backlog, not a defect count.
 2. **⇒ EXTEND THE PICKER WHERE IT STILL DOESN'T REACH** (small, additive, all fail-soft today):
    - **A multi-column widget** — `venn.sets` (2–3 column names) and `heatmap.annotations` are
      comma-separated LISTS of columns, so the single-select `column` type does not fit. The row-list
@@ -354,10 +431,19 @@ journal's own author guidelines**, not cnsplots.
   render caches OFF**. Use it after ANY visual change — including a change that is itself a visual
   fix, which is how the grey-ridge defect got in. A stale cache hit is 0.00 s and looks exactly
   like the fix not working.
-- **Browser checks = `scripts/browser-verify.sh`** (needs `SELOM_DATASETS_DIR`; **17 checks**). Two
-  entry fixtures: `openRealFigure` drives to a rendered figure in the EDITOR, and **`openWorkbench`
-  stops one step short** — Store-install → project → real file → intake → skill SELECTED — which is
-  the only state in which a skill's param panel renders. Adding a check is a new `.spec.ts`.
+- **Browser checks = `scripts/browser-verify.sh`** (needs `SELOM_DATASETS_DIR`; **23 checks**, 2 of
+  which skip unless `SELOM_BV_GDRIVE_REF`/`SELOM_BV_DROPBOX_REF` name a file). **On a loaded box,
+  run it as two filtered passes** — `scripts/browser-verify.sh <spec-filter> …` takes several — because
+  the Next dev server gets OOM-killed partway through and every later check then fails in ~200 ms
+  with `ERR_CONNECTION_REFUSED`. That wall of fast failures is ONE failure (the server), not many;
+  look for Next's `[?25h` exit marker in the log before believing a regression.
+  **Three** entry fixtures: `openRealFigure` drives to a rendered figure in the EDITOR;
+  **`openWorkbench` stops one step short** — Store-install → project → real file → intake → skill
+  SELECTED — the only state in which a skill's param panel renders; and **`runFromWorkbench` goes all
+  the way** — the same drive plus params SET THROUGH THE REAL CONTROLS (by accessible name, so an
+  API-only knob fails the check) plus Apply plus a rendered figure. That last one is the instrument
+  for "is this skill reachable", as distinct from `skill-smoke`'s "does this engine work".
+  Adding a check is a new `.spec.ts`.
   It owns its servers
   (BE `:8152` + FE `:3152`) and stops them on exit, and **resets its own SQLite store each run** —
   without that, reconcile drags every prior figure spec in and the drive blows the 180s timeout.
