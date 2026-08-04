@@ -34,6 +34,7 @@ _KIND = {
     "heatmap": "matrix",
     "corr_heatmap": "matrix",
     "cepo": "matrix",
+    "confusion": "matrix",
     # A Venn has no axes to style — the circles ARE the coordinate system, and its
     # x/y ranges exist only to hold the geometry. Same axis-less treatment as a trace grid.
     "venn": "axisless",
@@ -46,6 +47,17 @@ _KIND = {
 # Backward-compatible: ``erg_traces`` is already tagged ``trace_grid`` and also maps there in
 # ``_KIND``, so existing goldens are unchanged.
 _FIGUREKIND_TO_KIND = {"trace_grid": "trace_grid"}
+
+
+def _declared_scale(trace):
+    """A trace's self-declared colour-scale family (``meta.selom.scale``), or None.
+
+    Render-inert (Plotly ignores ``meta``), and read in preference to guessing from the trace's
+    shape — see :func:`_style_matrix`."""
+    try:
+        return trace["meta"]["selom"]["scale"]
+    except (KeyError, TypeError):
+        return None
 
 
 def _tagged_kind(spec):
@@ -203,6 +215,13 @@ def _style_matrix(st, spec):
         if tr.get("type") == "heatmap" and "zmid" in tr:
             tr["colorscale"] = st.diverging
             tr.pop("reversescale", None)
+        # A COUNT matrix (confusion) is sequential: it has a floor at zero and no midpoint, so the
+        # diverging ramp would invent one and paint "few" and "many" as two opposed directions. It
+        # DECLARES itself rather than being inferred from "has zmin but no zmid" — the clustermap's
+        # categorical annotation strips match that description exactly and must keep the stepwise
+        # scale the docstring below protects.
+        if tr.get("type") == "heatmap" and _declared_scale(tr) == "sequential":
+            tr["colorscale"] = st.sequential
         marker = tr.get("marker")
         if isinstance(marker, dict) and "cmid" in marker:
             marker["colorscale"] = st.diverging

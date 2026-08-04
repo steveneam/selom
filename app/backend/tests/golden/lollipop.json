@@ -1,0 +1,201 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "lines",
+      "name": "stem",
+      "showlegend": false,
+      "hoverinfo": "skip",
+      "line": {
+        "color": "#7c8896",
+        "width": 2.0
+      },
+      "opacity": 0.55,
+      "y": [
+        "Oxidative stress",
+        "Oxidative stress",
+        null,
+        "Glial activation",
+        "Glial activation",
+        null,
+        "Synaptic signalling",
+        "Synaptic signalling",
+        null,
+        "Visual cycle",
+        "Visual cycle",
+        null,
+        "Phototransduction",
+        "Phototransduction",
+        null
+      ],
+      "x": [
+        0.0,
+        1.4,
+        null,
+        0.0,
+        2.2,
+        null,
+        0.0,
+        3.1,
+        null,
+        0.0,
+        3.9,
+        null,
+        0.0,
+        4.9,
+        null
+      ]
+    },
+    {
+      "type": "scatter",
+      "mode": "markers",
+      "name": "median",
+      "showlegend": false,
+      "hoverinfo": "x+y",
+      "marker": {
+        "size": 9,
+        "line": {
+          "color": "#ffffff",
+          "width": 1.0
+        }
+      },
+      "y": [
+        "Oxidative stress",
+        "Glial activation",
+        "Synaptic signalling",
+        "Visual cycle",
+        "Phototransduction"
+      ],
+      "x": [
+        1.4,
+        2.2,
+        3.1,
+        3.9,
+        4.9
+      ],
+      "error_x": {
+        "type": "data",
+        "symmetric": false,
+        "array": [
+          0.3,
+          0.4,
+          0.3,
+          0.4,
+          0.3
+        ],
+        "arrayminus": [
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3
+        ],
+        "visible": true,
+        "thickness": 1.1,
+        "width": 4,
+        "color": "#333333"
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Ranked pathway scores (stub)",
+      "font": {
+        "family": "Arimo, Arial, Helvetica, sans-serif",
+        "size": 14,
+        "color": "#111111",
+        "weight": "bold"
+      },
+      "x": 0.01,
+      "xanchor": "left"
+    },
+    "xaxis": {
+      "showline": true,
+      "linecolor": "#1a1a1a",
+      "linewidth": 0.8,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#1a1a1a",
+      "ticklen": 3.0,
+      "tickwidth": 0.8,
+      "tickfont": {
+        "size": 11,
+        "color": "#2b2b2b"
+      },
+      "zeroline": false,
+      "showgrid": false,
+      "title": {
+        "text": "enrichment score",
+        "font": {
+          "size": 13,
+          "color": "#111111"
+        }
+      }
+    },
+    "yaxis": {
+      "showline": true,
+      "linecolor": "#1a1a1a",
+      "linewidth": 0.8,
+      "mirror": false,
+      "ticks": "outside",
+      "tickcolor": "#1a1a1a",
+      "ticklen": 3.0,
+      "tickwidth": 0.8,
+      "tickfont": {
+        "size": 11,
+        "color": "#2b2b2b"
+      },
+      "zeroline": false,
+      "showgrid": false,
+      "type": "category",
+      "title": {
+        "text": "pathway",
+        "font": {
+          "size": 13,
+          "color": "#111111"
+        }
+      }
+    },
+    "showlegend": false,
+    "plot_bgcolor": "#ffffff",
+    "font": {
+      "family": "Arimo, Arial, Helvetica, sans-serif",
+      "size": 13,
+      "color": "#2b2b2b"
+    },
+    "paper_bgcolor": "#ffffff",
+    "colorway": [
+      "#2f6db0",
+      "#e08a2b",
+      "#3f9b6b",
+      "#c0392b",
+      "#7d5ba6",
+      "#1f9aa6",
+      "#9aa017",
+      "#6b7280"
+    ],
+    "hoverlabel": {
+      "font": {
+        "family": "Arimo, Arial, Helvetica, sans-serif",
+        "size": 12
+      },
+      "bgcolor": "#111111"
+    },
+    "margin": {
+      "t": 46,
+      "r": 24,
+      "b": 52,
+      "l": 64
+    },
+    "legend": {
+      "itemwidth": 30,
+      "tracegroupgap": 6,
+      "font": {
+        "size": 11,
+        "color": "#2b2b2b"
+      },
+      "bgcolor": "rgba(0,0,0,0)",
+      "bordercolor": "rgba(0,0,0,0)"
+    }
+  }
+}

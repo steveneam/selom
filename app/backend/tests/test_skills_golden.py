@@ -23,7 +23,7 @@ SKILLS = [
     "cepo", "boxplot", "pvca", "regression", "integration", "pseudotime_genes",
     "diff_abundance", "ssgsea", "erg_traces", "erg_bwave_bar", "erg_intensity_response",
     "erg_flicker", "mixing_metrics", "facs_gating", "venn", "forest", "qq",
-    "umap_scrna", "line",
+    "umap_scrna", "line", "lollipop", "confusion", "slope", "ridge",
 ]
 GOLDEN_DIR = pathlib.Path(__file__).parent / "golden"
 

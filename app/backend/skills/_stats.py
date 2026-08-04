@@ -69,12 +69,48 @@ def compare_groups(a, b, test: str = "welch"):
         return None
 
 
+def compare_paired(a, b, test: str = "paired_t"):
+    """Two-sided p-value for **paired** observations — ``a[i]`` and ``b[i]`` are the SAME subject
+    measured twice. ``test``: ``paired_t`` (default) · ``wilcoxon`` (signed-rank). Returns None when
+    fewer than two complete pairs survive, or when every difference is exactly zero (nothing to
+    test). Pairs where either side is missing / non-finite are dropped as a unit — half a pair
+    carries no paired information. scipy lazy, exactly like :func:`compare_groups`.
+
+    WHY THIS IS NOT ``compare_groups``. A paired design's entire claim is the pairing, and an
+    unpaired test throws it away: it compares two marginal distributions and never asks which value
+    belongs to which subject. On a before/after figure that is the one comparison the picture is not
+    making, and it is also systematically weaker, because the between-subject variance stays in the
+    denominator instead of cancelling. A slope chart annotated with a Welch p is a figure whose
+    geometry and whose statistic disagree — cnsplots' ``slopeplot`` sidesteps this by computing no
+    statistic at all, which is honest but leaves the reader to eyeball it.
+    """
+    pairs = [(float(x), float(y)) for x, y in zip(a, b)
+             if x is not None and y is not None
+             and math.isfinite(float(x)) and math.isfinite(float(y))]
+    if len(pairs) < 2:
+        return None
+    diffs = [y - x for x, y in pairs]
+    if not any(d for d in diffs):          # every difference exactly zero
+        return None
+    from scipy import stats
+
+    t = str(test or "paired_t").strip().lower()
+    try:
+        if t in ("wilcoxon", "signedrank", "signed_rank"):
+            return float(stats.wilcoxon([x for x, _ in pairs], [y for _, y in pairs]).pvalue)
+        return float(stats.ttest_rel([x for x, _ in pairs], [y for _, y in pairs]).pvalue)
+    except (ValueError, ZeroDivisionError):
+        return None
+
+
 TEST_LABEL = {
     "welch": "Welch t",
     "student": "Student t",
     "mannwhitney": "Mann-Whitney U",
     "mwu": "Mann-Whitney U",
     "u": "Mann-Whitney U",
+    "paired_t": "Paired t",
+    "wilcoxon": "Wilcoxon signed-rank",
 }
 
 

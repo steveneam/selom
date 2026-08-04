@@ -1,0 +1,39 @@
+{
+  "id": "lollipop",
+  "version": "0.1.0",
+  "title": "Lollipop chart (ranked)",
+  "engine": "python",
+  "omics": "bulk-rna-seq|scrna-seq|proteomics|metabolomics",
+  "omics_type": ["general"],
+  "entrypoint": "skills.lollipop.run:run",
+  "inputs": [{ "name": "table", "kind": "csv|tsv|xlsx", "required": true }],
+  "param_spec": {
+    "group":       { "type": "str",  "default": "", "note": "Category column. Blank = the first non-numeric column." },
+    "value":       { "type": "str",  "default": "", "note": "Numeric column to rank. Blank = the first numeric column." },
+    "estimator":   { "type": "str",  "default": "median", "options": ["median", "mean"], "note": "The value each dot sits at. Median is the default because a ranking is usually read off the median." },
+    "sort":        { "type": "str",  "default": "desc", "options": ["desc", "asc", "none"], "note": "none keeps the order the rows arrived in." },
+    "orientation": { "type": "str",  "default": "h", "options": ["h", "v"], "note": "Horizontal by default — a ranking reads top-to-bottom and long category names get real room." },
+    "error_bars":  { "type": "bool", "default": true, "note": "95% CI from a seeded percentile bootstrap. Needs at least 3 values per category; a pre-aggregated table gets none rather than a fabricated one." },
+    "add_tip":     { "type": "bool", "default": false, "note": "Print each value beside its dot." },
+    "baseline":    { "type": "float", "default": 0.0, "note": "Where the stems start. 0 for a magnitude; set it to a reference level for a deviation." },
+    "order":       { "type": "str",  "default": "", "note": "Pin named categories first; the rest stay ranked." },
+    "add_count":   { "type": "bool", "default": false },
+    "pairs":       { "type": "str",  "default": "", "note": "\"A~B, C~D\" — significance brackets. Ignored on a pre-aggregated table, where every test would be n=1 vs n=1." },
+    "sig_test":    { "type": "str",  "default": "welch", "options": ["welch", "student", "mannwhitney"] },
+    "correction":  { "type": "str",  "default": "none", "options": ["none", "bonferroni", "bh"] }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "name": "Selom Lollipop Chart",
+    "summary": "Ranked stem-and-dot chart of one value per category — the cleaner alternative to a bar chart when the point of the figure is the ordering. Carries a 95% bootstrap confidence interval on the median (a bar chart's mean±SEM has no non-parametric equivalent), and refuses to invent one on an already-aggregated table. Optional significance brackets between named pairs.",
+    "category": "visualization",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".csv", ".tsv", ".xlsx"],
+    "chains_with": ["enrichment", "boxplot", "deg"],
+    "license": "MIT",
+    "popularity": 52
+  }
+}

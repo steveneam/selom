@@ -1,0 +1,33 @@
+{
+  "id": "ridge",
+  "version": "0.1.0",
+  "title": "Ridge plot (joyplot)",
+  "engine": "python",
+  "omics": "scrna-seq|bulk-rna-seq|proteomics|metabolomics",
+  "omics_type": ["general"],
+  "entrypoint": "skills.ridge.run:run",
+  "inputs": [{ "name": "table", "kind": "h5ad|csv|tsv|xlsx", "required": true }],
+  "param_spec": {
+    "group":       { "type": "str",  "default": "", "note": "Category column, one ridge per level. Blank = the first non-numeric column." },
+    "value":       { "type": "str",  "default": "", "note": "Numeric column whose distribution is drawn. Blank = the first numeric column." },
+    "overlap":     { "type": "float", "default": 0.55, "min": 0.0, "max": 0.95, "note": "How far each ridge rides over the one below. 0 separates them completely." },
+    "scale":       { "type": "str",  "default": "peak", "options": ["peak", "common"], "note": "peak normalizes every ridge to the same height, so shapes compare but a group of 5 looks as tall as one of 5000. common keeps one density scale, so height means something." },
+    "median_line": { "type": "bool", "default": true, "note": "Mark each group's median inside its ridge." },
+    "add_count":   { "type": "bool", "default": true, "note": "Weld n= to each ridge label — with peak scaling this is the only cue to group size." },
+    "order":       { "type": "str",  "default": "", "note": "Pin named groups first; the rest stay ordered by descending median." }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "name": "Selom Ridge Plot",
+    "summary": "Stacked kernel-density curves, one per group — the distribution-shape companion to box and violin. Shows what a five-number summary hides: two separated modes and one broad spread produce near-identical boxes but obviously different ridges. Discloses its own smoothing bandwidth, and names any group excluded for having too few values to estimate a density from.",
+    "category": "visualization",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".h5ad", ".csv", ".tsv", ".xlsx"],
+    "chains_with": ["boxplot", "violin", "normalization_qc"],
+    "license": "MIT",
+    "popularity": 54
+  }
+}

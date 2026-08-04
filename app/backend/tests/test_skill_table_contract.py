@@ -46,6 +46,18 @@ NATIVE = {
     # `line` — the per-point mean, spread and n. n is the number that judges the band and
     # is nowhere on the canvas, so it cannot be synthesized from the drawn shapes.
     "line",
+    # Lane B continued (§3.2 rows 7/8/10/11). Native and UNCONDITIONAL, same test as above: is the
+    # number recoverable from the drawn shapes? In each case no, and the un-recoverable number is
+    # the one a reader needs to judge the figure.
+    #   lollipop — the bootstrap CI bounds are asymmetric, so neither end is derivable from the
+    #     dot's position, and n (which decides whether an interval exists at all) is not drawn.
+    #   confusion — the marginals, and the agreement/kappa *refusal*. A normalized cell shows a
+    #     percentage; the count behind it is exactly what normalization hides.
+    #   slope — the paired p, and the up/down split. The split is the finding a flat mean conceals,
+    #     and counting segments off a rendered image is not a recovery.
+    #   ridge — the five-number summary and the BANDWIDTH. A curve is as bimodal as its bandwidth
+    #     allows, so a density plot that does not disclose its smoothing cannot be checked.
+    "lollipop", "confusion", "slope", "ridge",
 }
 
 # The reviewed native-AND-L3 overlap. Normally a skill declares ONE table source, and the

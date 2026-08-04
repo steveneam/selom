@@ -1,0 +1,35 @@
+{
+  "id": "slope",
+  "version": "0.1.0",
+  "title": "Slope chart (paired before/after)",
+  "engine": "python",
+  "omics": "bulk-rna-seq|scrna-seq|proteomics|metabolomics",
+  "omics_type": ["general"],
+  "entrypoint": "skills.slope.run:run",
+  "inputs": [{ "name": "table", "kind": "csv|tsv|xlsx", "required": true }],
+  "param_spec": {
+    "subject":   { "type": "str",  "default": "", "note": "What makes two rows the same individual (animal, eye, patient, sample). Required — guessing it wrong pairs the wrong rows." },
+    "condition": { "type": "str",  "default": "", "note": "The column holding the two states being compared. Required." },
+    "value":     { "type": "str",  "default": "", "note": "Numeric measure. Blank = the first numeric column." },
+    "levels":    { "type": "str",  "default": "", "note": "\"before, after\" — which two conditions, in order. Required when the column has more than two." },
+    "group":     { "type": "str",  "default": "", "note": "Optional. Clusters subjects along x, one before/after pair per group." },
+    "summary":   { "type": "str",  "default": "mean", "options": ["mean", "median", "none"], "note": "The bold line over the subjects." },
+    "points":    { "type": "bool", "default": true, "note": "Mark each subject's two values." },
+    "sig_test":  { "type": "str",  "default": "paired_t", "options": ["paired_t", "wilcoxon"], "note": "Paired by design — an unpaired test would discard the pairing the figure is built on." },
+    "order":     { "type": "str",  "default": "", "note": "Group order along x." }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "name": "Selom Slope Chart",
+    "summary": "Paired before/after chart — one line per subject between two conditions, coloured by whether it rose or fell. Shows what a bar chart of the same data destroys: whether individuals moved together, or half rose while half fell to leave the group mean unchanged. Tested with a paired t-test or Wilcoxon signed-rank, and reports how many subjects went each way.",
+    "category": "visualization",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".csv", ".tsv", ".xlsx"],
+    "chains_with": ["boxplot", "line", "deg"],
+    "license": "MIT",
+    "popularity": 50
+  }
+}

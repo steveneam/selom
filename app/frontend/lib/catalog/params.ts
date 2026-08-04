@@ -185,6 +185,80 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     { key: "label", label: "Label points with", type: "text", placeholder: "e.g. sample_id", help: "Annotates every point — best on small tables." },
     { key: "fit", label: "Show trend line", type: "switch", help: "Ordinary-least-squares fit with R², slope and p. Off draws a plain scatter and computes no fit." },
   ],
+  // Lollipop — a ranked value per category. The estimator/CI wording says what the interval IS,
+  // because a bootstrap interval and a mean±SEM are different claims and the figure draws one bar
+  // for either.
+  lollipop: [
+    { key: "group", label: "Category column", type: "text", placeholder: "auto-detect", help: "Blank = the first non-numeric column." },
+    { key: "value", label: "Value column", type: "text", placeholder: "auto-detect", help: "Blank = the first numeric column." },
+    { key: "estimator", label: "Dot shows", type: "select", options: [
+      { value: "median", label: "Median" },
+      { value: "mean", label: "Mean" },
+    ], help: "Median is the default — a ranking is usually read off the median." },
+    { key: "sort", label: "Rank by", type: "select", options: [
+      { value: "desc", label: "Highest first" },
+      { value: "asc", label: "Lowest first" },
+      { value: "none", label: "Order in the file" },
+    ] },
+    { key: "orientation", label: "Direction", type: "select", options: [
+      { value: "h", label: "Horizontal (ranked list)" },
+      { value: "v", label: "Vertical" },
+    ], help: "Horizontal gives long category names room instead of a tick rotation." },
+    { key: "error_bars", label: "95% confidence interval", type: "switch", help: "A seeded percentile bootstrap. Needs 3+ values per category — an already-aggregated table gets no interval rather than a fabricated one." },
+    { key: "add_tip", label: "Label each value", type: "switch", help: "Print the number beside its dot." },
+    { key: "add_count", label: "Show n per category", type: "switch" },
+  ],
+  // Ridge — the honesty knob is `scale`, so it is surfaced rather than left to the API. Peak
+  // normalization is the ridgeline convention AND the thing that makes a 5-point group look like
+  // a 5000-point one, so the control has to state that trade rather than just name the modes.
+  ridge: [
+    { key: "group", label: "Category column", type: "text", placeholder: "auto-detect", help: "One ridge per level. Blank = the first non-numeric column." },
+    { key: "value", label: "Value column", type: "text", placeholder: "auto-detect", help: "Blank = the first numeric column." },
+    { key: "scale", label: "Ridge height", type: "select", options: [
+      { value: "peak", label: "Normalized per group (compare shapes)" },
+      { value: "common", label: "Shared density scale (compare heights)" },
+    ], help: "Normalized makes every ridge the same height, so a group of 5 looks as tall as one of 5000 — the n= label is then the only size cue." },
+    { key: "overlap", label: "Overlap", type: "range", step: 0.05, help: "How far each ridge rides over the one below. 0 separates them completely." },
+    { key: "median_line", label: "Mark the median", type: "switch" },
+    { key: "add_count", label: "Show n per ridge", type: "switch" },
+  ],
+  // Confusion — two labellings of the same rows. `normalize` leads because it changes what the
+  // reader is looking at (counts vs per-class recall), not merely how it looks.
+  confusion: [
+    { key: "true", label: "Reference labels (rows)", type: "text", placeholder: "auto-detect", help: "The ground-truth or reference annotation. Blank = the first categorical column." },
+    { key: "predicted", label: "Compared labels (columns)", type: "text", placeholder: "auto-detect", help: "The predicted or second annotation. Blank = the next categorical column." },
+    { key: "normalize", label: "Cells show", type: "select", options: [
+      { value: "none", label: "Counts" },
+      { value: "row", label: "% of each reference label (recall)" },
+      { value: "column", label: "% of each compared label" },
+      { value: "all", label: "% of all rows" },
+    ], help: "The raw count stays in the hover, so a 100% row of one observation cannot pass for a hundred." },
+    { key: "annotate", label: "Print values in cells", type: "switch", help: "Dropped automatically above 400 cells." },
+  ],
+  // Slope — the ONLY skill here that refuses to auto-detect its key columns, because pairing the
+  // wrong rows produces a confident and completely wrong figure. Mobbin (Databricks / Confluence /
+  // Better Stack / GitHub Insights) shows the mature pattern is a typed select populated from the
+  // dataset's live schema — RULED OUT here, and for the same reason the `pairs=` pair-picker is:
+  // a ParamField cannot see the dataset's columns at render time. What survives that constraint is
+  // GitHub Insights' explicit "(optional)" convention, inverted — mark the REQUIRED ones, since a
+  // free-text field that silently fails at run time is the worst of both worlds.
+  slope: [
+    { key: "subject", label: "Subject column (required)", type: "text", placeholder: "e.g. sample_id, animal, patient", help: "What makes two rows the same individual. Never guessed — the wrong choice pairs the wrong rows and the figure still looks right." },
+    { key: "condition", label: "Condition column (required)", type: "text", placeholder: "e.g. timepoint, intensity_group", help: "The column holding the two states being compared." },
+    { key: "levels", label: "Which two, in order", type: "text", placeholder: "e.g. before, after", help: "Required when the condition column has more than two levels — picking two silently would decide the whole result." },
+    { key: "value", label: "Value column", type: "text", placeholder: "auto-detect", help: "Blank = the first numeric column." },
+    { key: "group", label: "Cluster by", type: "text", placeholder: "optional", help: "Draws one before/after pair per group along the x-axis." },
+    { key: "summary", label: "Summary line", type: "select", options: [
+      { value: "mean", label: "Mean" },
+      { value: "median", label: "Median" },
+      { value: "none", label: "None" },
+    ] },
+    { key: "sig_test", label: "Significance test", type: "select", options: [
+      { value: "paired_t", label: "Paired t-test" },
+      { value: "wilcoxon", label: "Wilcoxon signed-rank" },
+    ], help: "Both are paired by design — an unpaired test would discard the pairing this figure is built on." },
+    { key: "points", label: "Mark each value", type: "switch" },
+  ],
   // Line — the spread vocabulary here is the SAME one the bar chart and the ERG trace grid use
   // (skills/_charts.py), because it is the same code. Keep the wording identical to those so a
   // user who learns "Spread shows" once does not relearn it per chart type.

@@ -1,0 +1,32 @@
+{
+  "id": "confusion",
+  "version": "0.1.0",
+  "title": "Confusion / agreement matrix",
+  "engine": "python",
+  "omics": "scrna-seq|bulk-rna-seq|proteomics|metabolomics",
+  "omics_type": ["general"],
+  "entrypoint": "skills.confusion.run:run",
+  "inputs": [{ "name": "table", "kind": "h5ad|csv|tsv|xlsx", "required": true }],
+  "param_spec": {
+    "true":            { "type": "str",  "default": "", "note": "Reference / true label column (the rows). Blank = the first categorical column." },
+    "predicted":       { "type": "str",  "default": "", "note": "Compared / predicted label column (the columns). Blank = the next categorical column." },
+    "normalize":       { "type": "str",  "default": "none", "options": ["none", "row", "column", "all"], "note": "row = per-true-class recall, the standard confusion reading. The raw count stays in the hover so a 100% row of one observation cannot pass for a hundred." },
+    "annotate":        { "type": "bool", "default": true, "note": "Print the value in each cell (dropped automatically above 400 cells)." },
+    "true_order":      { "type": "str",  "default": "", "note": "Pin named row labels first; the rest follow in observed order. Never filters." },
+    "predicted_order": { "type": "str",  "default": "", "note": "Pin named column labels first; the rest follow in observed order. Never filters." }
+  },
+  "outputs": [
+    { "name": "figure", "kind": "plotly_spec" }
+  ],
+  "catalog": {
+    "name": "Selom Confusion Matrix",
+    "summary": "Cross-tabulation of two labellings of the same rows — predicted vs true, or (the omics use) a cluster assignment against a reference cell-type annotation, which is how an annotation gets validated. Optional row / column / total normalization, with the raw counts kept reachable. Reports overall agreement and Cohen's kappa only when the two label sets actually match, and names the reason when they do not.",
+    "category": "visualization",
+    "tier": "verified",
+    "status": "beta",
+    "input_formats": [".h5ad", ".csv", ".tsv", ".xlsx"],
+    "chains_with": ["cluster", "annotate", "markers"],
+    "license": "MIT",
+    "popularity": 48
+  }
+}
