@@ -1,17 +1,23 @@
 import { liveSkill } from "./live-skills";
+import { SELOM_SEED } from "./selom-seed.generated";
 import type { SkillCatalogEntry } from "./types";
 
 /**
- * Representative seed of the Skill Store inventory.
+ * Seed of the Skill Store inventory — the offline twin of `GET /skills` plus a curated long tail.
  *
- * This is a curated slice (~32 entries) standing in for the FULL ~600-skill
- * catalog — bioSkills (540 reference) + ClawBio (88 runnable). Phase B1 replaces
- * this with the live `GET /skills` registry ingested from the real repos
- * (ClawBio `skills/catalog.json` + bioSkills `SKILL.md` frontmatter). The shapes
- * are identical, so nothing in the Store UI changes when the live registry lands.
+ * TWO HALVES, and only one of them is written by hand:
+ *  · **Selom-native** — spread from `./selom-seed.generated.ts`, produced by
+ *    `scripts/gen-catalog-seed.mjs` from the backend's own `skill.json` files. This half used to be
+ *    hand-listed and went **19 of 44 skills stale**, which nothing could see until a real browser
+ *    drove the Workbench [[selom-shipped-not-reachable]]. Regenerate with `npm run gen:seed`;
+ *    `registry-completeness.test.ts` fails on drift, so it cannot go quietly stale again.
+ *  · **ClawBio / bioSkills** — a curated slice standing in for the full ~600-skill catalog
+ *    (540 bioSkills + 88 ClawBio). These ship no `skill.json`, so the copy is genuinely authored.
  *
  * `tier: "verified"` = runs now (Selom-native scverse runners + ClawBio runnable).
  * `tier: "community"` = browsable + installable-as-intent; runs later in a sandbox.
+ *
+ * The seed is the FALLBACK, never the authority: `getSkill` prefers the live registry (see below).
  */
 
 /** True catalog sizes (for the honest coverage meter — design §6.4). */
@@ -23,263 +29,11 @@ const e = (x: SkillCatalogEntry): SkillCatalogEntry => x;
 
 export const CATALOG: SkillCatalogEntry[] = [
   // ── Selom-native (the launch wedge — Verified, run now) ───────────────────
-  e({
-    id: "selom.umap_scrna",
-    name: "UMAP (single-cell)",
-    summary: "QC → normalize → PCA → neighbors → UMAP, coloured by Leiden cluster.",
-    source: "selom", category: "single-cell", omics: ["scRNA-seq"],
-    tier: "verified", status: "production", engine: "python",
-    inputFormats: [".h5ad", ".csv"], chainsWith: ["selom.deg", "selom.heatmap"],
-    outputs: ["figure"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "umap_scrna" }, version: "1.0.0", popularity: 98,
-  }),
-  e({
-    id: "selom.cluster",
-    name: "Leiden clustering",
-    summary: "Graph-based clustering with adjustable resolution; cluster sizes + QC.",
-    source: "selom", category: "single-cell", omics: ["scRNA-seq"],
-    tier: "verified", status: "production", engine: "python",
-    inputFormats: [".h5ad"], chainsWith: ["selom.umap_scrna", "selom.deg"],
-    outputs: ["figure", "tables"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "cluster" }, version: "1.0.0", popularity: 81,
-  }),
-  e({
-    id: "selom.integration",
-    name: "Integration (Melody)",
-    summary:
-      "Batch-correct and co-embed multiple single-cell libraries with Selom Melody — our clean-room Harmony-method engine (pure numpy, no GPL). Optional Harmony2 mode for large, heterogeneous data.",
-    source: "selom", category: "single-cell", omics: ["scRNA-seq"],
-    tier: "verified", status: "beta", engine: "python",
-    inputFormats: [".h5ad", ".csv"], chainsWith: ["selom.umap_scrna", "selom.deg"],
-    outputs: ["figure"], license: "Proprietary",
-    provenance: { repo: "selom/skills", path: "integration" }, version: "0.3.0", popularity: 70,
-  }),
-  e({
-    id: "selom.violin",
-    name: "Marker-gene violins",
-    summary: "Per-cluster expression violins for a marker gene (log1p).",
-    source: "selom", category: "single-cell", omics: ["scRNA-seq"],
-    tier: "verified", status: "production", engine: "python",
-    inputFormats: [".h5ad"], chainsWith: ["selom.cluster", "selom.deg"],
-    outputs: ["figure"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "violin" }, version: "1.0.0", popularity: 79,
-  }),
-  e({
-    id: "selom.deg",
-    name: "Differential expression",
-    summary: "Bulk DE (pyDESeq2) or marker ranking (Wilcoxon) per contrast.",
-    source: "selom", category: "differential-expression", omics: ["bulk RNA-seq", "scRNA-seq"],
-    tier: "verified", status: "production", engine: "python",
-    inputFormats: [".h5ad", ".csv"], chainsWith: ["selom.volcano", "selom.enrichment"],
-    outputs: ["figure", "tables"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "deg" }, version: "1.0.0", popularity: 90,
-  }),
-  e({
-    id: "selom.volcano",
-    name: "Volcano plot",
-    summary: "DE volcano with FDR/log2FC thresholds and top-N gene labels.",
-    source: "selom", category: "data-visualization", omics: ["bulk RNA-seq", "proteomics"],
-    tier: "verified", status: "production", engine: "python",
-    inputFormats: [".csv"], chainsWith: ["selom.enrichment"],
-    outputs: ["figure"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "volcano" }, version: "1.0.0", popularity: 88,
-  }),
-  e({
-    id: "selom.heatmap",
-    name: "Expression heatmap",
-    summary: "Clustered heatmap of marker / top-variable genes with annotations.",
-    source: "selom", category: "data-visualization", omics: ["bulk RNA-seq", "scRNA-seq"],
-    tier: "verified", status: "production", engine: "python",
-    inputFormats: [".h5ad", ".csv"], chainsWith: ["selom.deg"],
-    outputs: ["figure"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "heatmap" }, version: "1.0.0", popularity: 76,
-  }),
-  e({
-    id: "selom.enrichment",
-    name: "Pathway enrichment",
-    summary: "In-house hypergeometric ORA against GO & Reactome; dotplot output.",
-    source: "selom", category: "pathway-analysis", omics: ["bulk RNA-seq", "scRNA-seq", "proteomics"],
-    tier: "verified", status: "beta", engine: "python",
-    inputFormats: [".csv"], chainsWith: ["selom.deg", "selom.volcano"],
-    // MIT, not GPL: enrichment is an in-house ORA, not a gseapy wrapper (DECISIONS #9).
-    outputs: ["figure", "tables"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "enrichment" }, version: "0.9.0", popularity: 72,
-  }),
-  e({
-    id: "selom.markers",
-    name: "Marker-gene dotplot",
-    summary: "Per-cluster markers as a dotplot — colour = mean expression, dot size = % of cells expressing.",
-    source: "selom", category: "single-cell", omics: ["scRNA-seq"],
-    tier: "verified", status: "production", engine: "python",
-    inputFormats: [".h5ad"], chainsWith: ["selom.cluster", "selom.annotate"],
-    outputs: ["figure"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "markers" }, version: "0.1.0", popularity: 83,
-  }),
-  e({
-    id: "selom.annotate",
-    name: "Cell-type annotation",
-    summary: "Marker-based cell-type labelling (score_genes); recolours the UMAP by assigned type.",
-    source: "selom", category: "single-cell", omics: ["scRNA-seq"],
-    tier: "verified", status: "beta", engine: "python",
-    inputFormats: [".h5ad"], chainsWith: ["selom.cluster", "selom.markers"],
-    outputs: ["figure"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "annotate" }, version: "0.1.0", popularity: 74,
-  }),
-  e({
-    id: "selom.trajectory",
-    name: "Trajectory & pseudotime",
-    summary: "Diffusion pseudotime (DPT) + PAGA — embedding coloured by pseudotime with the cluster graph overlaid.",
-    source: "selom", category: "single-cell", omics: ["scRNA-seq"],
-    tier: "verified", status: "beta", engine: "python",
-    inputFormats: [".h5ad"], chainsWith: ["selom.cluster", "selom.umap_scrna"],
-    outputs: ["figure"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "trajectory" }, version: "0.1.0", popularity: 71,
-  }),
-  e({
-    id: "selom.pca",
-    name: "PCA (samples)",
-    summary: "Principal-component analysis of samples from a feature × sample table; PC1 vs PC2 by group.",
-    source: "selom", category: "data-visualization", omics: ["bulk RNA-seq", "proteomics"],
-    tier: "verified", status: "production", engine: "python",
-    inputFormats: [".csv", ".tsv", ".xlsx"], chainsWith: ["selom.deg", "selom.volcano"],
-    outputs: ["figure"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "pca" }, version: "0.1.0", popularity: 70,
-  }),
-  e({
-    id: "selom.composition",
-    name: "Composition bar",
-    summary: "Composition / proportion bar across conditions (e.g. cell-type deconvolution).",
-    source: "selom", category: "data-visualization", omics: ["scRNA-seq", "proteomics"],
-    tier: "verified", status: "production", engine: "python",
-    inputFormats: [".csv", ".tsv", ".xlsx"], chainsWith: ["selom.annotate", "selom.cluster"],
-    outputs: ["figure"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "composition" }, version: "0.1.0", popularity: 66,
-  }),
-  e({
-    id: "selom.proteomics_de",
-    name: "Proteomics differential abundance",
-    summary: "Intensity matrix → log2 + median-normalize → Welch t-test + BH-FDR, drawn as a volcano.",
-    source: "selom", category: "proteomics", omics: ["proteomics"],
-    tier: "verified", status: "beta", engine: "python",
-    inputFormats: [".csv"], chainsWith: ["selom.enrichment", "selom.heatmap"],
-    outputs: ["figure"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "proteomics_de" }, version: "0.1.0", popularity: 60,
-  }),
-  e({
-    id: "selom.gsea",
-    name: "GSEA running enrichment",
-    summary: "Running enrichment-score curve with leading-edge hits and permutation NES/p (in-house weighted-KS, no gseapy).",
-    source: "selom", category: "pathway-analysis", omics: ["bulk RNA-seq", "proteomics"],
-    tier: "verified", status: "beta", engine: "python",
-    inputFormats: [".csv"], chainsWith: ["selom.volcano", "selom.enrichment"],
-    outputs: ["figure"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "gsea" }, version: "0.1.0", popularity: 64,
-  }),
-  e({
-    id: "selom.corr_heatmap",
-    name: "Correlation heatmap",
-    summary: "Hierarchically-clustered sample×sample (or feature×feature) correlation matrix — replicate concordance & batch structure at a glance.",
-    source: "selom", category: "data-visualization", omics: ["bulk RNA-seq", "scRNA-seq", "proteomics"],
-    tier: "verified", status: "production", engine: "python",
-    inputFormats: [".csv", ".tsv", ".xlsx"], chainsWith: ["selom.pca", "selom.heatmap"],
-    outputs: ["figure"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "corr_heatmap" }, version: "0.1.0", popularity: 68,
-  }),
-  e({
-    id: "selom.upset",
-    name: "UpSet plot",
-    summary: "Set-intersection plot — intersection-size bars over a membership dot-matrix; consumes a boolean elements×sets table (DEG / marker-set overlaps).",
-    source: "selom", category: "data-visualization", omics: ["bulk RNA-seq", "scRNA-seq", "proteomics"],
-    tier: "verified", status: "production", engine: "python",
-    inputFormats: [".csv", ".tsv", ".xlsx"], chainsWith: ["selom.deg", "selom.enrichment"],
-    outputs: ["figure"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "upset" }, version: "0.1.0", popularity: 64,
-  }),
-  e({
-    id: "selom.scorecard",
-    name: "Benchmark scorecard (radar)",
-    summary: "Radar / spider chart comparing conditions across many metrics — rank N models/protocols on M scores at a glance (per-metric normalized).",
-    source: "selom", category: "data-visualization", omics: ["bulk RNA-seq", "scRNA-seq", "proteomics"],
-    tier: "verified", status: "production", engine: "python",
-    inputFormats: [".csv", ".tsv", ".xlsx"], chainsWith: ["selom.corr_heatmap", "selom.composition"],
-    outputs: ["figure"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "scorecard" }, version: "0.1.0", popularity: 60,
-  }),
-  e({
-    id: "selom.normalization_qc",
-    name: "QC metrics panel",
-    summary: "Per-cell QC violins — total counts, genes-per-cell and mitochondrial-% per sample. The standard scRNA quality check before analysis.",
-    source: "selom", category: "single-cell", omics: ["scRNA-seq"],
-    tier: "verified", status: "production", engine: "python",
-    inputFormats: [".h5ad"], chainsWith: ["selom.umap_scrna", "selom.cluster"],
-    outputs: ["figure"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "normalization_qc" }, version: "0.1.0", popularity: 67,
-  }),
-  e({
-    id: "selom.sankey",
-    name: "Sankey flow",
-    summary: "Sankey / alluvial flow diagram — quantities flowing between stages or categories (cell-state transitions, QC attrition, sample→cell-type). Consumes a long edge table (source, target, value).",
-    source: "selom", category: "data-visualization", omics: ["bulk RNA-seq", "scRNA-seq", "proteomics"],
-    tier: "verified", status: "production", engine: "python",
-    inputFormats: [".csv", ".tsv", ".xlsx"], chainsWith: ["selom.composition", "selom.cluster"],
-    outputs: ["figure"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "sankey" }, version: "0.1.0", popularity: 58,
-  }),
-  e({
-    id: "selom.string_network",
-    name: "STRING interaction network",
-    summary: "STRING protein-protein interaction network for a gene list (or DE table) — live STRING API. Nodes coloured by log2 fold change (or degree), edges are STRING interactions above a confidence cutoff.",
-    source: "selom", category: "pathway-analysis", omics: ["bulk RNA-seq", "scRNA-seq", "proteomics"],
-    tier: "verified", status: "beta", engine: "python",
-    inputFormats: [".csv"], chainsWith: ["selom.deg", "selom.enrichment"],
-    outputs: ["figure"], license: "MIT",
-    provenance: { repo: "selom/skills", path: "string_network" }, version: "0.1.0", popularity: 62,
-  }),
-  e({
-    id: "selom.erg_traces",
-    name: "Selom ERG Trace Grid",
-    summary:
-      "Stacked floating ERG waveforms — flash-intensity series down the rows, conditions across the columns, no per-panel axes, one shared scale bar. The publication layout GraphPad/Excel can't make. Ingests raw iWorx .iwxdata, LabScribe .txt, or a long waveform table; 'clean flats, keep OPs' filtering; attaches an a/b-wave table.",
-    source: "selom", category: "electrophysiology", omics: ["electrophysiology"],
-    tier: "verified", status: "beta", engine: "python",
-    inputFormats: [".csv", ".txt", ".iwxdata"], chainsWith: ["selom.erg_bwave_bar", "selom.erg_intensity_response"],
-    // Proprietary module (docs/records/erg-module/spec.md) — the trace-grid primitive + native .iwxdata decode.
-    outputs: ["figure", "tables"], license: "proprietary",
-    provenance: { repo: "selom/skills", path: "erg_traces" }, version: "0.1.0", popularity: 1,
-  }),
-  e({
-    id: "selom.erg_bwave_bar",
-    name: "Selom ERG a/b-wave Bar",
-    summary:
-      "Peak a-wave or b-wave at one flash intensity per condition (scotopic or photopic) — bar of the group mean ± SEM with every eye overlaid as an individual data point (the reviewer ask for quantitative graphs). Runs straight off the dropped recording: uses the device markers when present, else measures the peak from the same traces the grid draws, at the intensity you set. Condition colours + order match the trace grid; attaches a per-condition n / mean / SEM table.",
-    source: "selom", category: "electrophysiology", omics: ["electrophysiology"],
-    tier: "verified", status: "beta", engine: "python",
-    inputFormats: [".csv", ".txt", ".iwxdata"], chainsWith: ["selom.erg_traces", "selom.erg_intensity_response"],
-    outputs: ["figure", "tables"], license: "proprietary",
-    provenance: { repo: "selom/skills", path: "erg_bwave_bar" }, version: "0.1.0", popularity: 1,
-  }),
-  e({
-    id: "selom.erg_intensity_response",
-    name: "Selom ERG Intensity-Response",
-    summary:
-      "b-wave amplitude versus flash intensity per condition, with a Naka-Rushton saturating fit (V = Vmax·Iⁿ/(Iⁿ+Kⁿ)) overlaid; reports Vmax, semi-saturation log K, and slope n. The slope is adjustable, and null conditions that can't be fit are left honestly unfit. Reads the long ERG metrics table; colours + order match the trace grid.",
-    source: "selom", category: "electrophysiology", omics: ["electrophysiology"],
-    tier: "verified", status: "beta", engine: "python",
-    inputFormats: [".csv"], chainsWith: ["selom.erg_traces", "selom.erg_bwave_bar"],
-    outputs: ["figure", "tables"], license: "proprietary",
-    provenance: { repo: "selom/skills", path: "erg_intensity_response" }, version: "0.1.0", popularity: 1,
-  }),
-  e({
-    id: "selom.erg_flicker",
-    name: "Selom ERG Flicker",
-    summary:
-      "Light-adapted flicker ERG as a publication figure — steady-state waveform small-multiples (flicker frequency down the rows, conditions across the columns, one shared scale bar) or the N1→P1 amplitude-versus-frequency summary. The periodic-response figure the flash trace grid can't make: N1→P1 amplitude + P1 implicit time are measured from the phase-averaged steady-state cycle, with no a-/b-wave or Naka-Rushton language. Reads the long ERG waveform table; colours + order match the trace grid; attaches a per-condition N1/P1 table.",
-    source: "selom", category: "electrophysiology", omics: ["electrophysiology"],
-    tier: "verified", status: "beta", engine: "python",
-    inputFormats: [".csv", ".txt", ".iwxdata"], chainsWith: ["selom.erg_traces", "selom.erg_intensity_response", "selom.erg_bwave_bar"],
-    outputs: ["figure", "tables"], license: "proprietary",
-    provenance: { repo: "selom/skills", path: "erg_flicker" }, version: "0.1.0", popularity: 1,
-  }),
+  // GENERATED from the backend's own skill.json files, not hand-listed: this block went 19
+  // skills stale and nothing could see it. `npm run gen:seed` rewrites it; the drift guard in
+  // registry-completeness.test.ts fails the build if anyone forgets. Everything BELOW is
+  // hand-authored curation for sources that ship no skill.json.
+  ...SELOM_SEED,
 
   // ── ClawBio runnable (Verified — wrap the ~29 production pipelines) ────────
   e({

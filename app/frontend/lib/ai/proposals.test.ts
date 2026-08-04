@@ -528,8 +528,14 @@ describe("slug normalization invariant (route stage / FIX 1 guard)", () => {
   });
 
   it("normalized id round-trips through getSkill and preserves the display name", () => {
+    // The claim is the ROUND-TRIP — a normalized id resolves to a human name, not its raw slug.
+    // It used to assert the literal "UMAP (single-cell)", which was the hand-written seed's copy of
+    // a name the backend serves as "scRNA UMAP"; the app showed the live one, so the pin was
+    // testing a string no user ever saw. The seed is generated from `skill.json` now.
     const skill = getSkill(catalogId);
-    expect(skill?.name).toBe("UMAP (single-cell)");
+    expect(skill?.name).toBeTruthy();
+    expect(skill?.name).not.toBe(catalogId);
+    expect(skill?.name).not.toBe(bareSlug);
   });
 });
 

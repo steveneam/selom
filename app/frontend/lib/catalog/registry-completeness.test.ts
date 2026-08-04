@@ -154,7 +154,162 @@ describe("reachability — every backend skill can be resolved by the app", () =
     const { setLiveSkills } = await import("./live-skills");
     const { getSkill } = await import("./seed");
     setLiveSkills([]); // backend down → `loadCatalog` keeps the seed
-    // A seeded skill still resolves; a post-seed one honestly does not (there is nothing to say).
+    // Backend-down is the ONLY state the seed answers in, so the bar is the same one the live
+    // registry meets: every skill still nameable. It used to be 25 of 44 (`getSkill` returning
+    // undefined for the rest), which is why the seed is generated now — see the drift guard below.
     expect(getSkill("selom.volcano")?.name).toBeTruthy();
+    const unseeded = backendCatalogIds().filter((id) => !getSkill(id));
+    expect(unseeded, `skills the OFFLINE app cannot name: ${unseeded.join(", ")}`).toEqual([]);
+  });
+});
+
+/**
+ * Control coverage: every backend knob either RENDERS a control, or is a named, tracked waiver.
+ *
+ * THE CLASS. Two sessions running, "shipped" turned out not to mean "reachable": 17 routes with no
+ * FE call site, then 19 skills behind a disabled Apply. Both are now guarded. Neither guard can see
+ * the next layer down — a skill that resolves, installs and runs, whose KNOBS the user cannot touch.
+ *
+ * `paramFieldsFromSpec` iterates the presentation OVERLAY, not the backend spec, so a skill with no
+ * overlay renders exactly zero controls. Measured 2026-08-04: **171 of 313 knobs across 37 skills**,
+ * and 18 skills with no overlay at all. The workbench then tells the user "Runs with smart defaults
+ * — ready to apply", which reads as a product decision and is usually just an absent overlay. The
+ * sharpest case is `volcano`, the flagship: it says "Tune the options" while `fc_threshold`,
+ * `fdr_threshold` and `top_n` — the three knobs that decide what the volcano SHOWS — are API-only.
+ *
+ * WHY A WAIVER LIST AND NOT A THRESHOLD. A count ratchets down and tells you nothing about what is
+ * missing; this names every gap, so the backlog is readable and a new skill cannot quietly join it.
+ * Same shape as `test_reachability_guard.py`. It is exact in BOTH directions on purpose: adding a
+ * control fails until the waiver is deleted, so the list cannot rot into fiction.
+ */
+const API_ONLY_KNOBS: Record<string, string[]> = {
+  annotate: ["groupby", "embedding", "normalize"],
+  cepo: ["group_key", "n_genes", "min_cells", "exprs_pct", "normalize"],
+  confusion: ["true_order", "predicted_order"],
+  corr_heatmap: ["axis", "method", "cluster"],
+  deg: ["mode", "groupby", "method", "top_n", "normalize", "group_col", "group_val", "time_col",
+    "covariate_col", "min_count", "normalization", "sample_col", "condition_col", "label_col",
+    "label", "min_cells"],
+  diff_abundance: ["sample_col", "condition_col", "label_col", "reference", "treatment",
+    "normalization", "min_cells"],
+  enrichment: ["top_n", "fdr_threshold", "fc_threshold"],
+  erg_bwave_bar: ["value_col", "stimulus_type", "manual_marks", "ab_detector"],
+  erg_flicker: ["mark_labels", "manual_marks", "fourier"],
+  erg_intensity_response: ["value_col", "stimulus_type", "error", "spread", "points", "band_alpha",
+    "boundary_lines", "band_color", "manual_marks", "ab_detector"],
+  erg_traces: ["role", "stimulus_type", "marks", "mark_labels", "manual_marks",
+    "ab_detector", "oscillatory_potentials", "phnr"],
+  facs_gating: ["x_channel", "y_channel", "plot", "compensate", "comp_matrix", "transform",
+    "transform_t", "cofactor", "bins", "max_events", "gates"],
+  go_graph: ["top_n", "namespace", "fdr_threshold", "fc_threshold"],
+  gsea: ["gene_set", "gene_sets", "engine", "set_name", "weight", "n_perm"],
+  heatmap: ["groupby"],
+  integration: ["n_neighbors", "n_pcs", "color_by", "max_iter_harmony"],
+  lollipop: ["baseline", "order", "pairs", "sig_test", "correction"],
+  markers: ["groupby", "n_genes", "rank_by", "method", "standard_scale", "normalize"],
+  mixing_metrics: ["batch_key", "label_key", "embedding_key", "n_neighbors", "perplexity",
+    "normalize", "n_pcs"],
+  normalization_qc: ["groupby", "max_cells", "filter", "nmads", "doublets", "doublet_threshold"],
+  pathway: ["top_n", "fdr_threshold", "fc_threshold"],
+  pca: ["group_regex", "scale", "label_points"],
+  proteomics_de: ["fc_threshold", "fdr_threshold", "top_n", "min_valid", "log_input", "missing"],
+  pseudotime_genes: ["top_n", "groupby", "root", "n_bins", "normalize"],
+  pvca: ["factors", "pct_threshold", "normalize"],
+  ridge: ["order"],
+  sankey: ["max_links"],
+  scorecard: ["normalize", "fill", "max_rows"],
+  slope: ["order"],
+  ssgsea: ["gene_set", "gene_sets", "top_n", "min_size", "max_size", "weight", "zscore"],
+  string_network: ["species", "required_score", "max_genes", "fdr_threshold"],
+  trajectory: ["groupby", "root", "embedding", "threshold", "normalize"],
+  umap_scrna: ["color_by", "embedding"],
+  upset: ["mode", "min_size", "max_intersections", "sort_by"],
+  violin: ["groupby", "resolution", "normalize", "annotate", "context", "known_min"],
+  volcano: ["fc_threshold", "fdr_threshold", "top_n"],
+};
+
+describe("control coverage — a knob the backend accepts is a knob the user can reach", () => {
+  /** `{skill: [knobs with no rendered control]}`, derived from the same two sources as above. */
+  function uncontrolled(): Record<string, string[]> {
+    const out: Record<string, string[]> = {};
+    for (const [id, spec] of Object.entries(SPECS)) {
+      const shown = new Set(OVERLAYS[id] ?? []);
+      const gap = [...spec].filter((k) => !shown.has(k));
+      if (gap.length) out[id] = gap;
+    }
+    return out;
+  }
+
+  it("has no UNTRACKED API-only knob (a new skill cannot join the backlog quietly)", () => {
+    const untracked: string[] = [];
+    for (const [id, keys] of Object.entries(uncontrolled())) {
+      const waived = new Set(API_ONLY_KNOBS[id] ?? []);
+      for (const k of keys) if (!waived.has(k)) untracked.push(`${id}.${k}`);
+    }
+    expect(
+      untracked,
+      `knobs with no rendered control and no waiver — add a control in params.ts, or add it to ` +
+        `API_ONLY_KNOBS with the rest of the backlog: ${untracked.join(", ")}`,
+    ).toEqual([]);
+  });
+
+  it("carries no STALE waiver (a knob that got a control must leave the list)", () => {
+    const stale: string[] = [];
+    for (const [id, keys] of Object.entries(API_ONLY_KNOBS)) {
+      const gap = new Set(uncontrolled()[id] ?? []);
+      for (const k of keys) if (!gap.has(k)) stale.push(`${id}.${k}`);
+    }
+    expect(
+      stale,
+      `waived knobs that now HAVE a control (or no longer exist) — delete them from ` +
+        `API_ONLY_KNOBS so the backlog stays honest: ${stale.join(", ")}`,
+    ).toEqual([]);
+  });
+});
+
+/**
+ * Seed-drift guard: the generated Selom block must still match the backend's `skill.json` files.
+ *
+ * The seed was hand-maintained and drifted 19 skills behind the registry. Refilling it by hand would
+ * only reset the clock — a hand-maintained mirror of a live registry goes stale again, which is the
+ * lesson rather than the incident. So `scripts/gen-catalog-seed.mjs` writes that half, and this
+ * re-runs the generator in memory and compares. Adding a skill dir is now: run `npm run gen:seed`,
+ * or this fails and tells you to.
+ *
+ * It compares the ENTRIES, not the rendered file, so a formatting change to the emitter is not a
+ * false failure — only a real content difference is.
+ */
+describe("seed drift — the generated Selom block matches the backend skill.json files", () => {
+  it("is up to date (run `npm run gen:seed` if this fails)", async () => {
+    const { buildSelomSeed } = await import("../../scripts/gen-catalog-seed.mjs");
+    const { SELOM_SEED } = await import("./selom-seed.generated");
+    const fresh = buildSelomSeed();
+
+    const ids = (xs: { id: string }[]) => xs.map((x) => x.id).sort();
+    const added = ids(fresh).filter((id) => !ids(SELOM_SEED).includes(id));
+    const removed = ids(SELOM_SEED).filter((id) => !ids(fresh).includes(id));
+    expect({ added, removed }).toEqual({ added: [], removed: [] });
+    expect(SELOM_SEED).toEqual(fresh);
+  });
+
+  it("names every skill by its `title` — nothing shadows it", async () => {
+    // The FE half of `test_registry.py::test_title_is_the_only_display_name`. 21 skills used to
+    // carry a `catalog.name` that shadowed the title, so a retitle reached neither Store nor
+    // workbench ("Box / strip plot" displayed as "Selom Box Plot").
+    const { SELOM_SEED } = await import("./selom-seed.generated");
+    const titles: Record<string, string> = {};
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(p);
+        else if (entry.name === "skill.json") {
+          const json = JSON.parse(fs.readFileSync(p, "utf8"));
+          if (json?.id) titles[`selom.${json.id}`] = json.title;
+        }
+      }
+    };
+    walk(SKILLS_DIR);
+    const mismatched = SELOM_SEED.filter((s) => s.name !== titles[s.id]).map((s) => s.id);
+    expect(mismatched, `seed name != skill.json title: ${mismatched.join(", ")}`).toEqual([]);
   });
 });
