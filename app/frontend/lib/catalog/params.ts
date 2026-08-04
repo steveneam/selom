@@ -476,6 +476,10 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   violin: [
     { key: "gene", label: "Marker gene", type: "text", placeholder: "e.g. MS4A1" },
     scrnaGroupby("The cell-annotation column whose levels become one violin each — e.g. cell_type."),
+    // Immediately after `groupby`, because it only does anything in that knob's FALLBACK case.
+    // Parked at the end of the panel it sat a full scroll away from the control that triggers it.
+    { key: "resolution", label: "Cluster resolution", type: "range", step: 0.1,
+      help: "Only used when Selom has to cluster the cells itself — i.e. when “Group cells by” names no column your file has. Higher = more, finer clusters." },
     { key: "order", label: "Category order", type: "text", placeholder: "e.g. cluster 2, cluster 0", help: "Comma-separated. Named categories lead, in this order; the rest follow unchanged." },
     { key: "add_count", label: "Show n per group", type: "switch", help: "Append n= to each category label." },
     { key: "pairs", label: "Compare groups", type: "text", placeholder: "e.g. cluster 0~cluster 1", help: "Comma-separated pairs joined by ~. Each draws a bracket with significance stars, and the p-values appear in the Statistics table. A name that doesn't match a group is skipped." },
@@ -501,8 +505,6 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     // step 5 would make the default 5 an INVALID value the browser rejects.
     { key: "known_min", label: "“Well studied” threshold (papers)", type: "number", step: 1, showWhen: { key: "annotate", equals: "pubmed" },
       help: "At or above this many hits, the gene is called well studied. Below it, novel. The count is a LIVE PubMed lookup made when the figure runs, so re-running later can move it." },
-    { key: "resolution", label: "Cluster resolution", type: "range", step: 0.1,
-      help: "Only used when Selom has to cluster the cells itself (no grouping column in the file). Higher = more, finer clusters." },
     scrnaNormalize(),
   ],
   // Composition takes the ordering half of the vocabulary only — it holds one value per
@@ -1012,10 +1014,12 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   pseudotime_genes: [
     { key: "top_n", label: "Genes shown", type: "range", step: 1,
       help: "How many of the most pseudotime-varying genes to draw." },
+    // No positional words in the help — the grid is 2-column, so these two render side by side on
+    // the Workbench and stacked in the 360px dock. Each names the other by LABEL instead.
     { key: "groupby", label: "Root cluster column", type: "text", placeholder: "leiden",
-      help: "Used ONLY to place the start of the trajectory — the figure's x-axis is pseudotime, not this column. Pair it with Start from below." },
+      help: "Used ONLY to place the start of the trajectory — the figure's x-axis is pseudotime, not this column. Pair it with “Start from”." },
     { key: "root", label: "Start from", type: "text", placeholder: "auto",
-      help: "Which level of the column above the trajectory begins at. Blank = the extreme of the first diffusion component." },
+      help: "Which level of “Root cluster column” the trajectory begins at. Blank = the extreme of the first diffusion component." },
     { key: "n_bins", label: "Pseudotime bins", type: "range", step: 5,
       help: "Cells are averaged into this many bins along pseudotime before smoothing. Fewer = smoother curves and less visible noise." },
     scrnaNormalize(),

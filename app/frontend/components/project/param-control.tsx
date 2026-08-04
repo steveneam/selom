@@ -38,9 +38,14 @@ export function ParamControl({
   const disabledWrap = disabled ? "opacity-50" : "";
 
   if (field.type === "switch") {
-    const on = Boolean(v);
+    const on = isOn(v);
     return (
-      <label className={cn("flex items-center justify-between gap-3 sm:col-span-2", disabledWrap)}>
+      // A DIV, not a LABEL. The `badge` slot renders a BUTTON (the AI ✨ marker with its Revert
+      // action), and inside a `<label>` the first labelable descendant becomes the label's control
+      // — the badge, not the switch. Clicking the label text or the help paragraph then fired
+      // REVERT instead of toggling, silently discarding an AI proposal. The switch carries its own
+      // `aria-label`, so the accessible name is unaffected by dropping the wrapper.
+      <div className={cn("flex items-center justify-between gap-3 sm:col-span-2", disabledWrap)}>
         <span>
           <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">{field.label}{badge}</span>
           {field.help && <span className="block text-[11px] text-muted-foreground">{field.help}</span>}
@@ -55,7 +60,7 @@ export function ParamControl({
           className={cn(
             "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-colors",
             on ? "bg-primary" : "bg-input",
-            disabled && "cursor-not-allowed",
+            disabled ? "cursor-not-allowed" : "cursor-pointer hover:opacity-90",
           )}
         >
           <span
@@ -65,7 +70,7 @@ export function ParamControl({
             )}
           />
         </button>
-      </label>
+      </div>
     );
   }
 
@@ -299,4 +304,19 @@ function PairsControl({
       {field.help && <span className="mt-1 block text-[11px] text-muted-foreground">{field.help}</span>}
     </div>
   );
+}
+
+/**
+ * A bool param's on-state, mirroring the backend's `to_bool` rather than JS truthiness.
+ *
+ * `Boolean("false") === true`, so a bool arriving as a STRING drew the switch in the opposite state
+ * — and the params that reach here are not always real booleans: query-string params arrive as
+ * strings (`contract.resolved_params` exists to re-coerce them), a saved figure's recorded params
+ * round-trip through JSON, and an AI-staged proposal is free to hand over `"false"`. The worst case
+ * is that last one, because it draws an ON switch under an "AI-staged change" marker for a value
+ * the run will treat as OFF.
+ */
+function isOn(v: unknown): boolean {
+  if (typeof v === "string") return !["false", "0", "no", "off", ""].includes(v.trim().toLowerCase());
+  return Boolean(v);
 }

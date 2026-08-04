@@ -550,9 +550,16 @@ def _proteomics_de(p: dict):
 def _pvca(p: dict):
     factors = ", ".join(s.strip() for s in str(p.get("factors") or "").split(",") if s.strip())
     factor_txt = f"the {factors} factors" if factors else "the annotated sample factors"
+    # The runner ALWAYS mean-centres and scales to unit variance only when `normalize` is set
+    # (skills/pvca/run_real.py:38-42). Saying "standardized" unconditionally described a step the
+    # run may not have taken — harmless while the knob was API-only, a printed-vs-computed
+    # mismatch now that it renders as the "Scale features" switch.
+    scaling = ("standardized (mean-centred and scaled to unit variance)"
+               if p.get("normalize", True) else
+               "mean-centred, without scaling to unit variance,")
     text = (
         "The contribution of known sources of variation was quantified by Principal Variance "
-        "Component Analysis. Features were standardized and decomposed by principal-component "
+        f"Component Analysis. Features were {scaling} and decomposed by principal-component "
         f"analysis; the leading components explaining {float(p.get('pct_threshold', 0.6)):g} of the "
         f"total variance were retained, and for each the variance attributable to {factor_txt} was "
         "estimated by one-way analysis of variance. The per-component fractions were weighted by "
@@ -673,8 +680,11 @@ def _cepo(p: dict):
         f"Cell-identity marker genes were identified per {p.get('group_key') or 'cell-type'} group with "
         "Cepo, which ranks genes by differential stability — combining how highly and how stably each "
         f"gene is expressed within a group relative to the rest — rather than by mean difference. {norm}"
-        f"genes detected in at least {p['min_cells']} cells and expressed in at least "
-        f"{float(p['exprs_pct']):g} of cells were scored, and the top {p['n_genes']} differential-stability "
+        # `min_cells` filters CELL TYPES, not genes (skills/proprietary/cepo/run_real.py:69 —
+        # `types = [t for t in unique(labels) if (labels == t).sum() >= min_cells]`). The prose
+        # described a per-gene detection filter the runner never applies at that value.
+        f"cell types with at least {p['min_cells']} cells were scored, using genes expressed in at least "
+        f"{float(p['exprs_pct']):g} of cells, and the top {p['n_genes']} differential-stability "
         "genes per group are reported. This is a clean-room Python reimplementation of the Cepo method."
     )
     return text, [CEPO, SCANPY]
