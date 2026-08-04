@@ -18,7 +18,20 @@ import { FE_ORIGIN } from "./paths.mjs";
  * the checks themselves are the gate, and one of them failing honestly is far better than the whole
  * run refusing to start over a warm-up.
  */
-const ROUTES = ["/", "/extract"];
+/**
+ * `/p/[id]` is the one that matters most and was missing until 2026-08-04 — every check navigates
+ * to it (it IS the project workbench and the editor), it is the heaviest compile in the app, and
+ * warming `/` and `/extract` alone left the first check of each run paying for it. That cost three
+ * more false 180s timeouts in one session — `param-pickers` twice and `cloud-export`'s Drive leg
+ * once, each dying at `getByLabel("Project name")` immediately after the navigation, with every
+ * later check in the same run passing. Same tell as the three above: three different checks, one
+ * shared cause.
+ *
+ * A dynamic segment compiles per PATTERN, not per param, so any id warms the route. The id below is
+ * deliberately not a real one — the fetch only has to make Next compile the route, and the warm is
+ * fail-soft, so the 404 this returns is the expected outcome rather than a problem.
+ */
+const ROUTES = ["/", "/extract", "/store", "/p/warm-the-route"];
 
 export default async function warmRoutes() {
   const started = Date.now();

@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { expect, test as base, type Page } from "@playwright/test";
+import { expect, test as base, type Locator, type Page } from "@playwright/test";
 
 import { DATASETS_DIR, FIXTURE_CSV } from "../../scripts/browser-verify/paths.mjs";
 
@@ -293,6 +293,43 @@ export async function openWorkbench(
  * renders fails here rather than being silently defaulted — the difference between a skill that is
  * reachable and one that merely runs.
  */
+/**
+ * Set a slider by KEYBOARD, to the exact value, through events the browser marks as trusted.
+ *
+ * Playwright's `fill()` refuses an `input[type=range]` outright, so every threshold knob would
+ * otherwise be undrivable — and the alternative (assigning `.value` and dispatching a synthetic
+ * `input`) proves only that React's handler works when called, which is not the claim these checks
+ * make. `Home` snaps to the control's own `min`, then one `ArrowRight` per step walks to the target,
+ * which is exactly what a keyboard user does.
+ *
+ * The step count is read off the rendered element, so this stays correct when a spec's bounds move.
+ * It refuses a target that is off the step lattice rather than silently landing one step away —
+ * the same failure the `registry-completeness` slider-step guard catches at merge time.
+ */
+async function setRange(page: Page, field: Locator, target: number, label: string) {
+  const { min, step } = await field.evaluate((el) => {
+    const i = el as HTMLInputElement;
+    return { min: Number(i.min || 0), step: Number(i.step || 1) };
+  });
+  const presses = (target - min) / step;
+  expect(
+    Math.abs(presses - Math.round(presses)),
+    `"${label}" cannot reach ${target}: it steps by ${step} from ${min}`,
+  ).toBeLessThan(1e-6);
+  expect(presses, `"${label}": ${target} is below the control's min of ${min}`).toBeGreaterThanOrEqual(0);
+  // A guard on the harness, not the UI: a 2000-press walk means the test is asking for a value at
+  // the far end of a wide range and should say so, rather than spending a minute in key events.
+  expect(presses, `"${label}" would need ${presses} key presses — pick a nearer value`).toBeLessThanOrEqual(300);
+
+  await field.focus();
+  await page.keyboard.press("Home");
+  for (let i = 0; i < Math.round(presses); i++) await page.keyboard.press("ArrowRight");
+  // Compared as a NUMBER: twenty 0.1 steps can land on "2" or on "2.0000000000000004" depending on
+  // how the engine accumulates, and a string compare would fail on a slider that is exactly right.
+  const landed = await field.evaluate((el) => Number((el as HTMLInputElement).value));
+  expect(landed, `"${label}" did not land on ${target}`).toBeCloseTo(target, 6);
+}
+
 export async function runFromWorkbench(
   page: Page,
   opts: {
@@ -302,6 +339,12 @@ export async function runFromWorkbench(
     awaitControl?: string[];
     /** Accessible label → value, applied in declaration order (later knobs can depend on earlier). */
     params?: Record<string, string>;
+    /**
+     * Take the QC block card's "Review & run anyway" when the run is gated. Only for inputs the
+     * guardrail flags on a rule that does not apply to THIS skill — e.g. a pure edge table, which
+     * has no numeric column because the skill derives its values by counting the pairs.
+     */
+    overrideDataCheck?: boolean;
   },
 ) {
   const projectId = await openWorkbench(page, opts);
@@ -311,16 +354,33 @@ export async function runFromWorkbench(
     await expect(field, `no control labelled "${label}" — the knob is API-only`).toBeVisible({
       timeout: 30_000,
     });
-    const tag = await field.evaluate((el) => el.tagName);
-    if (tag === "SELECT") await field.selectOption(value);
+    const kind = await field.evaluate((el) =>
+      el.tagName === "SELECT" ? "select" : (el as HTMLInputElement).type,
+    );
+    if (kind === "select") await field.selectOption(value);
+    else if (kind === "range") await setRange(page, field, Number(value), label);
     else await field.fill(value);
   }
 
   await page.getByRole("button", { name: "Apply skill" }).click();
 
+  const canvas = page.locator(".js-plotly-plot");
+
+  // The QC guardrail's own escape hatch, driven only when the caller asks for it.
+  //
+  // A blocking QC flag makes the run a 422 and puts up the block card, whose subordinate action is
+  // "Review & run anyway" — a first-class path ("It's your data"), and one no browser check had
+  // ever taken. It is OPT-IN so a check that expects clean data still fails loudly on an
+  // unexpected block, rather than clicking through the guardrail and reporting a pass.
+  if (opts.overrideDataCheck) {
+    const override = page.getByRole("button", { name: /Review & run anyway/i });
+    await expect(canvas.or(override).first()).toBeVisible({ timeout: 180_000 });
+    if (await override.isVisible().catch(() => false)) await override.click();
+  }
+
   // A rendered Plotly canvas is the only proof. A run that raises leaves the workbench standing
   // with an error banner, which is what this times out on — so the failure names the skill.
-  await expect(page.locator(".js-plotly-plot")).toBeVisible({ timeout: 180_000 });
+  await expect(canvas).toBeVisible({ timeout: 180_000 });
   await settle(page);
   return projectId;
 }
