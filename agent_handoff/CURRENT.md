@@ -27,6 +27,7 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
+| **DEG-PANEL** | 2026-08-05 | `main` `9daa043..<head>` (**local — owner pushes**) | **`#1(d)` closed as one spec-first change, and the flagship DE figure had been claiming a fold change it never computed.** `deg` is not the shape the earlier knob batches were: **FOUR disjoint engines behind one `mode` knob, and `mode` itself was API-only** — the knob deciding which of the other seventeen do anything could not be touched. `API_ONLY_KNOBS` **75 → 52, 12 skills → 10** (measured by counting the list; the LIVE block's own "73 across 11" was stale again, the same derived-number error the board flagged last session). `diff_abundance` had **no overlay at all** — the `sankey` shape, where an empty panel is indistinguishable from "this skill has no options". ⚑ **THE FIGURE DEFECT: `_scrna` plots scanpy's `scores`, which its own docstring calls "the z-score underlying the computation of a p-value", under an axis and a Statistics column both reading *"log2 fold-change"*.** On the real corpus render that puts **44.6** under a log2 fold change — a 26-trillion-fold change — on the DEFAULT path of the flagship skill and on its own smoke case, green through nine gates. Re-ranking by `logfoldchanges` would not fix it (absent on the default Wilcoxon run), so the LABEL changes, computed from `method`. **Bounded honestly: no reproduction score reads it** — `de_counts` needs a `direction` column and `deg` emits none (`diff_abundance` does, and its numbers were always right). ⚑ **SIX PROSE LIES, from reading all four runner bodies**, every one green because the guard checks a param is MENTIONED not that the sentence is TRUE: `method` reaches `rank_genes_groups` untouched while the paragraph always said Wilcoxon · an absent `groupby` makes the runner **cluster the cells itself** and the paragraph named the requested column (the `violin` case, a **fifth** skill) · a blank `sample_col`/`condition_col` resolves through an alias list while the paragraph defaulted to the literal word *"sample"* · `mode="auto"` picks ONE engine and the sentence described both (`erg_flicker.view`) · and the sharpest, **`_bulk_deseq`'s ImportError fallback returns a log2 of mean CPM with NO model and NO p-values while the paragraph claimed a PyDESeq2 Wald test and Benjamini-Hochberg and CITED all three** (the `_boxplot` family, third time). Plus two undisclosed exclusion criteria and a TMM degrade that lived only in the figure subtitle. All ride `layout.meta.deg` — the `meta.significance` pattern, **fourth** use. ⚑ **AN EIGHTH LAYER OF [[selom-shipped-not-reachable]]: a param NO DECLARATION KNOWS ABOUT.** `deg`'s runner reads `group_regex` and `label_val`, absent from its `skill.json`; `_execute` passes unknown keys straight through, `validate_param_ranges` skips them, `resolved_params` **records** them. They work — and every guard in this repo starts from the declaration, so **none of them can see one**. The previous seven layers were *the user cannot get to it*; this is *no declaration admits it exists*. `group_regex` is now declared (it decides what the two bulk groups ARE), `label_val` deleted as an undocumented alias, and `mode`/`method` gain `options` so an unknown value is a **400** instead of a silent run of a different engine (`run()` lowercases but does not strip — `mode=" bulk"` ran the single-cell path). **The level widget** (`#2`'s converged half) is the single-select sibling of `pairs` with ONE added rule: blank column + exactly one candidate uses it, because a bulk counts CSV has **no condition column at all** and publishes its levels under the `__column_names__` sentinel. It deliberately does **not** fall back to `best_group` — that IS the engine's deg pick and agrees with the runner whenever an alias is present, but where none is **the runner RAISES while `best_group` guesses**, so the picker would offer levels for a run the backend refuses. Obs knobs read `groups`/`sample_col_candidates`, not `columns` (`[]` for an h5ad by construction — finding (f)); `groupby` is a **combobox** because Leiden does not exist until the run. ⚑ **TWO CORRECTIONS AGAINST MY OWN SPEC, recorded in it**: D1's *"under `auto`, only the shared knobs render"* would have **hidden the contrast boxes that ship today** — a regression dressed as a reachability fix (the `fdr_threshold` lesson), so `auto` shows the two engines it can resolve to and hides the other nine; and D6 had the stub's axis moving to meet its table when the stub's numbers are invented and *"score (signed)"* is the honest label, so the **table** moved — more truthful **and** it moves no golden. **Mobbin ruled radio cards OUT for `mode`**: attested five times (Wise · User Interviews · Gusto · Revolut · Cake) and **every instance is a full-page wizard step**, which a narrow dock has nowhere to host; what transferred is Copilot's mode-select-with-the-block-beneath and Gusto's per-option statement of what the option DOES. `PROSE_SILENT` untriaged **166 → 131** (equality-asserted). Gates: `verify.sh` **9/9 raw, exit 0, corpus set** · **skill-smoke 43 pass / 0 fail** · **browser-verify `deg-panel` 4/4** + `param-pickers`/`api-only-knobs`/`shared-vocab-knobs` **10/10** regression. Every new pin confirmed RED first. Also fixed, unrelated and blocking: **`wf-lint` was red on `main`** — `dorny/paths-filter`'s pinned commit gained an upstream `v3.0.3` tag so the bare `# v3` comment stopped naming a version. |
 | **GSEA-KNOBS + LEDGER-PROVENANCE** | 2026-08-05 | `main` `ea68c79..<head>` (**local — owner pushes**) | **`#3` and `#4` both closed in the owner's order, and the control pass found three prose lies the guard could not.** `#3`: `API_ONLY_KNOBS` **88 → 75, 14 skills → 12** (⚑ **MEASURED, not derived — the board's running tally said 86/13 and was already wrong by 2 knobs / 1 skill before this session; my first write-up compounded it by subtracting from the stale number instead of counting.** Count the list, never the tally). `gsea` (6) + `ssgsea` (7) share `gene_sets`/`gene_set` — verified identical by reading both bodies (same `_SOURCE_ALIASES` → `load_collection`, same `_parse_panel`), and `enrichment` adopts the same block so the library wording has ONE home. What is NOT shared is named: `weight` is the same exponent but its conventional value is the METHOD's (1.0 prerank / 0.25 ssGSEA, already carried by the spec default), and `top_n` is `enrichment`'s *most enriched* vs `ssgsea`'s *most VARIABLE across samples* — same key, different rule. ⚑ **Establishing that meaning is what surfaced three live printed-vs-computed lies in `methods._gsea`, all green through nine gates**: `engine` defaults to `auto` and resolves from what is IMPORTABLE, yet the paragraph said *"(gseapy.prerank)"* and cited GSEApy on **every** run — including blitzGSEA's gamma-fit p-values and the in-house numpy weighted-KS; `n_perm` was quoted RAW while `_perm_count` floors both library engines at 100 and reads an explicit 0 as **1000**, so `n_perm=50` claimed a resolution the run never had; and **Benjamini-Hochberg was claimed AND CITED on single-set and in-house runs, which correct nothing across sets** (the `_boxplot` "cites Welch and BH while returning `[]`" family, inverted). Plus ssGSEA's `top_n` quoted as a COUNT in both paragraph and caption when `order[:top_n]` is a CAP — the figure's own title has always carried the real number. **The guard was green because it checks a param is MENTIONED, not that the sentence is TRUE** — its known one-directional blind spot. All four are answers only the runner has, so they ride `layout.meta` and are lifted by `build_body`/`legends._facts` (`meta.significance` pattern, third use). Also: choosing the in-house engine in library mode raised *"needs gseapy or blitzgsea installed"* — blaming an absent dependency that IS installed, newly reachable now that `engine` has a control; and ssgsea's local `_truthy` is DELETED because `skills._engine.to_bool` is byte-identical (grep before you extract, again). ⚑ **Mobbin ruled the obvious pattern OUT**: an override should be an EXPLICIT mode (Google AI Studio folds "Write my own instructions" into the preset dropdown; WRITER uses segmented Upload/Paste-URL/Paste-text), which Selom cannot copy without inventing a backend `mode` param — so the library select **greys out** the instant a set is pasted, making the silent override visible exactly when it takes effect. **`overridable` defaults OFF for a reason caught before it shipped: `enrichment` declares no `gene_set` at all, and a gate naming an absent key never matches — it would have been PERMANENTLY DISABLED.** `PROSE_SILENT` **179 → 166**; `("methods","gsea")` retired. **`#4`** (DECISIONS #16, spec written first then built straight through, no pause): a metric the reader itself rated **0.45**, read off an L3-SYNTHESIZED table, rendered on `/reproduction/<slug>` as **VERIFIED / 100** Selom-confidence — `panel_extractor` did `out[gold.metric] = r.value` and dropped `layer`/`source`/`confidence`. Now `panel_extractor_readings` keeps the `Reading`, the provenance rides `MetricValue` + `ValidationResult`, and `_metric_score` caps `selom_confidence` at **75** — capping and not badging alone, because a badge is disclosure a reader can miss while the headline still says 100, and the cap is the pattern already in that function (`substituted` caps reproducibility at 92). ⚑ **TWO BOARD PREMISES NEEDED CORRECTING**: `PanelScore.provenance` was **already taken** (the deposited-source badge "ST6+ Fig4e−") → new field `reading_provenance`; and `run_panel` has **no production caller**, the same "plausible name, matching docstring, no caller" shape as `table_extractor`, so only `drive.py` was stamped. Rejected re-reading via `panel_readings` — `read_metric` PERFORMS synthesis, so a second pass re-synthesizes every tableless panel. ⚑ **The badge cannot appear on any published ledger and that is CORRECT** — rpgrip1/jev/hani are captured replays with no readings, so all 29 panels are `""` and `fixture.ts` (real engine output) still matches a regeneration; verified against the live engine, recorded in spec §7 so nobody reads it as broken. New capability: **vitest now includes `components/**/*.test.ts`**, so a component predicate is testable without a DOM. Gates: `verify.sh` **9/9 raw, exit 0, corpus set** on both commits · **skill-smoke 43 pass / 0 fail** · **browser-verify `shared-vocab-knobs` 5/5** real backend + real corpus. Every new pin confirmed RED first **except one, labelled as such** — the ssGSEA string-`"false"` test passes pre-fix because `resolved_params` already casts by declared type, so that expected defect was **not real**. |
 | **PROSE-TRIAGE** | 2026-08-05 | `main` `5eb8274..91ed4a4` (**pushed**) | **The board's `#2` opened on the ERG family expecting a confirmed-waive pass, and it was half printed-vs-computed lies: 26 of those 50 params decide what the figure CLAIMS while the paragraph said something else.** The two-directional prose↔param guard shipped as a RAW capture (261 params / 60 templates, none examined); the board's note said ERG was "mostly pipeline-level/internal". **Reading the four runners' BODIES said otherwise** [[share-vocabulary-by-meaning-not-name]]. ⚑ **`erg_traces` with `central="mean"` titles the figure *"Mean … ERG"* while the methods text said a representative eye is shown *"rather than shown as group means"* — prose contradicting the figure's own title.** `erg_intensity_response` with `fit=false` fits nothing, and the entire Naka-Rushton paragraph **plus its two citations** described a model that never ran (the `_boxplot` "cites Welch and BH while returning `[]`" family, inverted); *"did not support a saturating fit"* **IS `min_r2`**, the number saying which conditions were dropped. `erg_bwave_bar` hard-coded *"b-wave"* while `wave`/`value_col` select the a-wave — a **different construction** (baseline-to-trough, not trough-to-peak) — printed *"the standard error of the mean"* under `error=sd|ci95|minmax` **and under `show_error=false`, which draws no bar at all**, claimed *"every eye is overlaid"* with `points=false`, and drew significance brackets from `comparisons`/`sig_test`/`correction` **with no test named anywhere**. `erg_flicker`'s `view` picks ONE of two figures and the sentence claimed both at once, so the *"N1–P1 also plotted against frequency"* half was **false on the DEFAULT path**. Then the board's named result-changers: `proteomics_de` said *"mean-imputed"* on every run while `missing=mindet|minprob` fill from the detection-limit tail — **the choice that moves a fold-change further than the choice of test does** — and `log_input=true` means the intensities ARRIVED log-scaled while the paragraph still opened *"were log2-transformed"*; `markers`' CAPTION was wrong on the **default** path (`standard_scale` is default-TRUE, so the colour is [0,1]-scaled and the caption called it the mean). ⚑ **TWO WERE FIGURE DEFECTS, NOT PROSE.** `_erg_adaptation` read `adaptation` alone, but every runner resolves through `_erg.resolve_flash_mode` where an explicit `stimulus_type` **WINS** — so a photopic figure got a paragraph about overnight dark-adapted mice; worse, **all three flash runners hard-coded `adapt or "scotopic"` in their TITLE**, so on the iWorx path (no `stimulus_type` column) a run asked for `adaptation="photopic"` was **titled *Scotopic***. And **`violin` clusters the cells itself when the requested `groupby` is absent** — the figure disclosed the substitution in its title and axis while the paragraph *and* the caption named the column the user asked for, and the **`resolution` that produced those clusters was recorded nowhere at all**; its value axis also hard-coded *"expression (log1p)"* while `normalize=false` skips log1p. **The param cannot always answer** (`auto` resolves from the DATA; whether violin's fallback fired is a fact about the data), so both ride `layout.meta` lifted by `build_body` as `_`-prefixed facts — the `meta.significance` pattern — **written ONLY when they differ from the param-derived answer**, so every default run is byte-identical and no golden moves. **The structural half: every waiver now carries a VERDICT** — `PRESENTATION` · `INTERNAL` · **`VIA_OUTCOME`** (the claim IS made, from the recorded outcome, because the param is inert unless a data-dependent branch fired) · `IN_METHODS` (legends only) · `UNTRIAGED` — and **UNTRIAGED is a counted ratchet asserted by EQUALITY, not `<=`**, so the backlog cannot shrink on paper while the ceiling stays slack; **it caught exactly that on its first run**. **There is deliberately no `OWED` verdict** — a param whose fix is owed gets the fix and LEAVES the list, because a waiver admitting it protects a known lie is worse than no waiver. **261 → 179 untriaged**; `methods.proteomics_de` · `methods.markers` · `legends.markers` retired entirely. Also: `_pairwise_prose` is one home for every skill drawing brackets off `_stats.test_pairs` (boxplot · violin · erg_bwave_bar) and adds the clause they all owed — **a pair carrying an override (`A~B:**`) was NOT computed, so neither the named test nor SciPy may be credited with it** — and `erg_bwave_bar`'s local `_parse_comparisons` is DELETED because `_stats.parse_pairs` already existed and is strictly more capable (**I had started writing the third copy before checking**). Gates: `verify.sh` **9/9 raw, exit 0, corpus set** (BE 1704 fast + 397 slow · FE 730 · fe-build green) · **skill-smoke 43 pass / 0 fail, no regression**. **22 new pins, every one confirmed RED against the pre-fix code before being kept.** |
 | **COMPARE-VERIFY** | 2026-08-05 | `main` `5eb8274..9dafd55` (**pushed**) | **The board's `#1` closed: the fix pass's one unproven claim now has rendered proof — and proving it found a SECOND silent under-report in the same surface.** Compare was unreachable to every browser check because a comparison needs **sibling** figures: running a skill twice makes two unrelated ones, and only a sweep sets `parentFigureId`. **`sweepIntoCompare`** is the fourth browser-verify entry fixture (beside `openRealFigure`/`openWorkbench`/`runFromWorkbench`) — it forks the open figure into a version family over one knob and lands in compare. The check is the scenario four review lenses described: `lollipop` with real pairs, swept `correction` none→BH, asserting two titled cards, table 0 *identical*, table 1 *changed*, and the old plural copy nowhere. **TWO comparison pairs, not one, and that is load-bearing** — BH on a SINGLE p-value returns it unchanged (rank n of n), so a one-pair check would pass on the added `p (bh)` column alone and keep passing if the correction silently did nothing. ⚑ **THE FIND: `diffTables` indexed rows by `String(row[0])` into a Map, so a repeated first-column value overwrote its predecessor — no `added`, no `removed`, no trace.** That is the NORMAL shape of a pairwise table (`group A` repeats whenever one control is compared against several treatments): the real two-pair run rendered **ONE** row and reported *"~1 changed"* — a confident, specific, wrong number, the same family as the bug the check exists to prove fixed. Rows are keyed by first-column value **disambiguated by occurrence** — byte-identical to the old key wherever that column is unique (gene · cluster · rank · group = every other table this repo emits), never a dropped row; a composite key over the leading string columns would survive reordering but would report a changed second column as removed+added, which is worse reporting for a real edit. **Why the unit pins missed it is the part to keep: every fixture in `diff.test.ts` used a UNIQUE first column — the pairwise one included, with a single row. The tests used the one shape that cannot exhibit the defect.** Both new tests confirmed RED first. Also recorded: **locate a control inside a wrapping `<label>` BY ROLE** — Playwright's `getByLabel` matches the label's `textContent`, which for a wrapped `<select>` includes every `<option>`, so `getByLabel("Parameter",{exact:true})` finds nothing on the sweep form while the accessible name is correctly "Parameter". Gates: `verify.sh` **9/9 raw, exit 0, corpus set** (BE 1682 fast + 394 slow, FE 730, fe-build green) · **browser-verify compare-tables green + stats-view 5/5 green**. |
@@ -54,8 +55,65 @@
 | **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
 | older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · GSEA-KNOBS + LEDGER-PROVENANCE · 2026-08-05 20:22 +1000 (Sydney) · branch `main` (**LOCAL — the pushed BASE is `ea68c79`; this session's work sits on top of it. Working tree clean. ⚑ NO AHEAD-COUNT HERE ON PURPOSE: a handoff commit cannot know its own SHA. Trust `git log --oneline origin/main..HEAD`, not this stamp. Owner pushes.**) · Claude (FE+BE, solo, lead)
+## ▸ LIVE · DEG-PANEL · 2026-08-06 02:02 +1000 (Sydney) · branch `main` (**LOCAL — the pushed BASE is `ea68c79`; several sessions now sit on top of it. Working tree clean. ⚑ NO AHEAD-COUNT HERE ON PURPOSE: a handoff commit cannot know its own SHA. Trust `git log --oneline origin/main..HEAD`, not this stamp. Owner pushes.**) · Claude (FE+BE, solo, lead)
 
+- **The board's `#1(d)` is DONE**, spec-first, as one change (`docs/deg-panel/spec.md` → `3f102ea`).
+  Detail is in the commit; what follows is what a next session needs and could not re-derive.
+- **⚑ AN EIGHTH LAYER OF [[selom-shipped-not-reachable]], AND IT IS THE ONE NO GUARD CAN SEE.**
+  `deg`'s runner honoured two params its `skill.json` never declared (`group_regex`, `label_val`):
+  `_execute` merges unknown caller keys straight through, `validate_param_ranges` skips them, and
+  `resolved_params` **records them into the provenance bundle**. So they work — and because every
+  guard in this repo is driven by the DECLARATION (`API_ONLY_KNOBS` iterates the spec, the
+  prose↔param guard compares against `param_spec`, `paramFieldsFromSpec` drops an overlay key with
+  no spec entry), **not one of them can look down that arrow.** The previous seven layers were all
+  *the user cannot reach it*; this is *the param works and nothing admits it exists*.
+  **The guard for it is NOT built** — see NEXT#11, which is the highest-value item this session
+  leaves behind.
+- **⚑ A CONTROL PASS FOUND A FIGURE DEFECT, NOT JUST PROSE.** Two sessions running, reading a
+  runner's body for a REACHABILITY job is what surfaced the honesty defect. Here the axis of the
+  flagship DE skill named a quantity the figure does not contain, and the tell was on screen the
+  whole time: **a "log2 fold-change" of 44.6**. Nine gates green, `skill-smoke` green, and the
+  golden untouched — because the golden pins the STUB. **Render the figure and read the axis.**
+- **⚑ `layout.meta` IS NOW THE DEFAULT ANSWER FOR ANYTHING `auto`, FOURTH USE.** `meta.significance`
+  → `meta.adaptation` → `meta.clustered`/`meta.gsea` → `meta.deg`. If a param resolves at run time
+  (from the file, from an alias list, from what is importable), the prose must read the runner's
+  record. Expect this shape in `heatmap`/`integration`/`normalization_qc` too.
+- **⚑ THE LEVEL WIDGET'S ONE JUDGEMENT CALL, so nobody re-opens it.** It does NOT fall back to
+  `design.best_group` when several candidates exist. `best_group` genuinely IS the engine's deg
+  contrast pick, and `questionnaire._obs_aliases()` imports `deg.run_real`'s own
+  `_CONDITION_FALLBACKS` rather than shadow-copying them — so the two agree **whenever an alias
+  column is present**. Where none is, the runner **raises** while `best_group` falls back to the
+  lowest-cardinality candidate, so the picker would offer levels for a run the backend refuses.
+  One rule with no exception beat two.
+- **Two corrections against my own spec, written into it rather than quietly fixed.** D1's "under
+  `auto` only the shared knobs render" would have **hidden controls that ship today** — a
+  regression created by a reachability fix, the `fdr_threshold` lesson one level up. D6 had the
+  stub's axis moving to meet its table; the table was the dishonest half, and moving it instead is
+  more truthful AND moves no golden. **A spec's own decisions are re-checkable while building.**
+- **⚑ RECORDED, NOT WORKED AROUND: `rpgrip1_merged.h5ad` (1.2 GB) CANNOT BE DRIVEN THROUGH THE
+  BROWSER HARNESS.** The dev proxy drops the upload (`socket hang up`), the dataset is never
+  inspected, and every data-derived control then degrades to text **through no fault of its own** —
+  which reads exactly like a broken picker. It is the best-designed file in the corpus (`genotype`
+  WT/C3/FS/PT · `sample` ×9 · `celltypes` ×7) and the engine detects all of it correctly when
+  called directly. The picker check runs on `hani_irpe_subset` (131 MB) instead. **Anything needing
+  a large-file browser path is blocked on this.**
+- **Also worth knowing: `jev/retina_fadl.h5ad` has only TWO obs columns** (`n_genes`, `leiden`) —
+  **no condition column at all.** The standard scRNA smoke file cannot exercise any design-derived
+  control, and a check that assumes it can will fail on a correct fail-soft degrade.
+- **Gates.** `verify.sh` **9/9 raw, exit 0, corpus set** · **skill-smoke 43 pass / 0 fail, no
+  regression** · **browser-verify `deg-panel` 4/4** plus a 10/10 regression pass over
+  `param-pickers`/`api-only-knobs`/`shared-vocab-knobs` (the shared merge + gate machinery changed).
+  Every new pin confirmed RED first. **`wf-lint` was RED on `main` before I started** and is fixed
+  in its own commit (`aba600b`) — upstream tagged `dorny/paths-filter`'s pinned commit `v3.0.3`, so
+  the bare `# v3` comment stopped naming a version. It would have failed CI too.
+- **⇒ NEXT SESSION.** `#1`–`#4` are closed. **`API_ONLY_KNOBS` is 52 across 10 skills · PROSE_SILENT
+  untriaged is 131** — both MEASURED. In value order: **NEXT#11, the undeclared-param guard** (new,
+  and the only one of these that closes a whole invisible class) · **`#2`'s remaining 131**
+  (`heatmap`/`integration`/`normalization_qc` are the biggest blocks) · **`#5`'s JTBD backlog**.
+  ⚑ **But read the strategic call in DEFERRED first — it is still unanswered, and its own
+  recommendation was "do `#1(d)`, then pivot to P-E". `#1(d)` is now done.**
+
+<!-- superseded — GSEA-KNOBS + LEDGER-PROVENANCE, kept for its findings -->
 - **The board's `#3` and `#4` are BOTH DONE, in the owner's order.** Detail is in the two commits;
   what follows is what a next session needs and could not re-derive.
 - **⚑ READING THE RUNNER'S BODY FOR A *CONTROL* PASS FOUND THREE PROSE LIES.** `#3` was scoped as a
@@ -631,9 +689,16 @@
    ~~the two-directional prose↔param guard~~ · ~~the `#4` milestone reviews + fix pass~~ —
    **all DONE.** §3.2 is closed except rows 12–13. **Nothing is carried forward.**
 
-> **▶ THE NEXT SESSION — `#1` · `#2`(ERG+named) · `#3` · `#4` ARE ALL CLOSED (2026-08-05).**
-> **Start at the rest of `#2` (166 untriaged) — but take `deg`'s 26 WITH `#1(d)`'s spec, not
-> piecemeal — then `#1(d)`, then `#5`.** `API_ONLY_KNOBS` is **75 across 12 skills** (measured 2026-08-05 — the running tally below was stale; trust a count of the list).
+> **▶ THE NEXT SESSION — `#1` (incl. `(d)`) · `#2`(ERG+named+deg) · `#3` · `#4` ARE ALL CLOSED
+> (2026-08-05).** ⚑ **FIRST, ANSWER THE STRATEGIC CALL IN DEFERRED** — it has been open two
+> sessions and its own recommendation ("do `#1(d)`, then pivot to P-E") is now spent, because
+> `#1(d)` shipped. Absent an answer, the value order is: **`#11` the undeclared-param guard** (new
+> this session — the only item that closes a whole class the existing guards are structurally blind
+> to) → **the rest of `#2` (131 untriaged**; best blocks `heatmap` · `integration` ·
+> `normalization_qc`) → **`#5`**. `API_ONLY_KNOBS` is **52 across 10 skills** and `PROSE_SILENT`
+> untriaged is **131** — both MEASURED 2026-08-05 by counting the lists. ⚑ **Every running tally in
+> this file has been wrong at least once** (`86/13` when it was 88/14; `73/11` when it was 75/12).
+> **Count the list. Never subtract from the tally.**
 > Re-derive anything here that looks stale [[verify-todo-not-already-shipped]] — **`#2` is the
 > standing proof that a board's own characterisation of a backlog can be wrong.**
 >
@@ -716,11 +781,15 @@
      wording rather than invent a second vocabulary for the same idea. **Verify the shared meaning
      the (a) way before writing it**: `ssgsea` scores per-sample while `gsea` ranks a whole contrast,
      so `weight` and `top_n` are the two to check first.
-   - **(d) `deg` (16) — the largest single gap and the one that WANTS A SPEC, not an overlay.**
-     `method`, `mode`, `group_col`/`group_val`, `covariate_col` change the RESULT. Fold NEXT#2's
-     level widget into that spec: `deg.reference`/`treatment` and `diff_abundance`'s (7) are the
-     same "pick a level, not a column" shape, so the two items have converged — spec them together
-     or build the widget twice.
+   - ~~**(d) `deg` (16) + `diff_abundance` (7)**~~ — **DONE 2026-08-05** (`3f102ea`,
+     `docs/deg-panel/spec.md`). **75 → 52 knobs, 12 → 10 skills.** The spec was the right call and
+     the reason is reusable: `deg` is four disjoint engines behind one `mode` knob that was itself
+     API-only, so the panel needed a STRUCTURE (mode-gated `showWhen`, plus a new `oneOf` gate for
+     the knobs two engines share), not a list of controls. **NEXT#2's level widget shipped with
+     it** — `type: "level"`, the single-select sibling of `pairs`, reusable by `slope.levels`;
+     `columnsFrom: "groups" | "samples"` is what finally serves an h5ad, whose `columns` is `[]` by
+     construction. ⚑ **And the pass found the axis of the flagship DE figure naming a quantity it
+     does not contain** — see the SESSIONS row.
    - **(e) WAIVE, do not build:** the ERG family's 25 (`erg_intensity_response` 10 · `erg_traces` 8 ·
      `erg_bwave_bar` 4 · `erg_flicker` 3) is mostly `manual_marks`/`ab_detector`/`stimulus_type` —
      pipeline-level, already named internal on the board. **`facs_gating` (11) is the second-largest
@@ -740,14 +809,18 @@
      **`runFromWorkbench` now drives text · select · range · SWITCH**, so no widget class in the
      remaining backlog is undrivable.
 2. **⇒ EXTEND THE PICKER WHERE IT STILL DOESN'T REACH** (small, additive, all fail-soft today).
-   **⚑ Its level-widget half has CONVERGED with #1(d) — spec them together or build it twice.**
+   **⚑ Its level-widget half SHIPPED with #1(d) — `type: "level"` in `params.ts`, with the
+   sole-candidate rule and the deliberate no-`best_group`-fallback both documented in place.**
    - **A multi-column widget** — `venn.sets` (2–3 column names) and `heatmap.annotations` are
      comma-separated LISTS of columns, so the single-select `column` type does not fit. The row-list
      built for `pairs` is most of the answer.
-   - **A level widget for the ones that take a level, not a column** — `slope.levels` ("which two,
-     in order"), `deg.reference`/`treatment`. `group_candidates[].levels` already carries these, and
-     `resolvePairsField` is the pattern; `slope.levels` is an ORDERED two-of-N, so it is its own
-     shape, not a pair.
+   - ~~A level widget~~ **BUILT.** What remains is **`slope.levels`, an ORDERED two-of-N** — its own
+     shape, not a pair and not a single level. `resolveLevelField` is the pattern to extend.
+   - **⚑ Two corpus facts that will bite the next picker check** (both cost a failing run here):
+     `jev/retina_fadl.h5ad` has NO condition column (only `n_genes` + `leiden`), and
+     `rpgrip1_merged.h5ad` — the one file with a real design — is **1.2 GB and cannot be uploaded
+     through the dev proxy at all**. Use `hani/processed/hani_irpe_subset.h5ad` (131 MB, one
+     grouping) for anything design-derived.
    - **`violin` stays text on purpose** — its clusters do not exist before the run. If that ever
      changes, the honest source is a completed `cluster` run's own output, not `design`.
 3. ~~**PIN ZIZMOR + ADD THE WEEKLY DRIFT JOB**~~ — **BUILT 2026-08-04** (`6bf12a6`). Both blocking
@@ -848,6 +921,26 @@
       **refuted** this for `markers` specifically — it is a documented decision there — so treat it
       as a convention question, not a defect.
 
+11. **⇒ THE UNDECLARED-PARAM GUARD — new 2026-08-05, and the highest-value item on this board.**
+    An **eighth** layer of [[selom-shipped-not-reachable]], and the first one **no existing guard can
+    detect by construction**. `deg`'s runner read `group_regex` and `label_val`, neither declared in
+    its `skill.json`: `skills/contract._execute` merges unknown caller keys straight through
+    (`contract.py:78,90`), `validate_param_ranges` skips any key absent from `param_spec`
+    (`:164-166`), and `resolved_params` passes them into the **recorded provenance bundle**
+    (`:210-212`). So the param works, changes the result, and is written into the reproducibility
+    record — while `API_ONLY_KNOBS`, the prose↔param guard and `paramFieldsFromSpec` all START from
+    the declaration and therefore cannot see it. Two were found by reading ONE skill's runner.
+    - **Shape:** walk `skills/**/run*.py` by AST for `params.get("<key>")` / `params["<key>"]`,
+      subtract that skill's `param_spec` and the reserved `_`-prefixed keys, and fail on the
+      remainder — with a NAMED waiver in the `API_ONLY_KNOBS` shape (exact both directions), because
+      the first run will have a backlog. Extend `tests/test_methods_param_spec_guard.py`, which
+      already loads every `skill.json` and already owns the "declared vs referenced" comparison —
+      this is the same comparison against a different source.
+    - **Expect real finds.** Every skill was written before any of these guards existed, and an
+      undeclared param has had no reason to surface: it does not break, it does not warn, and it
+      passes every gate. Triage each as *declare it* (it changes the result — `group_regex` did) or
+      *delete it* (an undocumented alias — `label_val` was).
+
 **Owed follow-ups still open:** ~~the one-table `StatsTable` limit~~ **CLOSED 2026-08-05 — spec
 written, reviewed, corrected, and APPROVED TO BUILD ([[DECISIONS #15]]); both open questions
 decided** · ~~the `zizmor@latest` pin policy~~ **decided
@@ -872,8 +965,11 @@ journal's own author guidelines**, not cnsplots.
   engine that never ran), **but it is open-ended (75 knobs · 166 prose waivers · ~23 JTBD) and none
   of it moves Selom toward being usable by anyone but the owner.** **P-E is the only phase that
   does, and it is the one blocked on the owner** (Clerk keys + the route split, both below).
-  Recommendation: do `#1(d)` `deg` (the largest remaining gap, and its prose waivers fold into the
-  same spec), then pivot to P-E.
+  Recommendation was: do `#1(d)` `deg`, then pivot to P-E. ⚑ **`#1(d)` SHIPPED 2026-08-05, so the
+  recommendation is spent and this question is now the live one.** For what it is worth as evidence:
+  that one pass found a 26-trillion-fold mislabel on the flagship figure's axis and an eighth class
+  of unreachable-by-declaration, so the thread is still paying — but it is still open-ended, and it
+  still moves nothing toward a second user.
 - **Clerk keys** (publishable + secret + issuer URL) — the only thing blocking P-E's frontend half.
 - **The route split** — does the app move to `/app` so `/` can be public? Recommended in
   `docs/auth-multitenancy/spec.md` D5; **owed to Thalon's landing-page build** and much cheaper
