@@ -168,15 +168,23 @@ def validate_result_table(table: Any, *, skill_id: str = "") -> list[FrameViolat
     from skills._table import as_tables
 
     tables = as_tables(table)
+    multi = len(tables) > 1
     # The position prefix only appears when there is more than one, so every existing message —
     # and the tests pinning them — is unchanged for the single-table case.
     return [v for i, t in enumerate(tables)
-            for v in _validate_one_table(t, skill_id=skill_id,
-                                         at=f"table {i + 1}: " if len(tables) > 1 else "")]
+            for v in _validate_one_table(t, skill_id=skill_id, require_title=multi,
+                                         at=f"table {i + 1}: " if multi else "")]
 
 
-def _validate_one_table(table: Any, *, skill_id: str = "", at: str = "") -> list[FrameViolation]:
-    """One ``StatsTable``'s defects. ``at`` prefixes its position when the skill emitted several."""
+def _validate_one_table(table: Any, *, skill_id: str = "", at: str = "",
+                        require_title: bool = False) -> list[FrameViolation]:
+    """One ``StatsTable``'s defects. ``at`` prefixes its position when the skill emitted several.
+
+    ``require_title`` is G4 (docs/stats-tables/spec.md §6) and is set only for a multi-table result:
+    the frontend STACKS N tables, so an untitled one is indistinguishable from its neighbour. The
+    presentation and the requirement are the same decision, which is why this rides on the count
+    rather than being a blanket rule — a lone table's title is genuinely optional, and 20-odd
+    shipped runners rely on that."""
     if not isinstance(table, dict):
         return [FrameViolation(stage=STAGE_RESULT, code="not_a_table",
                                message=f"{at}{skill_id or 'skill'} returned a non-dict table.")]
@@ -186,6 +194,11 @@ def _validate_one_table(table: Any, *, skill_id: str = "", at: str = "") -> list
                                message=f"{at}{skill_id or 'skill'} table has no columns.")]
     width = len(cols)
     violations: list[FrameViolation] = []
+    if require_title and not str(table.get("title") or "").strip():
+        violations.append(FrameViolation(
+            stage=STAGE_RESULT, code="untitled_table",
+            message=f"{at}a skill emitting several tables must title each one — stacked panels are "
+                    f"told apart by their titles."))
     for i, row in enumerate(table.get("rows", []) or []):
         if not isinstance(row, (list, tuple)) or len(row) != width:
             got = len(row) if isinstance(row, (list, tuple)) else "non-list"

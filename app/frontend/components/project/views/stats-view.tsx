@@ -12,10 +12,20 @@ import { getSkill } from "@/lib/catalog/seed";
 import type { Figure } from "@/lib/projects/types";
 
 /**
- * The Statistics view (`view === "stats"`): the focused figure's stored table (or a spec-derived
- * fallback) with the gene-label column when the figure is a volcano. Presentational — the table +
+ * The Statistics view (`view === "stats"`): the focused figure's stored table(s) (or a spec-derived
+ * fallback) with the gene-label column when the figure is a volcano. Presentational — the tables +
  * labeling are derived in the composition root.
+ *
+ * **N tables STACK; they are never tabbed** (docs/stats-tables/spec.md D2). The deciding fact is
+ * what one of them is: a pairwise p-value table is not an alternative view of the ranked values, it
+ * is the **provenance of marks already drawn on the figure**. Stars on the canvas with their
+ * p-values behind an unselected tab repeats the exact failure the one-table trade existed to avoid.
+ * Tabs would also silently scope the per-panel CSV export, the compare diff and find-in-page to
+ * whichever tab is active.
  */
+/** Panels open by default. A wall-guard, not a preference — no skill in D4 wants more than two. */
+const MAX_OPEN = 3;
+
 export function StatsView({
   activeFigure,
   tables,
@@ -24,9 +34,7 @@ export function StatsView({
   onRunSkill,
 }: {
   activeFigure: Figure | undefined;
-  // A run may carry several tables (docs/stats-tables/spec.md D1). This slice moves the seam only —
-  // the stacked presentation (D2) is slice 2; today every skill emits at most one, so rendering the
-  // first is the same pixels.
+  /** Every table this run computed, in the runner's array order (D4 — order is the only authority). */
   tables: React.ComponentProps<typeof StatsPanel>["table"][];
   labeling: StatsLabeling | undefined;
   onOpenFigure: (f: Figure) => void;
@@ -70,7 +78,17 @@ export function StatsView({
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight text-foreground">
             <Table2 className="size-4 text-stage-publish" />
-            {table.title ?? "Statistics"}
+            {/*
+              One table lends the heading its title, exactly as before (G3). With several, the
+              heading goes generic and each keeps its own title on its own panel — and there is
+              deliberately NO "N tables" count. Mobbin: eight mature multi-section report surfaces
+              and not one heads the group with a count of its sections. Laravel Cloud
+              (mobbin.com/screens/32d12b37-22cd-4a53-981e-e338101609ce) titles each section and lets
+              the stack speak; Braintrust (…/5cdf1141-8f00-4e7d-b5f4-729ea894a29a) does show counts,
+              but per-section on its own header, describing ROWS — which StatsPanel already does. A
+              count here would tell the reader how many boxes sit below boxes they can already see.
+            */}
+            {tables.length === 1 ? (table.title ?? "Statistics") : "Statistics"}
           </h2>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">
             from <span className="text-foreground">{activeFigure.title}</span> ·{" "}
@@ -82,7 +100,24 @@ export function StatsView({
         </Button>
       </div>
       <PaneBoundary label="stats" title="This table couldn't be shown" resetKeys={[activeFigure.id]}>
-        <StatsPanel table={table} defaultOpen labeling={labeling} />
+        <div className="flex flex-col gap-3">
+          {tables.map((t, i) => (
+            <StatsPanel
+              key={i}
+              table={t}
+              // EVERY table is open, up to the wall-guard. Collapsing tables 2..N was an earlier
+              // draft and is wrong for the same reason tabs are: a collapsed panel and an
+              // unselected tab hide the same numbers, and the p-values must be visible in the same
+              // glance as the stars they explain. Affordable because the panel body is already
+              // height-capped (max-h-[300px]) and its rows capped at 200.
+              defaultOpen={i < MAX_OPEN}
+              // Labelling is a COLUMN INDEX, so it is meaningful against exactly one table — the
+              // first (spec §Gene labelling). volcano and deg, the only figures with geneLabels,
+              // emit one table each, so this states the answer rather than changing today's.
+              labeling={i === 0 ? labeling : undefined}
+            />
+          ))}
+        </div>
       </PaneBoundary>
       {/* Advisory-only (propose-never-auto): explain which test this figure uses + what it assumes. */}
       <AskAi

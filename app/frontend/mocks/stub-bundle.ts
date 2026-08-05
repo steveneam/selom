@@ -219,7 +219,10 @@ const DE_SKILLS = new Set(["deg", "volcano", "proteomics_de"]);
  * row-level diff offline. Mock-only; the production umap/cluster table is a backend
  * concern (markers/cluster-summary not yet wired into the S2.1 contract).
  */
-export function mockTable(skillId: string, query: Record<string, string> = {}): StatsTable | null {
+export function mockTable(
+  skillId: string,
+  query: Record<string, string> = {},
+): StatsTable | StatsTable[] | null {
   if (skillId === "umap_scrna" || skillId === "cluster") {
     const res = Number(query.resolution ?? 1.0);
     const n = Math.max(2, Math.min(18, Math.round(3 + (Number.isFinite(res) ? res : 1) * 6)));
@@ -282,6 +285,43 @@ export function mockTable(skillId: string, query: Record<string, string> = {}): 
       ],
       title: "Enrichment results",
     };
+  }
+  // ── the two-table case (docs/stats-tables/spec.md D1/D2) ──────────────────────────────────────
+  //
+  // `lollipop` is rank 1 on D4's list: it computes ranked values WITH a bootstrap CI, and — when
+  // the user asks for pairwise statistics — a second table of the p-values behind the stars it
+  // draws. Today the runner DISCARDS one of them because the wire carried a single table
+  // (`skills/lollipop/run.py:212` says so in a comment). Slice 3 attaches both.
+  //
+  // ⚑ THIS MOCK LEADS ITS RUNNER BY ONE SLICE, deliberately and narrowly: without a two-table
+  // fixture, `dev:mock` can only exercise the shape that already worked, so the stacked
+  // presentation would ship unproven offline [[mock-must-mirror-backend-contract]]. It is gated on
+  // the SAME condition the real skill branches on — `pairs=` set — so it mirrors the runner's own
+  // logic rather than inventing a shape, and slice 3 makes it literally true. If slice 3 has not
+  // landed and you are reading this, that is the thing to close, not this fixture.
+  if (skillId === "lollipop") {
+    const ranked: StatsTable = {
+      columns: ["rank", "arm", "median", "n", "95% CI"],
+      rows: [
+        [1, "WT Control", 412.5, 12, "388.1 – 436.0"],
+        [2, "RK-PDE6B", 268.9, 11, "241.7 – 295.4"],
+        [3, "CMV-GFP", 74.2, 12, "61.8 – 88.6"],
+      ],
+      title: "Ranked values",
+    };
+    if (!query.pairs) return ranked;
+    return [
+      ranked,
+      {
+        columns: ["comparison", "p", "adjusted p", "stars"],
+        rows: [
+          ["WT Control vs RK-PDE6B", 0.0031, 0.0093, "**"],
+          ["WT Control vs CMV-GFP", 0.000008, 0.000024, "***"],
+          ["RK-PDE6B vs CMV-GFP", 0.021, 0.021, "*"],
+        ],
+        title: "Pairwise p-values",
+      },
+    ];
   }
   return null;
 }

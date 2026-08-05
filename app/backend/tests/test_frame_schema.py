@@ -118,8 +118,10 @@ def test_validate_result_table_validates_every_element_of_a_list():
     """G1 (docs/stats-tables/spec.md §6) — a runner may attach a LIST of tables, and a ragged table
     in position 2 must fail exactly as loudly as one in position 1. Without this the second table is
     the unguarded one, which is the whole failure mode a result-seam schema exists to stop."""
-    good = {"columns": ["gene", "log2FC"], "rows": [["ACTB", 2.1]]}
-    ragged = {"columns": ["a", "b"], "rows": [["only-one"]]}
+    # Titled, because a multi-table result must title every element (G4 below) — this test is about
+    # raggedness, so it keeps the other rule satisfied rather than tripping it incidentally.
+    good = {"columns": ["gene", "log2FC"], "rows": [["ACTB", 2.1]], "title": "Ranked values"}
+    ragged = {"columns": ["a", "b"], "rows": [["only-one"]], "title": "Pairwise p-values"}
     assert validate_result_table([]) == []
     assert validate_result_table([good, good]) == []
 
@@ -135,6 +137,24 @@ def test_validate_result_table_validates_every_element_of_a_list():
     assert "table 1" in first_bad[0].message
     # A non-dict element is caught too, not silently skipped.
     assert [v.code for v in validate_result_table([good, "not a dict"])] == ["not_a_table"]
+
+
+def test_g4_a_multi_table_runner_must_title_every_table():
+    """G4 — the FE STACKS N tables, so an untitled one is indistinguishable from its neighbour. The
+    presentation and the requirement are the same decision, which is why the rule rides on the COUNT:
+    a lone table's title stays optional (20-odd shipped runners rely on that) and only a list has to
+    name its parts."""
+    titled = {"columns": ["a"], "rows": [[1]], "title": "Ranked values"}
+    untitled = {"columns": ["b"], "rows": [[2]]}
+
+    assert validate_result_table(untitled) == [], "one table's title stays optional"
+    assert validate_result_table([untitled]) == [], "a one-element list is still one table"
+    assert validate_result_table([titled, titled]) == []
+
+    codes = [v.code for v in validate_result_table([titled, untitled], skill_id="lollipop")]
+    assert codes == ["untitled_table"]
+    blank = validate_result_table([titled, {**untitled, "title": "   "}])
+    assert [v.code for v in blank] == ["untitled_table"], "whitespace is not a title"
 
 
 def test_single_table_messages_carry_no_position_prefix():

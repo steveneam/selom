@@ -4,6 +4,7 @@ import { asTables } from "./stats-tables";
 import { figureTables } from "@/lib/lineage/figure-table";
 import type { Figure } from "@/lib/projects/types";
 import type { StatsTable } from "@/lib/skills/api";
+import { mockTable } from "@/mocks/stub-bundle";
 
 /**
  * The frontend half of the multi-table contract (docs/stats-tables/spec.md D1) — the ONE place the
@@ -56,5 +57,35 @@ describe("figureTables", () => {
     expect(figureTables(fig({}))).toEqual([]);
     expect(figureTables(fig({ table: [] }))).toEqual([]);
     expect(figureTables(fig({ spec: { data: [], layout: {} } }))).toEqual([]);
+  });
+});
+
+describe("the dev:mock fixture mirrors the multi-table contract", () => {
+  // A mock that only ever returns one table proves the shape that already worked
+  // [[mock-must-mirror-backend-contract]]. `lollipop` is D4's rank 1 — it computes ranked values
+  // AND, when `pairs=` is set, the p-values behind the stars it draws, and today discards one.
+  it("returns two titled tables for lollipop with pairs= set, one without", () => {
+    const single = asTables(mockTable("lollipop", {}));
+    expect(single).toHaveLength(1);
+    expect(single[0].title).toBe("Ranked values");
+
+    const both = asTables(mockTable("lollipop", { pairs: "WT Control,CMV-GFP" }));
+    expect(both).toHaveLength(2);
+    // G4's frontend mirror: stacked panels are told apart by their titles, so every one must have
+    // a real title — the backend twin is `validate_result_table`'s `untitled_table`.
+    expect(both.every((t) => (t.title ?? "").trim().length > 0)).toBe(true);
+    expect(both.map((t) => t.title)).toEqual(["Ranked values", "Pairwise p-values"]);
+    // Array order is the runner's and carries meaning (D4): the ranked values are primary, and the
+    // pairwise table is the provenance of marks already drawn on the figure.
+    expect(both[1].columns).toContain("adjusted p");
+  });
+
+  it("every mocked table is well-formed — rectangular rows under real columns", () => {
+    for (const id of ["umap_scrna", "deg", "volcano", "pca", "composition", "enrichment", "lollipop"]) {
+      for (const t of asTables(mockTable(id, { pairs: "a,b" }))) {
+        expect(t.columns.length, `${id} has columns`).toBeGreaterThan(0);
+        for (const row of t.rows) expect(row, `${id} row width`).toHaveLength(t.columns.length);
+      }
+    }
   });
 });
