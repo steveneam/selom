@@ -863,6 +863,17 @@ journal's own author guidelines**, not cnsplots.
 
 ### ⚑ Batched for the owner — NEXT WEEK (owner-directed 2026-08-02: "anything that needs me")
 
+- **⇒ THE ONE STRATEGIC CALL, raised 2026-08-05 and UNANSWERED — surface it early, don't default.**
+  **Keep burning down the honesty backlogs, or unblock P-E?** The measured position
+  (`docs/build-plan-2026-08/plan.md` §0–§1): **P-A and P-C are done, P-B/P-D partial, the engine
+  spine P1–P4 is effectively complete, and P5 is data-bound not code-bound.** Roughly ten sessions
+  have gone to a reachability/honesty thread no phase anticipated — it keeps finding real defects
+  (a catalog denying capabilities that ship, compare diffing 1 of N tables, a paragraph citing an
+  engine that never ran), **but it is open-ended (75 knobs · 166 prose waivers · ~23 JTBD) and none
+  of it moves Selom toward being usable by anyone but the owner.** **P-E is the only phase that
+  does, and it is the one blocked on the owner** (Clerk keys + the route split, both below).
+  Recommendation: do `#1(d)` `deg` (the largest remaining gap, and its prose waivers fold into the
+  same spec), then pivot to P-E.
 - **Clerk keys** (publishable + secret + issuer URL) — the only thing blocking P-E's frontend half.
 - **The route split** — does the app move to `/app` so `/` can be public? Recommended in
   `docs/auth-multitenancy/spec.md` D5; **owed to Thalon's landing-page build** and much cheaper
