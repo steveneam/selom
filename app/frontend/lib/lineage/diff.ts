@@ -56,7 +56,7 @@ export interface CellDelta {
 }
 
 export interface RowDelta {
-  /** The first-column value the two tables are aligned on. */
+  /** The row identity the two tables are aligned on ({@link rowKeys}) — never rendered. */
   key: string;
   status: DeltaStatus;
   cells: CellDelta[];
@@ -77,10 +77,43 @@ function emptyLike(t: StatsTable): StatsTable {
   return { columns: t.columns, rows: [], title: t.title };
 }
 
-/** Index a table's rows by their first-column value (last wins on a duplicate key). */
+/** Separator for a generated duplicate key — escaped, never a literal control byte in the source. */
+const DUP = "\u0000";
+
+/**
+ * Row identity across two versions: the first column's value, disambiguated by OCCURRENCE.
+ *
+ * ⚑ The bare first-column value is not a key. A pairwise table's first column is `group A`, so one
+ * control compared against several treatments repeats it on every row — and the previous
+ * `map.set(String(row[0]), row)` let each duplicate overwrite its predecessor, dropping every
+ * earlier row from the diff with no `added`, no `removed` and no trace. A real two-comparison
+ * `lollipop` run rendered ONE row and reported "~1 changed": a confident, specific, wrong number.
+ *
+ * Occurrence is the honest general rule. It aligns the i-th "Control" in A with the i-th "Control"
+ * in B — the only signal available without knowing what a given table's columns MEAN — and it is
+ * byte-identical to the old key whenever the first column is unique, which is every other table
+ * this repo emits (gene, cluster, rank, group). A smarter composite key over the leading string
+ * columns would survive reordering, but it would also report a row whose second column changed as
+ * removed+added rather than changed, which is strictly worse reporting for a real edit.
+ *
+ * The separator is NUL: it cannot occur in a rendered cell, so a genuine label can never collide
+ * with a generated one. The key is React's list key and the alignment handle only — never rendered.
+ */
+function rowKeys(t: StatsTable): string[] {
+  const seen = new Map<string, number>();
+  return t.rows.map((r) => {
+    const label = String(r[0]);
+    const n = seen.get(label) ?? 0;
+    seen.set(label, n + 1);
+    return n === 0 ? label : `${label}${DUP}${n}`;
+  });
+}
+
+/** Index a table's rows by {@link rowKeys}, so a repeated label keeps every one of its rows. */
 function indexRows(t: StatsTable): Map<string, Cell[]> {
+  const keys = rowKeys(t);
   const m = new Map<string, Cell[]>();
-  for (const r of t.rows) m.set(String(r[0]), r);
+  t.rows.forEach((r, i) => m.set(keys[i], r));
   return m;
 }
 
@@ -109,15 +142,12 @@ export function diffTables(
 
   const aRows = indexRows(A);
   const bRows = indexRows(B);
-  // Keys in B order first (the "current" version), then A-only keys in A order.
+  // Keys in B order first (the "current" version), then A-only keys in A order. Both sides use
+  // `rowKeys` — the same occurrence-disambiguated identity the index is built on, so a repeated
+  // label enumerates all of its rows here instead of collapsing to the first one seen.
   const keys: string[] = [];
   const seen = new Set<string>();
-  for (const r of B.rows) {
-    const k = String(r[0]);
-    if (!seen.has(k)) { seen.add(k); keys.push(k); }
-  }
-  for (const r of A.rows) {
-    const k = String(r[0]);
+  for (const k of [...rowKeys(B), ...rowKeys(A)]) {
     if (!seen.has(k)) { seen.add(k); keys.push(k); }
   }
 

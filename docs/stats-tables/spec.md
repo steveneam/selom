@@ -282,6 +282,24 @@ sorts, exports, diffs, and extracts like every other table, which a caption does
 > any new `asTables(…)[0]` outside a named allowlist. **Three of four review lenses found this
 > independently; none of the nine gates could see it, because reading index 0 of an array is
 > perfectly typed.**
+>
+> **Verified in a browser 2026-08-05** — `e2e/browser-verify/compare-tables.spec.ts`, on a real
+> backend and the real ERG corpus: a `lollipop` run with two comparison pairs, swept
+> `correction` none→BH, renders **two** titled diff cards; the ranked table reports *identical* while
+> the pairwise card reports the change. Reaching compare at all needed a new harness capability
+> (`sweepIntoCompare`), because a comparison needs SIBLING figures — running a skill twice makes two
+> unrelated ones, and only the sweep sets `parentFigureId`.
+>
+> **⚑ And proving it found a second silent-underreport in the same surface.** `diffTables` indexed
+> rows by `String(row[0])` into a Map, so a repeated first-column value overwrote its predecessor —
+> no `added`, no `removed`, no trace. That is the NORMAL shape of a pairwise table (`group A`
+> repeats whenever one control is compared against several treatments): the real two-pair run
+> rendered **one** row and reported *"~1 changed"*, a confident, specific, wrong number. Rows are now
+> keyed by first-column value **disambiguated by occurrence** — byte-identical to the old key
+> whenever that column is unique, which is every other table this repo emits (gene · cluster · rank ·
+> group), and never a dropped row. **Note why the unit pins missed it: every fixture in
+> `diff.test.ts` used a unique first column — including the pairwise one, which had a single row.
+> The tests used the one shape that cannot exhibit the defect.** Both directions are pinned now.
 
 ### D5 — the legend and the caption read the **first** table
 

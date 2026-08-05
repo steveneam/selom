@@ -403,6 +403,94 @@ export async function runFromWorkbench(
   return projectId;
 }
 
+/**
+ * Wait until a value stops changing, then return it.
+ *
+ * The sweep form RE-SUGGESTS its values whenever the chosen parameter changes (a `useEffect` on
+ * `param`), so a `fill()` issued before that effect lands is silently overwritten by the suggestion.
+ * That is the same class as `clickWhenLive`'s hydration wait — a React state the DOM does not
+ * expose — so it is waited for, not slept through, and the caller asserts on the result afterwards.
+ */
+async function settleValue(page: Page, field: Locator, tries = 30): Promise<string> {
+  let last: string | null = null;
+  for (let i = 0; i < tries; i++) {
+    const now = await field.inputValue();
+    if (now === last) return now;
+    last = now;
+    await page.waitForTimeout(100);
+  }
+  return last ?? "";
+}
+
+/**
+ * Fork the open figure into a VERSION FAMILY by sweeping one parameter, and land in compare.
+ *
+ * ⚑ WHY THIS IS A FIXTURE AND NOT A FEW LINES IN ONE SPEC. Compare is the one editor surface no
+ * browser check could reach, because reaching it needs something no other fixture produces: two
+ * figures that are *siblings*. `runFromWorkbench` twice makes two unrelated figures — a variant
+ * needs `parentFigureId`, and the only user path that sets it is the sweep (or a re-run). So the
+ * whole compare surface — the version pickers, the parameter diff, the per-table diffs — sat
+ * unobserved, and that is exactly where the milestone review found a defect four independent lenses
+ * caught and nine gates could not: `figureTables(a)[0]`, one table compared under a card announcing
+ * "The results tables are identical". Reading index 0 of an array is perfectly typed.
+ *
+ * The postcondition is the compare view itself, which is why it is not called `sweep…`:
+ * `runSweep` sets the compare family to the N siblings it just saved and switches the view, so on
+ * return version A is the first swept value and version B the last — in declaration order.
+ *
+ * Values are typed into the real control and the summary line is asserted before Run, so a fixture
+ * that silently swept the SUGGESTED values (all three corrections, not the two asked for) fails
+ * here rather than producing a family that quietly answers a different question.
+ */
+export async function sweepIntoCompare(
+  page: Page,
+  {
+    /** The parameter's own label, as the user reads it in the select — e.g. "Rank by". */
+    param,
+    /** Two or more values; the form refuses fewer, and one version is not a comparison. */
+    values,
+  }: { param: string; values: string[] },
+) {
+  expect(values.length, "a sweep needs at least two values to make a family").toBeGreaterThanOrEqual(2);
+
+  await page.getByRole("button", { name: "Sweep", exact: true }).click();
+  // ⚑ BY ROLE + ACCESSIBLE NAME, not `getByLabel`. The sweep form wraps its `<select>` in a
+  // `<label>`, and Playwright's getByLabel matches on the label's TEXT CONTENT — which for a
+  // wrapping label includes the select's own `<option>` text ("ParameterCategory columnValue
+  // column…"), so an exact match finds nothing. The accessibility name is correctly "Parameter"
+  // (accname excludes the embedded control), so the a11y tree is both the accurate query and the
+  // one that asserts what a screen reader actually announces.
+  const paramSelect = page.getByRole("combobox", { name: "Parameter", exact: true });
+  await expect(paramSelect, "the version bar's Sweep did not open the form").toBeVisible({
+    timeout: 30_000,
+  });
+  await paramSelect.selectOption({ label: param });
+
+  const valuesInput = page.getByRole("textbox", { name: /^Values/ });
+  await settleValue(page, valuesInput); // let the re-suggest effect land before overwriting it
+  await valuesInput.fill(values.join(", "));
+
+  // The form's own preview of what it is about to run. Asserting it means a swallowed fill, a value
+  // the parser rejected, or a duplicate collapsed by `parseValues` fails HERE, naming the values —
+  // rather than in the diff, where it would read as a product defect.
+  await expect(
+    page.getByText(`→ ${values.length} versions: ${values.join(", ")}`),
+    `the sweep form did not accept "${values.join(", ")}" for "${param}"`,
+  ).toBeVisible({ timeout: 15_000 });
+
+  await page.getByRole("button", { name: "Run sweep" }).click();
+
+  // N real runs, sequentially, then the view switches itself. The heading is the postcondition.
+  await expect(
+    page.getByRole("heading", { name: "Compare versions" }),
+    "the sweep did not land in the compare view — a run failed, or fewer than 2 versions were saved",
+  ).toBeVisible({ timeout: 300_000 });
+  await expect(page.locator(".js-plotly-plot"), "both versions render their figure").toHaveCount(2, {
+    timeout: 60_000,
+  });
+  await settle(page);
+}
+
 /** The D-5 measurement, verbatim from the Lane 3 wrap, returned as data instead of console output. */
 export async function measureStage(page: Page): Promise<StageGeometry> {
   return page.evaluate(() => {

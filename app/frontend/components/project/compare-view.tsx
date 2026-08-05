@@ -167,6 +167,9 @@ function TableDiffCard({ title, diff }: { title: string; diff: NonNullable<Retur
   return (
     <DiffCard
       title={title}
+      // Distinct from the Parameters card's testid so a check can COUNT the table cards — which is
+      // the whole of the fix: one card per table pair, where there used to be one card, full stop.
+      testId="table-diff-card"
       summary={<DiffSummary added={diff.added} removed={diff.removed} changed={diff.changed} />}
     >
       {changedRows.length === 0 ? (
@@ -319,9 +322,19 @@ function VersionPicker({
   );
 }
 
-function DiffCard({ title, summary, children }: { title: string; summary?: React.ReactNode; children: React.ReactNode }) {
+function DiffCard({
+  title,
+  summary,
+  testId = "diff-card",
+  children,
+}: {
+  title: string;
+  summary?: React.ReactNode;
+  testId?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="rounded-xl border border-border bg-card/40">
+    <div className="rounded-xl border border-border bg-card/40" data-testid={testId}>
       <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
         <span className="text-xs font-semibold text-foreground">{title}</span>
         {summary}

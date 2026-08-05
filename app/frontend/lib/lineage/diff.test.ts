@@ -87,6 +87,49 @@ describe("diffTables", () => {
     expect(diffTables(null, TA)!.added).toBe(3);
     expect(diffTables(TA, null)!.removed).toBe(3);
   });
+
+  /**
+   * ⚑ A REPEATED first-column value must not swallow the rows above it.
+   *
+   * Rows were indexed by `String(row[0])` into a Map, so a duplicate key overwrote its predecessor
+   * and every earlier row vanished from the diff — no `added`, no `removed`, no trace. That is not
+   * an exotic shape: it is the NORMAL shape of a pairwise table, whose first column is `group A`,
+   * whenever one control is compared against several treatments.
+   *
+   * Found in the browser, not here, and the reason is worth keeping: the unit fixtures above all use
+   * a UNIQUE first column (gene, cluster, a single pair), which is precisely the shape that cannot
+   * exhibit the bug. The real `lollipop` run had two comparisons sharing "Control", and compare
+   * rendered ONE row while announcing "~1 changed" — a confident, specific, wrong number.
+   */
+  it("keeps every row when the first column repeats — one control, several treatments", () => {
+    const a: StatsTable = {
+      columns: ["group A", "group B", "p"],
+      rows: [["Control", "Drug", 0.04], ["Control", "Vehicle", 0.6]],
+    };
+    const b: StatsTable = {
+      columns: ["group A", "group B", "p"],
+      rows: [["Control", "Drug", 0.08], ["Control", "Vehicle", 0.6]],
+    };
+    const diff = diffTables(a, b)!;
+    expect(diff.rows, "both comparisons survive the alignment").toHaveLength(2);
+    expect(diff.added).toBe(0);
+    expect(diff.removed).toBe(0);
+    // Aligned in order, so the change is attributed to the pair that actually moved.
+    expect(diff.changed).toBe(1);
+    const moved = diff.rows.find((r) => r.status === "changed")!;
+    expect(moved.cells.find((c) => c.column === "group B")!.b).toBe("Drug");
+    expect(moved.cells.find((c) => c.column === "p")!.a).toBe(0.04);
+    expect(moved.cells.find((c) => c.column === "p")!.b).toBe(0.08);
+  });
+
+  it("a duplicate row ADDED on one side is reported, not absorbed", () => {
+    const a: StatsTable = { columns: ["g", "p"], rows: [["Control", 0.04]] };
+    const b: StatsTable = { columns: ["g", "p"], rows: [["Control", 0.04], ["Control", 0.5]] };
+    const diff = diffTables(a, b)!;
+    expect(diff.rows).toHaveLength(2);
+    expect(diff.added, "the second Control row is new in B").toBe(1);
+    expect(diff.changed).toBe(0);
+  });
 });
 
 describe("pairTableDiffs", () => {
