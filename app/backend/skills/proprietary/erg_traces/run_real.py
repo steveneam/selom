@@ -45,7 +45,11 @@ def run(data_path: str, params: dict) -> dict:
     # Landmark mode for the a/b table: cone (photopic) windows when the data/param says photopic,
     # else scotopic. `adapt` reflects the stimulus_type filter when that column is present; else fall
     # back to the user's adaptation/stimulus_type hint (a plain waveform CSV with no such column).
-    metric_mode = adapt or _erg.adaptation_mode(params.get("adaptation", "auto"), params.get("stimulus_type", ""))
+    # The adaptation this figure CLAIMS (title + methods paragraph) — and, here, the landmark mode.
+    # Under `adaptation="auto"` it is resolved from the DATA, which no parameter can tell the prose,
+    # so it is recorded below when it differs from the param-derived answer (default run unchanged).
+    param_mode = _erg.adaptation_mode(params.get("adaptation", "auto"), params.get("stimulus_type", ""))
+    metric_mode = adapt or param_mode
     # Operator-set landmark marks (docs/records/erg-manual-marks/spec.md). The trace grid is the primary
     # authoring surface: a per-panel mark is keyed by (condition, "", intensity_group, "") — empty
     # stimulus/eye, so it also drives the per-eye bar + intensity-response via the wildcard match.
@@ -235,13 +239,13 @@ def run(data_path: str, params: dict) -> dict:
     n_lo, n_hi = (min(n_seen), max(n_seen)) if n_seen else (0, 0)
     n_txt = f"n={n_lo}" if n_lo == n_hi else f"n={n_lo}–{n_hi}"
     if central == "mean":
-        title = f"Mean {adapt or 'scotopic'} ERG (± {_erg.ERR_LABEL.get(error, 'SEM')}, {n_txt})"
+        title = f"Mean {metric_mode} ERG (± {_erg.ERR_LABEL.get(error, 'SEM')}, {n_txt})"
         tbl_title = "ERG a/b-wave (means)"
     elif central == "none":
-        title = f"Individual {adapt or 'scotopic'} ERG traces ({n_txt})"
+        title = f"Individual {metric_mode} ERG traces ({n_txt})"
         tbl_title = "ERG a/b-wave (cohort mean)"
     else:
-        title = f"Representative {adapt or 'scotopic'} ERG"
+        title = f"Representative {metric_mode} ERG"
         tbl_title = "ERG a/b-wave (representatives)"
 
     spec = grid_spec(
@@ -261,6 +265,8 @@ def run(data_path: str, params: dict) -> dict:
     ab_meta = _erg.detector_summary(lm_log)
     if ab_meta is not None:
         spec["layout"].setdefault("meta", {})["ab_detector"] = ab_meta
+    if metric_mode != param_mode:
+        spec["layout"].setdefault("meta", {})["adaptation"] = metric_mode
     cols = ["condition", "intensity (log cd·s/m²)", f"b-wave ({unit})", f"a-wave ({unit})",
             "b-wave t (ms)"] + _inner_retinal_columns(show_ops, show_phnr, unit)
     spec["table"] = table(

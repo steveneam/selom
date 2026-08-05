@@ -12,7 +12,7 @@ attribution sentence and returns ``{"text", "citations"}``.
 
 from __future__ import annotations
 
-from skills import _erg
+from skills import _erg, _stats
 from skills._engine import to_bool
 from skills.contract import SkillSpec, resolved_params
 
@@ -113,13 +113,48 @@ def _cluster(p: dict):
     return text, [SCANPY, LEIDEN, SILHOUETTE]
 
 
+def _grouping_phrase(p: dict, requested: str) -> str:
+    """The grouping a figure was ACTUALLY drawn by.
+
+    ``violin`` (and its siblings) fall back to clustering the cells themselves when the requested
+    ``groupby`` column is absent from the data, and then group by Leiden. The figure discloses the
+    substitution in its title and axis; the paragraph named the column the user asked for. Whether
+    the fallback fired is a fact about the DATA, so the runner records it (``layout.meta.clustered``,
+    lifted by ``build_body``) — and that record is also the only place the ``resolution`` that
+    produced those clusters appears.
+    """
+    c = p.get("_clustered")
+    if not isinstance(c, dict):
+        return f"grouped by {requested}"
+    res = c.get("resolution")
+    at = f" at resolution {float(res):g}" if isinstance(res, (int, float)) else ""
+    asked = str(c.get("requested") or "").strip()
+    instead = (f" — the requested '{asked}' was not present in the data" if asked
+               and asked != "leiden" else "")
+    return f"grouped by Leiden clusters computed on the data{at}{instead}"
+
+
 def _violin(p: dict):
     gene = p.get("gene") or "the selected marker gene"
+    # `normalize=False` skips both `normalize_total` and `log1p` — the paragraph (and, until this
+    # change, the figure's own value axis) called the plotted values log1p-normalized regardless.
+    scale = ("log1p-normalized" if to_bool(p.get("normalize", True))
+             else "already-normalized (no further scaling applied)")
     text = (
-        f"Per-group expression of {gene} was visualized as log1p-normalized violin "
-        f"distributions grouped by {p['groupby']} (Scanpy)."
+        f"Per-group expression of {gene} was visualized as {scale} violin "
+        f"distributions {_grouping_phrase(p, str(p['groupby']))} (Scanpy)."
     )
-    citations = [SCANPY]
+    # The category order, the n= labels and the significance brackets are the same vocabulary
+    # `boxplot` uses (`skills._stats`) — and the stars were drawn with no test named anywhere.
+    named = [s.strip() for s in str(p.get("order") or "").split(",") if s.strip()]
+    if named:
+        text += (f" {', '.join(named)} lead in that order, with the remaining groups in the order "
+                 "they occur in the data.")
+    if to_bool(p.get("add_count", False)):
+        text += " Each group label carries its n."
+    sig, sig_cites = _pairwise_prose(p.get("pairs"), p.get("sig_test"), p.get("correction"))
+    text += sig
+    citations = [SCANPY] + sig_cites
     if str(p.get("annotate") or "none").lower() == "pubmed":
         context = str(p.get("context") or "").strip()
         scope = f" co-occurring with '{context}'" if context else ""
@@ -246,8 +281,12 @@ def _pathway(p: dict):
 
 def _markers(p: dict):
     scaled = " (scaled to [0,1] per gene)" if p.get("standard_scale", True) else ""
+    # `normalize=False` skips both `normalize_total` and `log1p`, so the values the dot colour
+    # encodes are the supplied ones — "mean log1p expression" described a transform that was
+    # skipped, and the same word is in the legend and on the colour-bar label.
+    scale = "log1p" if to_bool(p.get("normalize", True)) else "supplied"
     dotplot = (
-        "Expression is summarized as a dotplot in which colour encodes the mean log1p "
+        f"Expression is summarized as a dotplot in which colour encodes the mean {scale} "
         f"expression within each group{scaled} and dot size encodes the fraction of cells "
         "expressing the gene."
     )
@@ -529,6 +568,20 @@ def _string_network(p: dict):
     return text, [STRING]
 
 
+# How the run filled its dropouts — the choice that MOVES a proteomics fold-change further than the
+# choice of test does, and which the paragraph asserted as "mean-imputed" on every run.
+_IMPUTE_PHRASE = {
+    "mean": ("residual missing values imputed within each group at the protein's observed group "
+             "mean, which biases genuinely missing-not-at-random dropouts toward no change"),
+    "mindet": ("residual missing values imputed per sample from the 1st percentile of that "
+               "sample's observed intensities, a deterministic detection-limit proxy for "
+               "missing-not-at-random dropouts"),
+    "minprob": ("residual missing values imputed per sample by a downshifted-normal draw (mean "
+                "− 1.8 SD, width 0.3 SD; seeded, so the run is reproducible), the Perseus "
+                "left-censored treatment for missing-not-at-random dropouts"),
+}
+
+
 def _proteomics_de(p: dict):
     moderated = str(p.get("stats") or "welch").lower() == "moderated"
     test = (
@@ -537,13 +590,25 @@ def _proteomics_de(p: dict):
         "sample sizes"
         if moderated else "a Welch (unequal-variance) t-test"
     )
+    # `log_input` means the intensities ARRIVED on a log scale and the runner does NOT transform
+    # them — the paragraph opened by claiming a log2 transform that had not happened.
+    prep = ("Protein intensities were taken as already log-scaled and median-normalized across "
+            "samples" if to_bool(p.get("log_input", False)) else
+            "Protein intensities were log2-transformed and median-normalized across samples")
+    a, b = str(p.get("group_a") or "").strip(), str(p.get("group_b") or "").strip()
+    # Which two groups: the contrast is the whole claim, and "the two groups" names neither.
+    between = (f"between the sample groups matching '{a}' and '{b}'" if a and b
+               else "between the two sample groups")
+    impute = _IMPUTE_PHRASE.get(str(p.get("missing") or "mean").strip().lower(),
+                                _IMPUTE_PHRASE["mean"])
     text = (
-        "Protein intensities were log2-transformed and median-normalized across samples; proteins "
+        f"{prep}; proteins "
         f"quantified in at least {float(p.get('min_valid', 0.5)):g} of the samples per group were "
-        f"tested for differential abundance between the two groups with {test}, with residual "
-        "missing values mean-imputed within each group. P-values were corrected by the "
-        f"Benjamini-Hochberg procedure and the result drawn as a volcano (|log2FC| ≥ "
-        f"{float(p.get('fc_threshold', 1.0)):g}, FDR ≤ {float(p.get('fdr_threshold', 0.05)):g})."
+        f"tested for differential abundance {between} with {test}, with {impute}. P-values were "
+        f"corrected by the Benjamini-Hochberg procedure and the result drawn as a volcano "
+        f"(|log2FC| ≥ {float(p.get('fc_threshold', 1.0)):g}, FDR ≤ "
+        f"{float(p.get('fdr_threshold', 0.05)):g}), with the top "
+        f"{int(p.get('top_n', 10) or 0)} by significance labelled."
     )
     return text, ([SMYTH, BH, SCIPY] if moderated else [BH, SCIPY])
 
@@ -625,31 +690,13 @@ def _boxplot(p: dict):
     # The pairwise sentence is emitted ONLY when a comparison was actually requested — the stars are
     # a published claim, so the test behind them and any multiplicity correction have to be named
     # rather than left to the Statistics table alone.
-    pairs = str(p.get("pairs") or "").strip()
-    if pairs:
-        label = {"welch": "Welch's t-test (unequal variances)",
-                 "student": "Student's t-test (equal variances)",
-                 "mannwhitney": "the Mann-Whitney U test",
-                 "mwu": "the Mann-Whitney U test",
-                 "u": "the Mann-Whitney U test"}.get(
-                     str(p.get("sig_test", "welch")).strip().lower(), "Welch's t-test")
-        adjust = {"bonferroni": " p-values were adjusted for multiple comparisons using the "
-                                "Bonferroni correction",
-                  "bh": " p-values were adjusted for multiple comparisons using the "
-                        "Benjamini-Hochberg procedure"}.get(
-                      str(p.get("correction", "none")).strip().lower(),
-                      " p-values are uncorrected for multiple comparisons")
-        text += (f" Named pairs of groups were compared with {label}, and significance brackets "
-                 f"drawn on the figure;{adjust}.")
-        # The citations follow the CLAIMS, not the skill. A paragraph that names a statistical test
-        # and the Benjamini-Hochberg procedure and then cites nothing is the same printed-vs-computed
-        # gap in the bibliography that the prose↔param guard closes in the prose: the reader is given
-        # a method they cannot look up. Emitted only inside `if pairs:`, because a box plot that
-        # tested nothing owes no reference.
-        cites.append(SCIPY)
-        if str(p.get("correction", "none")).strip().lower() == "bh":
-            cites.append(BH)
-    return text, cites
+    # The citations follow the CLAIMS, not the skill. A paragraph that names a statistical test and
+    # the Benjamini-Hochberg procedure and then cites nothing is the same printed-vs-computed gap in
+    # the bibliography that the prose↔param guard closes in the prose: the reader is given a method
+    # they cannot look up. `_pairwise_prose` returns ("", []) when no pair was named, because a box
+    # plot that tested nothing owes no reference.
+    sentence, sig_cites = _pairwise_prose(p.get("pairs"), p.get("sig_test"), p.get("correction"))
+    return text + sentence, cites + sig_cites
 
 
 def _gsea(p: dict):
@@ -747,9 +794,113 @@ def _cepo(p: dict):
 
 
 def _erg_adaptation(p: dict) -> str:
-    """Resolve the recording adaptation for the methods wording — ``auto`` reads as scotopic
-    (the default dark-adapted ERG). Mirrors ``_erg.resolve_flash_mode``'s hint."""
-    return "photopic" if str(p.get("adaptation", "auto")).strip().lower() == "photopic" else "scotopic"
+    """Resolve the recording adaptation for the methods wording.
+
+    Two things this used to get wrong, both of which put the WRONG WORD in the first sentence of
+    an ERG methods paragraph — the one that says whether the reader is looking at rod or cone
+    physiology:
+
+    * it read ``adaptation`` only, but every ERG runner resolves the flash mode through
+      ``_erg.resolve_flash_mode``, where an explicit ``stimulus_type`` **wins** over the friendly
+      hint. A figure run with ``stimulus_type="photopic_flash"`` and the default ``adaptation="auto"``
+      is photopic, and the prose called it scotopic.
+    * with ``adaptation="auto"`` the mode is a fact about the DATA (the first of scotopic→photopic
+      actually present in the export), which no parameter can tell you. So the runner records what
+      it resolved in ``layout.meta.adaptation`` and ``build_body`` lifts it — the ``_significance``
+      pattern. Absent (litsynth replaying from recorded params alone) we fall back to the
+      param-derived answer, which is exact whenever either knob was set explicitly.
+    """
+    recorded = str(p.get("_adaptation") or "").strip().lower()
+    if recorded in ("scotopic", "photopic"):
+        return recorded
+    return _erg.adaptation_mode(p.get("adaptation", "auto"), p.get("stimulus_type", ""))
+
+
+def _erg_manual_marks(p: dict, device_may_win: bool = False) -> str:
+    """The sentence that discloses OPERATOR-SET landmark times (erg-manual-marks R6).
+
+    A manual mark moves the time at which the a-/b- (or N1/P1) landmark is read, and the runner
+    RE-MEASURES the amplitude there — so the numbers on the figure are not the ones the automatic
+    window produced. That is a provenance fact of the same weight as ``ab_detector``, and the
+    paragraph described the automatic construction as if it were the whole story.
+
+    ``device_may_win`` is the honest qualifier for the two skills where a supplied device-metrics
+    table outranks the marks (``erg_bwave_bar`` / ``erg_intensity_response`` apply them only on the
+    measure-from-traces path); stating the rule keeps the sentence true under both inputs rather
+    than inventing a second printed-vs-computed gap while closing one.
+    """
+    marks = _erg.parse_manual_marks(p.get("manual_marks", ""))
+    if not marks:
+        return ""
+    n = len(marks)
+    scope = (" where amplitudes were measured from the traces (device markers, when the input "
+             "carries them, remain authoritative)" if device_may_win else "")
+    return (f" Landmark times were set by the operator for {n} segment(s) rather than taken from "
+            f"the automatic window, and the amplitudes re-measured at those times{scope}.")
+
+
+# What an error bar MEANS. `_charts.ERR_LABEL` is the figure-side abbreviation ("SEM"); this is its
+# prose half, and the two must agree or the paragraph and the axis label describe different numbers.
+_SPREAD_PHRASE = {
+    "sem": "the standard error of the mean",
+    "sd": "the standard deviation",
+    "ci95": "a 95% confidence interval",
+    "minmax": "the range from minimum to maximum",
+}
+
+
+def _spread_phrase(error) -> str:
+    """``error`` → the phrase naming what the bar/band spans. Defaults to SEM, matching every
+    runner's own default, so a paragraph never silently promotes an SD bar to a standard error."""
+    return _SPREAD_PHRASE.get(str(error or "sem").strip().lower(), _SPREAD_PHRASE["sem"])
+
+
+# The statistical vocabulary shared by every skill that draws significance brackets. One home: the
+# figure gets its stars from `_stats.test_pairs`, and this is the sentence describing that same
+# call — `boxplot` and `erg_bwave_bar` name the identical tests and corrections.
+_SIG_TEST_LABEL = {
+    "welch": "Welch's t-test (unequal variances)",
+    "student": "Student's t-test (equal variances)",
+    "mannwhitney": "the Mann-Whitney U test",
+    "mwu": "the Mann-Whitney U test",
+    "u": "the Mann-Whitney U test",
+}
+_CORRECTION_CLAUSE = {
+    "bonferroni": " p-values were adjusted for multiple comparisons using the Bonferroni correction",
+    "bh": " p-values were adjusted for multiple comparisons using the Benjamini-Hochberg procedure",
+}
+
+
+def _pairwise_prose(raw_pairs, sig_test, correction, *, subject: str = "groups"):
+    """``(sentence, citations)`` for a figure's significance brackets — ``("", [])`` when no
+    comparison was asked for, because a figure that tested nothing owes no test and no reference.
+
+    Two claims are made conditional here. The **test** and the **multiplicity correction** are named
+    because the stars are a published claim and silence about multiplicity reads as "corrected". And
+    a pair carrying an OVERRIDE (``"A~B:**"`` / ``"A~B:0.003"``) was **not** computed by that test —
+    the operator supplied the star — so the sentence says which pairs Selom actually tested rather
+    than crediting the named test with all of them.
+    """
+    pairs = _stats.parse_pairs(raw_pairs)
+    if not pairs:
+        return "", []
+    label = _SIG_TEST_LABEL.get(str(sig_test or "welch").strip().lower(), _SIG_TEST_LABEL["welch"])
+    corr = str(correction or "none").strip().lower()
+    adjust = _CORRECTION_CLAUSE.get(corr, " p-values are uncorrected for multiple comparisons")
+    n_over = sum(1 for _a, _b, override in pairs if override)
+    if n_over == len(pairs):
+        # Nothing was computed — naming a test here would credit it with every star on the figure,
+        # and citing SciPy would point the reader at software that never ran for this claim.
+        return (f" Significance brackets were drawn for {len(pairs)} named pair(s) of {subject} "
+                f"from operator-supplied values; no test was computed for them."), []
+    cites = [SCIPY] + ([BH] if corr == "bh" else [])
+    if n_over:
+        return (f" Significance brackets were drawn for {len(pairs)} named pair(s) of {subject}, of "
+                f"which {n_over} show operator-supplied values rather than a computed test; the "
+                f"remaining {len(pairs) - n_over} pair(s) were compared with "
+                f"{label};{adjust}."), cites
+    return (f" Named pairs of {subject} were compared with {label}, and significance brackets "
+            f"drawn on the figure;{adjust}."), cites
 
 
 def _erg_ab_detector(p: dict) -> str:
@@ -827,6 +978,47 @@ def _truthy(v) -> bool:
     return str(v).strip().lower() not in ("", "false", "0", "no", "none")
 
 
+def _erg_central(p: dict) -> str:
+    """What each panel's drawn trace IS — the claim ``central`` decides and the paragraph used to
+    make unconditionally.
+
+    The original text said "a single representative eye is shown … representatives are labelled as
+    such **rather than shown as group means**". ``central="mean"`` averages the n recordings at each
+    time point and titles the figure "Mean … ERG", so the methods paragraph contradicted the figure's
+    own title; ``central="none"`` draws every replicate at equal weight and shows no exemplar at all.
+
+    The spread overlay travels with the mean branch for the same reason: a shaded band is a
+    quantitative claim, and which quantity it spans (``error``) is nowhere else in the figure.
+    """
+    central = str(p.get("central", "representative")).strip().lower()
+    if central == "mean":
+        spread = str(p.get("spread", "band")).strip().lower()
+        drawn = {
+            "band": f"a shaded band spanning {_spread_phrase(p.get('error'))}",
+            "error_bars": f"error bars spanning {_spread_phrase(p.get('error'))}",
+            "both": (f"a shaded band and error bars, each spanning "
+                     f"{_spread_phrase(p.get('error'))}"),
+            "individual": "the contributing recordings overlaid faintly behind it",
+        }.get(spread, "")
+        # band/error_bars need n>=2 or the runner degrades to the bare mean line, so the claim is
+        # made as "where more than one recording contributed" rather than unconditionally.
+        overlay = (f", with {drawn} where more than one recording contributed"
+                   if drawn and spread != "individual" else (f", with {drawn}" if drawn else ""))
+        return ("For each condition and flash step the recordings were averaged point-by-point into "
+                f"a mean trace{overlay}; cataractous or failed-acquisition eyes were excluded.")
+    if central == "none":
+        return ("For each condition and flash step every contributing recording is drawn at equal "
+                "weight, with no averaged trace; cataractous or failed-acquisition eyes were "
+                "excluded. The a/b-wave table reports the cohort mean.")
+    role = str(p.get("role", "representative")).strip()
+    named = f" (the rows marked '{role}')" if role and role != "representative" else ""
+    return ("For each condition a single representative eye is shown"
+            f"{named}, selected as the eye whose full amplitude-versus-intensity series lay closest "
+            "(minimum sum-of-squared deviations) to its group mean; cataractous or "
+            "failed-acquisition eyes were excluded, and representatives are labelled as such rather "
+            "than shown as group means.")
+
+
 def _erg_traces(p: dict):
     filtered = str(p.get("filter", True)).lower() not in ("false", "0", "no")
     lp = float(p.get("lowpass_hz", 120.0) or 120.0)
@@ -835,12 +1027,7 @@ def _erg_traces(p: dict):
         f"low-pass filtered at {lp:g} Hz while preserving the oscillatory potentials; "
         if filtered else ""
     )
-    representative = (
-        "For each condition a single representative eye is shown, selected as the eye whose full "
-        "amplitude-versus-intensity series lay closest (minimum sum-of-squared deviations) to its "
-        "group mean; cataractous or failed-acquisition eyes were excluded, and representatives are "
-        "labelled as such rather than shown as group means."
-    )
+    representative = _erg_central(p) + _erg_manual_marks(p)
     if _erg_adaptation(p) == "photopic":
         text = (
             "Full-field photopic (cone-driven) electroretinograms were recorded after light "
@@ -863,37 +1050,91 @@ def _erg_traces(p: dict):
     return text, [ISCEV]
 
 
+def _wave_label(col: str) -> str:
+    """Value column → the landmark it names. Takes the resolved COLUMN rather than the params dict
+    because ``wave`` exists on the bar and not on the intensity-response curve, and each template
+    must reference only its own skill's vocabulary (the first guard is exact in that direction)."""
+    return {"a_wave_uv": "a-wave", "b_wave_uv": "b-wave"}.get(str(col).strip(), str(col).strip())
+
+
 def _erg_bwave_bar(p: dict):
     mode = _erg_adaptation(p)
+    # Which measurement is plotted: `wave` selects a/b and `value_col` overrides it outright (empty
+    # = derive from `wave`), exactly as the runner resolves it. The paragraph said "b-wave"
+    # unconditionally, so an a-wave figure — one the parameter panel offers — shipped with prose
+    # naming the other landmark entirely.
+    wave_sel = "a" if str(p.get("wave", "b")).strip().lower() == "a" else "b"
+    wave = _wave_label(str(p.get("value_col") or "").strip() or f"{wave_sel}_wave_uv")
+    # `wave`/`value_col` decide WHICH landmark; a-wave is measured from baseline to the initial
+    # cornea-negative trough, b-wave trough-to-peak — two different constructions, so the sentence
+    # describing the measurement follows the same switch as the label.
+    how = ("from the pre-stimulus baseline to the initial cornea-negative trough"
+           if wave == "a-wave" else
+           "as the trough-to-peak b-wave" if wave == "b-wave" else f"as {wave}")
+    step = str(p.get("intensity_group") or "").strip()
+    at = f" at flash step {step}" if step else " at a single flash intensity"
+    # `show_error` can remove the error bar entirely and `error` decides what it spans — the
+    # paragraph claimed a standard error on every run, including the ones that draw no bar at all.
+    spread = (f" with {_spread_phrase(p.get('error'))}"
+              if to_bool(p.get("show_error", True)) else " and no error bar")
+    points = (", and every eye is overlaid as an individual data point"
+              if to_bool(p.get("points", True)) else ", without the individual eyes overlaid")
+    sig, cites = _pairwise_prose(p.get("comparisons"), p.get("sig_test"), p.get("correction"),
+                                 subject="conditions")
     text = (
-        f"Peak {mode} b-wave amplitudes at a single flash intensity were compared across conditions. "
-        "Each bar shows the group mean with the standard error of the mean, and every eye is overlaid "
-        "as an individual data point. Amplitudes were measured as the trough-to-peak b-wave on "
+        f"Peak {mode} {wave} amplitudes{at} were compared across conditions. "
+        f"Each bar shows the group mean{spread}{points}. Amplitudes were measured {how} on "
         "baseline-corrected, intensity-averaged traces; cataractous or failed-acquisition eyes were "
-        f"excluded.{_erg_ab_detector(p)}"
+        f"excluded.{_erg_ab_detector(p)}{_erg_manual_marks(p, True)}{sig}"
     )
-    return text, [ISCEV]
+    return text, [ISCEV] + cites
 
 
 def _erg_intensity_response(p: dict):
     mode = _erg_adaptation(p)
-    slope = float(p.get("nr_slope", 0.0) or 0.0)
-    if slope > 0:
-        slope_txt = (f"the slope n was fixed at {slope:g} and Vmax and K were estimated")
-    else:
-        slope_txt = (
-            "Vmax, K and the slope n were estimated where the data constrained the slope; for a "
-            "responder whose slope was under-constrained, n was fixed at a physiological value (1.0)"
-        )
+    # `value_col` is this skill's whole measurement selector (there is no `wave` knob) — its default
+    # is the b-wave, but a run against `a_wave_uv` was described as a b-wave curve.
+    wave = _wave_label(str(p.get("value_col") or "b_wave_uv"))
+    # `spread` decides whether any spread is DRAWN and `error` decides what it spans; the paragraph
+    # promised "mean ± standard error" on every run, including `spread="none"` (a bare mean curve)
+    # and `error="sd"` (a wider bar the reader would have read as a standard error).
+    spread = str(p.get("spread", "error_bars")).strip().lower()
+    shown = {"error_bars": "error bars", "band": "a shaded band",
+             "both": "error bars and a shaded band"}.get(spread)
+    spread_txt = (f" (mean per condition, with {shown} spanning {_spread_phrase(p.get('error'))})"
+                  if shown else " (mean per condition, with no spread drawn)")
     text = (
-        f"{mode.capitalize()} b-wave amplitude was plotted against flash intensity for each condition "
-        "(mean ± standard error across eyes). The intensity-response relationship was fit per "
-        "condition with the Naka-Rushton function V = Vmax·Iⁿ/(Iⁿ + Kⁿ), where I is flash energy, "
-        f"Vmax the saturated amplitude, K the semi-saturation intensity and n the slope; {slope_txt} "
-        "by bounded non-linear least-squares regression (SciPy). Conditions whose response did not "
-        f"support a saturating fit were left unfit.{_erg_ab_detector(p)}"
+        f"{mode.capitalize()} {wave} amplitude was plotted against flash intensity for each "
+        f"condition{spread_txt}."
     )
-    return text, [ISCEV, NAKA_RUSHTON, SCIPY]
+    cites = [ISCEV]
+    # `fit=False` runs the whole skill with NO curve fitting — every word of the Naka-Rushton
+    # paragraph, and both of its citations, described a model that never ran.
+    if to_bool(p.get("fit", True)):
+        slope = float(p.get("nr_slope", 0.0) or 0.0)
+        if slope > 0:
+            slope_txt = (f"the slope n was fixed at {slope:g} and Vmax and K were estimated")
+        else:
+            slope_txt = (
+                "Vmax, K and the slope n were estimated where the data constrained the slope; for a "
+                "responder whose slope was under-constrained, n was fixed at a physiological value "
+                "(1.0)"
+            )
+        # "did not support a saturating fit" IS the `min_r2` threshold — the one number a reader
+        # needs to know which conditions were dropped from the fit and why.
+        min_r2 = float(p.get("min_r2", 0.3) or 0.0)
+        text += (
+            " The intensity-response relationship was fit per condition with the Naka-Rushton "
+            "function V = Vmax·Iⁿ/(Iⁿ + Kⁿ), where I is flash energy, Vmax the saturated amplitude, "
+            f"K the semi-saturation intensity and n the slope; {slope_txt} by bounded non-linear "
+            "least-squares regression (SciPy). Conditions whose best fit did not reach R² ≥ "
+            f"{min_r2:g} were left unfit."
+        )
+        cites += [NAKA_RUSHTON, SCIPY]
+    else:
+        text += " No intensity-response model was fit; the measured points are shown as recorded."
+    text += _erg_ab_detector(p) + _erg_manual_marks(p, True)
+    return text, cites
 
 
 def _erg_flicker_fourier(p: dict) -> str:
@@ -917,15 +1158,25 @@ def _erg_flicker(p: dict):
         f"filtered at {lp:g} Hz."
         if filtered else ""
     )
+    # `view` picks ONE of two figures, and the sentence describing them claimed both at once: the
+    # waveform grid draws no amplitude-versus-frequency plot (so the "also plotted against
+    # frequency" half was false on the DEFAULT path), and the summary view returns only that plot
+    # and no waveform grid (so the other half was false there).
+    shown = (
+        "N1–P1 amplitude is plotted against flicker frequency, one series per condition"
+        if str(p.get("view", "waveform")).strip().lower() == "summary" else
+        "The steady-state waveform is shown per condition and flicker frequency"
+    )
     text = (
         "Light-adapted flicker electroretinograms were recorded under a rod-suppressing background. "
         "For each flicker frequency the steady-state response was phase-averaged into a single "
         "representative cycle, and the N1–P1 amplitude — the cornea-negative trough to the following "
         "cornea-positive peak — together with the P1 implicit time were measured from that averaged "
-        "cycle. The steady-state waveform is shown per condition; where more than one flicker "
-        "frequency was recorded, N1–P1 amplitude is also plotted against frequency. No a-/b-wave or "
-        "saturating intensity-response model is applied, as the flicker response is a periodic "
-        f"steady-state measure rather than a flash transient.{_erg_flicker_fourier(p)}{display}"
+        f"cycle. {shown}; the N1–P1 amplitude and P1 implicit time are reported for every condition "
+        "and frequency in the accompanying table. No a-/b-wave or saturating intensity-response "
+        "model is applied, as the flicker "
+        "response is a periodic steady-state measure rather than a flash transient."
+        f"{_erg_flicker_fourier(p)}{_erg_manual_marks(p, True)}{display}"
     )
     return text, [ISCEV]
 
@@ -1117,8 +1368,17 @@ def build_body(spec: SkillSpec, params: dict, figure: dict | None = None) -> tup
         resolved["_gates_unresolved"] = list(meta["gates_unresolved"])  # A16 — populations not counted
     if isinstance(meta.get("ab_detector"), dict):
         resolved["_ab_detector"] = meta["ab_detector"]  # A18 — which ERG detector, and its gate
+    if meta.get("adaptation") in ("scotopic", "photopic"):
+        # The rod/cone mode the ERG runner RESOLVED. Written only when `adaptation="auto"` let the
+        # data decide, which the parameters alone cannot express — the first sentence of an ERG
+        # paragraph says whether the reader is looking at rod or cone physiology.
+        resolved["_adaptation"] = meta["adaptation"]
     if isinstance(meta.get("oscillatory_potentials"), dict):
         resolved["_op_group"] = meta["oscillatory_potentials"]  # L1-09 — OP segments excluded
+    if isinstance(meta.get("clustered"), dict):
+        # The runner clustered the cells itself because the requested `groupby` column was absent —
+        # a fact about the DATA, and the only record of the `resolution` that produced them.
+        resolved["_clustered"] = meta["clustered"]
     builder = _TEMPLATES.get(spec.id)
     return builder(resolved) if builder else _generic(spec, resolved)
 

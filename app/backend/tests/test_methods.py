@@ -1,6 +1,7 @@
 """B4 auto methods-text — every skill yields cited, parameterized prose."""
 
 from companions import methods
+from companions.methods import BH, SCIPY
 from skills.contract import SkillSpec, load_skill
 from skills.registry import list_skill_ids
 
@@ -138,3 +139,245 @@ def test_boxplot_names_the_test_behind_its_stars_only_when_pairs_was_asked_for()
     assert "Welch" in raw
     assert "uncorrected for multiple comparisons" in raw, \
         "silence about multiplicity reads as 'corrected'; say which it is"
+
+
+# --- ERG: the PROSE_SILENT triage of 2026-08-05 ------------------------------------------------
+#
+# The board predicted the ERG family would be a confirmed-waive pass ("pipeline-level/internal").
+# Reading the four runners said otherwise: 26 of the 50 waived params changed what the figure
+# CLAIMS while the paragraph said something else. Each test below pins one of those claims to the
+# knob that decides it.
+
+
+def _prose(skill_id: str, params: dict, figure: dict | None = None) -> str:
+    return methods.build(load_skill(skill_id), params, figure=figure)["text"]
+
+
+def test_erg_bar_names_the_wave_it_actually_plots():
+    """`wave` selects the a- or b-wave and `value_col` overrides it outright. The paragraph said
+    "b-wave" unconditionally — and describes the MEASUREMENT, which is a different construction for
+    each landmark (baseline-to-trough vs trough-to-peak)."""
+    b = _prose("erg_bwave_bar", {})
+    assert "b-wave" in b and "trough-to-peak b-wave" in b
+
+    a = _prose("erg_bwave_bar", {"wave": "a"})
+    assert "a-wave" in a and "b-wave" not in a
+    assert "from the pre-stimulus baseline to the initial cornea-negative trough" in a
+
+    # `value_col` is the override the runner honours ahead of `wave`.
+    assert "a-wave" in _prose("erg_bwave_bar", {"wave": "b", "value_col": "a_wave_uv"})
+
+
+def test_erg_bar_spread_claim_follows_error_and_show_error():
+    """"the standard error of the mean" was printed on every run — including `error="sd"` (a wider
+    bar a reader would read as a standard error) and `show_error=False` (no bar at all)."""
+    assert "with the standard error of the mean" in _prose("erg_bwave_bar", {})
+    assert "with the standard deviation" in _prose("erg_bwave_bar", {"error": "sd"})
+    assert "with a 95% confidence interval" in _prose("erg_bwave_bar", {"error": "ci95"})
+
+    off = _prose("erg_bwave_bar", {"show_error": "false"})
+    assert "and no error bar" in off
+    assert "standard error" not in off
+
+
+def test_erg_bar_points_claim_follows_the_points_knob():
+    assert "every eye is overlaid" in _prose("erg_bwave_bar", {})
+    assert "without the individual eyes overlaid" in _prose("erg_bwave_bar", {"points": "false"})
+
+
+def test_erg_bar_names_the_test_behind_its_brackets_and_flags_overrides():
+    """Brackets are a published claim. With no `comparisons` there is no test to name; with a
+    `A~B:**` override the star was typed in by the operator, so neither the test nor SciPy may be
+    credited with it."""
+    none = methods.build(load_skill("erg_bwave_bar"), {})
+    assert "compared with" not in none["text"]
+    assert SCIPY not in none["citations"]
+
+    computed = methods.build(load_skill("erg_bwave_bar"),
+                             {"comparisons": "Control~Untreated", "sig_test": "mannwhitney",
+                              "correction": "bh"})
+    assert "Mann-Whitney U" in computed["text"]
+    assert "Benjamini-Hochberg" in computed["text"]
+    assert SCIPY in computed["citations"] and BH in computed["citations"]
+
+    mixed = _prose("erg_bwave_bar", {"comparisons": "Control~Untreated, Control~CMV:**"})
+    assert "1 show operator-supplied values rather than a computed test" in mixed
+    assert "remaining 1 pair(s) were compared with Welch" in mixed
+
+    # Every bracket overridden → no test ran, so no test and no SciPy citation.
+    only = methods.build(load_skill("erg_bwave_bar"), {"comparisons": "Control~Untreated:**"})
+    assert "no test was computed for them" in only["text"]
+    assert "Welch" not in only["text"]
+    assert SCIPY not in only["citations"]
+
+
+def test_erg_adaptation_follows_stimulus_type_and_the_recorded_mode():
+    """The first sentence of an ERG paragraph says whether the reader is looking at rod or cone
+    physiology. It read `adaptation` alone, but every runner resolves the mode through
+    `_erg.resolve_flash_mode`, where an explicit `stimulus_type` WINS — and under `auto` the answer
+    comes from the data, which only the runner can report (`layout.meta.adaptation`)."""
+    assert "scotopic" in _prose("erg_traces", {})
+
+    override = _prose("erg_traces", {"stimulus_type": "photopic_flash"})
+    assert "photopic (cone-driven)" in override
+    assert "dark-adapted mice" not in override
+
+    # `auto` on a photopic-only export: no parameter can say so, the runner records it.
+    recorded = _prose("erg_traces", {}, {"layout": {"meta": {"adaptation": "photopic"}}})
+    assert "photopic (cone-driven)" in recorded
+
+    # The bar and the curve share the helper.
+    assert "photopic" in _prose("erg_bwave_bar", {"stimulus_type": "photopic_flash"})
+    assert "Photopic" in _prose("erg_intensity_response", {"stimulus_type": "photopic_flash"})
+
+
+def test_erg_intensity_response_drops_the_fit_paragraph_when_fit_is_off():
+    """`fit=False` runs the skill with no curve fitting at all. Every word of the Naka-Rushton
+    paragraph — and both of its citations — described a model that never ran."""
+    on = methods.build(load_skill("erg_intensity_response"), {})
+    assert "Naka-Rushton" in on["text"]
+    assert any("Naka" in c for c in on["citations"])
+    assert any("SciPy" in c for c in on["citations"])
+
+    off = methods.build(load_skill("erg_intensity_response"), {"fit": "false"})
+    assert "Naka-Rushton" not in off["text"]
+    assert "No intensity-response model was fit" in off["text"]
+    assert not any("Naka" in c for c in off["citations"]), "a citation for a model that never ran"
+    assert not any("SciPy" in c for c in off["citations"])
+
+
+def test_erg_intensity_response_states_the_r2_threshold_and_its_spread():
+    """"did not support a saturating fit" IS `min_r2` — the number that says which conditions were
+    dropped. And `spread` decides whether any spread is drawn at all."""
+    assert "R² ≥ 0.3" in _prose("erg_intensity_response", {})
+    assert "R² ≥ 0.6" in _prose("erg_intensity_response", {"min_r2": "0.6"})
+
+    assert "error bars spanning the standard error of the mean" in \
+        _prose("erg_intensity_response", {})
+    assert "a shaded band spanning the standard deviation" in \
+        _prose("erg_intensity_response", {"spread": "band", "error": "sd"})
+    none = _prose("erg_intensity_response", {"spread": "none"})
+    assert "with no spread drawn" in none and "standard error" not in none
+
+
+def test_erg_traces_central_mean_does_not_claim_a_representative_eye():
+    """`central="mean"` titles the figure "Mean … ERG" while the paragraph said representatives are
+    shown "rather than shown as group means" — the prose contradicted the figure's own title."""
+    rep = _prose("erg_traces", {})
+    assert "a single representative eye is shown" in rep
+
+    mean = _prose("erg_traces", {"central": "mean", "error": "ci95"})
+    assert "representative eye" not in mean
+    assert "averaged point-by-point into a mean trace" in mean
+    assert "a shaded band spanning a 95% confidence interval" in mean
+
+    individual = _prose("erg_traces", {"central": "none"})
+    assert "representative eye" not in individual
+    assert "every contributing recording is drawn at equal weight" in individual
+
+
+def test_erg_flicker_describes_the_view_it_actually_drew():
+    """`view` picks ONE of two figures and the sentence claimed both at once: the default waveform
+    grid draws no amplitude-versus-frequency plot, and the summary view draws no waveform grid."""
+    wave = _prose("erg_flicker", {})
+    assert "The steady-state waveform is shown per condition" in wave
+    assert "plotted against frequency" not in wave
+
+    summary = _prose("erg_flicker", {"view": "summary"})
+    assert "N1–P1 amplitude is plotted against flicker frequency" in summary
+    assert "The steady-state waveform is shown" not in summary
+
+
+def test_erg_manual_marks_are_disclosed():
+    """An operator-set landmark moves the time the amplitude is read at and the runner RE-MEASURES
+    there — the numbers are not the ones the automatic window produced."""
+    import json
+
+    marks = json.dumps({"Control|1.0||": {"b_ms": 55.0}, "Untreated|1.0||": {"a_ms": 12.0}})
+    for skill_id in ("erg_traces", "erg_bwave_bar", "erg_intensity_response", "erg_flicker"):
+        assert "Landmark times" not in _prose(skill_id, {}), skill_id
+        text = _prose(skill_id, {"manual_marks": marks})
+        assert "set by the operator for 2 segment(s)" in text, skill_id
+
+    # Where a device-metrics table outranks the marks, the sentence says so rather than claiming
+    # they always applied.
+    assert "device markers" in _prose("erg_bwave_bar", {"manual_marks": marks})
+    assert "device markers" not in _prose("erg_traces", {"manual_marks": marks})
+
+
+# --- the result-changing params the board named next -------------------------------------------
+
+
+def test_proteomics_de_names_the_imputation_it_actually_ran():
+    """`missing` is the knob that moves a proteomics fold-change further than the choice of test
+    does: the default per-protein mean impute biases genuinely missing-not-at-random dropouts
+    toward NO CHANGE, while `mindet`/`minprob` fill from the detection-limit tail and preserve
+    them. The paragraph said "mean-imputed" on every run."""
+    mean = _prose("proteomics_de", {})
+    assert "at the protein's observed group mean" in mean
+    assert "biases genuinely missing-not-at-random dropouts toward no change" in mean
+
+    mindet = _prose("proteomics_de", {"missing": "mindet"})
+    assert "1st percentile of that sample's observed intensities" in mindet
+    assert "group mean" not in mindet
+
+    minprob = _prose("proteomics_de", {"missing": "minprob"})
+    assert "downshifted-normal draw" in minprob and "Perseus" in minprob
+
+
+def test_proteomics_de_log_transform_claim_follows_log_input():
+    """`log_input=True` means the intensities ARRIVED log-scaled and the runner transforms
+    nothing — the paragraph opened by claiming a log2 transform that had not happened."""
+    assert "were log2-transformed" in _prose("proteomics_de", {})
+    already = _prose("proteomics_de", {"log_input": "true"})
+    assert "already log-scaled" in already and "were log2-transformed" not in already
+
+
+def test_proteomics_de_names_the_contrast():
+    """"between the two groups" names neither, and the contrast is the whole claim."""
+    assert "between the two sample groups" in _prose("proteomics_de", {})
+    named = _prose("proteomics_de", {"group_a": "Tumour", "group_b": "Normal"})
+    assert "matching 'Tumour' and 'Normal'" in named
+
+
+def test_violin_names_the_test_behind_its_brackets_and_its_scale():
+    """The violin draws brackets from the same `_stats.test_pairs` call as the box plot, and
+    neither its methods paragraph nor its caption named the test. `normalize=False` skips both
+    `normalize_total` and `log1p`, so "log1p-normalized" was a claim about a skipped step."""
+    plain = methods.build(load_skill("violin"), {})
+    assert "log1p-normalized" in plain["text"]
+    assert "compared with" not in plain["text"]
+    assert SCIPY not in plain["citations"]
+
+    raw = _prose("violin", {"normalize": "false"})
+    assert "log1p-normalized" not in raw
+    assert "already-normalized (no further scaling applied)" in raw
+
+    tested = methods.build(load_skill("violin"),
+                           {"pairs": "cluster 0~cluster 1", "correction": "bonferroni"})
+    assert "Welch's t-test" in tested["text"] and "Bonferroni" in tested["text"]
+    assert SCIPY in tested["citations"]
+
+
+def test_violin_reports_the_grouping_it_actually_used():
+    """When the requested `groupby` column is absent the runner clusters the cells itself and groups
+    by Leiden — the figure says so in its title and axis, and the paragraph went on naming the
+    column the user asked for. It is also the only place `resolution` is recorded."""
+    asked = _prose("violin", {"groupby": "cell_type"})
+    assert "grouped by cell_type" in asked
+
+    substituted = methods.build(
+        load_skill("violin"), {"groupby": "cell_type"},
+        figure={"layout": {"meta": {"clustered": {"requested": "cell_type", "groupby": "leiden",
+                                                  "resolution": 1.2}}}})["text"]
+    assert "grouped by Leiden clusters computed on the data at resolution 1.2" in substituted
+    assert "the requested 'cell_type' was not present in the data" in substituted
+    assert "grouped by cell_type" not in substituted
+
+
+def test_markers_colour_claim_follows_normalize():
+    """`normalize=False` skips `log1p`, so "mean log1p expression" described a transform the run
+    did not perform — in the paragraph, in the caption, and on the colour-bar label."""
+    assert "mean log1p expression" in _prose("markers", {"standard_scale": "false"})
+    assert "mean supplied expression" in \
+        _prose("markers", {"standard_scale": "false", "normalize": "false"})

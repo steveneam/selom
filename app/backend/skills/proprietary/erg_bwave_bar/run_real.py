@@ -12,7 +12,7 @@ Two input shapes are accepted, so the bar is a true fan-out sibling of the trace
 
 The ``wave`` param selects a-wave or b-wave (``b`` default); ``intensity_group`` picks the flash.
 """
-from skills import _erg
+from skills import _erg, _stats
 from skills._engine import to_bool
 from skills._table import table
 from skills.proprietary.erg_bwave_bar.run import bar_spec
@@ -40,7 +40,11 @@ def run(data_path: str, params: dict) -> dict:
     sig_test = str(params.get("sig_test", "welch")).strip().lower()
     correction = str(params.get("correction", "none")).strip().lower()
     legend = to_bool(params.get("legend", False))
-    comparisons = _parse_comparisons(params.get("comparisons", ""))
+    # `_stats.parse_pairs` is the declared home for this vocabulary (it is what `test_pairs`
+    # consumes, and it also accepts already-structured input); the local copy this replaced was a
+    # byte-identical second parser. The methods paragraph reads the same parse, so a star the
+    # operator typed in by hand is never attributed to a test Selom did not run.
+    comparisons = _stats.parse_pairs(params.get("comparisons", ""))
     hline = _to_float_or_none(params.get("hline"))
     vline = _to_float_or_none(params.get("vline"))
 
@@ -85,6 +89,15 @@ def run(data_path: str, params: dict) -> dict:
             if not sub.empty:
                 df = sub
 
+    # The adaptation this figure CLAIMS, in its title and in its methods paragraph. With
+    # `adaptation="auto"` and a multi-mode export the answer comes from the DATA (the first of
+    # scotopic→photopic present), which no parameter can tell the prose — so record it when it
+    # differs from the param-derived answer. Equal on every default run, so nothing is written and
+    # the figure is unchanged (the `meta.significance` / `detector_summary` pattern).
+    param_mode = _erg.adaptation_mode(params.get("adaptation", "auto"),
+                                      params.get("stimulus_type", ""))
+    adapt_label = adapt or param_mode
+
     # Honour an optional QC column (drop flagged eyes from both the bar and the points).
     if "qc_excluded" in df.columns:
         df = df[~df["qc_excluded"].astype(str).str.strip().str.lower().isin(_TRUTHY)]
@@ -123,7 +136,7 @@ def run(data_path: str, params: dict) -> dict:
             intensity_label = f"{float(logs.iloc[0]):g} log cd·s/m²"
 
     spec, tbl_rows = bar_spec(cond_values, intensity_label=intensity_label,
-                              title=f"{adapt or 'scotopic'} {wave_label} by condition".capitalize(),
+                              title=f"{adapt_label} {wave_label} by condition".capitalize(),
                               unit=unit, factor=factor, show_points=show_points,
                               wave_label=wave_label, error=error, show_error=show_error,
                               bar_fill=bar_fill,
@@ -147,21 +160,9 @@ def run(data_path: str, params: dict) -> dict:
                           tbl_rows, title=f"ERG {wave_label} (mean ± {err_label}, {source}{prov})")
     if ab_meta is not None:
         spec["layout"].setdefault("meta", {})["ab_detector"] = ab_meta
+    if adapt_label != param_mode:
+        spec["layout"].setdefault("meta", {})["adaptation"] = adapt_label
     return spec
-
-
-def _parse_comparisons(raw):
-    """``"A~B, C~D"`` (or ``;``-separated) → ``[(condA, condB, override), …]`` for the significance
-    brackets. An optional ``:`` suffix overrides the stars — ``"A~B:**"`` (literal stars) or
-    ``"A~B:0.003"`` (a p-value) — else Selom computes them (the Both-available choice). Empty /
-    malformed pairs are skipped (no brackets, not an error)."""
-    out = []
-    for chunk in str(raw or "").replace(";", ",").split(","):
-        pair, _, override = chunk.partition(":")
-        parts = [p.strip() for p in pair.split("~")]
-        if len(parts) == 2 and parts[0] and parts[1]:
-            out.append((parts[0], parts[1], override.strip() or None))
-    return out
 
 
 def _to_float_or_none(v):

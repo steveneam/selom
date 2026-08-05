@@ -46,7 +46,24 @@ def _facts(figure: dict | None, table: dict | list | None) -> dict:
             counts = None
         if counts is not None:
             facts["up"], facts["down"] = counts
+    # The grouping the runner actually used, when it had to substitute one (the requested `groupby`
+    # column was absent and it clustered the cells itself). The caption names the groups the reader
+    # is looking at, so naming the column the user ASKED for is exactly the wrong one.
+    clustered = ((figure or {}).get("layout") or {}).get("meta") or {}
+    if isinstance(clustered.get("clustered"), dict):
+        facts["clustered"] = clustered["clustered"]
     return facts
+
+
+def _grouping(p: dict, facts: dict) -> str:
+    """The group label a caption should use — the substituted Leiden clustering when the runner had
+    to compute one, else the requested column."""
+    c = facts.get("clustered")
+    if isinstance(c, dict):
+        res = c.get("resolution")
+        at = f" (resolution {float(res):g})" if isinstance(res, (int, float)) else ""
+        return f"Leiden cluster{at}"
+    return str(p.get("groupby", ""))
 
 
 def _de_split(facts: dict) -> str:
@@ -89,11 +106,22 @@ def _cluster(p, f):
 
 def _violin(p, f):
     gene = p.get("gene") or "the selected marker gene"
-    text = f"Violin plot of {gene} expression across {p['groupby']} groups."
+    text = f"Violin plot of {gene} expression across {_grouping(p, f)} groups."
+    # Stars on the canvas with no test named is the defect `boxplot`'s legend has too; here the
+    # brackets come from the same `_stats.test_pairs` call, so the legend names the same things.
+    if str(p.get("pairs") or "").strip():
+        test = {"student": "Student's t-test", "mannwhitney": "the Mann-Whitney U test",
+                "mwu": "the Mann-Whitney U test", "u": "the Mann-Whitney U test"}.get(
+                    str(p.get("sig_test") or "welch").strip().lower(), "Welch's t-test")
+        adj = {"bonferroni": ", Bonferroni-corrected", "bh": ", Benjamini-Hochberg-corrected"}.get(
+            str(p.get("correction") or "none").strip().lower(), ", uncorrected")
+        text += f" Brackets show pairwise comparisons by {test}{adj}."
     if str(p.get("annotate") or "none").lower() == "pubmed":
+        context = str(p.get("context") or "").strip()
+        scope = f" co-occurring with '{context}'" if context else ""
         text += (
-            f" Markers with at least {int(p.get('known_min', 5))} matching PubMed records "
-            "are annotated as known and the rest as novel."
+            f" Markers with at least {int(p.get('known_min', 5))} matching PubMed records"
+            f"{scope} are annotated as known and the rest as novel."
         )
     return text
 
@@ -111,10 +139,19 @@ def _volcano(p, f):
 
 
 def _proteomics_de(p, f):
+    # WHICH two groups, and how the dropouts were filled: an MNAR-aware imputation moves a
+    # proteomics fold-change further than the choice of test does, so a legend that names neither
+    # describes a different figure from the one beside it under any non-default setting.
+    a, b = str(p.get("group_a") or "").strip(), str(p.get("group_b") or "").strip()
+    between = f"'{a}' versus '{b}'" if a and b else "the two groups"
+    fill = {"mindet": ", missing values filled from each sample's detection-limit tail",
+            "minprob": ", missing values filled by a downshifted-normal draw per sample"}.get(
+                str(p.get("missing") or "mean").strip().lower(), "")
     return (
-        "Volcano plot of differential protein abundance between the two groups "
+        f"Volcano plot of differential protein abundance, {between} "
         f"(|log2FC| >= {float(p.get('fc_threshold', 1.0)):g}, FDR <= "
-        f"{float(p.get('fdr_threshold', 0.05)):g}){_de_split(f)}."
+        f"{float(p.get('fdr_threshold', 0.05)):g}){fill}{_de_split(f)}, the top "
+        f"{int(p.get('top_n', 10) or 0)} by significance labelled."
     )
 
 
@@ -146,9 +183,20 @@ def _pathway(p, f):
 
 
 def _markers(p, f):
+    # Two claims the legend got wrong on the DEFAULT path. `standard_scale` is default-TRUE, so the
+    # colour encodes expression scaled to [0,1] per gene, not the mean; and "top N marker genes"
+    # names no criterion, while `rank_by` chooses between a p-value ranking and an effect size —
+    # which is the difference the methods paragraph spends a sentence on.
+    scaled = ("expression scaled to [0,1] per gene" if p.get("standard_scale", True)
+              else f"mean {'log1p' if p.get('normalize', True) else 'supplied'} expression")
+    rank_by = str(p.get("rank_by") or "wilcoxon").strip().lower()
+    by = {"auc": "one-versus-rest AUC", "cohens_d": "one-versus-rest Cohen's d",
+          "cohen": "one-versus-rest Cohen's d", "cohens": "one-versus-rest Cohen's d",
+          "d": "one-versus-rest Cohen's d"}.get(
+              rank_by, f"the {p['method']} test")
     return (
-        f"Dot plot of the top {p['n_genes']} marker genes per {p['groupby']} group: colour encodes "
-        "mean expression and dot size the fraction of cells expressing the gene."
+        f"Dot plot of the top {p['n_genes']} marker genes per {p['groupby']} group, ranked by "
+        f"{by}: colour encodes {scaled} and dot size the fraction of cells expressing the gene."
     )
 
 

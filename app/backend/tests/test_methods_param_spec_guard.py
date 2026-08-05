@@ -19,6 +19,7 @@ must not, rewrite the prose.
 from __future__ import annotations
 
 import ast
+import enum
 import pathlib
 
 import pytest
@@ -112,139 +113,208 @@ def test_template_references_only_declared_params(module, skill_id):
 # below, deliberately. The list is a RATCHET in the `API_ONLY_KNOBS` shape — exact in both
 # directions, so it can only shrink and nothing new joins it silently.
 #
-# ⚑ THIS LIST IS A RAW FIRST CAPTURE, NOT A TRIAGED ONE. It is every unmentioned param as of
-# 2026-08-05 (269 across 61 templates), which is the backlog the board predicted this guard would
-# surface. It has NOT been split into "cosmetic, no sentence owed" (`erg_traces.band_color`,
-# `scale_ms`) versus "changes the result and the prose owes it a sentence" — and the second bucket
-# is real and load-bearing: `deg.method` decides WHICH TEST ran, `proteomics_de.missing` decides an
-# imputation that biases fold-changes toward zero, `boxplot.sig_test`/`correction` decide the stars
-# drawn on the figure. Doing that triage is the next session's work on this item.
+# ⚑ EVERY WAIVER CARRIES ITS VERDICT. The list began (2026-08-05) as a RAW capture — 269 params
+# across 61 templates, none of them examined — and the value of triaging it is that the two buckets
+# are nothing alike. `erg_traces.band_color` is a colour; `erg_intensity_response.fit` switches the
+# entire Naka-Rushton model off while the paragraph went on describing it. A flat set cannot tell
+# those apart, so the split is recorded ON each entry and the guard enforces the vocabulary:
 #
-# The immediate value does not depend on the triage: a NEW param must now either be described in
-# the prose or be added here on purpose. Both defects of 2026-08-05 arrived exactly that way — a
-# knob became reachable and its methods sentence was never re-checked.
-PROSE_SILENT: dict[tuple[str, str], set[str]] = {
-    ("methods", "annotate"): {"embedding", "normalize"},
+#   PRESENTATION — decides how the figure LOOKS. The prose asserts nothing about it, and adding a
+#                  sentence would pad the paragraph without making the figure more reproducible.
+#   INTERNAL     — plumbing: caps, engine seeds, advanced overrides that do not change what the
+#                  figure claims. Named here so "not user-facing" is a decision, not an oversight.
+#   VIA_OUTCOME  — the claim IS made, from the runner's recorded outcome (a ``_``-prefixed fact
+#                  lifted by ``build_body`` / ``legends._facts``) rather than from the param name.
+#                  Strictly better than quoting the param, because these params are INERT unless a
+#                  data-dependent branch fired, and only the runner knows whether it did.
+#   IN_METHODS   — legends only: the methods paragraph carries the claim and the caption makes none
+#                  this param could falsify. A caption is one sentence about one figure, not a
+#                  second copy of the recipe.
+#   UNTRIAGED    — the raw capture, not yet examined. This is the DEBT, and it is a counted ratchet
+#                  (`_UNTRIAGED_CEILING`) that can only shrink.
+#
+# There is deliberately no OWED verdict: a param whose prose is owed gets the SENTENCE and leaves
+# this list. A waiver that admits it is protecting a known lie would be worse than no waiver.
+#
+# The immediate value never depended on the triage: a NEW param must either be described in the
+# prose or be added here on purpose. Both defects of 2026-08-05 arrived exactly that way — a knob
+# became reachable and its methods sentence was never re-checked.
+
+
+class Silence(str, enum.Enum):
+    PRESENTATION = "presentation"
+    INTERNAL = "internal"
+    VIA_OUTCOME = "via-outcome"
+    IN_METHODS = "in-methods"
+    UNTRIAGED = "untriaged"
+
+
+_P, _I, _U = Silence.PRESENTATION, Silence.INTERNAL, Silence.UNTRIAGED
+_OUT, _M = Silence.VIA_OUTCOME, Silence.IN_METHODS
+
+
+def _untriaged(*keys: str) -> dict[str, Silence]:
+    """The raw 2026-08-05 capture, verbatim — not yet examined. Shrinks as templates are triaged."""
+    return {k: _U for k in keys}
+
+
+PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
+    ("methods", "annotate"): _untriaged("embedding", "normalize"),
     # ("methods", "boxplot") is GONE — the first entry this ratchet retired. All 11 of its params
     # are described now, and two of its claims were live printed-vs-computed lies the backlog
     # pointed straight at: "box-and-whisker … 1.5× the IQR" on a `style="strip"` run that draws no
     # box at all, and "ordered by descending median" on a run where `order` puts the user's named
     # categories first. Both read green through nine gates because a template that never mentions a
     # param cannot be caught by a rule about templates that mention the wrong one.
-    ("methods", "cluster"): {"normalize"},
-    ("methods", "composition"): {"order", "orientation", "sort_by"},
-    ("methods", "deg"): {
+    ("methods", "cluster"): _untriaged("normalize"),
+    ("methods", "composition"): _untriaged("order", "orientation", "sort_by"),
+    ("methods", "deg"): _untriaged(
         "condition_col", "covariate_col", "group_col", "group_val", "label_col", "method",
         "min_cells", "min_count", "normalization", "normalize", "time_col"
-    },
-    ("methods", "diff_abundance"): {"condition_col", "label_col", "min_cells", "sample_col"},
-    ("methods", "enrichment"): {"fc_threshold", "fdr_threshold", "gene_sets"},
+    ),
+    ("methods", "diff_abundance"): _untriaged("condition_col", "label_col", "min_cells",
+                                              "sample_col"),
+    ("methods", "enrichment"): _untriaged("fc_threshold", "fdr_threshold", "gene_sets"),
+    # ── THE ERG FAMILY, TRIAGED 2026-08-05 ──────────────────────────────────────────────────────
+    # The board predicted a confirmed-waive pass ("mostly pipeline-level/internal"). It was half
+    # wrong: 26 of these 50 params changed what the figure CLAIMS and the paragraph said otherwise,
+    # so they got sentences and left this list. What survives is genuinely presentational — colours,
+    # alphas, scale-bar lengths, legend toggles, display units the prose never quotes.
     ("methods", "erg_bwave_bar"): {
-        "bar_fill", "comparisons", "correction", "display_unit", "error", "hline", "hline_label",
-        "intensity_group", "legend", "manual_marks", "points", "show_error", "sig_test",
-        "stimulus_type", "value_col", "wave"
+        "bar_fill": _P, "hline": _P, "hline_label": _P, "legend": _P,
+        # The paragraph quotes no unit; the axis title and the Statistics table carry it.
+        "display_unit": _P,
     },
     ("methods", "erg_flicker"): {
-        "display_unit", "manual_marks", "mark_labels", "marks", "scale_ms", "scale_uv", "view"
+        "marks": _P, "mark_labels": _P, "scale_ms": _P, "scale_uv": _P, "display_unit": _P,
     },
     ("methods", "erg_intensity_response"): {
-        "band_alpha", "band_color", "boundary_lines", "display_unit", "error", "fit",
-        "manual_marks", "min_r2", "points", "spread", "stimulus_type", "value_col"
+        "band_alpha": _P, "band_color": _P, "boundary_lines": _P, "display_unit": _P,
+        # Unlike the bar, this paragraph makes no claim about individual eyes being drawn, so
+        # silence stays honest whichever way the knob is set.
+        "points": _P,
     },
     ("methods", "erg_traces"): {
-        "band_alpha", "band_color", "boundary_lines", "central", "display_unit", "error",
-        "error_every", "manual_marks", "mark_labels", "marks", "role", "scale_ms", "scale_uv",
-        "spread", "stimulus_type"
+        "band_alpha": _P, "band_color": _P, "boundary_lines": _P, "display_unit": _P,
+        "error_every": _P, "marks": _P, "mark_labels": _P, "scale_ms": _P, "scale_uv": _P,
     },
-    ("methods", "facs_gating"): {
+    # ────────────────────────────────────────────────────────────────────────────────────────────
+    ("methods", "facs_gating"): _untriaged(
         "bins", "comp_matrix", "max_events", "transform_t", "x_channel", "y_channel"
-    },
-    ("methods", "gsea"): {"engine"},
-    ("methods", "heatmap"): {"annotations", "cut_k", "quant_track", "split_by", "split_by_cut"},
-    ("methods", "integration"): {"alpha", "harmony2"},
-    ("methods", "line"): {"central", "markers", "points", "x", "y"},
-    ("methods", "markers"): {"normalize"},
-    ("methods", "normalization_qc"): {"max_cells"},
-    ("methods", "pathway"): {"fc_threshold", "fdr_threshold"},
-    ("methods", "pca"): {"group_regex", "label_points"},
-    ("methods", "proteomics_de"): {"group_a", "group_b", "log_input", "missing", "top_n"},
-    ("methods", "pseudotime_genes"): {"groupby", "n_bins", "normalize"},
-    ("methods", "qq"): {"max_points", "p_col", "top_n"},
-    ("methods", "regression"): {"fit", "group", "label"},
-    ("methods", "sankey"): {"max_links"},
-    ("methods", "scorecard"): {"fill", "max_rows"},
-    ("methods", "string_network"): {"fdr_threshold", "max_genes"},
-    ("methods", "trajectory"): {"embedding", "groupby", "normalize"},
-    ("methods", "upset"): {"sort_by"},
+    ),
+    ("methods", "gsea"): _untriaged("engine"),
+    ("methods", "heatmap"): _untriaged("annotations", "cut_k", "quant_track", "split_by",
+                                       "split_by_cut"),
+    ("methods", "integration"): _untriaged("alpha", "harmony2"),
+    ("methods", "line"): _untriaged("central", "markers", "points", "x", "y"),
+    # ("methods", "markers") is GONE — `normalize` skips log1p, and the dotplot's colour was
+    # described as "mean log1p expression" either way.
+    ("methods", "normalization_qc"): _untriaged("max_cells"),
+    ("methods", "pathway"): _untriaged("fc_threshold", "fdr_threshold"),
+    ("methods", "pca"): _untriaged("group_regex", "label_points"),
+    # ("methods", "proteomics_de") is GONE — the second entry this ratchet retired, and the one the
+    # board pointed at: `missing` chooses between a mean impute that biases MNAR dropouts toward no
+    # change and two left-censored fills that preserve them, and the paragraph said "mean-imputed"
+    # on every run. `log_input` was the same shape one clause earlier ("log2-transformed" on a run
+    # that transforms nothing).
+    ("methods", "pseudotime_genes"): _untriaged("groupby", "n_bins", "normalize"),
+    ("methods", "qq"): _untriaged("max_points", "p_col", "top_n"),
+    ("methods", "regression"): _untriaged("fit", "group", "label"),
+    ("methods", "sankey"): _untriaged("max_links"),
+    ("methods", "scorecard"): _untriaged("fill", "max_rows"),
+    ("methods", "string_network"): _untriaged("fdr_threshold", "max_genes"),
+    ("methods", "trajectory"): _untriaged("embedding", "groupby", "normalize"),
+    ("methods", "upset"): _untriaged("sort_by"),
     ("methods", "violin"): {
-        "add_count", "correction", "normalize", "order", "pairs", "resolution", "sig_test"
+        # Leiden `resolution` applies ONLY when the requested `groupby` column is absent and the
+        # runner clusters the cells itself. Quoting the param would claim a clustering that usually
+        # never happened; the paragraph states it from `layout.meta.clustered` instead, which is the
+        # only place that resolution is recorded at all.
+        "resolution": _OUT,
     },
-    ("methods", "volcano"): {"highlight"},
-    ("legends", "annotate"): {"embedding", "groupby", "normalize"},
-    ("legends", "boxplot"): {
+    ("methods", "volcano"): _untriaged("highlight"),
+    ("legends", "annotate"): _untriaged("embedding", "groupby", "normalize"),
+    ("legends", "boxplot"): _untriaged(
         "add_count", "correction", "notched", "order", "orientation", "pairs", "points",
         "sig_test", "style"
-    },
-    ("legends", "cepo"): {"exprs_pct", "min_cells", "normalize"},
-    ("legends", "cluster"): {"n_neighbors", "n_pcs", "normalize"},
-    ("legends", "composition"): {"order", "orientation", "sort_by"},
-    ("legends", "corr_heatmap"): {"cluster"},
-    ("legends", "deg"): {
+    ),
+    ("legends", "cepo"): _untriaged("exprs_pct", "min_cells", "normalize"),
+    ("legends", "cluster"): _untriaged("n_neighbors", "n_pcs", "normalize"),
+    ("legends", "composition"): _untriaged("order", "orientation", "sort_by"),
+    ("legends", "corr_heatmap"): _untriaged("cluster"),
+    ("legends", "deg"): _untriaged(
         "condition_col", "covariate_col", "group_col", "group_val", "groupby", "label",
         "label_col", "method", "min_cells", "min_count", "mode", "normalization", "normalize",
         "sample_col", "time_col"
-    },
-    ("legends", "diff_abundance"): {
+    ),
+    ("legends", "diff_abundance"): _untriaged(
         "condition_col", "label_col", "min_cells", "normalization", "sample_col"
-    },
-    ("legends", "enrichment"): {"fc_threshold", "fdr_threshold", "gene_sets"},
-    ("legends", "go_graph"): {"fc_threshold", "fdr_threshold", "namespace"},
-    ("legends", "gsea"): {"engine", "gene_set", "gene_sets", "n_perm", "set_name", "weight"},
-    ("legends", "heatmap"): {
+    ),
+    ("legends", "enrichment"): _untriaged("fc_threshold", "fdr_threshold", "gene_sets"),
+    ("legends", "go_graph"): _untriaged("fc_threshold", "fdr_threshold", "namespace"),
+    ("legends", "gsea"): _untriaged("engine", "gene_set", "gene_sets", "n_perm", "set_name",
+                                    "weight"),
+    ("legends", "heatmap"): _untriaged(
         "annotations", "cluster", "cut_k", "quant_track", "split_by", "split_by_cut"
-    },
-    ("legends", "integration"): {
+    ),
+    ("legends", "integration"): _untriaged(
         "alpha", "harmony2", "max_iter_harmony", "n_hvg", "n_neighbors", "n_pcs", "normalize",
         "theta"
-    },
-    ("legends", "markers"): {"method", "normalize", "rank_by", "standard_scale"},
-    ("legends", "normalization_qc"): {
+    ),
+    # ("legends", "markers") is GONE — two wrong claims on the DEFAULT path: `standard_scale` is
+    # default-true, so the colour encodes [0,1]-scaled expression and the caption called it the
+    # mean; and "top N marker genes" named no criterion while `rank_by` chooses between a p-value
+    # ranking and a one-versus-rest effect size.
+    ("legends", "normalization_qc"): _untriaged(
         "doublet_threshold", "doublets", "filter", "max_cells", "nmads"
-    },
-    ("legends", "pathway"): {"fc_threshold", "fdr_threshold"},
-    ("legends", "pca"): {"group_regex", "label_points", "scale"},
+    ),
+    ("legends", "pathway"): _untriaged("fc_threshold", "fdr_threshold"),
+    ("legends", "pca"): _untriaged("group_regex", "label_points", "scale"),
     ("legends", "proteomics_de"): {
-        "group_a", "group_b", "log_input", "min_valid", "missing", "stats", "top_n"
+        # The caption names the contrast, the thresholds, the label count and any non-default
+        # imputation. It makes no claim about the input scale, the sparsity filter or which t-test
+        # ran — the methods paragraph states all three, and a caption is one sentence.
+        "log_input": _M, "min_valid": _M, "stats": _M,
     },
-    ("legends", "pseudotime_genes"): {"groupby", "n_bins", "normalize", "root"},
-    ("legends", "pvca"): {"normalize", "pct_threshold"},
-    ("legends", "regression"): {"fit", "group", "label"},
-    ("legends", "sankey"): {"max_links"},
-    ("legends", "scorecard"): {"fill", "invert_metrics", "max_rows", "normalize"},
-    ("legends", "ssgsea"): {"gene_set", "gene_sets", "max_size", "min_size", "weight", "zscore"},
-    ("legends", "string_network"): {"fdr_threshold", "max_genes"},
-    ("legends", "trajectory"): {"embedding", "groupby", "normalize", "root", "threshold"},
-    ("legends", "umap_scrna"): {"n_hvg", "n_neighbors", "n_pcs", "normalize"},
-    ("legends", "upset"): {"mode", "sort_by"},
+    ("legends", "pseudotime_genes"): _untriaged("groupby", "n_bins", "normalize", "root"),
+    ("legends", "pvca"): _untriaged("normalize", "pct_threshold"),
+    ("legends", "regression"): _untriaged("fit", "group", "label"),
+    ("legends", "sankey"): _untriaged("max_links"),
+    ("legends", "scorecard"): _untriaged("fill", "invert_metrics", "max_rows", "normalize"),
+    ("legends", "ssgsea"): _untriaged("gene_set", "gene_sets", "max_size", "min_size", "weight",
+                                      "zscore"),
+    ("legends", "string_network"): _untriaged("fdr_threshold", "max_genes"),
+    ("legends", "trajectory"): _untriaged("embedding", "groupby", "normalize", "root", "threshold"),
+    ("legends", "umap_scrna"): _untriaged("n_hvg", "n_neighbors", "n_pcs", "normalize"),
+    ("legends", "upset"): _untriaged("mode", "sort_by"),
     ("legends", "violin"): {
-        "add_count", "context", "correction", "normalize", "order", "pairs", "resolution",
-        "sig_test"
+        # The caption names the gene, the grouping actually used and the bracket test. It claims no
+        # scale, no ordering and no n= labels, so those three cannot make it wrong; `resolution` is
+        # reported through the recorded clustering, exactly as in the methods paragraph.
+        "normalize": _M, "order": _M, "add_count": _M, "resolution": _OUT,
     },
-    ("legends", "volcano"): {"highlight"},
+    ("legends", "volcano"): _untriaged("highlight"),
 }
+
+# The DEBT ratchet. Every entry still tagged UNTRIAGED is a param nobody has asked "does the prose
+# owe this a sentence?" — the state the whole list started in. It can only shrink: triaging a
+# template either gives a param a sentence (it leaves the list) or records a verdict (it stays with
+# PRESENTATION / INTERNAL). Lower this number when you triage; a new UNTRIAGED entry pushes over it
+# and fails, which is the point — nothing joins the backlog silently.
+_UNTRIAGED_CEILING = 179
 @pytest.mark.parametrize("module,skill_id", _CASES)
 def test_every_declared_param_is_described_or_deliberately_silent(module, skill_id):
     """The reverse direction — a declared param the prose never mentions is either described or
     written down. Prevents the printed-vs-computed lie: prose asserting a step the run skipped."""
     refs = {r for r in _template_refs(_MODULES[module], skill_id) if not r.startswith("_")}
     declared = set(load_skill(skill_id).param_spec)
-    waived = PROSE_SILENT.get((module, skill_id), set())
+    waived = set(PROSE_SILENT.get((module, skill_id), {}))
 
     undocumented = sorted(declared - refs - waived)
     assert not undocumented, (
         f"{module}.py template for {skill_id!r} never mentions param(s) {undocumented}. Either name "
         f"them in the prose (and make any claim they control CONDITIONAL on their value), or add "
-        f"them to PROSE_SILENT with a reason. Silence is allowed; silence by accident is not."
+        f"them to PROSE_SILENT with a verdict. Silence is allowed; silence by accident is not."
     )
 
     # Stale in the other direction: a param that GAINED a sentence, or was removed from the
@@ -262,6 +332,29 @@ def test_prose_silent_names_only_live_skills():
     be a tracked debt."""
     live = set(_CASES)
     assert sorted(k for k in PROSE_SILENT if k not in live) == []
+
+
+def test_every_waiver_carries_a_declared_verdict():
+    """Guard the guard: a bare string (or any value outside the vocabulary) would re-create the flat
+    set this list started as, where a colour and a model switch look identical."""
+    bad = sorted((f"{m}.{s}.{k}", repr(v)) for (m, s), d in PROSE_SILENT.items()
+                 for k, v in d.items() if not isinstance(v, Silence))
+    assert bad == [], f"waivers with no declared verdict: {bad}"
+
+
+def test_untriaged_backlog_only_shrinks():
+    """The debt ratchet. UNTRIAGED means "nobody has asked whether the prose owes this a sentence" —
+    the state every entry started in. Triaging is the work; this makes the backlog a number that can
+    only go down, and stops a new param joining it silently under cover of the old ones."""
+    n = sum(1 for d in PROSE_SILENT.values() for v in d.values() if v is Silence.UNTRIAGED)
+    assert n <= _UNTRIAGED_CEILING, (
+        f"{n} UNTRIAGED waivers, ceiling {_UNTRIAGED_CEILING}. A new param may not join the "
+        f"backlog: give it a sentence, or a PRESENTATION / INTERNAL verdict."
+    )
+    assert n == _UNTRIAGED_CEILING, (
+        f"{n} UNTRIAGED waivers but the ceiling still says {_UNTRIAGED_CEILING} — lower it to {n}, "
+        f"or the backlog shrinks on paper while the ratchet stays slack."
+    )
 
 
 def test_extractor_is_not_vacuous():

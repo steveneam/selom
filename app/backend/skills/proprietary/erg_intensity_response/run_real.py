@@ -100,6 +100,12 @@ def run(data_path: str, params: dict) -> dict:
         raise ValueError(f"erg_intensity_response: input missing required columns {sorted(missing)}")
 
     df, adapt = _filter_mode(df, params)
+    # The adaptation this figure CLAIMS (title + methods paragraph). Under `adaptation="auto"` the
+    # answer comes from the DATA, which no parameter can tell the prose — recorded below only when
+    # it differs from the param-derived answer, so a default run is byte-identical.
+    param_mode = _erg.adaptation_mode(params.get("adaptation", "auto"),
+                                      params.get("stimulus_type", ""))
+    adapt_label = adapt or param_mode
 
     if "qc_excluded" in df.columns:
         df = df[~df["qc_excluded"].astype(str).str.strip().str.lower().isin(_TRUTHY)]
@@ -149,7 +155,7 @@ def run(data_path: str, params: dict) -> dict:
     unit = _erg.resolve_display_unit(params.get("display_unit", "uV"), peak_uv)
     factor = _erg.unit_factor(unit)
     spec, tbl_rows = ir_spec(cond_series, fits,
-                             title=f"{adapt or 'scotopic'} b-wave intensity-response".capitalize(),
+                             title=f"{adapt_label} b-wave intensity-response".capitalize(),
                              unit=unit, factor=factor, spread=spread, points=points,
                              band_alpha=band_alpha, boundary=boundary, band_color=band_color)
     # Manual-marks provenance (erg-manual-marks R6): caption the operator-adjusted mix on the
@@ -165,4 +171,6 @@ def run(data_path: str, params: dict) -> dict:
         title="Naka-Rushton fit" + prov)
     if ab_meta is not None:
         spec["layout"].setdefault("meta", {})["ab_detector"] = ab_meta
+    if adapt_label != param_mode:
+        spec["layout"].setdefault("meta", {})["adaptation"] = adapt_label
     return spec

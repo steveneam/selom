@@ -61,6 +61,7 @@ _SLOW_FILES = {
     "test_pseudotime_genes.py",
     "test_reconstruct.py",
     "test_repro_assets.py",
+    "test_violin_grouping.py",   # scanpy PCA + neighbours + Leiden, ~14s
 }
 
 

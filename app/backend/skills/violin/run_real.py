@@ -21,19 +21,28 @@ def run(data_path: str, params: dict) -> dict:
         sc.pp.normalize_total(adata, target_sum=1e4)
         sc.pp.log1p(adata)
 
-    groupby = params.get("groupby") or "leiden"
+    requested = params.get("groupby") or "leiden"
+    groupby = requested
+    # The grouping the figure ACTUALLY used. When the requested column is absent the runner clusters
+    # the cells itself and groups by Leiden instead — a substitution the figure discloses in its
+    # title and axis, while the methods paragraph went on naming the column the user asked for.
+    # Recorded (with the resolution that produced the clusters, which is otherwise nowhere) so the
+    # prose can say what happened; nothing is written when the requested column was there.
+    clustered = None
     if groupby not in adata.obs.columns:
         n_pcs = max(2, min(50, adata.n_obs - 1, adata.n_vars - 1))
+        resolution = float(params["resolution"])
         sc.pp.pca(adata, n_comps=n_pcs)
         sc.pp.neighbors(adata, n_neighbors=15, n_pcs=n_pcs)
         sc.tl.leiden(
             adata,
-            resolution=float(params["resolution"]),
+            resolution=resolution,
             flavor="igraph",
             n_iterations=2,
             directed=False,
         )
         groupby = "leiden"
+        clustered = {"requested": str(requested), "groupby": "leiden", "resolution": resolution}
 
     gene = (params.get("gene") or "").strip()
     if gene not in set(map(str, adata.var_names)):
@@ -49,8 +58,14 @@ def run(data_path: str, params: dict) -> dict:
         f"cluster {g}": expr[(groups == g).to_numpy()]
         for g in sorted(groups.unique(), key=lambda s: (len(s), s))
     }
-    spec = violin_spec(cells, params, "expression (log1p)", groupby,
+    # The value axis must name the scale actually plotted: with `normalize=False` the runner does
+    # NOT log1p the matrix, and the axis said "expression (log1p)" regardless.
+    value_label = ("expression (log1p)" if to_bool(params.get("normalize", True))
+                   else "expression (as supplied)")
+    spec = violin_spec(cells, params, value_label, groupby,
                        f"{gene} expression by {groupby}")
+    if clustered is not None:
+        spec["layout"].setdefault("meta", {})["clustered"] = clustered
     if str(params.get("annotate") or "none").lower() == "pubmed":
         spec = _annotate_with_pubmed(spec, gene, params)
     return jsonable(spec)
