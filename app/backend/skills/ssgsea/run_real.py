@@ -13,6 +13,7 @@ heatmap spec with the stub via ``run.ssgsea_spec``.
 
 import re
 
+from skills._engine import to_bool
 from skills.ssgsea.run import ssgsea_spec
 
 _SOURCE_ALIASES = {"": "go", "go": "go", "wikipathways": "wikipathways", "wiki": "wikipathways",
@@ -93,7 +94,8 @@ def _assemble(res, sample_order, params):
     samples = [str(c) for c in mat.columns]
     raw = mat.to_numpy(dtype=float)
 
-    if _truthy(params.get("zscore", True)):
+    zscored = to_bool(params.get("zscore", True))
+    if zscored:
         z = _row_zscore(raw, np)
         score_label = "enrichment (z)"
     else:
@@ -111,7 +113,18 @@ def _assemble(res, sample_order, params):
         f"ssGSEA NES — {len(pathways)} gene sets x {len(samples)} samples",
     )
     z_list = [[round(float(v), 4) for v in row] for row in np.asarray(z)]
-    return jsonable(ssgsea_spec(z_list, samples, pathways, title, score_label, stats))
+    spec = ssgsea_spec(z_list, samples, pathways, title, score_label, stats)
+    # What the run RESOLVED, for the methods paragraph (`meta.significance` pattern).
+    #   `shown`  — `top_n` is a CAP, not a count: `order[:top_n]` yields fewer rows whenever the
+    #              library had fewer scoreable sets, and the paragraph claimed the cap as the count.
+    #              The figure title already states the real number; the prose did not.
+    #   `zscore` — the resolved boolean, so the prose and the colourbar cannot disagree about which
+    #              scale is drawn. `to_bool` (shared, replacing a local third copy) is what makes a
+    #              RAW string "false" turn z-scoring off on a direct call.
+    spec["layout"].setdefault("meta", {})["ssgsea"] = {
+        "shown": len(pathways), "zscore": zscored,
+    }
+    return jsonable(spec)
 
 
 def _row_zscore(values, np):
@@ -121,12 +134,6 @@ def _row_zscore(values, np):
     std = values.std(axis=1, keepdims=True)
     std[std == 0] = 1.0
     return np.round((values - mean) / std, 4)
-
-
-def _truthy(v):
-    if isinstance(v, bool):
-        return v
-    return str(v).strip().lower() in ("1", "true", "yes", "on")
 
 
 def _parse_panel(raw) -> set:

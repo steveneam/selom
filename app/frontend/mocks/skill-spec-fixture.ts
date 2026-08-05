@@ -184,6 +184,23 @@ export const SKILL_PARAM_SPECS: Record<string, BackendParamSpec> = {
     fdr_threshold: { type: "float", default: 0.05, min: 0.0, max: 1.0 },
     fc_threshold: { type: "float", default: 0.0, min: 0.0, max: 5.0 },
   },
+  gsea: {
+    gene_set: { type: "str", default: "" },
+    gene_sets: { type: "str", default: "go", options: ["go", "wikipathways", "curated", "reference", "all"] },
+    engine: { type: "str", default: "auto", options: ["auto", "gseapy", "blitzgsea", "inhouse"] },
+    set_name: { type: "str", default: "Gene set" },
+    weight: { type: "float", default: 1.0, min: 0.0, max: 2.0 },
+    n_perm: { type: "int", default: 1000, min: 0, max: 10000 },
+  },
+  ssgsea: {
+    gene_set: { type: "str", default: "" },
+    gene_sets: { type: "str", default: "go", options: ["go", "wikipathways", "curated", "reference", "all"] },
+    top_n: { type: "int", default: 25, min: 1, max: 100 },
+    min_size: { type: "int", default: 10, min: 1, max: 5000 },
+    max_size: { type: "int", default: 500, min: 2, max: 100000 },
+    weight: { type: "float", default: 0.25, min: 0.0, max: 2.0 },
+    zscore: { type: "bool", default: true },
+  },
   sankey: {
     max_links: { type: "int", default: 60, min: 1, max: 500 },
   },

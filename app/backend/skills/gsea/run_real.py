@@ -52,7 +52,8 @@ def run(data_path: str, params: dict) -> dict:
     ranked = _ranked(df, params.get("_column_override"))
     sets, lib_mode = _resolve_sets(params, ranked)
 
-    engine = str(params.get("engine", "auto")).strip().lower()
+    requested = str(params.get("engine", "auto")).strip().lower()
+    engine = requested
     if engine == "auto":
         # gseapy.prerank is the validated default — it exposes the running-ES curve and gives
         # real NES/FDR. blitzgsea (gamma-fit, scales to thousands of sets) is opt-in only: its
@@ -66,8 +67,28 @@ def run(data_path: str, params: dict) -> dict:
     if engine == "blitzgsea" and find_spec("blitzgsea"):
         return _run_blitz(ranked, sets, lib_mode, params)
     if lib_mode:
+        # The in-house weighted-KS fallback scores ONE set, so it cannot run library mode. Name the
+        # cause the caller can act on: when the engine was CHOSEN the environment is not the
+        # problem, and the old message ("needs gseapy or blitzgsea installed") blamed a missing
+        # dependency that is in fact installed. Reachable from the UI since `engine` gained a
+        # control, so a wrong diagnosis here is a wrong diagnosis a user actually sees.
+        if requested == "inhouse":
+            raise ValueError(
+                "gsea: the in-house engine scores a single gene set and cannot run library mode. "
+                "Paste your own gene set, or choose the gseapy / blitzgsea engine to score a library."
+            )
         raise ValueError("library-mode GSEA needs gseapy or blitzgsea installed (uv sync --extra omics)")
     return _run_inhouse(ranked, sets, params)
+
+
+def _perm_count(params: dict) -> int:
+    """The permutation count gseapy/blitzgsea are actually given.
+
+    Both floor it at 100, and ``or 1000`` turns an explicit 0 into the default — so the number the
+    methods paragraph must quote is this one, never the raw param. `n_perm=50` runs 100 permutations
+    and `n_perm=0` runs 1000; a paragraph quoting the param states a resolution the run never used.
+    """
+    return max(100, int(params.get("n_perm", 1000)) or 1000)
 
 
 # ---- inputs ------------------------------------------------------------------
@@ -127,7 +148,7 @@ def _run_gseapy(ranked, sets, lib_mode, params):
     kw = dict(
         rnk=ranked, gene_sets={k: list(v) for k, v in sets.items()},
         min_size=_MIN_SIZE, max_size=_MAX_SIZE,
-        permutation_num=max(100, int(params.get("n_perm", 1000)) or 1000),
+        permutation_num=_perm_count(params),
         seed=0, threads=4, no_plot=True, outdir=None, verbose=False,
     )
     weight = float(params.get("weight", 1.0))
@@ -149,7 +170,8 @@ def _run_gseapy(ranked, sets, lib_mode, params):
     hits = [int(i) for i in r.get("hits", [])]
     es, nes, pval, fdr = float(r["es"]), float(r["nes"]), float(r["pval"]), float(r["fdr"])
     return _figure(RES, metric, hits, es, nes, pval, fdr, _label(term, params, lib_mode),
-                   res if lib_mode else None, jsonable)
+                   res if lib_mode else None, jsonable,
+                   run=_run_meta("gseapy", _perm_count(params), lib_mode))
 
 
 def _ranking_values(pre, ranked, n):
@@ -171,7 +193,7 @@ def _run_blitz(ranked, sets, lib_mode, params):
 
     sig = ranked.rename(columns={"gene": 0, "metric": 1})[[0, 1]]
     res = blitz.gsea(sig, {k: list(v) for k, v in sets.items()},
-                     permutations=max(100, int(params.get("n_perm", 1000)) or 1000), seed=0)
+                     permutations=_perm_count(params), seed=0)
     res = res.reset_index().rename(columns={"index": "Term"}) if "Term" not in res.columns else res
     if res.empty:
         raise ValueError("gsea: no gene set reached the minimum size against this ranked list")
@@ -196,7 +218,8 @@ def _run_blitz(ranked, sets, lib_mode, params):
     fdr = float(row.get("FDR q-val", float("nan")))
     hits = [int(i) for i in np.where(hit)[0]]
     return _figure(RES, m, hits, float(es), nes, pval, fdr, _label(term, params, lib_mode),
-                   res if lib_mode else None, jsonable)
+                   res if lib_mode else None, jsonable,
+                   run=_run_meta("blitzgsea", _perm_count(params), lib_mode))
 
 
 # ---- in-house fallback (single set) ------------------------------------------
@@ -215,13 +238,33 @@ def _run_inhouse(ranked, sets, params):
         raise ValueError(f"only {k} gene_set members found in the ranked list (need >=2)")
     p = float(params.get("weight", 1.0))
     RES, es, _peak = _running_es(m, hit, p, np)
-    nes, pval = _nes_p(m, k, p, es, int(params.get("n_perm", 1000)), np)
+    # NOT `_perm_count`: the in-house path honours the raw value, and <=0 means it runs no
+    # permutation test at all (p is left at 1.0). The two engines genuinely differ here, so the
+    # recorded fact differs with them rather than quoting one floor for both.
+    n_perm = int(params.get("n_perm", 1000))
+    nes, pval = _nes_p(m, k, p, es, n_perm, np)
     hits = [int(i) for i in np.where(hit)[0]]
-    return _figure(RES, m, hits, es, nes, pval, None, set_name, None, jsonable)
+    return _figure(RES, m, hits, es, nes, pval, None, set_name, None, jsonable,
+                   run=_run_meta("inhouse", max(0, n_perm), False))
 
 
 # ---- shared figure assembly --------------------------------------------------
-def _figure(RES, metric, hits, es, nes, pval, fdr, label, res_table, jsonable):
+def _run_meta(engine: str, n_perm: int, fdr_corrected: bool) -> dict:
+    """What the run RESOLVED — the three facts the parameters cannot answer.
+
+    ``engine`` defaults to ``"auto"``, which picks gseapy / blitzgsea / in-house from what is
+    importable at run time, so the params alone never say which statistics were computed. The
+    permutation count is floored per engine (see ``_perm_count``). And a Benjamini-Hochberg FDR
+    across sets exists only in LIBRARY mode — a pasted single set has nothing to correct across,
+    and the in-house engine computes no q at all.
+
+    Lifted by ``methods.build_body`` as ``_gsea_run`` (the ``meta.significance`` pattern), so the
+    paragraph states what ran instead of what was asked for.
+    """
+    return {"engine": engine, "n_perm": int(n_perm), "fdr_corrected": bool(fdr_corrected)}
+
+
+def _figure(RES, metric, hits, es, nes, pval, fdr, label, res_table, jsonable, run=None):
     import numpy as np
 
     RES = np.asarray(RES, dtype=float)
@@ -237,10 +280,13 @@ def _figure(RES, metric, hits, es, nes, pval, fdr, label, res_table, jsonable):
     y_m = [round(float(metric[i]), 4) for i in idx]
     hit_x = [i + 1 for i in hits]
     table = _results_table(res_table) if res_table is not None else None
-    return jsonable(_assemble(
+    spec = _assemble(
         x_plot, y_es, peak + 1, round(float(es), 4), hit_x, x_plot, y_m,
         round(float(nes), 4), _safe(pval), label, fdr=_safe(fdr), table=table,
-    ))
+    )
+    if run is not None:
+        spec["layout"].setdefault("meta", {})["gsea"] = run
+    return jsonable(spec)
 
 
 def _results_table(res):

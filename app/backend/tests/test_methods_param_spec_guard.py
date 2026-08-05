@@ -202,7 +202,9 @@ PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
     ("methods", "facs_gating"): _untriaged(
         "bins", "comp_matrix", "max_events", "transform_t", "x_channel", "y_channel"
     ),
-    ("methods", "gsea"): _untriaged("engine"),
+    # ("methods", "gsea") is GONE — `engine` was its last waiver, and the paragraph now names the
+    # engine that actually ran (recorded by the runner, because `auto` resolves at run time) and
+    # cites it, instead of crediting gseapy for blitzGSEA's and the in-house engine's work.
     ("methods", "heatmap"): _untriaged("annotations", "cut_k", "quant_track", "split_by",
                                        "split_by_cut"),
     ("methods", "integration"): _untriaged("alpha", "harmony2"),
@@ -252,8 +254,19 @@ PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
     ),
     ("legends", "enrichment"): _untriaged("fc_threshold", "fdr_threshold", "gene_sets"),
     ("legends", "go_graph"): _untriaged("fc_threshold", "fdr_threshold", "namespace"),
-    ("legends", "gsea"): _untriaged("engine", "gene_set", "gene_sets", "n_perm", "set_name",
-                                    "weight"),
+    # ── GSEA + ssGSEA, TRIAGED 2026-08-05 (with NEXT#3's control pass over the same runners) ──────
+    # Both captions describe the figure's GEOMETRY — the running-score curve, the sample x pathway
+    # heatmap — and name no library, no engine and no statistic, so none of these can falsify one.
+    # The methods paragraph states all of them. Triaged only after reading both runners' bodies,
+    # which is what turned up three live printed-vs-computed lies in the METHODS half of the same
+    # templates: the paragraph credited `gseapy.prerank` whatever `engine` resolved to (`auto`
+    # resolves from what is importable, so the params never knew), quoted the raw `n_perm` while
+    # both library engines floor it at 100 and read an explicit 0 as 1000, and claimed a
+    # Benjamini-Hochberg correction — with the citation — on single-set and in-house runs that
+    # correct nothing. Those left the prose, not this list.
+    ("legends", "gsea"): {
+        "engine": _M, "gene_set": _M, "gene_sets": _M, "n_perm": _M, "set_name": _M, "weight": _M,
+    },
     ("legends", "heatmap"): _untriaged(
         "annotations", "cluster", "cut_k", "quant_track", "split_by", "split_by_cut"
     ),
@@ -281,8 +294,15 @@ PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
     ("legends", "regression"): _untriaged("fit", "group", "label"),
     ("legends", "sankey"): _untriaged("max_links"),
     ("legends", "scorecard"): _untriaged("fill", "invert_metrics", "max_rows", "normalize"),
-    ("legends", "ssgsea"): _untriaged("gene_set", "gene_sets", "max_size", "min_size", "weight",
-                                      "zscore"),
+    # `top_n` is deliberately absent: the caption quoted it as a COUNT ("the top 25 gene sets")
+    # when it is a cap, and named no criterion for "top" — the pair of defects that retired the
+    # `markers` caption. It now reads the realized count and says "vary most across samples", so it
+    # is described rather than waived. `zscore` stays silent honestly: the caption claims "pathway
+    # activity" without asserting a scale, and the colourbar names it on the figure itself.
+    ("legends", "ssgsea"): {
+        "gene_set": _M, "gene_sets": _M, "max_size": _M, "min_size": _M, "weight": _M,
+        "zscore": _M,
+    },
     ("legends", "string_network"): _untriaged("fdr_threshold", "max_genes"),
     ("legends", "trajectory"): _untriaged("embedding", "groupby", "normalize", "root", "threshold"),
     ("legends", "umap_scrna"): _untriaged("n_hvg", "n_neighbors", "n_pcs", "normalize"),
@@ -301,7 +321,7 @@ PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
 # template either gives a param a sentence (it leaves the list) or records a verdict (it stays with
 # PRESENTATION / INTERNAL). Lower this number when you triage; a new UNTRIAGED entry pushes over it
 # and fails, which is the point — nothing joins the backlog silently.
-_UNTRIAGED_CEILING = 179
+_UNTRIAGED_CEILING = 166
 @pytest.mark.parametrize("module,skill_id", _CASES)
 def test_every_declared_param_is_described_or_deliberately_silent(module, skill_id):
     """The reverse direction — a declared param the prose never mentions is either described or

@@ -86,3 +86,32 @@ def test_real_engine_on_synthetic_matrix(tmp_path):
     assert len(heat["y"]) == 1                  # the single pasted set
     nes = fig["table"]["rows"][0][1:]           # raw NES per sample
     assert nes[0] > nes[2] and nes[1] > nes[3]  # enriched samples score higher
+
+
+@pytest.mark.skipif(find_spec("gseapy") is None, reason="gseapy not installed")
+def test_run_records_what_it_drew_not_the_cap(tmp_path):
+    """`top_n` is a CAP: `order[:top_n]` yields fewer rows whenever fewer sets scored, so a
+    paragraph or caption quoting the param can be contradicted by the figure beside it. The runner
+    records the realized count (and the resolved `zscore`, which is read through the string-aware
+    `to_bool` the prose did not share)."""
+    import numpy as np
+    import pandas as pd
+
+    from skills.ssgsea.run_real import run
+
+    rng = np.random.default_rng(1)
+    genes = [f"G{i}" for i in range(120)]
+    expr = pd.DataFrame(rng.lognormal(size=(120, 4)), index=genes,
+                        columns=["S1", "S2", "S3", "S4"])
+    path = tmp_path / "expr.csv"
+    expr.to_csv(path)
+
+    # One pasted set, asked for a cap of 25 — the run can only draw the 1 it has.
+    fig = run(str(path), {"gene_set": " ".join(genes[:25]), "top_n": 25, "min_size": 5,
+                          "max_size": 200, "zscore": "false"})
+    meta = fig["layout"]["meta"]["ssgsea"]
+    assert meta["shown"] == 1, "the cap is not the count"
+    assert len(fig["data"][0]["y"]) == meta["shown"]
+    # The STRING "false" turns z-scoring off in the runner; the recorded fact must agree with it.
+    assert meta["zscore"] is False
+    assert fig["data"][0]["colorbar"]["title"]["text"] == "NES"

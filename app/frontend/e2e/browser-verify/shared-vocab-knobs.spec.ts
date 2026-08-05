@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { runFromWorkbench } from "./fixtures";
+import { openWorkbench, runFromWorkbench } from "./fixtures";
 
 /**
  * The second `API_ONLY_KNOBS` pass, driven through the controls that now exist.
@@ -102,4 +102,124 @@ test("pca's grouping regex and point labels reach the figure — the first switc
   for (const t of traces) {
     expect(t.mode, `trace "${t.name}" still draws its labels`).toBe("markers");
   }
+});
+
+/**
+ * The `gsea` + `ssgsea` block (13 knobs), and the one affordance this pass ADDED rather than
+ * exposed: the pasted-set override is now visible at the moment it takes effect.
+ *
+ * `gene_set` silently outranks `gene_sets` — pasting members switches the run into single-set mode
+ * and the library selection stops mattering. Mobbin was unanimous that mature products make an
+ * override an EXPLICIT mode (Google AI Studio folds "Write my own instructions" into the preset
+ * dropdown; WRITER uses a segmented Upload / Paste URL / Paste text), which Selom cannot copy
+ * without inventing a backend `mode` param — so the library control GREYS OUT instead. That is a
+ * DOM fact no unit test covers, and it is asserted here beside the figure it explains.
+ *
+ * Driven in single-set mode deliberately: library mode over the full GO library takes minutes and
+ * would time out, and the pasted path is the one that exercises the override, `set_name` (which
+ * becomes the figure's title) and the gating together.
+ */
+test("gsea's pasted gene set overrides the library — and the library control says so", async ({ page }) => {
+  await runFromWorkbench(page, {
+    projectName: "Browser-verify · GSEA pasted set",
+    // The limma DE oracle: ~14k human genes with logFC, the shape gsea ranks.
+    csvRelPath: "alpk1/irpe_rawcounts/DE_oracle_d311_limma.csv",
+    skillName: "GSEA running enrichment",
+    awaitControl: ["Or paste your own gene set", "Name for your gene set"],
+    params: {
+      // The 13 most up-regulated genes in this very table, so the set is concentrated at the TOP
+      // of the descending rank and must score a strongly positive ES. A random set would not.
+      "Or paste your own gene set":
+        "TSTD1, NLRP2, POTEF, ZNF572, LINC00654, LINC01291, GFAP, REC8, LINC00314, PCDHGA7, PCDHB5, TMEM30B, APLNR",
+      "Name for your gene set": "Top up-regulated",
+      // The in-house engine: no library, no permutation cost, and it proves the `engine` select
+      // reaches the runner — a wrong value here raises rather than quietly using gseapy.
+      "GSEA engine": "inhouse",
+      "Permutations": "200",
+    },
+  });
+
+  const fig = await page.evaluate(() => {
+    const plot = document.querySelector(".js-plotly-plot") as
+      | (HTMLElement & { layout?: { title?: { text?: string } }; data?: { y?: number[] }[] })
+      | null;
+    return {
+      title: plot?.layout?.title?.text ?? "",
+      peak: ((plot?.data ?? [])[1]?.y ?? [])[0],
+    };
+  });
+
+  // set_name → the pasted set names the figure. In library mode the title carries a GO term
+  // instead, so this string can only come from the control.
+  expect(fig.title, `set_name never reached the figure: "${fig.title}"`)
+    .toContain("Top up-regulated");
+  // gene_set → a top-concentrated set gives a strong POSITIVE enrichment score. This is the
+  // pasted members arriving, not merely a figure being drawn.
+  expect(fig.peak, "the pasted set did not reach the engine").toBeGreaterThan(0.3);
+
+});
+
+/**
+ * ⚑ The override, made visible — and it has to be checked in the WORKBENCH, not after Apply.
+ *
+ * A skill's parameter panel only renders while the skill is SELECTED; once Apply lands, the page is
+ * the editor and the controls are behind the figure-data rail. Asserting this beside the figure
+ * assertions above cost a red run with "element(s) not found", which is the distinction
+ * `openWorkbench` exists for: it stops one step short, in the only state where a param panel is on
+ * screen. Kept as its own check rather than folded in, because it is a claim about the PANEL, and
+ * the panel is a different surface from the figure.
+ */
+test("gsea's library select greys out the moment a gene set is pasted", async ({ page }) => {
+  await openWorkbench(page, {
+    projectName: "Browser-verify · GSEA override gating",
+    csvRelPath: "alpk1/irpe_rawcounts/DE_oracle_d311_limma.csv",
+    skillName: "GSEA running enrichment",
+    awaitControl: ["Reference library", "Or paste your own gene set"],
+  });
+
+  // Blank `gene_set` is the DEFAULT, so the library is the live choice and must be usable. Pinning
+  // both directions matters: a control that is always disabled would satisfy the assertion below
+  // while being a worse bug than the one this fixes.
+  const library = page.getByRole("combobox", { name: "Reference library" });
+  await expect(library, "the library select is inert on the default path").toBeEnabled();
+
+  await page.getByRole("textbox", { name: "Or paste your own gene set" }).fill("RHO, PRPH2, NRL");
+  // The run now ignores the library entirely. The panel has to say so at the instant it becomes
+  // true — otherwise it offers a choice with no consequence, the silent override this block ends.
+  await expect(library, "the library select stayed live under a pasted set").toBeDisabled();
+});
+
+test("ssgsea's set-size bounds and z-score switch reach the heatmap", async ({ page }) => {
+  await runFromWorkbench(page, {
+    projectName: "Browser-verify · ssGSEA bounds",
+    // Symbols x 18 samples — the expression matrix ssgsea scores per sample.
+    csvRelPath: "alpk1/eyg29/EYG_29_iRPE_human_St7-TMM-K0_rawCounts.csv",
+    skillName: "ssGSEA single-sample pathway enrichment",
+    awaitControl: ["Gene sets shown", "Z-score rows for display"],
+    params: {
+      "Or paste your own gene set": "RPE65, BEST1, TYR, MLANA, PMEL, TTR, SERPINF1, RLBP1",
+      "Gene sets shown": "5",
+      "Smallest gene set": "3",
+      // OFF — the colourbar must then name the raw NES rather than the z-scored display scale.
+      "Z-score rows for display": "false",
+    },
+  });
+
+  const fig = await page.evaluate(() => {
+    const plot = document.querySelector(".js-plotly-plot") as
+      | (HTMLElement & { data?: { colorbar?: { title?: { text?: string } }; y?: unknown[] }[] })
+      | null;
+    const heat = (plot?.data ?? [])[0];
+    return {
+      scale: heat?.colorbar?.title?.text ?? "",
+      rows: (heat?.y ?? []).length,
+    };
+  });
+
+  // zscore=false → the colourbar names the raw score. The default reads "enrichment (z)", so this
+  // is the switch arriving at the engine and changing what the colours MEAN.
+  expect(fig.scale, "the z-score switch did not reach the engine").toBe("NES");
+  // One pasted set is all there is to draw, whatever the cap says — the cap-is-not-a-count fact
+  // the methods paragraph and caption now read from the runner instead of from `top_n`.
+  expect(fig.rows).toBe(1);
 });

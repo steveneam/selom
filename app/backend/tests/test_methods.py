@@ -1,6 +1,6 @@
 """B4 auto methods-text — every skill yields cited, parameterized prose."""
 
-from companions import methods
+from companions import legends, methods
 from companions.methods import BH, SCIPY
 from skills.contract import SkillSpec, load_skill
 from skills.registry import list_skill_ids
@@ -41,6 +41,96 @@ def test_gsea_methods_template_is_specific_not_generic():
     single = methods.build(load_skill("gsea"), {"gene_set": "RHO,PRPH2,NRL", "set_name": "Rod set"})
     assert "Rod set" in single["text"]
     assert not any("Gene Ontology" in c for c in single["citations"])
+
+
+def _gsea_fig(engine, n_perm, fdr_corrected):
+    """A figure carrying only what the gsea runner records about its own run."""
+    return {"layout": {"meta": {"gsea": {
+        "engine": engine, "n_perm": n_perm, "fdr_corrected": fdr_corrected,
+    }}}}
+
+
+def test_gsea_methods_names_the_engine_that_actually_ran():
+    """The paragraph said "(gseapy.prerank)" and cited GSEApy on EVERY run, but `engine` defaults to
+    `auto` and resolves from what is importable — so the params never knew which statistics were
+    computed. blitzGSEA fits a gamma distribution and the in-house engine is Selom's own numpy
+    weighted-KS; crediting a package that did not run is a citation the reader cannot check."""
+    blitz = methods.build(load_skill("gsea"), {"engine": "blitzgsea"},
+                          figure=_gsea_fig("blitzgsea", 1000, True))
+    assert "blitzGSEA" in blitz["text"] and "gseapy.prerank" not in blitz["text"]
+    assert any("blitzGSEA" in c for c in blitz["citations"])
+    assert not any("GSEApy" in c for c in blitz["citations"])
+
+    house = methods.build(load_skill("gsea"), {"engine": "inhouse", "gene_set": "RHO,NRL"},
+                          figure=_gsea_fig("inhouse", 1000, False))
+    assert "in-house weighted Kolmogorov-Smirnov" in house["text"]
+    assert not any("GSEApy" in c for c in house["citations"])
+    # Subramanian is still owed — the METHOD is GSEA whoever implements it.
+    assert any("PNAS" in c for c in house["citations"])
+
+
+def test_gsea_methods_quotes_the_permutation_count_the_run_used():
+    """`_perm_count` floors the two library engines at 100 and reads an explicit 0 as the default,
+    so the raw param is not the resolution the run had. A methods paragraph claiming "50 gene-set
+    permutations" states a precision that was never computed."""
+    floored = methods.build(load_skill("gsea"), {"n_perm": "50"},
+                            figure=_gsea_fig("gseapy", 100, True))
+    assert "100 gene-set permutations" in floored["text"]
+    assert "50 gene-set permutations" not in floored["text"]
+
+    # Zero permutations is not a small test, it is NO test: the in-house engine leaves p at 1.0 and
+    # returns the score unnormalized, so the sentence has to change, not just its number.
+    none_run = methods.build(load_skill("gsea"), {"engine": "inhouse", "gene_set": "RHO,NRL",
+                                                  "n_perm": "0"},
+                             figure=_gsea_fig("inhouse", 0, False))
+    assert "no permutation test was run" in none_run["text"]
+    assert "0 gene-set permutations" not in none_run["text"]
+    assert "empirical p-value" not in none_run["text"].split("no permutation test")[0]
+
+
+def test_gsea_methods_claims_bh_only_when_a_correction_ran():
+    """Benjamini-Hochberg across sets exists only in LIBRARY mode. A pasted single set has nothing
+    to correct across and the in-house engine computes no q at all — yet the paragraph claimed the
+    correction and cited Benjamini & Hochberg on both. Same family as the `_boxplot` prose that
+    named Welch and BH while returning no citations, inverted."""
+    library = methods.build(load_skill("gsea"), {}, figure=_gsea_fig("gseapy", 1000, True))
+    assert "Benjamini-Hochberg" in library["text"]
+    assert any(c is BH for c in library["citations"])
+
+    single = methods.build(load_skill("gsea"), {"gene_set": "RHO,PRPH2,NRL"},
+                           figure=_gsea_fig("gseapy", 1000, False))
+    assert "Benjamini-Hochberg" not in single["text"]
+    assert not any(c is BH for c in single["citations"])
+    assert "false-discovery" not in single["text"]
+
+
+def test_ssgsea_prose_reads_a_string_false_zscore():
+    """A CONTRACT pin, not a defect pin — it passes against the pre-fix prose too, and that is
+    worth recording: the template used plain truthiness (where the string "false" is TRUE), and
+    was saved only because `resolved_params` casts by the declared `bool` type first. This asserts
+    the property the prose depends on, so the day that coercion moves, the failure lands here
+    rather than in a published paragraph claiming a transform the run skipped."""
+    off = methods.build(load_skill("ssgsea"), {"zscore": "false"})
+    assert "z-scored" not in off["text"]
+    on = methods.build(load_skill("ssgsea"), {"zscore": "true"})
+    assert "z-scored" in on["text"]
+
+
+def test_ssgsea_prose_states_the_count_drawn_not_the_cap():
+    """`top_n` is a cap — `order[:top_n]` yields fewer rows whenever fewer sets scored — so both the
+    paragraph and the caption were quoting a number the figure could contradict. The figure's own
+    title has always carried the real count."""
+    spec = load_skill("ssgsea")
+    fig = {"layout": {"meta": {"ssgsea": {"shown": 6, "zscore": True}}}}
+    # `top_n=25` is the CAP and 6 is what was drawn. Assert on the claim, not on the digits — "25"
+    # also occurs in the weight exponent 0.25, and a bare substring check would read that as a bug.
+    text = methods.build(spec, {"top_n": "25"}, figure=fig)["text"]
+    assert "6 most variable gene sets" in text and "25 most variable" not in text
+
+    caption = legends.build_caption(spec, {"top_n": "25"}, figure=fig)
+    assert "6 gene sets" in caption and "25 gene sets" not in caption
+    # The criterion is named, not just the number — "the top N" said nothing about how N was picked.
+    assert "vary most across samples" in caption
 
 
 def test_go_graph_methods_template_is_specific():

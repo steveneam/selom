@@ -68,6 +68,21 @@ export interface ParamDataContext {
   groups?: GroupCandidate[] | null;
 }
 
+/**
+ * A conditional gate on another field's current value, shared by `showWhen` and `enabledWhen`.
+ *
+ * `not` inverts the match, and exists for one shape the plain `equals` cannot express: a knob that
+ * is inert until a free-text field is NON-empty. `equals: ""` already reads "that field is blank"
+ * (an unset param falls back to its default, and these default to `""`), so the inverse is the only
+ * missing half. Kept as a flag on the same gate rather than a second gate type, so both consumers
+ * — `visibleParamFields` and `isFieldDisabled` — keep one comparison between them.
+ */
+export interface FieldGate {
+  key: string;
+  equals: string | number | boolean;
+  not?: boolean;
+}
+
 /** A rendered parameter control (what `ParamControl` consumes). */
 export interface ParamField {
   key: string;
@@ -94,7 +109,7 @@ export interface ParamField {
    * field still carries its default, so it is always sendable — just hidden until
    * relevant. See `visibleParamFields`.
    */
-  showWhen?: { key: string; equals: string | number | boolean };
+  showWhen?: FieldGate;
   /**
    * Conditional *enablement* (vs `showWhen`'s conditional visibility): the field always
    * RENDERS, but is shown disabled (greyed, non-interactive) until another field equals
@@ -104,7 +119,7 @@ export interface ParamField {
    * exist. Cosmetic fine-tuning that would only clutter the panel stays on `showWhen` (hidden).
    * See `isFieldDisabled`.
    */
-  enabledWhen?: { key: string; equals: string | number | boolean };
+  enabledWhen?: FieldGate;
   /**
    * `column` fields only — the dataset's columns, annotated where the engine also told us the
    * column is categorical (`condition — 6 levels`). That annotation is the honest Selom form of the
@@ -140,10 +155,10 @@ export interface ParamPresentation {
   placeholder?: string;
   help?: string;
   options?: { value: string; label: string }[];
-  showWhen?: { key: string; equals: string | number | boolean };
+  showWhen?: FieldGate;
   /** Show-but-disable gate (see `ParamField.enabledWhen`): the control always renders, greyed
    *  until the named field matches `equals`. For discoverable-but-inert capability controls. */
-  enabledWhen?: { key: string; equals: string | number | boolean };
+  enabledWhen?: FieldGate;
   /** `pairs` only — the sibling field naming the group column whose levels this picker offers
    *  (e.g. boxplot's `group`). Omitted → the engine's `best_group` is the only source. */
   levelsFrom?: string;
@@ -262,6 +277,59 @@ const scrnaNormalize = (extra = ""): ParamPresentation => ({
 const scrnaGroupby = (purpose: string): ParamPresentation => ({
   key: "groupby", label: "Group cells by", type: "text", placeholder: "leiden",
   help: `${purpose} If your file has no such column, Selom clusters the cells itself (Leiden) and groups by that.`,
+});
+
+/**
+ * The gene-set library pair — `gene_sets` (which collection to score) and `gene_set` (paste your
+ * own instead). Shared by `enrichment` · `gsea` · `ssgsea`, whose runners resolve them through
+ * byte-identical code: the same `_SOURCE_ALIASES` map into `gene_sets.library.load_collection`,
+ * and the same `_parse_panel` split on commas/whitespace. Confirmed by reading each runner's BODY
+ * (`skills/gsea/run_real.py:104` · `skills/ssgsea/run_real.py:55`), the `normalize`/`pvca` rule.
+ *
+ * The METHOD is not shared and the wording must not pretend otherwise: `enrichment` is an
+ * over-representation test on a gene LIST, `gsea` walks a whole ranked contrast, `ssgsea` scores
+ * each sample independently. So the shared part is the library and the override; the clause naming
+ * what scores against it is passed in.
+ *
+ * ⚑ THE OVERRIDE IS THE REASON THESE TRAVEL TOGETHER. A non-empty `gene_set` switches the run into
+ * single-set mode and the library selection stops mattering entirely — silently, today, because the
+ * two were independent controls. Mobbin was unanimous that mature products make an override an
+ * EXPLICIT mode rather than an emergent one: Google AI Studio puts "Write my own instructions" in
+ * the same dropdown as the presets (https://mobbin.com/screens/675981da-f3cf-42a5-b10f-0655500284f9),
+ * and WRITER uses a segmented `Upload new file | Paste URL | Paste text`
+ * (https://mobbin.com/screens/90363e8d-d9ab-466d-8953-abd6a2c11920) — one decision, one control.
+ * Selom cannot adopt either shape without inventing a backend `mode` param the runners do not have,
+ * which is a contract change, not a reachability fix. So the honest half is taken: the library
+ * control GREYS OUT the moment a set is pasted (`enabledWhen`), which makes the override visible at
+ * the instant it takes effect. Recorded as ruled-out-with-reason, not as a pattern to copy later.
+ */
+const geneSetLibrary = (scoredBy: string, overridable = false): ParamPresentation => ({
+  key: "gene_sets", label: "Reference library", type: "select",
+  options: [
+    { value: "go", label: "Gene Ontology" },
+    { value: "wikipathways", label: "WikiPathways" },
+    { value: "curated", label: "Selom curated" },
+    { value: "reference", label: "Reference panels" },
+    { value: "all", label: "All sources" },
+  ],
+  // `resolveOptions` intersects these with the skill's own declared options, so `enrichment` —
+  // whose skill.json omits `reference` — renders its four and no dead choice appears.
+  //
+  // `overridable` is NOT cosmetic and defaults to off: `enrichment` declares no `gene_set` param at
+  // all, and a gate naming a key absent from the schema reads `undefined`, never matches `""`, and
+  // would leave its library select PERMANENTLY DISABLED. The sentence would be false there too —
+  // there is no paste field to override it. Sharing the vocabulary means sharing what is actually
+  // shared; the override belongs to the two skills that have one.
+  help: overridable
+    ? `The license-clean library ${scoredBy}. Ignored while you have pasted your own gene set below.`
+    : `The license-clean library ${scoredBy}.`,
+  enabledWhen: overridable ? { key: "gene_set", equals: "" } : undefined,
+});
+
+const pastedGeneSet = (instead: string): ParamPresentation => ({
+  key: "gene_set", label: "Or paste your own gene set", type: "text",
+  placeholder: "TP53, BRCA1, EGFR",
+  help: `Gene symbols separated by commas or spaces. Leave blank to use the reference library above; fill it in and ${instead}`,
 });
 
 const PRESENTATION: Record<string, ParamPresentation[]> = {
@@ -591,16 +659,7 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
   ],
   // Gene-set builder Phase A: apply a corpus source / a highlight panel from "Gene Sets".
   enrichment: [
-    {
-      key: "gene_sets", label: "Reference library", type: "select",
-      options: [
-        { value: "go", label: "Gene Ontology" },
-        { value: "wikipathways", label: "WikiPathways" },
-        { value: "curated", label: "Selom curated" },
-        { value: "all", label: "All sources" },
-      ],
-      help: "The license-clean library the over-representation test scores against.",
-    },
+    geneSetLibrary("the over-representation test scores against"),
     {
       key: "direction", label: "Direction", type: "select",
       options: [
@@ -644,6 +703,72 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
       help: "GO's three branches answer different questions. Mixing them in one graph is usually why it reads as unrelated clusters.",
     },
     ...GENE_LIST_CUTOFFS,
+  ],
+  // GSEA — every knob was API-only until 2026-08-05. The ranking is derived from the file, so what
+  // is left to choose is WHAT is tested (library or a pasted set), HOW hard the metric is weighted,
+  // and how much permutation resolution the p-value gets. Ordered library → override → statistics.
+  gsea: [
+    geneSetLibrary("the ranked list is scored against", true),
+    pastedGeneSet("only that set is tested, as a single pre-ranked GSEA."),
+    {
+      key: "set_name", label: "Name for your gene set", type: "text", placeholder: "Gene set",
+      // Greyed rather than hidden: it names the pasted set in the figure TITLE, so it is worth
+      // advertising, but in library mode the label comes from the winning term and this is inert.
+      // `not` inverts the blank test — the one gate shape `equals` alone cannot express.
+      enabledWhen: { key: "gene_set", equals: "", not: true },
+      help: "Labels your pasted set on the figure. Unused with the reference library, where each term carries its own name.",
+    },
+    {
+      key: "weight", label: "Metric weighting exponent", type: "range", step: 0.05,
+      help: "How hard the ranking metric weights the running score. 1 is the classic weighted GSEA; 0 ignores the magnitudes and tests rank order alone.",
+    },
+    {
+      // NOT a slider, for `fdr_threshold`'s reason: the useful values (100 / 1000 / 10000) are
+      // log-spaced across a 0-10000 track, so a linear thumb makes the two smaller ones
+      // indistinguishable. The floor is stated because it is real — `_perm_count` raises anything
+      // under 100 to 100, so a control that silently accepted 50 would misreport its own run.
+      key: "n_perm", label: "Permutations", type: "number", step: 100,
+      help: "More permutations resolve smaller p-values, and cost run time proportionally. The gseapy and blitzGSEA engines use 100 as a floor.",
+    },
+    {
+      key: "engine", label: "GSEA engine", type: "select",
+      options: [
+        { value: "auto", label: "Automatic (recommended)" },
+        { value: "gseapy", label: "gseapy.prerank" },
+        { value: "blitzgsea", label: "blitzGSEA (gamma-fit p-values)" },
+        { value: "inhouse", label: "In-house weighted KS (single set only)" },
+      ],
+      help: "Automatic picks gseapy, the validated default. blitzGSEA resolves smaller p-values and scales to large libraries, but its first run pays a JIT compile. The in-house engine needs no extra dependency and scores only a pasted set.",
+    },
+  ],
+  // ssGSEA — scores every sample independently, so there is no contrast to choose: the knobs decide
+  // which sets qualify, how many of them are drawn, and whether the heatmap shows raw NES or z.
+  ssgsea: [
+    geneSetLibrary("every sample is scored against", true),
+    pastedGeneSet("every sample is scored against that set alone."),
+    {
+      // The selection rule is the part a reader cannot guess and the one that differs from
+      // `enrichment.top_n` (most ENRICHED): these are the most VARIABLE across samples, which is
+      // what makes a heatmap worth looking at. Same key, different meaning — not shared.
+      key: "top_n", label: "Gene sets shown", type: "range", step: 1,
+      help: "How many gene sets the heatmap draws, taken in order of variance ACROSS samples — the ones that separate your samples, not the most enriched overall.",
+    },
+    {
+      key: "min_size", label: "Smallest gene set", type: "number", step: 1,
+      help: "Sets with fewer detected members than this are dropped. Very small sets score erratically because one gene moves the whole result.",
+    },
+    {
+      key: "max_size", label: "Largest gene set", type: "number", step: 1,
+      help: "Sets with more detected members than this are dropped. Very broad sets score near-identically in every sample and crowd out the informative ones.",
+    },
+    {
+      key: "weight", label: "Rank weighting exponent", type: "range", step: 0.05,
+      help: "How hard a gene's rank within the sample weights its contribution. 0.25 is the value the ssGSEA method was published with.",
+    },
+    {
+      key: "zscore", label: "Z-score rows for display", type: "switch",
+      help: "Centres each pathway across samples so the diverging colours read as relative activity. Off shows the raw enrichment scores, where a uniformly high pathway stays high. The exported table always carries the raw scores.",
+    },
   ],
   // Sankey — one knob, and it was API-only, so this skill rendered an EMPTY parameter panel.
   sankey: [
@@ -1333,11 +1458,8 @@ export function isFieldDisabled(schema: ParamField[], field: ParamField, params:
 }
 
 /** Does the current (or default) value of the gate's field match its `equals`? Loose compare. */
-function gateMatches(
-  gate: { key: string; equals: string | number | boolean },
-  schema: ParamField[],
-  params: SkillParams,
-): boolean {
+function gateMatches(gate: FieldGate, schema: ParamField[], params: SkillParams): boolean {
   const current = params[gate.key] ?? schema.find((x) => x.key === gate.key)?.default;
-  return current === gate.equals || String(current) === String(gate.equals);
+  const hit = current === gate.equals || String(current) === String(gate.equals);
+  return gate.not ? !hit : hit;
 }

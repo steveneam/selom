@@ -138,3 +138,40 @@ def test_a_non_numeric_ranking_column_is_an_honest_error_not_a_garbage_ranking()
     })
     with pytest.raises(ValueError, match="does not look like a ranking metric"):
         _ranked(df, None)
+
+
+def test_run_records_the_engine_and_permutation_count_it_actually_used(tmp_path):
+    """The prose cannot state what ran unless the runner writes it down.
+
+    `engine` defaults to `auto` and resolves from what is importable, and `_perm_count` floors the
+    library engines at 100 — so both facts are the runner's to record, not the params'. Same shape
+    as `meta.significance` / `meta.adaptation`.
+    """
+    from skills.gsea.run_real import run
+
+    path = _ranked_csv(tmp_path)
+    top = " ".join(f"G{i}" for i in range(30))
+    fig = run(path, {"engine": "inhouse", "gene_set": top, "n_perm": 200})
+    assert fig["layout"]["meta"]["gsea"] == {
+        "engine": "inhouse", "n_perm": 200, "fdr_corrected": False,
+    }
+
+    # A single pasted set corrects nothing across sets, whichever engine ran.
+    pytest.importorskip("gseapy")
+    fig = run(path, {"engine": "gseapy", "gene_set": top, "n_perm": 200})
+    assert fig["layout"]["meta"]["gsea"]["engine"] == "gseapy"
+    assert fig["layout"]["meta"]["gsea"]["fdr_corrected"] is False
+
+
+def test_inhouse_engine_refuses_library_mode_with_an_actionable_message(tmp_path):
+    """The in-house engine scores ONE set, so library mode is impossible for it — and the message
+    blamed a missing dependency ("needs gseapy or blitzgsea installed") that is in fact installed.
+    Reachable from the UI since `engine` gained a control, so the wrong diagnosis is one a user
+    now sees."""
+    from skills.gsea.run_real import run
+
+    with pytest.raises(ValueError) as err:
+        run(_ranked_csv(tmp_path), {"engine": "inhouse"})   # no gene_set -> library mode
+    msg = str(err.value)
+    assert "cannot run library mode" in msg
+    assert "installed" not in msg, "the environment is not the problem when the engine was chosen"

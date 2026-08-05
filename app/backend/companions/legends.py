@@ -49,9 +49,14 @@ def _facts(figure: dict | None, table: dict | list | None) -> dict:
     # The grouping the runner actually used, when it had to substitute one (the requested `groupby`
     # column was absent and it clustered the cells itself). The caption names the groups the reader
     # is looking at, so naming the column the user ASKED for is exactly the wrong one.
-    clustered = ((figure or {}).get("layout") or {}).get("meta") or {}
-    if isinstance(clustered.get("clustered"), dict):
-        facts["clustered"] = clustered["clustered"]
+    meta = ((figure or {}).get("layout") or {}).get("meta") or {}
+    if isinstance(meta.get("clustered"), dict):
+        facts["clustered"] = meta["clustered"]
+    # How many gene sets ssGSEA actually DREW. `top_n` is a cap, so the param overstates it whenever
+    # the library scored fewer sets than the cap — and a caption is a published claim about one
+    # figure. Same shape as `clustered`: a fact only the runner has.
+    if isinstance(meta.get("ssgsea"), dict) and "shown" in meta["ssgsea"]:
+        facts["ssgsea_shown"] = meta["ssgsea"]["shown"]
     return facts
 
 
@@ -245,9 +250,14 @@ def _gsea(p, f):
 
 
 def _ssgsea(p, f):
+    # `top_n` is a CAP, not a count — `order[:top_n]` yields fewer rows whenever the library scored
+    # fewer sets — and "the top N" named no criterion, the defect that retired the `markers`
+    # caption. The runner records what it actually drew and by what rule; the param is the fallback
+    # for a params-only call.
+    shown = int((f or {}).get("ssgsea_shown", p.get("top_n", 25)))
     return (
-        f"Per-sample pathway activity (single-sample GSEA) for the top {int(p.get('top_n', 25))} "
-        "gene sets, as a sample x pathway heatmap."
+        f"Per-sample pathway activity (single-sample GSEA) for the {shown} gene sets that vary "
+        "most across samples, as a sample x pathway heatmap."
     )
 
 

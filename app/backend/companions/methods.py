@@ -40,6 +40,7 @@ STRING = "Szklarczyk, D. et al. The STRING database in 2023: protein-protein ass
 SMYTH = "Smyth, G.K. Linear models and empirical Bayes methods for assessing differential expression in microarray experiments. Statistical Applications in Genetics and Molecular Biology 3, Article 3 (2004)."
 GSEA = "Subramanian, A. et al. Gene set enrichment analysis: a knowledge-based approach for interpreting genome-wide expression profiles. PNAS 102, 15545-15550 (2005)."
 GSEAPY = "Fang, Z., Liu, X. & Peltz, G. GSEApy: a comprehensive package for performing gene set enrichment analysis in Python. Bioinformatics 39, btac757 (2023)."
+BLITZGSEA = "Lachmann, A., Xie, Z. & Ma'ayan, A. blitzGSEA: efficient computation of gene set enrichment analysis through gamma distribution approximation. Bioinformatics 38, 2356-2357 (2022)."
 SSGSEA = "Barbie, D.A. et al. Systematic RNA interference reveals that oncogenic KRAS-driven cancers require TBK1. Nature 462, 108-112 (2009)."
 CEPO = "Kim, H.J., Wang, K., Chen, C. et al. Uncovering cell identity through differential stability with Cepo. Nature Computational Science 1, 784-790 (2021)."
 PVCA = "Boedigheimer, M.J. et al. Sources of variation in baseline gene expression levels from toxicogenomics study control animals across multiple laboratories. BMC Genomics 9, 285 (2008)."
@@ -699,10 +700,53 @@ def _boxplot(p: dict):
     return text + sentence, cites + sig_cites
 
 
+# How each GSEA engine is named in prose, and what it owes the bibliography. `inhouse` cites no
+# tool on purpose — it is Selom's own numpy implementation of the Subramanian method, which is
+# already cited, and crediting a package that never ran is the defect this table exists to fix.
+_GSEA_ENGINES = {
+    "gseapy": ("pre-ranked Gene Set Enrichment Analysis (gseapy.prerank)", [GSEAPY]),
+    "blitzgsea": (
+        "pre-ranked Gene Set Enrichment Analysis (blitzGSEA, with gamma-distribution-approximated "
+        "p-values)", [BLITZGSEA],
+    ),
+    "inhouse": (
+        "pre-ranked Gene Set Enrichment Analysis (an in-house weighted Kolmogorov-Smirnov "
+        "implementation)", [],
+    ),
+}
+
+
+def _gsea_run(p: dict) -> dict:
+    """What the run resolved — engine, permutation count, whether an FDR was corrected.
+
+    Prefers the runner's recorded fact (`_gsea_run`, lifted from ``layout.meta``). Falling back to
+    the params is only for replay from recorded config (litsynth), where no figure is at hand: an
+    explicit ``engine`` is honoured, and ``auto`` is reported as gseapy because that is what it
+    selects wherever gseapy is importable — the shipped configuration, and the previous
+    unconditional claim.
+    """
+    fact = p.get("_gsea_run")
+    if isinstance(fact, dict):
+        return fact
+    engine = str(p.get("engine") or "auto").strip().lower()
+    if engine not in _GSEA_ENGINES:
+        engine = "gseapy"
+    return {
+        "engine": engine,
+        # Mirrors skills/gsea/run_real._perm_count: both library engines floor at 100 and read an
+        # explicit 0 as the default, so the raw param is not the number the run used.
+        "n_perm": int(p.get("n_perm", 1000)) if engine == "inhouse"
+        else max(100, int(p.get("n_perm", 1000)) or 1000),
+        "fdr_corrected": not str(p.get("gene_set") or "").strip() and engine != "inhouse",
+    }
+
+
 def _gsea(p: dict):
     pasted = str(p.get("gene_set") or "").strip()
     weight = p.get("weight", 1.0)
-    n_perm = p.get("n_perm", 1000)
+    run = _gsea_run(p)
+    method, engine_cite = _GSEA_ENGINES.get(str(run.get("engine")), _GSEA_ENGINES["gseapy"])
+    n_perm = int(run.get("n_perm", 1000))
     if pasted:
         target = f"a single gene set ('{p.get('set_name') or 'Gene set'}')"
         lib_cite: list[str] = []
@@ -713,17 +757,39 @@ def _gsea(p: dict):
                                                               "the Gene Ontology")
         target = f"every gene set in {source}"
         lib_cite = [GO]
+    # A permutation count of zero is not a small test, it is NO test: the in-house engine returns
+    # the enrichment score unnormalized and leaves p at 1.0. Claiming "0 permutations ... to yield
+    # a normalized enrichment score and empirical p-value" would describe a result that was never
+    # computed, so the sentence changes rather than the number in it.
+    if n_perm > 0:
+        significance = (
+            f"significance was assessed against {n_perm} gene-set permutations to yield a "
+            "normalized enrichment score (NES) and empirical p-value"
+        )
+    else:
+        significance = (
+            "no permutation test was run, so the enrichment score is reported unnormalized and "
+            "without an empirical p-value"
+        )
+    # Benjamini-Hochberg across sets exists only in library mode. A pasted single set has nothing
+    # to correct across, and the in-house engine computes no q at all — the paragraph claimed the
+    # correction (and cited it) on both.
+    if run.get("fdr_corrected"):
+        significance += (
+            ", with false-discovery rates corrected across sets by the Benjamini-Hochberg procedure"
+        )
+        fdr_cite = [BH]
+    else:
+        fdr_cite = []
     text = (
         "Genes were ranked by their signed differential-expression metric (log2 fold change or a "
-        "signed test statistic) and tested for coordinated enrichment by pre-ranked Gene Set "
-        f"Enrichment Analysis (gseapy.prerank) against {target}. A running enrichment score was "
-        f"accumulated along the ranked list with the Kolmogorov-Smirnov statistic weighted by the "
-        f"metric (exponent {weight:g}); significance was assessed against {n_perm} gene-set "
-        "permutations to yield a normalized enrichment score (NES) and empirical p-value, with "
-        "false-discovery rates corrected across sets by the Benjamini-Hochberg procedure. The "
-        "running enrichment curve, leading-edge hits, and ranked metric are shown."
+        f"signed test statistic) and tested for coordinated enrichment by {method} against "
+        f"{target}. A running enrichment score was accumulated along the ranked list with the "
+        f"Kolmogorov-Smirnov statistic weighted by the metric (exponent {float(weight):g}); "
+        f"{significance}. The running enrichment curve, leading-edge hits, and ranked metric "
+        "are shown."
     )
-    return text, [GSEA, GSEAPY, *lib_cite, BH]
+    return text, [GSEA, *engine_cite, *lib_cite, *fdr_cite]
 
 
 def _ssgsea(p: dict):
@@ -740,19 +806,27 @@ def _ssgsea(p: dict):
         lib_cite = [GO]
     weight = p.get("weight", 0.25)
     min_size, max_size = p.get("min_size", 10), p.get("max_size", 500)
-    top_n = p.get("top_n", 25)
-    norm = (
-        " Per-pathway scores were z-scored across samples for display."
-        if p.get("zscore", True) else ""
-    )
+    fact = p.get("_ssgsea_run")
+    fact = fact if isinstance(fact, dict) else {}
+    # `top_n` is a CAP: `order[:top_n]` yields fewer rows whenever the library scored fewer sets
+    # than the cap, and the paragraph quoted the cap as though it were the count. The runner
+    # records what it actually drew (the figure title has always stated it); the param is the
+    # fallback for replay from recorded config, where no figure is at hand.
+    shown = int(fact.get("shown", p.get("top_n", 25)))
+    # Prefer the runner's resolved boolean; `to_bool` is the fallback, matching the coercion the
+    # runner applies to RAW params. Not a live defect on this path — `resolved_params` already
+    # casts by the declared `bool` type, so the string "false" arrives here as False — but the two
+    # sides now agree by construction rather than by both happening to be right.
+    zscored = bool(fact["zscore"]) if "zscore" in fact else to_bool(p.get("zscore", True))
+    norm = " Per-pathway scores were z-scored across samples for display." if zscored else ""
     text = (
         "Per-sample pathway activity was quantified by single-sample Gene Set Enrichment "
         "Analysis (ssGSEA; gseapy.ssgsea). Within each sample, genes were rank-normalized and a "
         f"normalized enrichment score was computed for {target} as a Kolmogorov-Smirnov-like "
         f"statistic over the ranked list, weighted by the rank (exponent {float(weight):g}); no "
         "differential-expression test or permutation was required. Gene sets with fewer than "
-        f"{int(min_size)} or more than {int(max_size)} detected members were excluded. The top "
-        f"{int(top_n)} gene sets by across-sample variance are shown as a sample x pathway "
+        f"{int(min_size)} or more than {int(max_size)} detected members were excluded. The "
+        f"{shown} most variable gene sets across samples are shown as a sample x pathway "
         f"heatmap.{norm}"
     )
     return text, [SSGSEA, GSEAPY, *lib_cite]
@@ -1379,6 +1453,15 @@ def build_body(spec: SkillSpec, params: dict, figure: dict | None = None) -> tup
         # The runner clustered the cells itself because the requested `groupby` column was absent —
         # a fact about the DATA, and the only record of the `resolution` that produced them.
         resolved["_clustered"] = meta["clustered"]
+    if isinstance(meta.get("gsea"), dict):
+        # Which GSEA engine ran, how many permutations it was actually given, and whether an FDR
+        # was corrected across sets. `engine` DEFAULTS to "auto" and resolves from what is
+        # importable, so the params cannot name the statistics that were computed.
+        resolved["_gsea_run"] = meta["gsea"]
+    if isinstance(meta.get("ssgsea"), dict):
+        # `top_n` is a cap, not a count, and `zscore` is read through a string-aware truthiness
+        # test the prose did not share. Both are answers only the runner has.
+        resolved["_ssgsea_run"] = meta["ssgsea"]
     builder = _TEMPLATES.get(spec.id)
     return builder(resolved) if builder else _generic(spec, resolved)
 
