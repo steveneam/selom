@@ -169,45 +169,202 @@ def _violin(p: dict):
     return text, citations
 
 
-def _deg(p: dict):
+# The scanpy ranking tests, named as a reader would write them. `method` reaches
+# `rank_genes_groups` untouched, so the paragraph must not hard-code one.
+_DEG_TESTS = {
+    "wilcoxon": "the Wilcoxon rank-sum test",
+    "t-test": "Welch's t-test",
+    "t-test_overestim_var": "a t-test with overestimated variance",
+    "logreg": "logistic regression",
+}
+
+
+def _deg_mode(p: dict) -> str:
+    """The engine that RAN. ``mode="auto"`` — the default — resolves from the file extension at run
+    time (`deg/run_real.py:31-33`), so the params alone cannot say whether the reader is looking at
+    a single-cell marker ranking or a bulk DESeq2 contrast. The runner records it."""
+    run = p.get("_deg_run") or {}
+    if run.get("mode"):
+        return str(run["mode"])
     mode = str(p.get("mode") or "auto").lower()
     if mode in ("pseudobulk", "pseudo-bulk", "pseudo_bulk"):
-        sample_col = str(p.get("sample_col") or "sample")
-        reference, treatment = str(p.get("reference") or "").strip(), str(p.get("treatment") or "").strip()
+        return "pseudobulk"
+    if mode in ("timecourse", "time-course", "time_course"):
+        return "timecourse"
+    return mode if mode in ("scrna", "bulk") else "auto"
+
+
+def _deseq_claims(p: dict, run: dict) -> tuple[str, str, list[str]]:
+    """``(engine clause, correction clause, citations)`` for a DESeq2-family path.
+
+    ⚑ THE FALLBACK IS THE POINT. `_bulk_deseq` catches `ImportError` and returns a log2 of mean CPM
+    — **no model, no test, no p-value at all** — while the old paragraph went on claiming a PyDESeq2
+    Wald test and Benjamini-Hochberg correction, and cited all three. Same shape as `_boxplot`
+    citing Welch and BH while returning no comparisons. The engine label is the only record of which
+    happened, so it decides the sentence AND the citation list.
+
+    With no engine label (litsynth replay from recorded params, no figure) the REQUESTED
+    `normalization` is named instead. That is the honest degrade: it is what was asked for, and the
+    one thing the label adds — that TMM silently fell back — cannot be known without the run.
+    """
+    engine = str(run.get("engine") or "")
+    if "absent" in engine:
+        return (
+            " counts were compared as the log2 ratio of mean CPM between the groups",
+            " No statistical model was fitted and no p-values were computed, because PyDESeq2 was "
+            "not available in this environment; the ranking reflects effect size alone.",
+            [],
+        )
+    tmm = "TMM norm" in engine if engine else str(p.get("normalization") or "").lower() == "tmm"
+    norm = (
+        " with TMM size factors (the edgeR / limma-voom convention) substituted into the fit"
+        if tmm
+        else " with median-of-ratios size factors"
+    )
+    unavailable = (
+        " TMM normalization was requested but was unavailable in this environment, so DESeq2's "
+        "median-of-ratios size factors were used instead."
+        if "TMM unavailable" in engine
+        else ""
+    )
+    return (
+        " raw counts were modelled with PyDESeq2 (a Python reimplementation of DESeq2)"
+        f"{norm} and tested with the Wald test",
+        f" P-values were corrected by the Benjamini-Hochberg procedure.{unavailable}",
+        [PYDESEQ2, DESEQ2, BH],
+    )
+
+
+def _deg_filters(p: dict) -> str:
+    """The exclusion criteria — both disclosed in the figure subtitle and in neither companion."""
+    return (
+        f" Genes whose counts summed below {int(p.get('min_count', 10))} across the retained "
+        "samples were excluded before fitting."
+    )
+
+
+def _deg(p: dict):
+    run = p.get("_deg_run") or {}
+    mode = _deg_mode(p)
+    reference, treatment = str(p.get("reference") or "").strip(), str(p.get("treatment") or "").strip()
+
+    if mode == "pseudobulk":
+        # RESOLVED, not requested: a blank `sample_col` falls through `_SAMPLE_FALLBACKS`, so the
+        # old default of the literal word "sample" named a column that need not exist.
+        sample_col = str(run.get("sample_col") or p.get("sample_col") or "sample")
+        condition_col = str(run.get("condition_col") or p.get("condition_col") or "").strip()
+        by_condition = f" by {condition_col}" if condition_col else ""
         contrast = f" ({treatment} versus {reference})" if reference and treatment else ""
-        label = str(p.get("label") or "").strip()
-        within = f" within {label}" if label else ""
+        label, label_col = str(p.get("label") or "").strip(), str(p.get("label_col") or "").strip()
+        within = f" within {label_col} = {label}" if label and label_col else (f" within {label}" if label else "")
+        engine_clause, correction, cites = _deseq_claims(p, run)
+        dropped = int(run.get("n_dropped") or 0)
+        excluded = (
+            f" {dropped} replicate(s) with fewer than {int(run.get('min_cells', p.get('min_cells', 10)))} "
+            "cells were excluded."
+            if dropped else ""
+        )
         text = (
             f"Differential expression between conditions{contrast} was assessed with a pseudo-bulk "
-            f"approach to avoid pseudoreplication: single-cell raw counts were summed per biological "
-            f"replicate ({sample_col}){within} to form one expression profile per sample, which were "
-            "then modelled as bulk RNA-seq with PyDESeq2 (a Python reimplementation of DESeq2) and "
-            "tested with the Wald test. Aggregating to the replicate level treats samples — not "
-            "individual cells — as the unit of replication, the statistically valid design for "
-            f"multi-sample comparisons. The top {p['top_n']} genes are reported, with p-values "
-            "corrected by the Benjamini-Hochberg procedure."
+            "approach to avoid pseudoreplication: single-cell raw counts were summed per biological "
+            f"replicate ({sample_col}){within} to form one expression profile per sample, grouped"
+            f"{by_condition}, and{engine_clause}. Aggregating to the replicate level treats samples "
+            "— not individual cells — as the unit of replication, the statistically valid design "
+            f"for multi-sample comparisons.{excluded}{_deg_filters(p)} The top {p['top_n']} genes "
+            f"are reported.{correction}"
         )
-        return text, [SCANPY, PYDESEQ2, DESEQ2, SQUAIR, BH]
-    if mode in ("timecourse", "time-course", "time_course"):
+        return text, [SCANPY, *cites, SQUAIR] if cites else [SCANPY, SQUAIR]
+
+    if mode == "timecourse":
+        time_col = str(p.get("time_col") or "time")
+        covariate = str(p.get("covariate_col") or "").strip()
+        # Setting `covariate_col` is not the same as the adjustment RUNNING: the design gains the
+        # term only when the column resolves to >=2 distinct levels (`_timecourse_rank`).
+        adjusted = bool(run.get("covariate_adjusted"))
+        adj_clause = (
+            f", adjusting for {covariate} (design ~{covariate} + time)" if adjusted
+            else f". The requested covariate {covariate} held a single value across the retained "
+                 "samples, so no adjustment was applied" if covariate else ""
+        )
+        stratum = (
+            f" The trend was computed within a single stratum ({p.get('group_col')} = "
+            f"{p.get('group_val')}) so it is not confounded across groups."
+            if run.get("restricted") or (p.get("group_col") and p.get("group_val")) else ""
+        )
+        if "absent" in str(run.get("engine") or ""):
+            text = (
+                f"Genes trending over {time_col} were ranked by the Pearson correlation of log2-CPM "
+                f"expression with the numeric timepoint{adj_clause}. No count model was fitted and "
+                "no p-values were computed, because PyDESeq2 was not available in this "
+                f"environment.{stratum}{_deg_filters(p)} The top {p['top_n']} trending genes are "
+                "shown as mean log2-CPM trajectories."
+            )
+            return text, []
         text = (
             "Time-course differential expression was assessed by modelling raw counts against the "
-            f"sampling time as a continuous covariate in PyDESeq2 (a Python reimplementation of DESeq2) "
-            "and Wald-testing the time coefficient, identifying genes with a significant linear "
-            f"expression trend over time. The top {p['top_n']} trending genes are shown as mean "
-            "log2-CPM trajectories, with p-values corrected by the Benjamini-Hochberg procedure."
+            f"{time_col} value as a continuous covariate in PyDESeq2 (a Python reimplementation of "
+            f"DESeq2){adj_clause} and Wald-testing the time coefficient, identifying genes with a "
+            f"significant linear expression trend over time.{stratum}{_deg_filters(p)} The top "
+            f"{p['top_n']} trending genes are shown as mean log2-CPM trajectories, with p-values "
+            "corrected by the Benjamini-Hochberg procedure."
         )
         return text, [PYDESEQ2, DESEQ2, BH]
-    reference, treatment = str(p.get("reference") or "").strip(), str(p.get("treatment") or "").strip()
-    contrast = f" for the {treatment}-versus-{reference} contrast" if reference and treatment else ""
-    text = (
-        f"Differential expression was assessed{contrast}. For single-cell data, marker genes were "
-        f"ranked per {p['groupby']} group with the Wilcoxon rank-sum test (Scanpy rank_genes_groups); "
-        "for bulk RNA-seq, raw counts were modelled with PyDESeq2 (a Python reimplementation of DESeq2) "
-        "and tested with the Wald test. The "
-        f"top {p['top_n']} genes per contrast are reported, with p-values corrected for multiple "
-        "testing by the Benjamini-Hochberg procedure."
+
+    if mode == "bulk":
+        contrast = f" for the {treatment}-versus-{reference} contrast" if reference and treatment else ""
+        engine_clause, correction, cites = _deseq_claims(p, run)
+        text = (
+            f"Differential expression was assessed{contrast}:{engine_clause}."
+            f"{_deg_filters(p)} The top {p['top_n']} genes are reported.{correction}"
+        )
+        return text, cites
+
+    if mode == "auto":
+        # ⚑ The engine is genuinely UNKNOWN here: `mode="auto"` resolves from the file extension at
+        # run time, and this branch is only reached when no figure was supplied (the jobs queue,
+        # litsynth replay from recorded params). The old paragraph described both engines as though
+        # both had run, which is a lie once you know which one did — but guessing one is a lie in
+        # the other direction. So it states the SELECTION RULE, which is the true thing that can be
+        # said from params alone. The live path (`routers/_run.py`) passes the figure and never
+        # lands here.
+        contrast = f" for the {treatment}-versus-{reference} contrast" if reference and treatment else ""
+        engine_clause, correction, cites = _deseq_claims(p, run)
+        text = (
+            f"Differential expression was assessed{contrast}. The engine was selected from the "
+            "input: for single-cell data (.h5ad), marker genes were ranked per "
+            f"{p['groupby']} group with {_DEG_TESTS.get(str(p.get('method') or 'wilcoxon').strip().lower(), 'the configured test')} "
+            f"(Scanpy rank_genes_groups); for a bulk counts table,{engine_clause}."
+            f"{_deg_filters(p)} The top {p['top_n']} genes are reported.{correction}"
+        )
+        return text, [SCANPY, *cites]
+
+    # Single-cell marker ranking. This is NOT a fold-change contrast: scanpy ranks by a test
+    # statistic, which is why the figure's axis names it.
+    method = str(run.get("method") or p.get("method") or "wilcoxon").strip().lower()
+    test = _DEG_TESTS.get(method, f"the {method} test")
+    normalized = (
+        "Counts were normalized to 10,000 per cell and log1p-transformed, then "
+        if to_bool(p.get("normalize", True)) else "Counts were used as supplied (already normalized), and "
     )
-    return text, [SCANPY, PYDESEQ2, DESEQ2, BH]
+    # The runner clusters the cells ITSELF when the requested column is absent, and the figure title
+    # has always carried the substituted name while the paragraph carried the requested one.
+    if run.get("clustered"):
+        grouping = (
+            f"cells were clustered with the Leiden algorithm (the requested "
+            f"{run.get('requested_groupby', 'grouping')} column was not present in the data) and "
+            "marker genes were ranked per cluster"
+        )
+    else:
+        grouping = f"marker genes were ranked per {run.get('groupby') or p['groupby']} group"
+    shown = run.get("group")
+    shown_clause = f" The figure shows the top genes for group {shown}." if shown else ""
+    text = (
+        f"{normalized}{grouping} with {test} (Scanpy rank_genes_groups). Genes are ranked by the "
+        f"test statistic, not by fold change. The top {p['top_n']} genes are reported."
+        f"{shown_clause} P-values are corrected for multiple testing by the "
+        "Benjamini-Hochberg procedure."
+    )
+    return text, [SCANPY, BH]
 
 
 def _volcano(p: dict):
@@ -368,22 +525,57 @@ def _composition(p: dict):
 
 
 def _diff_abundance(p: dict):
+    run = p.get("_deg_run") or {}
     reference, treatment = str(p.get("reference") or "").strip(), str(p.get("treatment") or "").strip()
     contrast = f" ({treatment} versus {reference})" if reference and treatment else ""
-    tmm = str(p.get("normalization") or "tmm").lower() == "tmm"
+    # The three obs columns are RESOLVED through the deg runner's alias lists when the params are
+    # blank (`diff_abundance/run_real.py:29-31`), so a paragraph quoting the params would name
+    # nothing at all on the common auto-detect path.
+    cluster_col = str(run.get("label_col") or p.get("label_col") or "").strip()
+    sample_col = str(run.get("sample_col") or p.get("sample_col") or "").strip()
+    named = (
+        f" (clusters from {cluster_col}, replicates from {sample_col})"
+        if cluster_col and sample_col else ""
+    )
+    excluded = (
+        f" Clusters with fewer than {int(run.get('min_cells', p.get('min_cells', 10)))} cells "
+        "across the retained samples were excluded."
+    )
+    engine = str(run.get("engine") or "")
+    if "absent" in engine:
+        # The proportion + Welch fallback: a different test on a different quantity. Claiming
+        # DESeq2 here would be the `_boxplot` family again.
+        text = (
+            f"Differential abundance of clusters between conditions{contrast} was tested by "
+            f"tallying the number of cells of each cluster in each sample{named} and comparing each "
+            "cluster's per-sample proportion between the two conditions with Welch's t-test, "
+            "p-values corrected by the Benjamini-Hochberg procedure. PyDESeq2 was not available in "
+            "this environment, so the count model was not used. Each sample — not each cell — is "
+            f"the unit of replication.{excluded} The log2 fold change in abundance per cluster is "
+            "shown (positive = expanding in the treatment). Because cluster proportions are "
+            "compositional, the per-cluster changes should be read together."
+        )
+        return text, [SCANPY, BH]
+    tmm = "TMM norm" in engine if engine else str(p.get("normalization") or "tmm").lower() == "tmm"
     norm = (
         "TMM-normalized (the edgeR differential-abundance convention, which limits the "
         "compositional bias whereby one expanding cluster makes the others appear to shrink)"
         if tmm else "median-of-ratios normalized"
     )
+    unavailable = (
+        " TMM normalization was requested but was unavailable in this environment, so DESeq2's "
+        "median-of-ratios size factors were used instead."
+        if "TMM unavailable" in engine else ""
+    )
     text = (
         f"Differential abundance of clusters between conditions{contrast} was tested by tallying "
-        "the number of cells of each cluster in each sample and modelling that cells-per-"
+        f"the number of cells of each cluster in each sample{named} and modelling that cells-per-"
         f"(cluster × sample) count table with PyDESeq2 (a Python reimplementation of DESeq2), "
-        f"{norm}, with the Wald test. Each sample — not each cell — is the unit of replication, "
-        "and p-values are corrected by the Benjamini-Hochberg procedure. The log2 fold change in "
-        "abundance per cluster is shown (positive = expanding in the treatment). Because cluster "
-        "proportions are compositional, the per-cluster changes should be read together."
+        f"{norm}, with the Wald test.{unavailable} Each sample — not each cell — is the unit of "
+        f"replication, and p-values are corrected by the Benjamini-Hochberg procedure.{excluded} "
+        "The log2 fold change in abundance per cluster is shown (positive = expanding in the "
+        "treatment). Because cluster proportions are compositional, the per-cluster changes should "
+        "be read together."
     )
     return text, [SCANPY, PYDESEQ2, DESEQ2, BH]
 
@@ -1462,6 +1654,12 @@ def build_body(spec: SkillSpec, params: dict, figure: dict | None = None) -> tup
         # `top_n` is a cap, not a count, and `zscore` is read through a string-aware truthiness
         # test the prose did not share. Both are answers only the runner has.
         resolved["_ssgsea_run"] = meta["ssgsea"]
+    if isinstance(meta.get("deg"), dict):
+        # WHICH of four engines ran (`mode="auto"` resolves from the file extension), which obs
+        # columns it resolved through the alias lists, whether it had to cluster the cells itself,
+        # and — the one that governs the CITATIONS — the engine label, which carries both the TMM
+        # degrade and the pyDESeq2-absent fallback to an untested CPM fold change.
+        resolved["_deg_run"] = meta["deg"]
     builder = _TEMPLATES.get(spec.id)
     return builder(resolved) if builder else _generic(spec, resolved)
 

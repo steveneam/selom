@@ -72,6 +72,15 @@ def run(data_path: str, params: dict) -> dict:
         f"{counts.shape[0]} clusters · cells-per-(cluster×sample); proportions are compositional"
     )
     spec = _da_spec(clusters, lfc, f"Differential abundance — {treatment} vs {reference}", subtitle)
+    # The facts only this run has (`companions.methods.build_body` lifts them): the three obs
+    # columns are RESOLVED through the deg runner's alias lists when the params are blank, and the
+    # engine label carries both the TMM degrade and the pyDESeq2-absent fallback — which decides
+    # whether the paragraph may claim a Wald test and cite PyDESeq2 at all.
+    spec.setdefault("layout", {})["meta"] = {"deg": {
+        "mode": "diff_abundance", "engine": engine,
+        "sample_col": sample_col, "condition_col": condition_col, "label_col": label_col,
+        "n_clusters": int(counts.shape[0]), "min_cells": min_cells,
+    }}
 
     rows = []
     for c, fc, q in sorted(zip(clusters, lfc, padj), key=lambda t: abs(t[1]), reverse=True):

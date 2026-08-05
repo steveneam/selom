@@ -102,7 +102,41 @@ export function ParamControl({
     );
   }
 
-  if (field.type === "column") {
+  if (field.type === "combobox") {
+    // Pick-or-type: the dataset's columns are offered, but a value that does not exist YET stays
+    // typeable — `deg.groupby` resolves to Leiden clusters the runner computes on the spot, so a
+    // closed select would make the runner's commonest resolved value unofferable. A native
+    // input+datalist is the accessible form of this and needs no popover.
+    const listId = `${field.key}-options`;
+    return (
+      <label className={cn("block", disabledWrap)}>
+        <span className="flex min-h-8 items-start gap-1.5 text-xs font-medium leading-4 text-foreground">{field.label}{badge}</span>
+        <input
+          list={listId}
+          value={String(v)}
+          disabled={disabled}
+          aria-label={field.label}
+          placeholder={field.placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          className={cn(
+            "mt-1 h-9 w-full rounded-md border border-input bg-background/60 px-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:border-ring/60 focus-visible:ring-2 focus-visible:ring-ring/30",
+            disabled && "cursor-not-allowed",
+          )}
+        />
+        <datalist id={listId}>
+          {field.columns?.map((c) => (
+            <option key={c.value} value={c.value}>{c.label}</option>
+          ))}
+        </datalist>
+        {field.help && <span className="mt-1 block text-[11px] text-muted-foreground">{field.help}</span>}
+      </label>
+    );
+  }
+
+  if (field.type === "column" || field.type === "level") {
+    // One select for both: a column picker and a level picker differ only in the vocabulary the
+    // resolver filled (`columns` vs the per-render `options`) and in what a blank value means.
+    const choices = field.type === "level" ? (field.options ?? []) : (field.columns ?? []);
     return (
       <label className={cn("block", disabledWrap)}>
         <span className="flex min-h-8 items-start gap-1.5 text-xs font-medium leading-4 text-foreground">{field.label}{badge}</span>
@@ -121,14 +155,14 @@ export function ParamControl({
         >
           {/* The blank choice is the backend's auto-detect, named rather than left as an empty row. */}
           <option value="" className="bg-card text-foreground">{field.placeholder ?? "auto-detect"}</option>
-          {/* A saved figure can name a column THIS dataset lacks. Keep it selectable and say so —
-              silently dropping it would rewrite the user's spec on open. */}
-          {String(v) && !field.columns?.some((c) => c.value === String(v)) && (
+          {/* A saved figure can name a column/level THIS dataset lacks. Keep it selectable and say
+              so — silently dropping it would rewrite the user's spec on open. */}
+          {String(v) && !choices.some((c) => c.value === String(v)) && (
             <option value={String(v)} className="bg-card text-foreground">
               {String(v)} — not in this dataset
             </option>
           )}
-          {field.columns?.map((c) => (
+          {choices.map((c) => (
             <option key={c.value} value={c.value} className="bg-card text-foreground">
               {c.label}
             </option>

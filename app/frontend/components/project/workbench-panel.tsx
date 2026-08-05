@@ -115,8 +115,16 @@ export function WorkbenchPanel({
   // typed. Both halves already rode `/data/inspect` and are persisted on the dataset — no request.
   // Memoized because it participates in the field memo inside `useSkillParams`.
   const paramContext = React.useMemo(
-    () => ({ columns: route?.dataFit?.columns ?? null, groups: route?.design?.group_candidates ?? null }),
-    [route?.dataFit?.columns, route?.design?.group_candidates],
+    () => ({
+      columns: route?.dataFit?.columns ?? null,
+      groups: route?.design?.group_candidates ?? null,
+      sampleColumns: route?.design?.sample_col_candidates ?? null,
+    }),
+    [
+      route?.dataFit?.columns,
+      route?.design?.group_candidates,
+      route?.design?.sample_col_candidates,
+    ],
   );
   const { fields: schema, loading: paramsLoading } = useSkillParams(selected, null, paramContext);
 

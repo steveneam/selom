@@ -51,11 +51,12 @@ export type BackendParamSpec = Record<string, BackendParam>;
  * than typed. Every field maps 1:1 onto something `/data/inspect` already returns and the FE
  * already persists on the `Dataset` (`lib/projects/types.ts`), so this costs no request:
  *
- *   - `columns`      ← `data_fit.columns`          (every column in the table)
- *   - `groups`       ← `design.group_candidates[]` (categorical columns + their level names)
+ *   - `columns`       ← `data_fit.columns`            (every column in the table)
+ *   - `groups`        ← `design.group_candidates[]`   (categorical columns + their level names)
+ *   - `sampleColumns` ← `design.sample_col_candidates` (obs columns that could be the replicate id)
  *
- * Both optional: a matrix (h5ad) has no `columns` by construction, and a dataset whose inspect
- * failed has neither. Absent → the fields render exactly as they did before any of this existed.
+ * All optional: a matrix (h5ad) has no `columns` by construction, and a dataset whose inspect
+ * failed has none of them. Absent → the fields render exactly as they did before any of this existed.
  *
  * `design.best_group` is deliberately NOT threaded. It is the engine's pick for a *deg contrast*,
  * and a chart skill's auto-detect is a different rule (boxplot's blank `group` takes the first
@@ -66,6 +67,7 @@ export type BackendParamSpec = Record<string, BackendParam>;
 export interface ParamDataContext {
   columns?: string[] | null;
   groups?: GroupCandidate[] | null;
+  sampleColumns?: string[] | null;
 }
 
 /**
@@ -79,7 +81,15 @@ export interface ParamDataContext {
  */
 export interface FieldGate {
   key: string;
-  equals: string | number | boolean;
+  /** The value to match. Optional only because {@link oneOf} replaces it; give exactly one. */
+  equals?: string | number | boolean;
+  /**
+   * Match ANY of these instead of `equals` (which is then ignored). Added for `deg`, whose four
+   * engines share knobs unevenly: `normalization` is read by the bulk and pseudo-bulk paths and by
+   * neither of the other two, which no single `equals` — and no `not` — can express. Prefer
+   * `equals`; reach for this only when a knob genuinely belongs to a SUBSET of several modes.
+   */
+  oneOf?: (string | number | boolean)[];
   not?: boolean;
 }
 
@@ -88,12 +98,17 @@ export interface ParamField {
   key: string;
   label: string;
   /**
-   * `column` — a picker over the dataset's real columns (falls back to `text` with no context).
-   * `pairs`  — the repeatable "compare A vs B" row-list (falls back to `text` with no levels).
-   * Both are *resolved* widgets: they are only emitted when the vocabulary to fill them exists,
+   * `column`   — a picker over the dataset's real columns (falls back to `text` with no context).
+   * `combobox` — the same vocabulary, but typeable: for a column that may not exist until the run
+   *              (`deg.groupby` resolves to Leiden clusters the runner computes on the spot), where a
+   *              closed select would make the commonest value unofferable.
+   * `level`    — pick ONE level of a chosen column (`deg.reference`), the single-select sibling of
+   *              `pairs`. Falls back to `text` when no level vocabulary is in play.
+   * `pairs`    — the repeatable "compare A vs B" row-list (falls back to `text` with no levels).
+   * All four are *resolved* widgets: they are only emitted when the vocabulary to fill them exists,
    * so `ParamControl` never has to render an empty picker.
    */
-  type: "range" | "number" | "text" | "switch" | "select" | "column" | "pairs";
+  type: "range" | "number" | "text" | "switch" | "select" | "column" | "combobox" | "level" | "pairs";
   default: number | string | boolean;
   min?: number;
   max?: number;
@@ -129,13 +144,22 @@ export interface ParamField {
    */
   columns?: { value: string; label: string }[];
   /**
-   * `pairs` fields only — level names per candidate group column, and which sibling field names
-   * the group column in play. The pair vocabulary depends on a param the user picks at RUN time,
+   * `pairs`/`level` fields only — level names per candidate group column, and which sibling field
+   * names the group column in play. The vocabulary depends on a param the user picks at RUN time,
    * so the options can't be frozen at merge time; `visibleParamFields` resolves them per render
    * (and drops the field back to `text` when the chosen column has no known levels).
    */
   levelsByGroup?: Record<string, string[]>;
   levelsFrom?: string;
+  /**
+   * `level` fields only — the engine's control/baseline guess per candidate column
+   * (`design.group_candidates[].reference_guess`), used to annotate one option when
+   * {@link referenceHint} is set. It NEVER pre-selects: the backend already defaults the contrast
+   * when a column has exactly two levels, and writing the guess into the param would turn an
+   * inferred default into a recorded user choice.
+   */
+  referenceGuessByGroup?: Record<string, string>;
+  referenceHint?: boolean;
 }
 
 /**
@@ -159,9 +183,21 @@ export interface ParamPresentation {
   /** Show-but-disable gate (see `ParamField.enabledWhen`): the control always renders, greyed
    *  until the named field matches `equals`. For discoverable-but-inert capability controls. */
   enabledWhen?: FieldGate;
-  /** `pairs` only — the sibling field naming the group column whose levels this picker offers
-   *  (e.g. boxplot's `group`). Omitted → the engine's `best_group` is the only source. */
+  /** `pairs`/`level` only — the sibling field naming the group column whose levels this picker
+   *  offers (e.g. boxplot's `group`, deg's `condition_col`). */
   levelsFrom?: string;
+  /** `column`/`combobox` only — which vocabulary the picker draws from. Default `"table"` keeps
+   *  today's behaviour (`data_fit.columns`, every column of a tabular file). The other two exist
+   *  because an h5ad has NO `columns` by construction (`engine/compat.py:175`), so a single-cell
+   *  knob pointed at "table" is a text box on exactly the files it consumes:
+   *   - `"groups"`  — `design.group_candidates[]`, the categorical/grouping columns WITH their
+   *                   level counts. The right source for any "which factor?" knob, on both
+   *                   modalities (an h5ad's obs columns, a CSV's categorical columns).
+   *   - `"samples"` — `design.sample_col_candidates`, the id-like obs columns that could be the
+   *                   biological replicate. Detected for exactly this and never threaded until now. */
+  columnsFrom?: "table" | "groups" | "samples";
+  /** `level` only — annotate the engine's `reference_guess` option as the likely control. */
+  referenceHint?: boolean;
 }
 
 /**
@@ -371,9 +407,94 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     { key: "n_hvg", label: "Highly variable genes", type: "range", step: 250, help: "Top-N variable genes for PCA before integration (0 = all; ~2000–5000 is standard for multi-batch)." },
     scrnaNormalize(),
   ],
+  // ── `deg` — FOUR engines behind one knob (docs/deg-panel/spec.md) ────────────────────────────
+  //
+  // `skills/deg/run_real.py:30-40` dispatches on `mode` to `_scrna` (scanpy marker ranking) ·
+  // `_bulk` (pyDESeq2 Wald on a counts table) · `_pseudobulk` (sum per replicate, then the bulk
+  // engine) · `_timecourse` (continuous-time Wald). The 18 knobs partition almost cleanly across
+  // them — `time_col` is meaningless on an h5ad, `groupby`/`method` are meaningless on a counts
+  // CSV — so a flat panel of 18 would be reachable AND wrong: it would offer a user four knobs
+  // their run cannot read. Every engine-specific field is therefore gated on `mode`.
+  //
+  // ⚑ WHAT `auto` SHOWS, and the correction behind it. The spec's first draft said "under `auto`,
+  // only the shared knobs render". That would have been a REGRESSION: `reference`/`treatment` are
+  // visible text boxes today, and hiding them until the user names a mode would take a working
+  // control away in the name of fixing reachability — the `fdr_threshold` lesson (a new gap
+  // created by the fix for a gap). `auto` resolves to exactly TWO of the four engines (h5ad ->
+  // scRNA, anything else -> bulk; `run_real.py:31-33` — pseudobulk and time-course are never
+  // auto-selected), so `auto` shows the union of those two and hides the other nine knobs. The
+  // mode help says so rather than leaving the mixture unexplained.
+  //
+  // Mobbin ruled OUT the obvious pattern: a radio-card chooser with a description per engine is
+  // well attested (Wise · User Interviews · Gusto · Revolut Business · Cake Equity) but EVERY
+  // instance is a full-page wizard step with Back/Next, and this panel is a narrow dock with no
+  // step to host one — the pattern is unavailable to Selom, not merely unchosen. What transfers is
+  // Copilot's "mode select with the conditional block directly beneath it" and Gusto's per-option
+  // statement of what the option DOES, compressed into the option labels below.
   deg: [
-    { key: "reference", label: "Reference group", type: "text", placeholder: "e.g. control", help: "Baseline condition for the contrast." },
-    { key: "treatment", label: "Treatment group", type: "text", placeholder: "e.g. treated" },
+    { key: "mode", label: "Analysis mode", type: "select", help: "Auto picks single-cell for an .h5ad and bulk for a counts table, and shows both sets of options below. Name the mode to narrow them — and to reach pseudo-bulk or time-course, which auto never picks.", options: [
+      { value: "auto", label: "Auto (from the file)" },
+      { value: "scrna", label: "Single-cell markers (Wilcoxon per cluster)" },
+      { value: "bulk", label: "Bulk RNA-seq (DESeq2 Wald)" },
+      { value: "pseudobulk", label: "Pseudo-bulk (sum per replicate, then DESeq2)" },
+      { value: "timecourse", label: "Time-course (linear trend over time)" },
+    ] },
+    // The contrast. `levelsFrom: condition_col` serves BOTH DESeq2 paths: on pseudobulk the levels
+    // come from the chosen obs column, and on a bulk counts CSV `condition_col` is blank but the
+    // engine publishes exactly one candidate (the `__column_names__` sentinel), which the
+    // sole-candidate rule in `resolveLevelField` picks up.
+    { key: "reference", label: "Reference group", type: "level", levelsFrom: "condition_col", referenceHint: true, placeholder: "e.g. control", help: "The baseline. log2 fold-change is measured as treatment versus this.", showWhen: { key: "mode", oneOf: ["auto", "bulk", "pseudobulk"] } },
+    { key: "treatment", label: "Treatment group", type: "level", levelsFrom: "condition_col", placeholder: "e.g. treated", help: "The condition compared against the reference. Both blank = Selom uses the two groups it finds, and refuses to guess when there are more than two.", showWhen: { key: "mode", oneOf: ["auto", "bulk", "pseudobulk"] } },
+    { key: "top_n", label: "Genes shown", type: "range", help: "How many genes the bar chart draws, strongest effect first. The full ranking is in the Statistics table either way." },
+    // ── single-cell ──
+    { key: "groupby", label: "Group cells by", type: "combobox", columnsFrom: "groups", placeholder: "leiden", help: "Markers are ranked for the first level of this column. If your file has no such column, Selom clusters the cells itself (Leiden) and groups by that — which is why you can type a name that does not exist yet.", showWhen: { key: "mode", oneOf: ["auto", "scrna"] } },
+    { key: "method", label: "Ranking test", type: "select", help: "Wilcoxon is the scanpy default and assumes nothing about the distribution. The t-tests are parametric; logistic regression ranks by how well a gene separates the group.", options: [
+      { value: "wilcoxon", label: "Wilcoxon rank-sum" },
+      { value: "t-test", label: "t-test" },
+      { value: "t-test_overestim_var", label: "t-test (overestimated variance)" },
+      { value: "logreg", label: "Logistic regression" },
+    ], showWhen: { key: "mode", oneOf: ["auto", "scrna"] } },
+    { ...scrnaNormalize(), showWhen: { key: "mode", oneOf: ["auto", "scrna"] } },
+    // ── pseudo-bulk ──
+    { key: "sample_col", label: "Replicate column", type: "column", columnsFrom: "samples", placeholder: "auto-detect", help: "The obs column identifying the biological replicate. Counts are summed per replicate, which is what makes a multi-sample comparison valid — cells are not replicates.", showWhen: { key: "mode", equals: "pseudobulk" } },
+    { key: "condition_col", label: "Condition column", type: "column", columnsFrom: "groups", placeholder: "auto-detect", help: "The obs column holding the conditions to contrast. Pick it to choose the reference and treatment from its real levels.", showWhen: { key: "mode", equals: "pseudobulk" } },
+    { key: "label_col", label: "Cell-type column", type: "column", columnsFrom: "groups", placeholder: "optional", help: "Restrict the contrast to one cell type. Leave blank to test all cells together.", showWhen: { key: "mode", equals: "pseudobulk" } },
+    { key: "label", label: "Cell type", type: "level", levelsFrom: "label_col", placeholder: "e.g. Rod", help: "Which value of the cell-type column to restrict to. Required once that column is set.", showWhen: { key: "mode", equals: "pseudobulk" } },
+    { key: "min_cells", label: "Min cells per replicate", type: "number", help: "Replicates with fewer cells than this are DROPPED from the contrast — a sample-exclusion criterion, so the methods text reports how many went.", showWhen: { key: "mode", equals: "pseudobulk" } },
+    // ── time-course ──
+    { key: "time_col", label: "Time column", type: "text", placeholder: "time", help: "The design-sheet column holding each sample's timepoint. Needs an uploaded design sheet — column names cannot carry timepoints.", showWhen: { key: "mode", equals: "timecourse" } },
+    { key: "covariate_col", label: "Adjust for", type: "text", placeholder: "e.g. genotype", help: "A design-sheet column to adjust the trend for (design ~covariate + time). Ignored if it holds only one value, so the methods text states whether the adjustment actually ran.", showWhen: { key: "mode", equals: "timecourse" } },
+    { key: "group_val", label: "Restrict to", type: "text", placeholder: "e.g. retina", help: "Keep only samples whose stratum column equals this, so a trend is not confounded across tissues.", showWhen: { key: "mode", equals: "timecourse" } },
+    // ── bulk + shared DESeq2 ──
+    { key: "group_col", label: "Group column (design sheet)", type: "text", placeholder: "e.g. condition", help: "The design-sheet column carrying each sample's group. Blank = groups are read from the count-column names.", showWhen: { key: "mode", oneOf: ["auto", "bulk", "timecourse"] } },
+    { key: "group_regex", label: "Replicate suffix pattern", type: "text", placeholder: "_\\d+$", help: "Stripped from each count-column name to derive its group (ctrl_1 → ctrl). Only used when there is no design sheet — and it decides what the two groups ARE.", showWhen: { key: "mode", oneOf: ["auto", "bulk"] } },
+    { key: "normalization", label: "Size-factor normalization", type: "select", help: "Median-of-ratios is DESeq2's own. TMM matches an edgeR / limma-voom pipeline; the test stays DESeq2's Wald either way. Falls back to median-of-ratios if TMM is unavailable, and the methods text says which one ran.", options: [
+      { value: "deseq2", label: "Median-of-ratios (DESeq2)" },
+      { value: "tmm", label: "TMM (edgeR convention)" },
+    ], showWhen: { key: "mode", oneOf: ["auto", "bulk", "pseudobulk"] } },
+    { key: "min_count", label: "Min total count per gene", type: "number", help: "Genes whose counts sum below this across the kept samples are dropped before fitting — standard DESeq2 practice, and it decides how many genes were tested.", showWhen: { key: "mode", equals: "scrna", not: true } },
+  ],
+  // `diff_abundance` had NO overlay at all — the `sankey` shape, where an empty parameter panel is
+  // indistinguishable from "this skill has no options". It shares three obs knobs with `deg`'s
+  // pseudo-bulk path and resolves them through the SAME `_resolve_obs_col` + `_SAMPLE_FALLBACKS` /
+  // `_CONDITION_FALLBACKS` (`diff_abundance/run_real.py:24-31` imports them from `deg.run_real`),
+  // so the wording is shared by meaning, not by key name.
+  //
+  // Its `normalization` DEFAULT differs from `deg`'s (tmm vs deseq2) and that is deliberate, not
+  // drift: TMM is the edgeR differential-abundance convention because it blunts the compositional
+  // artefact whereby one expanding cluster makes every other look like it shrank. The help says so,
+  // because two panels showing the same knob with different defaults otherwise reads as a bug.
+  diff_abundance: [
+    { key: "reference", label: "Reference group", type: "level", levelsFrom: "condition_col", referenceHint: true, placeholder: "e.g. control", help: "The baseline. log2 fold-change in abundance is measured as treatment versus this." },
+    { key: "treatment", label: "Treatment group", type: "level", levelsFrom: "condition_col", placeholder: "e.g. treated", help: "Both blank = Selom uses the two conditions it finds, and refuses to guess when there are more than two." },
+    { key: "sample_col", label: "Replicate column", type: "column", columnsFrom: "samples", placeholder: "auto-detect", help: "The obs column identifying the biological replicate. Each sample — not each cell — is the unit of replication." },
+    { key: "condition_col", label: "Condition column", type: "column", columnsFrom: "groups", placeholder: "auto-detect", help: "The obs column holding the conditions to contrast. Pick it to choose the reference and treatment from its real levels." },
+    { key: "label_col", label: "Cluster column", type: "column", columnsFrom: "groups", placeholder: "auto-detect", help: "The obs column whose values are the clusters tested for expansion or shrinkage." },
+    { key: "normalization", label: "Size-factor normalization", type: "select", help: "TMM is the edgeR differential-abundance convention: it limits the compositional bias whereby one expanding cluster makes every other appear to shrink. That is why this defaults to TMM while bulk DE defaults to median-of-ratios.", options: [
+      { value: "tmm", label: "TMM (edgeR convention)" },
+      { value: "deseq2", label: "Median-of-ratios (DESeq2)" },
+    ] },
+    { key: "min_cells", label: "Min cells per cluster", type: "number", help: "Clusters with fewer total cells than this across the kept samples are DROPPED — an exclusion criterion, so the methods text reports it." },
   ],
   // Distribution comparisons (boxplot · violin) share ONE vocabulary, because they share one
   // engine (skills/_stats.py): order → add_count → pairs → the test behind the stars. Keep the two
@@ -1301,23 +1422,58 @@ function resolveColumns(ctx: ParamDataContext | undefined): ParamField["columns"
   });
 }
 
-/** Level names per candidate group column — the pair picker's vocabulary. */
+/** Level names per candidate group column — the pair / level picker's vocabulary. */
 function resolveLevels(ctx: ParamDataContext | undefined): Record<string, string[]> | undefined {
   const groups = (ctx?.groups ?? []).filter((g) => g.levels.length > 0);
   if (groups.length === 0) return undefined;
   return Object.fromEntries(groups.map((g) => [g.key, g.levels.map((l) => l.name)]));
 }
 
+/** The engine's control/baseline guess per candidate column — annotation only, never a selection. */
+function resolveReferenceGuesses(ctx: ParamDataContext | undefined): Record<string, string> | undefined {
+  const hits = (ctx?.groups ?? []).filter((g) => g.reference_guess);
+  if (hits.length === 0) return undefined;
+  return Object.fromEntries(hits.map((g) => [g.key, g.reference_guess as string]));
+}
+
+/**
+ * The column vocabulary for a `column`/`combobox` field, per its `columnsFrom` source.
+ *
+ * `"groups"` and `"samples"` exist because `data_fit.columns` is `[]` for an h5ad by construction,
+ * so the default source cannot serve a single-cell knob at all. `"groups"` keeps the level-count
+ * annotation (`condition — 6 levels`), which is the distinction that actually matters when choosing
+ * a grouping factor; `"samples"` has no level counts to show (a replicate id column is an id).
+ */
+function resolveColumnsFrom(
+  from: ParamPresentation["columnsFrom"],
+  ctx: ParamDataContext | undefined,
+): ParamField["columns"] {
+  if (from === "groups") {
+    const groups = ctx?.groups ?? [];
+    if (groups.length === 0) return undefined;
+    return groups.map((g) => ({
+      value: g.key,
+      label: g.n_levels ? `${g.key} — ${g.n_levels} levels` : g.key,
+    }));
+  }
+  if (from === "samples") {
+    const cols = ctx?.sampleColumns ?? [];
+    if (cols.length === 0) return undefined;
+    return cols.map((c) => ({ value: c, label: c }));
+  }
+  return resolveColumns(ctx);
+}
+
 function mergeField(pres: ParamPresentation, ps: BackendParam, ctx?: ParamDataContext): ParamField {
   // A `column`/`pairs` widget is only emitted when its vocabulary exists; otherwise the field
   // degrades to the text box it has always been. That keeps a context-free merge byte-identical
   // to today's and spares `ParamControl` an empty-picker branch.
-  const columns = pres.type === "column" ? resolveColumns(ctx) : undefined;
-  const levelsByGroup = pres.type === "pairs" ? resolveLevels(ctx) : undefined;
+  const picksColumn = pres.type === "column" || pres.type === "combobox";
+  const picksLevel = pres.type === "pairs" || pres.type === "level";
+  const columns = picksColumn ? resolveColumnsFrom(pres.columnsFrom, ctx) : undefined;
+  const levelsByGroup = picksLevel ? resolveLevels(ctx) : undefined;
   const type: ParamField["type"] =
-    (pres.type === "column" && !columns) || (pres.type === "pairs" && !levelsByGroup)
-      ? "text"
-      : pres.type;
+    (picksColumn && !columns) || (picksLevel && !levelsByGroup) ? "text" : pres.type;
   return {
     key: pres.key,
     label: pres.label,
@@ -1334,6 +1490,9 @@ function mergeField(pres: ParamPresentation, ps: BackendParam, ctx?: ParamDataCo
     columns,
     levelsByGroup,
     levelsFrom: levelsByGroup ? pres.levelsFrom : undefined,
+    referenceGuessByGroup:
+      pres.type === "level" && levelsByGroup ? resolveReferenceGuesses(ctx) : undefined,
+    referenceHint: pres.type === "level" ? pres.referenceHint : undefined,
   };
 }
 
@@ -1395,7 +1554,51 @@ export function overlayParamKeys(): Record<string, string[]> {
 export function visibleParamFields(schema: ParamField[], params: SkillParams): ParamField[] {
   return schema
     .filter((f) => !f.showWhen || gateMatches(f.showWhen, schema, params))
-    .map((f) => (f.type === "pairs" ? resolvePairsField(f, schema, params) : f));
+    .map((f) => {
+      if (f.type === "pairs") return resolvePairsField(f, schema, params);
+      if (f.type === "level") return resolveLevelField(f, schema, params);
+      return f;
+    });
+}
+
+/** The group column a `pairs`/`level` field is currently reading its vocabulary from, or `""`. */
+function chosenGroup(field: ParamField, schema: ParamField[], params: SkillParams): string {
+  if (!field.levelsFrom) return "";
+  return String(
+    params[field.levelsFrom] ?? schema.find((x) => x.key === field.levelsFrom)?.default ?? "",
+  );
+}
+
+/**
+ * A `level` field's options — the single-select sibling of {@link resolvePairsField}, resolved per
+ * render for the same reason: the vocabulary depends on a column the user picks at run time.
+ *
+ * It differs from `pairs` in ONE rule, and only because of a shape `pairs` never met. When the
+ * sibling column field is blank but the dataset publishes exactly ONE group candidate, that
+ * candidate is used. A bulk counts CSV has no condition *column* at all — the contrast levels come
+ * from the sample-column NAMES, which the engine publishes as a single candidate under the
+ * `__column_names__` sentinel (`engine/questionnaire.py:189`); the design-sheet and time-course
+ * branches each publish exactly one too. "One grouping on offer means nothing to disambiguate"
+ * covers all three with one rule, and stays strict on an h5ad, which normally has several.
+ *
+ * What is deliberately NOT done is falling back to `design.best_group` when several exist. It is
+ * genuinely the engine's pick FOR a deg contrast — `engine/questionnaire._obs_aliases()` imports
+ * `deg.run_real`'s own `_CONDITION_FALLBACKS` rather than shadow-copying them, so the two agree
+ * whenever an alias column is present. They diverge when none is: the runner RAISES while
+ * `best_group` falls back to the lowest-cardinality candidate, so the picker would offer levels for
+ * a run the backend refuses. One rule with no exception beats two.
+ */
+function resolveLevelField(field: ParamField, schema: ParamField[], params: SkillParams): ParamField {
+  const byGroup = field.levelsByGroup ?? {};
+  const keys = Object.keys(byGroup);
+  const key = chosenGroup(field, schema, params) || (keys.length === 1 ? keys[0] : "");
+  const levels = byGroup[key];
+  if (!levels || levels.length === 0) return { ...field, type: "text" };
+  const guess = field.referenceHint ? field.referenceGuessByGroup?.[key] : undefined;
+  return {
+    ...field,
+    options: levels.map((l) => ({ value: l, label: l === guess ? `${l} — likely control` : l })),
+  };
 }
 
 /**
@@ -1411,10 +1614,7 @@ export function visibleParamFields(schema: ParamField[], params: SkillParams): P
  */
 function resolvePairsField(field: ParamField, schema: ParamField[], params: SkillParams): ParamField {
   const byGroup = field.levelsByGroup ?? {};
-  const chosen = field.levelsFrom
-    ? String(params[field.levelsFrom] ?? schema.find((x) => x.key === field.levelsFrom)?.default ?? "")
-    : "";
-  const levels = byGroup[chosen];
+  const levels = byGroup[chosenGroup(field, schema, params)];
   if (!levels || levels.length < 2) return { ...field, type: "text" };
   return { ...field, options: levels.map((l) => ({ value: l, label: l })) };
 }
@@ -1457,9 +1657,10 @@ export function isFieldDisabled(schema: ParamField[], field: ParamField, params:
   return field.enabledWhen ? !gateMatches(field.enabledWhen, schema, params) : false;
 }
 
-/** Does the current (or default) value of the gate's field match its `equals`? Loose compare. */
+/** Does the current (or default) value of the gate's field match `equals` / any of `oneOf`? Loose. */
 function gateMatches(gate: FieldGate, schema: ParamField[], params: SkillParams): boolean {
   const current = params[gate.key] ?? schema.find((x) => x.key === gate.key)?.default;
-  const hit = current === gate.equals || String(current) === String(gate.equals);
+  const wanted = gate.oneOf ?? [gate.equals];
+  const hit = wanted.some((w) => current === w || String(current) === String(w));
   return gate.not ? !hit : hit;
 }

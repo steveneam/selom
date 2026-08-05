@@ -64,7 +64,11 @@ def _stub_figure() -> dict:
             "bargap": 0.3,
         },
     }
-    # Statistics node (Pillar 1) — strongest effect first.
+    # Statistics node (Pillar 1) — strongest effect first. The column reads "score (signed)" to
+    # match this stub's own x-axis: the two disagreed, the table claiming a log2 fold change for
+    # numbers the axis correctly called an unnamed signed score. The axis is the honest one here
+    # (these are invented values, not any real quantity), so the table moves to meet it — which
+    # also leaves the golden, which pins the figure alone, untouched.
     tbl = sorted(range(len(scores)), key=lambda i: abs(scores[i]), reverse=True)
-    spec["table"] = table(["gene", "log2 fold-change"], [[genes[i], scores[i]] for i in tbl], "Top differential genes")
+    spec["table"] = table(["gene", "score (signed)"], [[genes[i], scores[i]] for i in tbl], "Top differential genes")
     return spec

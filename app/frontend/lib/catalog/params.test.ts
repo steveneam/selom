@@ -372,6 +372,179 @@ describe("pair picker", () => {
   });
 });
 
+describe("level picker — the single-select sibling of `pairs` (docs/deg-panel/spec.md D2)", () => {
+  /** An h5ad: `columns` is [] BY CONSTRUCTION (`engine/compat.py:175`), which is exactly why the
+   *  obs knobs read `groups`/`sampleColumns` and not `columns`. */
+  const h5ad: ParamDataContext = {
+    columns: [],
+    sampleColumns: ["orig.ident", "donor"],
+    groups: [
+      { key: "genotype", label: "genotype", n_levels: 2, reference_guess: "WT", levels:
+        ["WT", "KO"].map((name) => ({ name, n_replicates: 3, replicate_unit: "samples" })) },
+      { key: "cell_type", label: "cell_type", n_levels: 3, reference_guess: null, levels:
+        ["Rod", "Cone", "Muller"].map((name) => ({ name, n_replicates: 6, replicate_unit: "samples" })) },
+    ],
+  };
+  const fieldsFor = (ctx: ParamDataContext, params: Record<string, string> = {}) =>
+    visibleParamFields(paramFieldsFromSpec("deg", SKILL_PARAM_SPECS.deg, ctx), {
+      mode: "pseudobulk",
+      ...params,
+    });
+  const levelField = (key: string, ctx: ParamDataContext, params: Record<string, string> = {}) =>
+    fieldsFor(ctx, params).find((f) => f.key === key)!;
+
+  it("stays text while its column field is blank and several groupings are on offer", () => {
+    // Same rule as `pairs`, and for the same reason: blank means the backend's auto-detect, which
+    // resolves through alias lists the frontend cannot evaluate.
+    expect(levelField("reference", h5ad).type).toBe("text");
+  });
+
+  it("offers the CHOSEN column's real levels once that column is picked", () => {
+    const ref = levelField("reference", h5ad, { condition_col: "genotype" });
+    expect(ref.type).toBe("level");
+    expect(ref.options?.map((o) => o.value)).toEqual(["WT", "KO"]);
+  });
+
+  it("follows its own column field — `label` reads label_col, not condition_col", () => {
+    // The two level fields on this panel point at DIFFERENT columns. A shared resolver that read
+    // one sibling for both would put cell types in the contrast box.
+    const params = { condition_col: "genotype", label_col: "cell_type" };
+    expect(levelField("reference", h5ad, params).options?.map((o) => o.value)).toEqual(["WT", "KO"]);
+    expect(levelField("label", h5ad, params).options?.map((o) => o.value)).toEqual([
+      "Rod", "Cone", "Muller",
+    ]);
+  });
+
+  it("annotates the engine's reference guess on `reference` ONLY, and never pre-selects it", () => {
+    const params = { condition_col: "genotype" };
+    const ref = levelField("reference", h5ad, params);
+    expect(ref.options?.find((o) => o.value === "WT")!.label).toBe("WT — likely control");
+    // `treatment` carries no hint: "likely control" is advice about the baseline, and repeating it
+    // in the treatment box argues against the choice the user is making there.
+    expect(levelField("treatment", h5ad, params).options?.find((o) => o.value === "WT")!.label)
+      .toBe("WT");
+    // The guess annotates; it does not become the value. Writing it in would turn the backend's
+    // inferred default into a recorded user choice.
+    expect(ref.default).toBe("");
+  });
+
+  it("uses the SOLE candidate when the column field is blank — the bulk counts-CSV case", () => {
+    // A bulk counts table has no condition COLUMN: the levels come from the sample-column names,
+    // which the engine publishes as one candidate under the `__column_names__` sentinel
+    // (`engine/questionnaire.py:189`). There is no sibling field that could name it, so without
+    // this rule every bulk user would be back on a text box.
+    const bulk: ParamDataContext = {
+      columns: ["ctrl_1", "ctrl_2", "treat_1", "treat_2"],
+      groups: [
+        { key: "__column_names__", label: "sample columns", n_levels: 2, reference_guess: "ctrl",
+          levels: ["ctrl", "treat"].map((name) => ({ name, n_replicates: 2, replicate_unit: "samples" })) },
+      ],
+    };
+    const ref = visibleParamFields(paramFieldsFromSpec("deg", SKILL_PARAM_SPECS.deg, bulk), {
+      mode: "bulk",
+    }).find((f) => f.key === "reference")!;
+    expect(ref.type).toBe("level");
+    expect(ref.options?.map((o) => o.value)).toEqual(["ctrl", "treat"]);
+  });
+
+  it("falls back to text with no context at all (byte-identical to life before pickers)", () => {
+    const bare = paramFieldsFromSpec("deg", SKILL_PARAM_SPECS.deg);
+    expect(bare.find((f) => f.key === "reference")!.type).toBe("text");
+    expect(bare.find((f) => f.key === "sample_col")!.type).toBe("text");
+    expect(bare.find((f) => f.key === "groupby")!.type).toBe("text");
+  });
+});
+
+describe("obs-column pickers — `columnsFrom` (docs/deg-panel/spec.md D3)", () => {
+  const h5ad: ParamDataContext = {
+    columns: [],
+    sampleColumns: ["orig.ident", "donor"],
+    groups: [
+      { key: "genotype", label: "genotype", n_levels: 2, reference_guess: "WT", levels:
+        ["WT", "KO"].map((name) => ({ name, n_replicates: 3, replicate_unit: "samples" })) },
+    ],
+  };
+  const deg = (ctx: ParamDataContext) => paramFieldsFromSpec("deg", SKILL_PARAM_SPECS.deg, ctx);
+
+  it("⚑ serves the single-cell knobs, which the DEFAULT source cannot — h5ad `columns` is []", () => {
+    // Review finding (f): `resolveColumns` reads ctx.columns, empty by construction for an h5ad,
+    // so a `column` widget on an obs knob was a text box on exactly the files it consumes.
+    const fields = deg(h5ad);
+    expect(fields.find((f) => f.key === "condition_col")!.type).toBe("column");
+    expect(fields.find((f) => f.key === "condition_col")!.columns?.map((c) => c.value))
+      .toEqual(["genotype"]);
+  });
+
+  it("draws the replicate column from `sample_col_candidates`, not from the group candidates", () => {
+    // Detected for exactly this (questionnaire `_sample_col_candidates`) and never threaded until
+    // now. A sample id is not a grouping factor, so the two lists are deliberately different.
+    expect(deg(h5ad).find((f) => f.key === "sample_col")!.columns?.map((c) => c.value))
+      .toEqual(["orig.ident", "donor"]);
+  });
+
+  it("keeps the level-count annotation on a grouping column (`genotype — 2 levels`)", () => {
+    expect(deg(h5ad).find((f) => f.key === "condition_col")!.columns![0].label)
+      .toBe("genotype — 2 levels");
+  });
+
+  it("`groupby` is a COMBOBOX, because Leiden does not exist until the run", () => {
+    // A closed select would make the runner's commonest resolved value unofferable: when the named
+    // column is absent, `deg/run_real.py:96-102` clusters the cells itself and groups by `leiden`.
+    const groupby = deg(h5ad).find((f) => f.key === "groupby")!;
+    expect(groupby.type).toBe("combobox");
+    expect(groupby.columns?.map((c) => c.value)).toEqual(["genotype"]);
+  });
+
+  it("a design-SHEET column stays text — the context carries no design sheet to pick from", () => {
+    expect(deg(h5ad).find((f) => f.key === "time_col")!.type).toBe("text");
+    expect(deg(h5ad).find((f) => f.key === "covariate_col")!.type).toBe("text");
+  });
+});
+
+describe("mode gating — four engines, one panel (docs/deg-panel/spec.md D1)", () => {
+  const keys = (params: Record<string, string>) =>
+    visibleParamFields(paramFieldsFromSpec("deg", SKILL_PARAM_SPECS.deg), params).map((f) => f.key);
+
+  it("⚑ `auto` shows the scRNA AND bulk knobs — the two engines auto can resolve to", () => {
+    // The spec's first draft said "only the shared knobs", which would have HIDDEN the
+    // reference/treatment boxes that ship today — a regression dressed as a reachability fix.
+    // `run_real.py:31-33`: auto picks scRNA for .h5ad and bulk for everything else, and never
+    // picks pseudobulk or time-course.
+    const k = keys({});
+    expect(k).toEqual(expect.arrayContaining(["reference", "treatment", "groupby", "method",
+      "normalize", "group_col", "group_regex", "normalization", "min_count", "top_n"]));
+  });
+
+  it("`auto` hides the nine knobs no auto-resolved run can read", () => {
+    const k = keys({});
+    for (const hidden of ["sample_col", "condition_col", "label_col", "label", "min_cells",
+      "time_col", "covariate_col", "group_val"]) {
+      expect(k).not.toContain(hidden);
+    }
+  });
+
+  it("naming a mode narrows the panel to that engine's knobs", () => {
+    expect(keys({ mode: "scrna" })).toEqual(["mode", "top_n", "groupby", "method", "normalize"]);
+    expect(keys({ mode: "timecourse" })).toEqual(["mode", "top_n", "time_col", "covariate_col",
+      "group_val", "group_col", "min_count"]);
+  });
+
+  it("`min_count` is hidden on scRNA alone — the one path that never fits a count model", () => {
+    // It is read by bulk, pseudobulk AND time-course, which is why it uses `not` rather than
+    // listing three modes.
+    expect(keys({ mode: "scrna" })).not.toContain("min_count");
+    for (const mode of ["bulk", "pseudobulk", "timecourse"]) {
+      expect(keys({ mode })).toContain("min_count");
+    }
+  });
+
+  it("`normalization` reaches the two DESeq2 contrast paths and neither of the others", () => {
+    // The `oneOf` case: no single `equals` and no `not` can express "bulk or pseudobulk".
+    for (const mode of ["bulk", "pseudobulk"]) expect(keys({ mode })).toContain("normalization");
+    for (const mode of ["scrna", "timecourse"]) expect(keys({ mode })).not.toContain("normalization");
+  });
+});
+
 describe("pairs wire format — the picker authors the SAME string the backend already parses", () => {
   it("round-trips a complete list", () => {
     expect(parsePairs("Control~Treated, Control~Rescue")).toEqual([

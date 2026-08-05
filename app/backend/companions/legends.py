@@ -52,6 +52,10 @@ def _facts(figure: dict | None, table: dict | list | None) -> dict:
     meta = ((figure or {}).get("layout") or {}).get("meta") or {}
     if isinstance(meta.get("clustered"), dict):
         facts["clustered"] = meta["clustered"]
+    # `deg`/`diff_abundance`: which of four engines ran and what it resolved. A caption that names a
+    # contrast on a single-cell MARKER ranking describes a different figure from the one beside it.
+    if isinstance(meta.get("deg"), dict):
+        facts["deg"] = meta["deg"]
     # How many gene sets ssGSEA actually DREW. `top_n` is a cap, so the param overstates it whenever
     # the library scored fewer sets than the cap — and a caption is a published claim about one
     # figure. Same shape as `clustered`: a fact only the runner has.
@@ -132,7 +136,22 @@ def _violin(p, f):
 
 
 def _deg(p, f):
-    return f"Top {p['top_n']} differentially expressed genes{_contrast(p)}.{_de_split(f)}".rstrip()
+    """⚑ The caption used to call every `deg` run "differentially expressed genes … for T versus R".
+    On the single-cell path that is two claims the run never made: scanpy ranks MARKERS for one
+    cluster against the rest, and `reference`/`treatment` are not read at all — so a contrast the
+    user typed for a later bulk run was printed onto a marker figure. The figure's own title has
+    always said "Top markers". `top_n` is also a CAP on the DESeq2 paths (`.head(top_n)`), so the
+    caption says how many were drawn rather than asserting the requested number."""
+    run = f.get("deg") or {}
+    mode = str(run.get("mode") or "")
+    shown = f.get("n_rows")
+    n = f"Top {shown}" if isinstance(shown, int) and shown else f"Top {p['top_n']}"
+    if mode == "scrna":
+        group = run.get("group")
+        of = f" for {run.get('groupby')} group {group}" if group else ""
+        clustered = " (Leiden clusters computed by Selom)" if run.get("clustered") else ""
+        return f"{n} marker genes{of}{clustered}, ranked by test statistic."
+    return f"{n} differentially expressed genes{_contrast(p)}.{_de_split(f)}".rstrip()
 
 
 def _volcano(p, f):
@@ -236,8 +255,11 @@ def _composition(p, f):
 
 
 def _diff_abundance(p, f):
+    run = f.get("deg") or {}
+    col = str(run.get("label_col") or p.get("label_col") or "").strip()
+    of = f" ({col})" if col else ""
     return (
-        f"Differential abundance of clusters between conditions{_contrast(p)}, as the log2 fold "
+        f"Differential abundance of clusters{of} between conditions{_contrast(p)}, as the log2 fold "
         "change per cluster (positive = expanding in the treatment)."
     )
 

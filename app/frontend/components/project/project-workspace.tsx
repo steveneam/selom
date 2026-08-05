@@ -110,8 +110,13 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     () => ({
       columns: activeDataset?.dataFit?.columns ?? null,
       groups: activeDataset?.design?.group_candidates ?? null,
+      sampleColumns: activeDataset?.design?.sample_col_candidates ?? null,
     }),
-    [activeDataset?.dataFit?.columns, activeDataset?.design?.group_candidates],
+    [
+      activeDataset?.dataFit?.columns,
+      activeDataset?.design?.group_candidates,
+      activeDataset?.design?.sample_col_candidates,
+    ],
   );
   // Figure-data staging (§3C decomposition) — the STAGED inputs (a dot drag + the numeric Marks/Threshold
   // editors all write one `fdParams`), the live preview, the a/b-label toggle, and the deterministic

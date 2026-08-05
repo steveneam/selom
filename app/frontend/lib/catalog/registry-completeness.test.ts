@@ -262,11 +262,6 @@ describe("reachability — every backend skill can be resolved by the app", () =
  */
 const API_ONLY_KNOBS: Record<string, string[]> = {
   confusion: ["true_order", "predicted_order"],
-  deg: ["mode", "groupby", "method", "top_n", "normalize", "group_col", "group_val", "time_col",
-    "covariate_col", "min_count", "normalization", "sample_col", "condition_col", "label_col",
-    "label", "min_cells"],
-  diff_abundance: ["sample_col", "condition_col", "label_col", "reference", "treatment",
-    "normalization", "min_cells"],
   erg_bwave_bar: ["value_col", "stimulus_type", "manual_marks", "ab_detector"],
   erg_flicker: ["mark_labels", "manual_marks", "fourier"],
   erg_intensity_response: ["value_col", "stimulus_type", "error", "spread", "points", "band_alpha",

@@ -93,22 +93,31 @@ def _scrna(data_path: str, params: dict) -> dict:
         sc.pp.normalize_total(adata, target_sum=1e4)
         sc.pp.log1p(adata)
 
-    groupby = params.get("groupby") or "leiden"
+    requested = params.get("groupby") or "leiden"
+    groupby, clustered = requested, False
     if groupby not in adata.obs.columns:
         n_pcs = max(2, min(50, adata.n_obs - 1, adata.n_vars - 1))
         sc.pp.pca(adata, n_comps=n_pcs)
         sc.pp.neighbors(adata, n_neighbors=15, n_pcs=n_pcs)
         sc.tl.leiden(adata, flavor="igraph", n_iterations=2, directed=False)
-        groupby = "leiden"
+        groupby, clustered = "leiden", True
 
-    sc.tl.rank_genes_groups(adata, groupby, method=params.get("method", "wilcoxon"))
+    method = str(params.get("method") or "wilcoxon")
+    sc.tl.rank_genes_groups(adata, groupby, method=method)
     res = adata.uns["rank_genes_groups"]
     group0 = res["names"].dtype.names[0]
     top_n = int(params["top_n"])
     names = [str(res["names"][group0][i]) for i in range(top_n)]
     scores = [float(res["scores"][group0][i]) for i in range(top_n)]
     title = f"Top markers — {groupby} group {group0}"
-    return _bar(names, scores, title, jsonable)
+    meta = {"mode": "scrna", "groupby": groupby, "group": str(group0), "method": method}
+    if clustered:
+        # The requested column was absent so the runner clustered the cells itself. The title
+        # already carried the substituted name; the prose quoted the REQUESTED one.
+        meta["clustered"] = True
+        meta["requested_groupby"] = str(requested)
+    return _bar(names, scores, title, jsonable,
+                value_label=scrna_statistic_label(method), meta=meta)
 
 
 # Common obs columns that carry the biological-replicate / condition labels, tried in
@@ -195,7 +204,7 @@ def _pseudobulk(data_path: str, params: dict) -> dict:
 
     # Optional: restrict the contrast to a single cell-type / cluster.
     label_col = str(params.get("label_col") or "").strip()
-    label_val = str(params.get("label") or params.get("label_val") or "").strip()
+    label_val = str(params.get("label") or "").strip()
     label_note = ""
     if label_col:
         if label_col not in obs.columns:
@@ -280,7 +289,16 @@ def _pseudobulk(data_path: str, params: dict) -> dict:
         f"pseudobulk · {engine} · {treatment} (n={n_treat}) vs {reference} (n={n_ref})"
         f"{label_note} · {sub.shape[0]} genes{drop_note}"
     )
-    return _bar(names, scores, f"Pseudobulk DE — {treatment} vs {reference}", jsonable, subtitle)
+    meta = {
+        "mode": "pseudobulk", "engine": engine, "n_genes": int(sub.shape[0]),
+        # RESOLVED, not requested: a blank param falls through `_SAMPLE_FALLBACKS` /
+        # `_CONDITION_FALLBACKS`, so the paragraph's old default of the word "sample" named a
+        # column that need not exist (an h5ad keyed `orig.ident` is the common case).
+        "sample_col": sample_col, "condition_col": condition_col,
+        "n_dropped": len(dropped), "min_cells": min_cells,
+    }
+    return _bar(names, scores, f"Pseudobulk DE — {treatment} vs {reference}", jsonable, subtitle,
+                meta=meta)
 
 
 def _bulk(data_path: str, params: dict) -> dict:
@@ -324,7 +342,9 @@ def _bulk(data_path: str, params: dict) -> dict:
     normalization = str(params.get("normalization") or "deseq2").strip().lower()
     names, scores, engine = _bulk_deseq(sub, cond, reference, treatment, top_n, normalization)
     subtitle = f"{engine} · {treatment} (n={n_treat}) vs {reference} (n={n_ref}) · {sub.shape[0]} genes tested"
-    return _bar(names, scores, f"Top DE genes — {treatment} vs {reference}", jsonable, subtitle)
+    meta = {"mode": "bulk", "engine": engine, "n_genes": int(sub.shape[0])}
+    return _bar(names, scores, f"Top DE genes — {treatment} vs {reference}", jsonable, subtitle,
+                meta=meta)
 
 
 def deseq_results(sub, cond, reference, treatment, normalization="deseq2"):
@@ -423,7 +443,28 @@ def _fit_deseq_with_tmm(dds, sub):
     dds.cooks_outlier()
 
 
-def _bar(names, scores, title, jsonable, subtitle=None) -> dict:
+# What the plotted score IS, per engine. ⚑ The scRNA path does NOT produce a fold change: scanpy
+# stores the test statistic in `rank_genes_groups`'s `scores` field ("the z-score underlying the
+# computation of a p-value" — its own docstring) and exposes `logfoldchanges` SEPARATELY, only for
+# t-test-like methods. This bar plotted `scores` under an axis and a table column both reading
+# "log2 fold-change", on the default path of the flagship DE skill and on its corpus smoke case.
+# Re-ranking by `logfoldchanges` instead would not fix it — that field is absent on the default
+# Wilcoxon run — so the label is what changes, to name the quantity actually drawn.
+_SCRNA_STATISTIC = {
+    "wilcoxon": "Wilcoxon z-score",
+    "t-test": "t-statistic",
+    "t-test_overestim_var": "t-statistic",
+    "logreg": "logistic-regression coefficient",
+}
+LFC_LABEL = "log2 fold-change"
+
+
+def scrna_statistic_label(method: str) -> str:
+    """The name of the statistic `rank_genes_groups` ranks by, for the given method."""
+    return _SCRNA_STATISTIC.get(str(method or "wilcoxon").strip().lower(), "ranking statistic")
+
+
+def _bar(names, scores, title, jsonable, subtitle=None, value_label=LFC_LABEL, meta=None) -> dict:
     from skills._table import table
 
     # Ascending so the strongest |score| sits at the top of the horizontal bar.
@@ -443,15 +484,20 @@ def _bar(names, scores, title, jsonable, subtitle=None) -> dict:
         ],
         "layout": {
             "title": {"text": title if not subtitle else f"{title}<br><sub>{subtitle}</sub>"},
-            "xaxis": {"title": {"text": "log2 fold-change"}},
+            "xaxis": {"title": {"text": value_label}},
             "yaxis": {"title": {"text": "gene"}},
             "bargap": 0.3,
         },
     }
+    if meta:
+        # Facts only the RUN has — which of four engines ran, which columns it resolved, whether a
+        # fallback fired. Lifted by `companions.methods.build_body` / `legends._facts`, the
+        # `meta.significance` pattern. Params alone cannot answer any of them.
+        spec["layout"]["meta"] = {"deg": meta}
     # Statistics node (Pillar 1) — the top genes, strongest effect first.
     tbl = sorted(range(len(scores)), key=lambda i: abs(scores[i]), reverse=True)
     spec["table"] = table(
-        ["gene", "log2 fold-change"],
+        ["gene", value_label],
         [[names[i], round(float(scores[i]), 4)] for i in tbl],
         "Top differential genes",
     )
@@ -577,7 +623,7 @@ def _timecourse(data_path: str, params: dict) -> dict:
         covariate = [str(design[covariate_col].get(str(s))) for s in samples]
 
     top_n = int(params["top_n"])
-    ranked, subtitle = _timecourse_rank(sub, samples, times, top_n, covariate)
+    ranked, subtitle, rank_meta = _timecourse_rank(sub, samples, times, top_n, covariate)
 
     # Mean normalised (log2 CPM) expression per distinct timepoint, one line per gene.
     cpm = np.log2(sub.div(sub.sum(axis=0), axis=1) * 1e6 + 1.0)
@@ -594,6 +640,13 @@ def _timecourse(data_path: str, params: dict) -> dict:
             "title": {"text": f"Time-course DE — top {len(ranked)} trending genes<br><sub>{subtitle}</sub>"},
             "xaxis": {"title": {"text": f"{time_col} (numeric)"}},
             "yaxis": {"title": {"text": "mean log2 CPM"}},
+            "meta": {"deg": {
+                "mode": "timecourse", "n_samples": len(samples), "n_genes": int(sub.shape[0]),
+                # `covariate_col` being SET is not the same as the adjustment running: the design
+                # gains the term only when the column resolves to >=2 distinct levels, so a
+                # covariate naming a constant column is silently ignored.
+                "restricted": bool(group_col and group_val), **rank_meta,
+            }},
         },
     }
     return jsonable(spec)
@@ -605,7 +658,7 @@ def _timecourse_rank(sub, samples, times, top_n, covariate=None):
     pyDESeq2 with a continuous time factor + Wald on the time coefficient when present
     (adjusting for ``covariate`` if given via design ~covariate + time); else a Pearson
     correlation of log2-CPM vs time (deterministic light fallback). Returns (top gene
-    index, engine/subtitle label).
+    index, engine/subtitle label, the meta facts the prose needs).
     """
     import numpy as np
     import pandas as pd
@@ -634,8 +687,14 @@ def _timecourse_rank(sub, samples, times, top_n, covariate=None):
         res = res.sort_values("padj")
         n_sig = int((res["padj"] < 0.05).sum())
         ranked = [str(g) for g in res.head(top_n).index]
-        adj = " (adj. covariate)" if design != "~time" else ""
-        return ranked, f"pyDESeq2 continuous-time Wald{adj} · {len(samples)} samples · {n_sig} genes FDR<0.05"
+        adjusted = design != "~time"
+        adj = " (adj. covariate)" if adjusted else ""
+        return (
+            ranked,
+            f"pyDESeq2 continuous-time Wald{adj} · {len(samples)} samples · {n_sig} genes FDR<0.05",
+            {"engine": "pyDESeq2 (continuous-time Wald)", "covariate_adjusted": adjusted,
+             "n_sig": n_sig},
+        )
     except ModuleNotFoundError:
         cpm = np.log2(sub.div(sub.sum(axis=0), axis=1) * 1e6 + 1.0)
         t = times - times.mean()
@@ -643,4 +702,10 @@ def _timecourse_rank(sub, samples, times, top_n, covariate=None):
         x = cpm.sub(cpm.mean(axis=1), axis=0)
         corr = (x.mul(t, axis=1).sum(axis=1)) / (np.sqrt((x**2).sum(axis=1)) * denom + 1e-12)
         ranked = [str(g) for g in corr.abs().sort_values(ascending=False).head(top_n).index]
-        return ranked, f"Pearson time-trend (pyDESeq2 absent) · {len(samples)} samples"
+        return (
+            ranked,
+            f"Pearson time-trend (pyDESeq2 absent) · {len(samples)} samples",
+            # No model, no Wald test, no p-values — so the paragraph may not claim any of them,
+            # and may not cite PyDESeq2 or Benjamini-Hochberg for work that did not happen.
+            {"engine": "Pearson time-trend (pyDESeq2 absent)", "covariate_adjusted": False},
+        )

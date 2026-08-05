@@ -168,12 +168,30 @@ PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
     # param cannot be caught by a rule about templates that mention the wrong one.
     ("methods", "cluster"): _untriaged("normalize"),
     ("methods", "composition"): _untriaged("order", "orientation", "sort_by"),
-    ("methods", "deg"): _untriaged(
-        "condition_col", "covariate_col", "group_col", "group_val", "label_col", "method",
-        "min_cells", "min_count", "normalization", "normalize", "time_col"
-    ),
-    ("methods", "diff_abundance"): _untriaged("condition_col", "label_col", "min_cells",
-                                              "sample_col"),
+    # ── deg + diff_abundance, TRIAGED 2026-08-05 (with NEXT#1(d)'s panel spec over the same
+    # runners — docs/deg-panel/spec.md). `deg` is FOUR engines behind one `mode` knob, and reading
+    # all four bodies found six live printed-vs-computed lies the guard could not see, because it
+    # checks that a param is MENTIONED and not that the sentence is TRUE:
+    #   · `method` reaches `rank_genes_groups` untouched while the paragraph said "Wilcoxon" always;
+    #   · a `groupby` column that is absent makes the runner CLUSTER the cells itself, and the
+    #     paragraph named the column the user asked for (the `violin` case, a fifth skill);
+    #   · a blank `sample_col`/`condition_col` resolves through an alias list, while the paragraph
+    #     defaulted to the literal word "sample";
+    #   · `mode="auto"` picks ONE engine and the sentence described both at once (`erg_flicker.view`);
+    #   · and — the sharpest — `_bulk_deseq`'s ImportError fallback returns a log2 of mean CPM with
+    #     NO model and NO p-values, while the paragraph claimed a PyDESeq2 Wald test and
+    #     Benjamini-Hochberg correction and CITED all three (the `_boxplot` family, third time).
+    # What survives here is genuinely answered elsewhere or genuinely internal.
+    ("methods", "deg"): {
+        # The contrast levels: the paragraph names them via `reference`/`treatment`, and these two
+        # only DERIVE them (from a design sheet, or by stripping a suffix off the column names).
+        "group_regex": _I,
+    },
+    ("methods", "diff_abundance"): {
+        # Named in the paragraph from the RESOLVED value (the alias fallback), not from the param —
+        # a blank param would have the sentence name nothing at all.
+        "condition_col": _OUT,
+    },
     ("methods", "enrichment"): _untriaged("fc_threshold", "fdr_threshold", "gene_sets"),
     # ── THE ERG FAMILY, TRIAGED 2026-08-05 ──────────────────────────────────────────────────────
     # The board predicted a confirmed-waive pass ("mostly pipeline-level/internal"). It was half
@@ -244,14 +262,22 @@ PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
     ("legends", "cluster"): _untriaged("n_neighbors", "n_pcs", "normalize"),
     ("legends", "composition"): _untriaged("order", "orientation", "sort_by"),
     ("legends", "corr_heatmap"): _untriaged("cluster"),
-    ("legends", "deg"): _untriaged(
-        "condition_col", "covariate_col", "group_col", "group_val", "groupby", "label",
-        "label_col", "method", "min_cells", "min_count", "mode", "normalization", "normalize",
-        "sample_col", "time_col"
-    ),
-    ("legends", "diff_abundance"): _untriaged(
-        "condition_col", "label_col", "min_cells", "normalization", "sample_col"
-    ),
+    # A caption is ONE sentence about ONE figure, not a second copy of the recipe: the methods
+    # paragraph carries the recipe and the caption names what the reader is looking at. What the
+    # caption DOES now get right — and did not — is the mode, which changes the noun: on the
+    # single-cell path scanpy ranks MARKERS for one cluster against the rest and reads neither
+    # `reference` nor `treatment`, so the old caption printed a contrast the run never performed.
+    ("legends", "deg"): {
+        "condition_col": _M, "covariate_col": _M, "group_col": _M, "group_val": _M,
+        "group_regex": _M, "label": _M, "label_col": _M, "method": _M, "min_cells": _M,
+        "min_count": _M, "normalization": _M, "normalize": _M, "sample_col": _M, "time_col": _M,
+        # `mode` and `groupby` ARE claimed, from the recorded outcome — `mode="auto"` resolves at
+        # run time and a missing `groupby` column is substituted.
+        "mode": _OUT, "groupby": _OUT,
+    },
+    ("legends", "diff_abundance"): {
+        "condition_col": _M, "min_cells": _M, "normalization": _M, "sample_col": _M,
+    },
     ("legends", "enrichment"): _untriaged("fc_threshold", "fdr_threshold", "gene_sets"),
     ("legends", "go_graph"): _untriaged("fc_threshold", "fdr_threshold", "namespace"),
     # ── GSEA + ssGSEA, TRIAGED 2026-08-05 (with NEXT#3's control pass over the same runners) ──────
@@ -321,7 +347,7 @@ PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
 # template either gives a param a sentence (it leaves the list) or records a verdict (it stays with
 # PRESENTATION / INTERNAL). Lower this number when you triage; a new UNTRIAGED entry pushes over it
 # and fails, which is the point — nothing joins the backlog silently.
-_UNTRIAGED_CEILING = 166
+_UNTRIAGED_CEILING = 131   # 261 raw -> 179 (ERG) -> 166 (GSEA) -> 131 (deg + diff_abundance)
 @pytest.mark.parametrize("module,skill_id", _CASES)
 def test_every_declared_param_is_described_or_deliberately_silent(module, skill_id):
     """The reverse direction — a declared param the prose never mentions is either described or
