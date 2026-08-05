@@ -126,10 +126,19 @@
   is set, and `cepo`'s said *"genes detected in at least N cells"* while the runner filters **cell
   types**. **The reason both were green is finding 10(a): the prose↔param guard is exact in only one
   direction.** Fix that before the next overlay batch.
-- **Not done, and deliberately:** no code against the `StatsTable` spec (it is owed a review);
-  `deg` untouched — its `normalize` belongs to the shared block by meaning, but its panel is specced
-  whole at `#1(d)`, so spread the block in there rather than piecemeal; and the seven review
-  findings at **NEXT#10**, each confirmed and each bigger than the change that surfaced it.
+- **⚑ THE SPEC IS APPROVED AND THE NEXT SESSION IS PLANNED (owner, 2026-08-05 10:13 +1000).** The
+  owner accepted the recommendations, which decides both open questions and clears
+  `docs/stats-tables/spec.md` to build — locked as **[[DECISIONS #15]]**, where the *decision* lives;
+  the spec keeps the *design*, one home each. **κ leaves `confusion`'s title text**, and **a headline
+  number gets a one-row table now** rather than waiting for a metrics strip (the strip is unblocked
+  later — presentation-only over the same data, so nothing built now has to be undone). The
+  sequencing is in the RECOMMENDED ORDER block: slices 1→2→3, then **`#10(a)` before slice 5**,
+  then `#1(c)`.
+- **Not done, and deliberately:** no code against the spec yet (approval arrived at the wrap, and
+  slice 1 is a whole session's work that should start clean); `deg` untouched — its `normalize`
+  belongs to the shared block by meaning, but its panel is specced whole at `#1(d)`, so spread the
+  block in there rather than piecemeal; and the six remaining review findings at **NEXT#10(b)–(g)**,
+  each confirmed and each bigger than the change that surfaced it.
 
 ## ▸ (superseded) LIVE · KNOBS-1 · 2026-08-05 00:47 +1000 (Sydney) · branch `main` (**PUSHED — `origin/main` = `23256ad`, working tree clean, nothing local; CI green on both pushes, runs `30920091848` + `30920304922`**) · Claude (FE+BE, solo, lead)
 
@@ -445,26 +454,47 @@
    ~~`API_ONLY_KNOBS` first pass~~ — **all DONE.** §3.2 is closed except rows 12–13.
    **Nothing is carried forward.**
 
-> **▶ RECOMMENDED ORDER FOR THE NEXT SESSION** (rewritten 2026-08-05 after KNOBS-2 — re-derive if it
-> looks stale, per [[verify-todo-not-already-shipped]]):
+> **▶ THE NEXT SESSION IS PLANNED — OWNER APPROVED THE RECOMMENDATIONS 2026-08-05 10:13 +1000.**
+> `docs/stats-tables/spec.md` is **APPROVED TO BUILD** ([[DECISIONS #15]]) and both its open
+> questions are decided. Work this order; re-derive if it looks stale
+> [[verify-todo-not-already-shipped]].
 >
-> 1. **`#4`'s spec is WRITTEN and awaiting the owner** (`docs/stats-tables/spec.md`). If it comes
->    back approved, **build slice 1 only** — the D1 normalizers + D6's one-field Pydantic widening +
->    guards G1/G2/G3/G5 — and prove it a **no-op**: the whole product must behave identically before
->    any skill emits two tables. Slices 3–5 (`lollipop`, then `boxplot`/`violin`, then
->    `confusion`/`qq`) are independent and separately shippable. **Two open questions are owed an
->    answer first** (spec §Open questions): whether κ leaves `confusion`'s title, and whether a
->    headline number wants a one-row table or a metrics strip.
-> 2. **`#1(d)` + `#2` together — the `deg` spec.** Unchanged and now the largest single gap (16 of
->    the 91 remaining knobs). **Spread `scrnaNormalize()` into it** — `deg.normalize` is the same
->    knob as the other eleven, verified in source, and was left out only to avoid touching the panel
->    piecemeal.
-> 3. **`#1` is no longer the headline item — 91 knobs remain but 25 are the ERG family and 11 are
->    `facs_gating`, both explicitly WAIVE-or-last.** The genuinely useful remainder is `gsea` +
->    `ssgsea` (13, item (c)), `normalization_qc` (6) and `integration`/`umap_scrna` (6).
+> 1. **`#4` SLICE 1 — the contract, and prove it a NO-OP.** D1's two normalizers (`as_tables` /
+>    `asTables`, the ONLY narrowing sites) + D6's **two** Pydantic widenings (`FigureIn.table_stats`
+>    **and** `ReproRun.table`) + the `extract/readers.py` consumer + guards G1/G2/G2b/G3/G5. **No
+>    skill changes; the whole product must behave identically.** The part most worth proving is the
+>    reproduction reader, because its failure mode is a **silently lowered score**, not an error.
+>    ⚑ Two things the gauntlet caught that must land in this slice: restate the L3 gate in
+>    normalized terms (`readers.py:326` — `table is None` goes permanently False under the
+>    normalizer), and move `drive.py:140`'s `panel_extractor` call **inside** the try above it.
+> 2. **`#4` SLICE 2 — the FE stack** (D2: stacked, open by default up to three, never tabbed) + the
+>    mock fixture, which must carry a **two-table** case or it only proves the shape that already
+>    worked [[mock-must-mirror-backend-contract]].
+> 3. **`#4` SLICE 3 — `lollipop` unsqueezed**, the first real one: attach both tables, delete the
+>    swap, **bump `skill.json` version** (a warm result cache would otherwise serve the old
+>    single-table result), and verify in the browser with `pairs=` set through the real control.
+> 4. **`#10(a)` — the two-directional prose↔param guard. BEFORE slice 5, and before any further
+>    overlay batch.** `test_methods_param_spec_guard.py:94` asserts `refs - declared` only; add
+>    `declared - refs` with a named waiver list in the `API_ONLY_KNOBS` shape. **Expect it to fail
+>    loudly on the first run — that failure IS the backlog.** This is the reason two
+>    printed-vs-computed lies read green through nine gates, and slice 5 moves a *published number*
+>    between homes, which is exactly the change it guards.
+> 5. **`#4` SLICES 4–5** — `boxplot`/`violin` (+ dissolve `NATIVE_L3_BOTH` **in the same change**,
+>    never before), then `confusion`/`qq`: κ and λ leave the title string for a one-row table. The
+>    **refusal** case ("the label sets differ, so no κ is defined") must survive the move as
+>    prominently as a value would.
+> 6. **Then `#1(c)`** (`gsea` + `ssgsea`, 13 knobs) — and verify the shared meaning the way KNOBS-2
+>    did, by reading each runner's BODY [[share-vocabulary-by-meaning-not-name]]. `ssgsea` scores
+>    per-sample while `gsea` ranks a whole contrast, so `weight` and `top_n` are the two most likely
+>    to be false friends.
+>
+> Not this session unless the above finishes: `#1(d)`+`#2` (the `deg` spec — still the largest single
+> gap at 16 knobs, and **spread `scrnaNormalize()` into it**, since `deg.normalize` is the same knob
+> as the other eleven and was left out only to avoid touching that panel piecemeal).
 >
 > **Do not open `facs_gating`** (blocked on a real `.fcs` — DEFERRED) and **do not run the gauntlet /
-> `fe-review` per task** — they are milestone instruments [[review-cadence-phase-not-task]].
+> `fe-review` per task** — they are milestone instruments [[review-cadence-phase-not-task]]. Run them
+> at the end of the `#4` build, which is a genuine milestone boundary.
 1. **⇒ KEEP WORKING DOWN `API_ONLY_KNOBS` — 171 → 148 (`f7d5756`) → 91 (`98e29ce`); 36 skills → 27
    → 14.** ~~`volcano`~~ · ~~the over-representation trio~~ · ~~`proteomics_de`~~ · ~~the cheap
    ones~~ · ~~**(a) the scRNA shared vocabulary**~~ · ~~**(b) the cheap singles**~~ **DONE.**
@@ -536,19 +566,21 @@
      `30914228111`, green in 8s) rather than waiting for Monday — which is the half a local check
      could not answer, because **zizmor catches too-many permissions and never too-few**: its
      `contents: read` is now *proven* sufficient to check out, install uv and run zizmor online.
-4. ~~**SPEC THE MULTI-TABLE `StatsTable` CONTRACT**~~ — **WRITTEN 2026-08-05 (`62c7028`),
-   `docs/stats-tables/spec.md`, AWAITING OWNER REVIEW. No code was written against it.** All four
-   decisions the board asked for are answered (D1 wire shape · D2 the Mobbin presentation question ·
-   D3 the 27-skill migration · D4 which skills want 2+ and whether a `role` field is needed — it is
-   not), plus D5 legend/caption and D6 persistence.
-   - **Read §7 first if it comes back approved** — five slices, of which **slice 1 must be provable
-     as a NO-OP** (contract + normalizers + guards, no skill changes).
-   - **Two questions are owed the owner before slice 5** (§Open questions): does κ leave
-     `confusion`'s title text, and is a one-row scalar table the right home for λ/κ or should Selom
-     grow a headline-metrics strip? Recommendations given for both; nothing else is blocked.
+4. **⇒ BUILD THE MULTI-TABLE `StatsTable` CONTRACT — SPEC APPROVED 2026-08-05, [[DECISIONS #15]].**
+   `docs/stats-tables/spec.md` (written `62c7028`, corrected `703997a`). All decisions are locked:
+   D1 wire shape · D2 stacked-not-tabbed · D3 the 27-skill migration · D4 no `role` field · D5
+   legend reads the first table · D6 the two Pydantic widenings. **Both open questions are decided**
+   — κ leaves `confusion`'s title; a headline number gets a one-row table now, with the metrics
+   strip available later as a presentation-only change over the same data.
+   - **§7 is the build order**, and **slice 1 must be provable as a NO-OP** (contract + normalizers
+     + guards, no skill changes). See the RECOMMENDED ORDER block above for the sequencing, which
+     interleaves `#10(a)` before slice 5.
    - **The `NATIVE_L3_BOTH` exception (`boxplot`/`violin`) is DISSOLVED BY this change but not IN
      it** — its whole justification is that only one table fits. Rule recorded in D3: remove the
      exception in the same change that makes it false, never before.
+   - **The inventory does NOT claim completeness** — it says re-derive it. That is not modesty: the
+     first draft called itself complete, named a **test-only** function as the reproduction
+     consumer, and missed the reader actually on the score's critical path.
 5. **The audit's open rows 21–23** — long category labels colliding with the axis title, point-label
    collision on scatter/volcano (neither side applies `adjustText`), axis title vs long ticks under
    `automargin`. **Selom's own defects, which cnsplots does not solve either**, so this is where
@@ -573,12 +605,14 @@
 9. **`OH-01`** (arq + Redis job store) — unblocked; contract is `docs/jobs-surface/spec.md` §4.
 10. **⇒ FROM THE 2026-08-05 REVIEWS — CONFIRMED, VERIFIED IN CODE, DELIBERATELY NOT FIXED.** Each is
     real and each is bigger than the change that surfaced it. Ranked:
-    - **(a) The prose↔param guard is exact in ONE direction only** (`test_methods_param_spec_guard.py:94`
-      asserts `refs - declared`, never `declared - refs`) — **which is exactly why the two
-      printed-vs-computed lies fixed in `e41016c` were green**. Making it two-directional is the
-      right ratchet and will surface a real backlog (every param no prose mentions). **Do this
-      before the next overlay batch**, because a knob becoming reachable is precisely when its
-      methods sentence starts mattering.
+    - **(a) ⇒ SCHEDULED FOR NEXT SESSION (step 4 above). The prose↔param guard is exact in ONE
+      direction only** (`test_methods_param_spec_guard.py:94` asserts `refs - declared`, never
+      `declared - refs`) — **which is exactly why the two printed-vs-computed lies fixed in
+      `e41016c` were green**. Making it two-directional is the right ratchet and will surface a real
+      backlog (every param no prose mentions); **that first red run IS the backlog**, so give it a
+      named waiver list in the `API_ONLY_KNOBS` shape rather than weakening the assertion. Do it
+      **before `#4` slice 5 and before the next overlay batch** — a knob becoming reachable, or a
+      published number moving between homes, is precisely when its methods sentence starts mattering.
     - **(b) `violin`'s PubMed annotation is now reachable, degrades silently, and the degradation
       is recorded nowhere.** The count is a **live network lookup at run time**, so a figure is not
       reproducible as-of anything — and via L3 synthesis it can reach a score-eligible table. An
@@ -609,8 +643,9 @@
       **refuted** this for `markers` specifically — it is a documented decision there — so treat it
       as a convention question, not a defect.
 
-**Owed follow-ups still open:** ~~the one-table `StatsTable` limit~~ **decided 2026-08-04 → NEXT#4;
-SPEC WRITTEN 2026-08-05, awaiting owner review** · ~~the `zizmor@latest` pin policy~~ **decided
+**Owed follow-ups still open:** ~~the one-table `StatsTable` limit~~ **CLOSED 2026-08-05 — spec
+written, reviewed, corrected, and APPROVED TO BUILD ([[DECISIONS #15]]); both open questions
+decided** · ~~the `zizmor@latest` pin policy~~ **decided
 2026-08-04 → [[DECISIONS #14]], built at NEXT#3** · ~~the `pairs=` **pair-picker**~~ **BUILT 2026-08-04.** Note the correction to the correction:
 the levels were persisted for scRNA/bulk but **not for `generic_table`**, the only kind that uses
 `pairs=` — that needed a backend change (`_table_hints`) · there

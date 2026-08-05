@@ -1,8 +1,10 @@
 # Spec — a figure may carry more than one Statistics table
 
-Status: **written, awaiting owner review** (owner-directed 2026-08-04: spec first, *"continue
-learning from cnsplots and Mobbin to refine the spec as well"*). Board row: `NEXT#4` in
-`agent_handoff/CURRENT.md`. **No code has been written against this.**
+Status: **APPROVED TO BUILD** — owner accepted the recommendations 2026-08-05, locked as
+[[DECISIONS #15]]; both §Open questions are decided (below). Written under the owner's 2026-08-04
+direction: spec first, *"continue learning from cnsplots and Mobbin to refine the spec as well"*.
+Board row: `NEXT#4` in `agent_handoff/CURRENT.md`. **Build in the §7 slice order — slice 1 must be
+provable as a no-op.**
 
 > **Revised 2026-08-05 after `review-gauntlet`**, which confirmed two blockers and a design
 > inconsistency against the first draft. All are fixed below, each marked where it landed: the
@@ -346,22 +348,37 @@ Each extends an existing test file rather than adding a parallel one, per the ra
    Verify in the browser — set `pairs=` through the real control and see **both** tables
    [[verify-on-real-data-not-mock]].
 4. **`boxplot` / `violin`** (rank 2) + dissolve `NATIVE_L3_BOTH` in the same change (D3).
-5. **`confusion` / `qq`** (ranks 3–4): the scalar table; κ and λ leave the title string.
+5. **`confusion` / `qq`** (ranks 3–4): the scalar table; κ and λ leave the title string per the
+   decided question 1. **Do NEXT#10(a) — the two-directional prose↔param guard — before this slice**,
+   not after: moving a published number between homes is exactly the change whose methods/caption
+   text must be re-checked, and that guard is currently exact in one direction only, which is why
+   two printed-vs-computed lies survived nine green gates on 2026-08-05.
 
 Slices 3–5 are independent of each other and each is separately shippable.
 
-## Open questions for the owner
+## Open questions — DECIDED 2026-08-05 ([[DECISIONS #15]])
 
-1. **Slice 5 changes what a figure caption says** — `confusion`'s title currently *is* where κ is
-   published, and a reader who has seen that figure will look for it there. Move it to a table and
-   leave the title a plain description, or keep κ in both? Recommendation: **move it**, and let
-   `companions/legends` put it in the caption if it belongs in the caption — one home per fact.
-2. **Is a one-row scalar table the right shape for λ and κ** (D4 ranks 3–4), or should Selom grow a
-   distinct "headline metrics" strip above the tables? A strip is a bigger, more design-led change
-   and Mobbin has a clear precedent for it ([Dub's `Clicks / Leads / Sales`
-   tiles](https://mobbin.com/screens/d0f6f9cb-db3a-43e1-ba0c-97950979f096)). Recommendation:
-   **one-row table now** (it costs nothing and makes the numbers reachable today), strip later as a
-   presentation-only change over the same data.
+Both were resolved the owner's way: accept the recommendations. Recorded here with the reasoning
+that survives, because a decision without its "why" gets relitigated.
+
+1. **κ LEAVES `confusion`'s title text.** The title becomes a plain description of the matrix; the
+   agreement scalars (`n`, overall agreement, Cohen's κ — *or* the named refusal when the label sets
+   differ) move to a one-row table. `companions/legends` may put κ in the **caption** if it belongs
+   in the caption, but it is published from **one** home, not two.
+   - **The migration risk is real and must be handled, not waved past:** a reader who has seen the
+     current figure will look for κ in the title. The refusal case matters more than the number —
+     *"the two label sets differ, so no κ is defined"* is a **finding**, and it must survive the
+     move as prominently as a value would. Slice 5 carries a test that the refusal renders.
+2. **A headline number gets a ONE-ROW TABLE now** (D4 ranks 3–4: `confusion`'s agreement scalars,
+   `qq`'s λ + verdict + N tests). Not a deferred "headline metrics" strip.
+   - The strip is not rejected, only unblocked-later: it is a **presentation-only** change over
+     exactly the same data, so building the table now costs nothing that a strip would later have to
+     undo. Mobbin's precedent for the strip is [Dub's `Clicks / Leads / Sales`
+     tiles](https://mobbin.com/screens/d0f6f9cb-db3a-43e1-ba0c-97950979f096) — worth revisiting once
+     more than a couple of skills carry scalars.
+   - The decisive argument is reachability, not looks: a one-row table sorts, exports to CSV, diffs
+     in compare and is readable by the reproduction metric reader **today**. A caption string does
+     none of those, which is what made this a defect rather than a preference.
 
 ## What cnsplots contributes here — and what it does not
 
