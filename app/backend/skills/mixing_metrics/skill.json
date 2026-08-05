@@ -16,7 +16,7 @@
     "normalize":     { "type": "bool", "default": true, "note": "normalize_total + log1p before PCA when computing an embedding from raw counts" },
     "n_pcs":         { "type": "int",  "default": 50, "min": 2, "max": 200, "note": "PCs when an embedding must be computed" }
   },
-  "outputs": [{ "name": "figure", "kind": "plotly_spec" }],
+  "outputs": [{ "name": "figure", "kind": "plotly_spec" }, { "name": "table", "kind": "csv" }],
   "background": "Computes the standard single-cell integration-benchmark metrics from an embedding + a batch/label vector: iLISI (batch mixing) and cLISI (cell-type separation) as the perplexity-calibrated inverse-Simpson neighbourhood diversity; kBET acceptance (per-neighbourhood chi-squared of local vs global batch frequency); ARI and NMI of a KMeans(k=#labels) clustering vs the ground-truth labels; and batch/label silhouette widths. LISI and kBET are clean-room reimplementations from the published definitions (no GPL harmonypy/kBET code); ARI/NMI/silhouette use scikit-learn (BSD). Batch metrics need >=2 batches; label-dependent metrics report N/A without a label key. The graded metric the integration-benchmark paper class prints, that Selom's integration skill could not previously read back.",
   "references": [
     { "type": "publication", "title": "Fast, sensitive and accurate integration of single-cell data with Harmony", "authors": "Korsunsky I, Millard N, Fan J, et al.", "year": 2019, "doi": "10.1038/s41592-019-0619-0", "note": "LISI metric — clean-room reimplementation from the definition (the harmonypy compute_lisi lineage is GPL)." },

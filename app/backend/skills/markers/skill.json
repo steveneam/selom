@@ -15,7 +15,8 @@
     "normalize":      { "type": "bool",  "default": true }
   },
   "outputs": [
-    { "name": "figure", "kind": "plotly_spec" }
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table", "kind": "csv" }
   ],
   "catalog": {
     "summary": "Per-cluster marker genes as a dotplot — colour = mean expression, dot size = % of cells expressing.",

@@ -19,7 +19,8 @@
     "log_x":   { "type": "bool", "default": false, "note": "Log x-axis — for dose/intensity ladders." }
   },
   "outputs": [
-    { "name": "figure", "kind": "plotly_spec" }
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table", "kind": "csv" }
   ],
   "catalog": {
     "summary": "Line plot of one or more series over a continuous x — time course, dose response, intensity ladder — with the mean per point and its spread as a shaded band, error bars or the individual replicate curves. Repeated rows at the same x are treated as replicates, so a plain long-form table needs no reshaping.",

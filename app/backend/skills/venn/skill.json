@@ -12,7 +12,8 @@
     "show_percent": { "type": "bool", "default": false, "note": "Print each region's share of the union under its count." }
   },
   "outputs": [
-    { "name": "figure", "kind": "plotly_spec" }
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table", "kind": "csv" }
   ],
   "catalog": {
     "summary": "Venn diagram of 2-3 set overlaps — the shared/unique split of DE hits, marker panels or gene lists, drawn as editable circles with every region count in the Statistics table. Consumes the same boolean membership matrix as the UpSet plot; above three sets, use UpSet.",

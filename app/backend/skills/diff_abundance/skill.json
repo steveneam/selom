@@ -16,7 +16,8 @@
     "min_cells":     { "type": "int", "default": 10, "min": 0, "max": 100000, "note": "drop clusters with fewer total cells across kept samples" }
   },
   "outputs": [
-    { "name": "figure", "kind": "plotly_spec" }
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table", "kind": "csv" }
   ],
   "catalog": {
     "summary": "Differential abundance — tests which clusters expand or shrink between conditions on the cells-per-(cluster×sample) table with DESeq2 + TMM (sample-level replication; compositional caveat surfaced).",

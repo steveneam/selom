@@ -14,7 +14,8 @@
     "highlight":     { "type": "str",   "default": "" }
   },
   "outputs": [
-    { "name": "figure", "kind": "plotly_spec" }
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table", "kind": "csv" }
   ],
   "catalog": {
     "summary": "DE volcano with FDR/log2FC thresholds and top-N gene labels.",

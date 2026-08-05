@@ -14,7 +14,8 @@
     "max_points": { "type": "int",  "default": 6000, "min": 200, "max": 200000, "note": "Plotted-point budget. The significant tail is kept whole; only the bulk is thinned. λ and n always use every p-value." }
   },
   "outputs": [
-    { "name": "figure", "kind": "plotly_spec" }
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table", "kind": "csv" }
   ],
   "catalog": {
     "summary": "Q-Q plot of observed vs expected -log10 p-values with the 95% null band and the inflation factor λ — the calibration check that shows whether a test is inflated, conservative, or honest. A volcano of an inflated test looks better, not worse; this is the figure that catches it.",

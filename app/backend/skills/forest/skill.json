@@ -14,7 +14,8 @@
     "ref_line":   { "type": "float", "default": 0.0,  "min": -100, "max": 100, "note": "The null. 0 for a log fold-change or coefficient; 1 for an unlogged ratio." }
   },
   "outputs": [
-    { "name": "figure", "kind": "plotly_spec" }
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table", "kind": "csv" }
   ],
   "catalog": {
     "summary": "Forest plot of effect sizes with confidence intervals — one row per feature, a reference line at the null, and colour by whether the interval clears it. Takes a DE / model-results table and uses its explicit CI columns, its standard error, or its t-statistic (in that order, and says which).",

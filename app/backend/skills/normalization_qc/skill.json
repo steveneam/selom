@@ -15,7 +15,8 @@
     "doublet_threshold": { "type": "number", "default": 0.25, "min": 0.05, "max": 0.95, "note": "doublet-score cutoff (explicit; auto-thresholding needs scikit-image)" }
   },
   "outputs": [
-    { "name": "figure", "kind": "plotly_spec" }
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table", "kind": "csv" }
   ],
   "catalog": {
     "summary": "Per-cell QC violin panel — total counts, genes-per-cell and mitochondrial-% distributions per sample (paper Fig S1A). The standard scRNA quality check before analysis.",

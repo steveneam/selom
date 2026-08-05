@@ -19,7 +19,8 @@
     "order":     { "type": "str",  "default": "", "note": "Group order along x." }
   },
   "outputs": [
-    { "name": "figure", "kind": "plotly_spec" }
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table", "kind": "csv" }
   ],
   "catalog": {
     "summary": "Paired before/after chart — one line per subject between two conditions, coloured by whether it rose or fell. Shows what a bar chart of the same data destroys: whether individuals moved together, or half rose while half fell to leave the group mean unchanged. Tested with a paired t-test or Wilcoxon signed-rank, and reports how many subjects went each way.",

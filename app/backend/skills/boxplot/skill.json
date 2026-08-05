@@ -21,7 +21,8 @@
     "correction":  { "type": "str",  "default": "none", "options": ["none", "bonferroni", "bh"] }
   },
   "outputs": [
-    { "name": "figure", "kind": "plotly_spec" }
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table", "kind": "csv" }
   ],
   "catalog": {
     "summary": "Box or strip plot of a numeric measure across categories — quartiles, median and 1.5×IQR whiskers, or (style=strip) every individual value with the box hidden, which is the honest choice when n is small. Optional significance brackets between named pairs. The distribution-comparison companion to violin and composition.",

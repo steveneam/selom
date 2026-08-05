@@ -21,7 +21,8 @@
     "correction": { "type": "str",   "default": "none", "options": ["none", "bonferroni", "bh"] }
   },
   "outputs": [
-    { "name": "figure", "kind": "plotly_spec" }
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table", "kind": "csv" }
   ],
   "catalog": {
     "summary": "Per-cluster expression violins for a marker gene (log1p).",

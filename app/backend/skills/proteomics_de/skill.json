@@ -19,7 +19,8 @@
     "missing":       { "type": "str",   "default": "mean",  "options": ["mean", "mindet", "minprob"] }
   },
   "outputs": [
-    { "name": "figure", "kind": "plotly_spec" }
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table", "kind": "csv" }
   ],
   "catalog": {
     "summary": "Differential abundance from a proteomics intensity matrix (log2 + median-normalize + Welch or limma-style moderated t-test, BH-FDR; MNAR-aware left-censored imputation) drawn as a volcano.",

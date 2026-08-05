@@ -23,7 +23,8 @@
     "correction":  { "type": "str",  "default": "none", "options": ["none", "bonferroni", "bh"] }
   },
   "outputs": [
-    { "name": "figure", "kind": "plotly_spec" }
+    { "name": "figure", "kind": "plotly_spec" },
+    { "name": "table", "kind": "csv" }
   ],
   "catalog": {
     "summary": "Ranked stem-and-dot chart of one value per category — the cleaner alternative to a bar chart when the point of the figure is the ordering. Carries a 95% bootstrap confidence interval on the median (a bar chart's mean±SEM has no non-parametric equivalent), and refuses to invent one on an already-aggregated table. Optional significance brackets between named pairs.",

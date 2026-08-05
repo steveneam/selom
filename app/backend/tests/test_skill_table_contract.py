@@ -20,6 +20,8 @@ forcing a table-source decision before it can ship into a graded path.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from extract.synthesize import ALSO_SYNTHESIZE, _SYNTHESIZERS, synthesize_table
@@ -147,6 +149,43 @@ def test_native_classification_matches_source():
     assert detected == NATIVE, (
         f"native-table set drifted from source: in-source-not-doc={sorted(detected - NATIVE)} "
         f"in-doc-not-source={sorted(NATIVE - detected)}"
+    )
+
+
+def test_skill_json_outputs_declare_the_table_a_native_skill_emits():
+    """⚑ A native table the CATALOG denies exists is a capability the user is told they do not have.
+
+    Found 2026-08-05 while bumping `confusion`/`qq`: **17 of the 27 native skills declared
+    `outputs: [figure]`** while attaching a Statistics table on every run — `volcano`, `boxplot`,
+    `lollipop`, `venn`, `forest`, `line`, `markers`, `proteomics_de` among them. That string is
+    rendered verbatim on the Store's skill detail page (`components/store/skill-detail.tsx`), so a
+    user comparing skills was told the flagship DE skill produces a figure and no table.
+
+    Same family as the reachability sweeps [[selom-shipped-not-reachable]] and one rung further
+    out: not an unreachable route, skill, knob or contract capability, but a shipped capability the
+    product's own catalog **denies**. Nothing is broken at runtime, which is exactly why nine gates
+    were green over it.
+
+    The rule is `outputs` declares a table **iff** the skill is NATIVE, and it is asserted both
+    ways against the same source-derived set the test above uses — so a new skill cannot ship
+    silently either denying its table or advertising one it never attaches. L3 skills stay
+    figure-only on purpose: a synthesized table is Selom re-shaping the picture, not the skill's own
+    output, and claiming it here would overstate what the skill computes.
+    """
+    denied, overclaimed = [], []
+    for skill_id in list_skill_ids():
+        meta = json.loads((_skill_dir(skill_id) / "skill.json").read_text(encoding="utf-8"))
+        declares = any(o.get("name") == "table" for o in meta.get("outputs", []))
+        if _attaches_table(skill_id) and not declares:
+            denied.append(skill_id)
+        if declares and not _attaches_table(skill_id):
+            overclaimed.append(skill_id)
+    assert denied == [], (
+        f"{denied} attach a Statistics table but their skill.json says outputs: [figure] — the "
+        f"Store then tells a user the skill produces no table"
+    )
+    assert overclaimed == [], (
+        f"{overclaimed} advertise a table in skill.json that no runner attaches"
     )
 
 
