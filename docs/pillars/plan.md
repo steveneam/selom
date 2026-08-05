@@ -5,6 +5,24 @@
 > session-to-session sequencing the build drifted into across s25–s42 and
 > reorients everything around **one shared engine**.
 >
+> ### ⚑ PILLAR STATUS — re-measured 2026-08-05
+>
+> **The spine (P1–P4) is effectively COMPLETE.** P1 all four slices · P2 in substance (L3 Tier A+B,
+> 16 synthesizers, reader↔synthesize integrated, `proteomics_de` native) · P3 3a+3b · P4 all three.
+> **What is genuinely left is small and named:** P2 **2d** (data-matching robustness) and P3 **3c**
+> (honest "we're not sure → here are options").
+>
+> **P5 is the constraint, and it is NOT engineering.** 5a shipped; the ledger's reading-provenance
+> gap closed 2026-08-05 (`docs/provenance-stamping/spec.md`). 5b/5c/5d are **data-availability
+> bound** — dogfooding more papers needs more staged papers+data, not more code
+> [[selom-live-reproduction-drive]].
+>
+> **Where the sessions have actually gone since ~2026-08-03 is NOT on this map**: a
+> reachability/honesty thread (unreachable knobs, multi-table contract, prose↔param truthfulness,
+> ledger provenance). Tracked in `agent_handoff/CURRENT.md` NEXT and the backlogs named in
+> `docs/build-plan-2026-08/plan.md` §0. **Naming the pillar still applies** — most of that work
+> serves **P4** (contract uniformity / honest output) and **P5** (score credibility).
+>
 > Keystone first move (owner-picked): the engine-structure spec — `docs/engine-spine/spec.md`.
 > Parked sidetracks: `docs/on-hold/README.md` (cataloged, never deleted).
 > **Active hardening tracker (2026-07-02 audit):** `docs/restructure/plan.md` — the
@@ -87,11 +105,11 @@ skill emits a canonical Statistics table.
 **Today:** `reproduction_drive.py` merge + `data_map` (heuristic); `skills/_table.py`; the **L3
 spec is written but awaiting sign-off** (`docs/records/table-synthesis/spec.md`, 4 decisions).
 **Slices:**
-- **2a** Sign off the L3 spec (D-t1…D-t4) → build L3 **Tier A** (`pca, composition, cluster, pvca, regression, umap_scrna, annotate, integration, trajectory`).
-- **2b** Reader ↔ synthesize integration — `extract/readers.py` tries `synthesize_table` when the native table is absent (tagged lower confidence); re-verify a drive panel end-to-end.
-- **2c** `proteomics_de` native `de_table` at source (the one real source-fix; closes the Foundry gap).
-- **2d** Data-matching robustness — a per-panel "which file feeds this?" picker + a better heuristic; honest `data_unmatched`.
-- **2e** L3 **Tier B** (`corr_heatmap, sankey, upset, scorecard, boxplot, violin, heatmap`), each gated by a faithfulness check.
+- **2a** Sign off the L3 spec (D-t1…D-t4) → build L3 **Tier A** (`pca, composition, cluster, pvca, regression, umap_scrna, annotate, integration, trajectory`). **DONE.**
+- **2b** Reader ↔ synthesize integration — `extract/readers.py` tries `synthesize_table` when the native table is absent (tagged lower confidence); re-verify a drive panel end-to-end. **DONE — and the "tagged lower confidence" half was only HALF true until 2026-08-05:** the `Reading` carried `layer`/`source`/`confidence` but `panel_extractor` dropped all three, so a synthesized read scored on the ledger as a native one (VERIFIED / 100). Closed by `docs/provenance-stamping/spec.md` — the provenance now rides `MetricValue`/`ValidationResult`, badges the panel, and caps `selom_confidence` at 75.
+- **2c** `proteomics_de` native `de_table` at source (the one real source-fix; closes the Foundry gap). **DONE.**
+- **2d** Data-matching robustness — a per-panel "which file feeds this?" picker + a better heuristic; honest `data_unmatched`. **← OPEN (one of the two real P2 remainders).**
+- **2e** L3 **Tier B** (`corr_heatmap, sankey, upset, scorecard, boxplot, violin, heatmap`), each gated by a faithfulness check. **DONE — 16 synthesizers registered in `extract/synthesize.py`.**
 
 ### P3 — Routing & Guidance  ·  "which analysis to run"
 **Goal:** given a paper **or** raw data, suggest the right skill(s) / pipeline — the **guided**
@@ -109,8 +127,8 @@ sink + paste-ready methods.
 **Today:** ~30 skills, the figure editor, the publication theme, lit-synth methods (~70%). Strong;
 the gap is contract uniformity + the methods/legend wiring.
 **Slices:**
-- **4a** Skill-contract uniformity audit — every in-scope skill emits `{figure, table}` (via L3 where native is absent); fill only the gaps the two products actually hit.
-- **4b** Editor-as-sink hardening (any `{figure, table}` renders + edits anywhere — the chart-extractor already proved the sink).
+- **4a** Skill-contract uniformity audit — every in-scope skill emits `{figure, table}` (via L3 where native is absent); fill only the gaps the two products actually hit. **DONE, and it grew:** the wire is now `StatsTable | StatsTable[] | null` (a figure may carry MORE than one Statistics table — DECISIONS #15, `docs/stats-tables/spec.md`, five slices), narrowed at exactly one site per side. ⚑ **The audit's own by-product was the sharpest reachability finding to date: 17 of 27 native-table skills declared `outputs:["figure"]` — the CATALOG told users they emit no table while they do.**
+- **4b** Editor-as-sink hardening (any `{figure, table}` renders + edits anywhere — the chart-extractor already proved the sink). **DONE.**
 - **4c** Methods / figure-legend layer wiring (umbrella §11 remainder, ~70% on lit-synth) — paste-ready methods + legend for any run. **DONE (s47):** the methods half already shipped (lit-synth); the legend half is new — `legends.py` (the per-skill caption sibling of `methods.build_body`, params-honest + result-enriched via the canonical `readers.de_counts`), wired onto `/skills/{id}/run` as `figure_legend`, plus `litsynth/legends_from_ledger.compose_ledger_legends` + `GET /papers/{slug}/legends` (the reproduction twin of `/methods`).
 
 ### P5 — Reproduction & Scoring  ·  the proving ground (consumes P1–P4)
@@ -118,11 +136,14 @@ the gap is contract uniformity + the methods/legend wiring.
 Now harden **credibility**.
 **Today:** `reproduction_drive` + `reproduction_runs` + Phase-3 FE + 4 validated ledgers + the
 two-axis Score.
-**ACTIVE PHASE (s50, owner-picked):** *Reproduction — dogfood-ready* → focused execution plan
-+ agile task slices in **`docs/records/reproduction-dogfood/spec.md`** (covers **5b/5c/5d + P2 2d + P3 3c**).
-Owner's why: dogfood many papers to *train the engine* (limited own omics data). Start = a cold-drive
-diagnostic on Harmony. That spec is the task-of-record for this phase; the slices below are the
-roadmap entries it fulfils.
+**~~ACTIVE PHASE (s50, owner-picked)~~ — SUPERSEDED as the active phase (see the status block at the
+top; the live sequencing is `docs/build-plan-2026-08/plan.md` + `agent_handoff/CURRENT.md` NEXT).**
+The *Reproduction — dogfood-ready* plan (**`docs/records/reproduction-dogfood/spec.md`**, covering
+**5b/5c/5d + P2 2d + P3 3c**) is still the task-of-record **for those slices**, and the owner's why
+still holds: dogfood many papers to *train the engine*, given limited own omics data.
+⚑ **What changed is the blocker, not the intent** — the dogfood drive is **data-availability bound**
+([[selom-live-reproduction-drive]]): more staged papers+data, not more engine work. Do not read the
+slices below as shovel-ready.
 **Slices:**
 - **5a** Metric-type-aware tolerance grader — tie the band to known engine deltas ([[selom-gsea-engine-sensitivity]], Melody↔Harmony) so **engine-delta ≠ irreproducible** in `validate_panel`. **DONE (s46):** `metric_type` on `Golden` → family band (`METRIC_TYPE_TOLERANCES` + `infer_metric_type`/`resolve_tolerances`); explicit per-golden tolerance still wins; the drive auto-types its goldens; 4 ledgers byte-identical.
 - **5b** Generic-extractor coverage (more metrics readable without a hand ledger; rides P2/L3).

@@ -1,13 +1,16 @@
 # Selom — Roadmap
 
-> **HISTORICAL (2026-06-29).** This P0→v2 / C-B framing is superseded. All engine pillars
-> are complete and step 7c (FE state → Postgres) shipped; the next gate is step 8 (AWS
-> deploy). The current backlog lives in **`docs/pillars/plan.md`** +
-> **`docs/aws-materialization/plan.md`**; live state in `agent_handoff/CURRENT.md`. The
-> infra below (Supabase / Redis / R2 / Kaleido) is superseded by the AWS plan. Kept for
-> historical context only.
-
-**Current:** scaffold done (repo skeleton + agent-boot files). Next gate: P0 hello-UMAP.
+> **HISTORICAL (2026-06-29; re-confirmed stale 2026-08-05).** This P0→v2 / C-B framing is
+> superseded — **do not plan against anything below.** Kept for historical context only.
+>
+> **The live plans are:**
+> - **`docs/pillars/plan.md`** — the engine spine, pillars P1–P5 (P1–P4 effectively complete)
+> - **`docs/build-plan-2026-08/plan.md`** — product phases P-A…P-E + the measured status table
+> - **`agent_handoff/CURRENT.md`** — live state + the NEXT board
+> - `docs/aws-materialization/plan.md` — deploy (owner chose "this box first, AWS later")
+>
+> The infra named below (Supabase / Redis / R2 / Kaleido) is superseded by the AWS plan. The
+> "Current: scaffold done, next gate P0 hello-UMAP" line was ~44 skills and ~15 sessions ago.
 
 ## Phases
 

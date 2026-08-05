@@ -10,7 +10,10 @@ the docs convention in `docs/repo-structure/plan.md` §1.3).
 |---|---|---|
 | `repo-structure/plan.md` | spec | Repo structure conventions + cleanup/refactor plan |
 | `aws-materialization/` | spec | Active deploy work — plan, spec, integrations, 7c FE-state migration |
-| `pillars/plan.md` | spec | Master engine-spine map (P1–P5) — the current backlog |
+| `pillars/plan.md` | spec | Master engine-spine map (P1–P5) — **status block re-measured 2026-08-05; P1–P4 effectively complete, P5 is data-bound** |
+| `build-plan-2026-08/plan.md` | spec | **Product phases P-A…P-E + the measured "where Selom actually is" table.** Live sequencing beside `pillars/plan.md` |
+| `stats-tables/spec.md` | spec | A figure may carry MORE than one Statistics table (DECISIONS #15) — read its four correction blocks before trusting its rationale |
+| `provenance-stamping/spec.md` | spec | Reading provenance on the reproduction ledger (DECISIONS #16) — a synthesized read is badged + caps `selom_confidence`. **§7 explains why no published ledger shows it** |
 | `restructure/plan.md` | spec | **Architecture-audit tracker (2026-07-02)** — live task board (WS1–WS6) for the Product-A-first arch/process hardening; points into pillars + the followups |
 | `architecture-consistency-gate/` | spec | Review gate — bespoke panes on one consistent spine |
 | `engine-spine/spec.md` | spec | Shared engine spine |

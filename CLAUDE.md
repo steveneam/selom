@@ -30,7 +30,9 @@ Selom is the owner's product and work. Every artifact is authored by the owner �
 |---|---|
 | `README.md` | Project overview, stack, quickstart |
 | `PRODUCT.md` | Product vision and positioning |
-| `ROADMAP.md` | Phased plan (P0 hello-UMAP -> v2) |
+| **`docs/pillars/plan.md`** | **The engine spine — pillars P1–P5. The organizing plan.** Status block at the top is re-measured; P1–P4 are effectively complete |
+| **`docs/build-plan-2026-08/plan.md`** | **Product phases P-A…P-E + the measured "where Selom actually is" table.** Live sequencing |
+| `ROADMAP.md` | ⚠️ **HISTORICAL — superseded, do not plan against it.** The P0→v2 / C-B framing and its infra (Supabase/Redis/R2) are dead; kept for context only |
 | `agent_handoff/` | Cross-agent coordination home |
 
 ## Development

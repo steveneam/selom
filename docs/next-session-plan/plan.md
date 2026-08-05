@@ -61,8 +61,8 @@ shortcuts have failed; the fixture records them so they are not retried.
 how a crash on the primary flow survived seven green gates plus a 10-route real-browser smoke. When a
 flow branches on `mockMode`, the real branch is untested until a real run exercises it.
 
-**The gate of record is `scripts/verify.sh`** (7 gates, ~70s). Run it raw; never pipe it through
-`| tail`.
+**The gate of record is `scripts/verify.sh`** (**9 gates**, ~140-250s as of 2026-08-05 — `be-slow`
+and `wf-lint` were added after this doc was written). Run it raw; never pipe it through `| tail`.
 
 ---
 
