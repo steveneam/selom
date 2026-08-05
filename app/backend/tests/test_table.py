@@ -122,10 +122,13 @@ def test_g3_a_single_table_stays_a_bare_object_on_the_wire(skill_id):
     assert isinstance(table, dict), f"{skill_id} must still emit a bare StatsTable, not a list"
 
 
-def test_g3_no_native_skill_has_started_emitting_a_list():
-    """Slice 1 changes the contract, not a single runner. When slice 3 unsqueezes `lollipop` this
-    test is the one that must be updated on purpose — which is the point: the migration is a no-op
-    until someone deliberately makes it not one."""
+def test_g3_no_native_skill_emits_a_list_on_DEFAULT_params():
+    """A second table is always something the user ASKED for, never something a default hands them.
+
+    `lollipop` emits two once `pairs=` is set (slice 3), and that is the whole point — but with
+    default params every skill still attaches a bare object, so no already-persisted figure and no
+    consumer sees a shape change it did not request. A skill that starts emitting a list unprompted
+    fails here, which is the decision worth forcing to be deliberate."""
     from skills.registry import list_skill_ids
 
     listed = []

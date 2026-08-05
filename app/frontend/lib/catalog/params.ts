@@ -173,6 +173,41 @@ const geneListFdr = (notACutoffOn: string): ParamPresentation => ({
   help: `Which rows of your DE table become the query gene list. ${notACutoffOn} Ignored for a bare gene list.`,
 });
 
+/**
+ * The pairwise-comparison block — the test and the correction applied to `pairs`.
+ *
+ * THREE skills declare these (`boxplot` · `violin` · `lollipop`) and they mean exactly one thing.
+ * Confirmed the KNOBS-2 way, by reading each runner's BODY rather than matching the key name: all
+ * three call `test_pairs(parse_pairs(params["pairs"]), values_of, test=…, correction=…)` from the
+ * same `skills/_stats.py`, with the same `welch`/`none` defaults — byte-identical calls
+ * (`boxplot/run.py:111` · `violin/run.py:126` · `lollipop/run.py:203`).
+ *
+ * `pairs` itself is NOT in this block, and that is the point: it is the same knob by meaning but a
+ * different WIDGET per skill. `boxplot`/`lollipop` resolve a row-list over the group column's real
+ * levels; `violin` stays a text box on purpose, because its clusters do not exist until the run.
+ * Sharing the two that are genuinely identical and letting the third vary is the honest split —
+ * folding `pairs` in would force one widget onto a skill whose vocabulary is not knowable yet.
+ */
+const COMPARISON_STATS: ParamPresentation[] = [
+  {
+    key: "sig_test", label: "Significance test", type: "select", help: "Applied to every pair above.",
+    options: [
+      { value: "welch", label: "Welch t-test (unequal variance)" },
+      { value: "student", label: "Student t-test (equal variance)" },
+      { value: "mannwhitney", label: "Mann-Whitney U (rank)" },
+    ],
+  },
+  {
+    key: "correction", label: "Multiple-comparison correction", type: "select",
+    help: "Several brackets means several shots at p<0.05. Correcting adjusts BOTH the stars and the table.",
+    options: [
+      { value: "none", label: "None (raw p)" },
+      { value: "bonferroni", label: "Bonferroni" },
+      { value: "bh", label: "Benjamini-Hochberg (FDR)" },
+    ],
+  },
+];
+
 const GENE_LIST_CUTOFFS: ParamPresentation[] = [
   geneListFdr("Not a cutoff on the terms drawn — each of those carries its own p."),
   {
@@ -297,16 +332,7 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     { key: "order", label: "Category order", type: "text", placeholder: "e.g. Control, Low, High", help: "Comma-separated. Named categories lead, in this order; the rest follow unchanged." },
     { key: "add_count", label: "Show n per group", type: "switch", help: "Append n= to each category label." },
     { key: "pairs", label: "Compare groups", type: "pairs", levelsFrom: "group", placeholder: "e.g. Control~Treated, Control~Rescue", help: "Each pair draws a bracket with significance stars, and its p-value appears in the Statistics table. Pick the group column above to choose from its real levels." },
-    { key: "sig_test", label: "Significance test", type: "select", help: "Applied to every pair above.", options: [
-      { value: "welch", label: "Welch t-test (unequal variance)" },
-      { value: "student", label: "Student t-test (equal variance)" },
-      { value: "mannwhitney", label: "Mann-Whitney U (rank)" },
-    ] },
-    { key: "correction", label: "Multiple-comparison correction", type: "select", help: "Several brackets means several shots at p<0.05. Correcting adjusts BOTH the stars and the table.", options: [
-      { value: "none", label: "None (raw p)" },
-      { value: "bonferroni", label: "Bonferroni" },
-      { value: "bh", label: "Benjamini-Hochberg (FDR)" },
-    ] },
+    ...COMPARISON_STATS,
     { key: "points", label: "Show points", type: "select", options: [
       { value: "outliers", label: "Outliers only" },
       { value: "all", label: "All points" },
@@ -351,6 +377,14 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     { key: "error_bars", label: "95% confidence interval", type: "switch", help: "A seeded percentile bootstrap. Needs 3+ values per category — an already-aggregated table gets no interval rather than a fabricated one." },
     { key: "add_tip", label: "Label each value", type: "switch", help: "Print the number beside its dot." },
     { key: "add_count", label: "Show n per category", type: "switch" },
+    // ⚑ `pairs` is what MAKES lollipop's second Statistics table exist — without a control, the
+    // multi-table result shipped in the same change would have been unreachable from the UI, which
+    // is [[selom-shipped-not-reachable]] one layer further in than a knob: an unreachable contract
+    // capability. The help carries the one thing lollipop's `pairs` must say and boxplot's need
+    // not: an already-aggregated table is n=1 per category, so every test would be n=1 vs n=1 and
+    // the runner drops the comparison rather than printing "ns" whatever the data says.
+    { key: "pairs", label: "Compare groups", type: "pairs", levelsFrom: "group", placeholder: "e.g. Control~Treated, Control~Rescue", help: "Each pair draws a bracket with significance stars, and the p-values arrive as a second Statistics table beside the ranked values. Ignored on an already-aggregated table (one row per category), where every test would compare a single value with a single value." },
+    ...COMPARISON_STATS,
   ],
   // Ridge — the honesty knob is `scale`, so it is surfaced rather than left to the API. Peak
   // normalization is the ridgeline convention AND the thing that makes a 5-point group look like
@@ -483,16 +517,7 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     { key: "order", label: "Category order", type: "text", placeholder: "e.g. cluster 2, cluster 0", help: "Comma-separated. Named categories lead, in this order; the rest follow unchanged." },
     { key: "add_count", label: "Show n per group", type: "switch", help: "Append n= to each category label." },
     { key: "pairs", label: "Compare groups", type: "text", placeholder: "e.g. cluster 0~cluster 1", help: "Comma-separated pairs joined by ~. Each draws a bracket with significance stars, and the p-values appear in the Statistics table. A name that doesn't match a group is skipped." },
-    { key: "sig_test", label: "Significance test", type: "select", help: "Applied to every pair above.", options: [
-      { value: "welch", label: "Welch t-test (unequal variance)" },
-      { value: "student", label: "Student t-test (equal variance)" },
-      { value: "mannwhitney", label: "Mann-Whitney U (rank)" },
-    ] },
-    { key: "correction", label: "Multiple-comparison correction", type: "select", help: "Several brackets means several shots at p<0.05. Correcting adjusts BOTH the stars and the table.", options: [
-      { value: "none", label: "None (raw p)" },
-      { value: "bonferroni", label: "Bonferroni" },
-      { value: "bh", label: "Benjamini-Hochberg (FDR)" },
-    ] },
+    ...COMPARISON_STATS,
     // The PubMed annotation block. `context` and `known_min` do nothing unless the annotation is on,
     // so they are gated on it rather than left as two controls that silently no-op.
     { key: "annotate", label: "Annotate with literature", type: "select", options: [

@@ -1,6 +1,6 @@
 {
   "id": "lollipop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "title": "Lollipop chart (ranked)",
   "engine": "python",
   "omics": "bulk-rna-seq|scrna-seq|proteomics|metabolomics",

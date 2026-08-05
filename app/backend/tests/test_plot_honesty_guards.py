@@ -62,6 +62,42 @@ def test_lollipop_keeps_brackets_when_the_groups_have_replicates():
     assert spec["layout"].get("shapes"), "a real pairwise comparison must still draw its bracket"
 
 
+def test_lollipop_keeps_BOTH_tables_when_pairs_is_set():
+    """The squeeze is gone (docs/stats-tables/spec.md slice 3).
+
+    Asking for `pairs` used to DISCARD the ranked values — rank, n and the asymmetric bootstrap CI
+    bounds, none of which are readable off a dot — because the wire carried exactly one table. The
+    trade was made the right way round, but it was forced by the wire shape rather than by anything
+    about the science. Both are attached now, in the runner's order: the ranked values are the
+    primary result and the pairwise table is the provenance of the stars already drawn."""
+    from skills._table import as_tables
+
+    values = {"a": [3.0, 3.2, 2.9, 3.1, 3.05], "b": [1.0, 1.2, 0.9, 1.1, 1.05]}
+    spec = lollipop_spec(values, {"pairs": "a~b"}, "score", "term", "t")
+    tables = as_tables(spec["table"])
+    assert len(tables) == 2, "the ranked values must survive a pairwise run"
+
+    ranked, pairwise = tables
+    assert ranked["columns"][0] == "rank"
+    assert "CI low" in ranked["columns"], "the bootstrap interval is the thing that was being lost"
+    assert "Pairwise" in (pairwise.get("title") or "")
+    assert "p" in pairwise["columns"]
+    # G4: stacked panels are told apart by their titles, so a multi-table result must name each.
+    assert all((t.get("title") or "").strip() for t in tables)
+
+    # ...and the drawn stars still have their numbers, which is what the old trade protected.
+    assert spec["layout"].get("shapes"), "the brackets are still drawn"
+    assert pairwise["rows"], "the p-values behind those stars are still reachable"
+
+
+def test_lollipop_without_pairs_still_attaches_ONE_bare_table():
+    """The no-op half: nothing changes for a run that asked for no comparison. A bare object, not a
+    one-element list — every persisted `table_stats` row holds an object."""
+    spec = lollipop_spec({"a": [3.0, 3.2, 2.9], "b": [1.0, 1.2, 0.9]}, {}, "score", "term", "t")
+    assert isinstance(spec["table"], dict)
+    assert spec["table"]["columns"][0] == "rank"
+
+
 # ---------------------------------------------------------------- confusion: the diagonal
 def test_confusion_refuses_agreement_when_the_label_sets_differ():
     """Leiden ids against cell-type names have NO diagonal.

@@ -83,3 +83,64 @@ test("exactly one panel renders for a one-table run — the slice-1 no-op claim"
   });
   await expect(page.locator("table"), "one table in, one panel out").toHaveCount(1);
 });
+
+/**
+ * Slice 3 — `lollipop` unsqueezed, verified where the claim actually lives.
+ *
+ * Until this change the skill DISCARDED its ranked-values table whenever the user asked for
+ * pairwise statistics, because the wire carried exactly one. Both are attached now. This is the
+ * check that proves it end-to-end: a real backend, the real ERG corpus file, and `pairs=` built
+ * through the real row-list rather than posted — because a control that cannot express the value is
+ * the layer below coverage, and `lollipop.pairs` had NO control at all until this change
+ * [[selom-shipped-not-reachable]].
+ */
+test("lollipop keeps BOTH tables when pairs= is set through the real control", async ({ page }) => {
+  const { openWorkbench } = await import("./fixtures");
+  await openWorkbench(page, {
+    projectName: "Browser-verify · Lollipop two tables",
+    csvRelPath: "erg-fig1e/erg_metrics_long.csv",
+    skillName: "Lollipop chart (ranked)",
+    awaitControl: ["Category column", "Compare groups"],
+  });
+
+  // The pair picker is a free-text box until a group column is chosen — blank means the backend's
+  // dtype auto-detect, which the frontend cannot evaluate. Choose one, and it becomes the row-list
+  // over that column's REAL levels.
+  await page.getByLabel("Category column").selectOption("condition");
+  await page.getByLabel("Value column").selectOption("b_wave_uv");
+  await page.getByRole("button", { name: "Add comparison" }).click();
+  await page.getByLabel("Comparison 1, first group").selectOption("Control");
+  await page.getByLabel("Comparison 1, second group").selectOption("AAV8-RK-PDE6B");
+
+  await page.getByRole("button", { name: "Apply skill" }).click();
+  await expect(page.locator(".js-plotly-plot")).toBeVisible({ timeout: 180_000 });
+
+  await expandWorkrail(page);
+  await page.getByRole("button", { name: /Ranked values/i }).first().click();
+
+  // TWO panels, stacked, both open — the ranked values (which used to be thrown away) and the
+  // p-values behind the bracket now drawn on the figure.
+  const panels = page.getByTestId("stats-panel");
+  await expect(panels).toHaveCount(2, { timeout: 30_000 });
+  // Scoped to the panels: the work rail names the table too, so an unscoped role query is
+  // ambiguous — and that ambiguity is itself the rail correctly announcing the primary table.
+  await expect(panels.nth(0).getByRole("button", { name: /Ranked values/i })).toBeVisible();
+  await expect(panels.nth(1).getByRole("button", { name: /Pairwise comparisons/i })).toBeVisible();
+
+  // Both are OPEN, not merely present: a collapsed panel and an unselected tab hide the same
+  // numbers, which is the reason D2 ruled tabs out in the first place.
+  const grids = page.locator("[data-testid='stats-panel'] table");
+  await expect(grids).toHaveCount(2);
+
+  // The ranked table is the one that used to be discarded — it must carry the columns a dot cannot
+  // show: the rank, the n, and the asymmetric bootstrap interval.
+  const rankedHeaders = await grids.nth(0).locator("thead th").allInnerTexts();
+  expect(rankedHeaders.map((h) => h.trim())).toEqual(expect.arrayContaining(["rank", "n", "CI low", "CI high"]));
+
+  // ...and the pairwise table holds the p-value behind the star actually drawn on the canvas.
+  const pairHeaders = await grids.nth(1).locator("thead th").allInnerTexts();
+  expect(pairHeaders.map((h) => h.trim())).toEqual(expect.arrayContaining(["group A", "group B", "p"]));
+  const pairRows = await grids.nth(1).locator("tbody tr").allInnerTexts();
+  expect(pairRows.join(" ")).toContain("Control");
+  expect(pairRows.join(" ")).toContain("AAV8-RK-PDE6B");
+});

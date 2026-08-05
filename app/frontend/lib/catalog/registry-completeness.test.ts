@@ -277,7 +277,7 @@ const API_ONLY_KNOBS: Record<string, string[]> = {
     "transform_t", "cofactor", "bins", "max_events", "gates"],
   gsea: ["gene_set", "gene_sets", "engine", "set_name", "weight", "n_perm"],
   integration: ["n_neighbors", "n_pcs", "color_by", "max_iter_harmony"],
-  lollipop: ["baseline", "order", "pairs", "sig_test", "correction"],
+  lollipop: ["baseline", "order"],
   normalization_qc: ["groupby", "max_cells", "filter", "nmads", "doublets", "doublet_threshold"],
   ssgsea: ["gene_set", "gene_sets", "top_n", "min_size", "max_size", "weight", "zscore"],
   umap_scrna: ["color_by", "embedding"],

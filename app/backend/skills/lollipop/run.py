@@ -209,14 +209,20 @@ def lollipop_spec(groups: dict, params: dict, value_label: str, group_label: str
         # origin — which the horizontal reversal above flips.
         attach_brackets(spec, results, drawn, values_of, value_axis,
                         orientation="h" if horizontal else "v")
-        # The figure carries ONE table (`contract.run_skill_with_table` → `StatsTable | null`), so
-        # asking for `pairs` swaps the ranked values out for the p-values that produced the drawn
-        # stars — the same trade `boxplot` makes. Stars on a figure whose p-values appear nowhere is
-        # the failure mode worth avoiding; the ranked values remain on the axis (and in `add_tip`).
+        # BOTH tables now — the swap is gone (docs/stats-tables/spec.md, slice 3). The figure used
+        # to carry exactly one, so asking for `pairs` DISCARDED the ranked values (rank, n and the
+        # asymmetric bootstrap CI bounds, none of which are readable off a dot) to make room for the
+        # p-values behind the drawn stars. That trade was made the right way round — stars whose
+        # p-values appear nowhere is the worse failure — but it was forced by the wire shape, not by
+        # anything about the science.
+        #
+        # Array order is the runner's and it carries meaning (D4, no `role` field): the ranked values
+        # are the primary result, and the pairwise table is the PROVENANCE of marks already drawn on
+        # the canvas. The frontend stacks them in this order with both open.
         tbl = pairs_table(results, test=str(params.get("sig_test", "welch")),
                           correction=str(params.get("correction", "none")))
         if tbl:
-            spec["table"] = tbl
+            spec["table"] = [spec["table"], tbl]
     return spec
 
 
