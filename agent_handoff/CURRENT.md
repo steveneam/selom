@@ -50,7 +50,7 @@
 | **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
 | older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · STATS-TABLES · 2026-08-05 13:00 +1000 (Sydney) · branch `main` (**PUSHED at the owner's request — `origin/main` = `6be1fad`, range `f5a47c0..6be1fad`, working tree clean, nothing local; CI run `30970426817` GREEN on all six jobs**) · Claude (FE+BE, solo, lead)
+## ▸ LIVE · STATS-TABLES · 2026-08-05 13:00 +1000 (Sydney) · branch `main` (**PUSHED at the owner's request — range `f5a47c0..HEAD`, working tree clean, nothing local, `origin/main` == `HEAD`. CI run `30970426817` GREEN on all six jobs at `6be1fad`; the handoff commits on top of it are docs-only. Trust `git log`, not this stamp.**) · Claude (FE+BE, solo, lead)
 
 - **`#4` slices 1→4 are DONE, in the board's order, with `#10(a)` interleaved exactly where the
   board put it (before slice 5).** Slice 5 (`confusion`/`qq` scalar tables) is the only one left,
@@ -439,7 +439,7 @@
    **Nothing is carried forward.**
 
 > **▶ THE NEXT SESSION — `#4` SLICE 5, THEN THE MILESTONE REVIEWS.** Slices 1→4 shipped 2026-08-05
-> (`f5a47c0..6be1fad`, **pushed**). `#10(a)`, slice 5's stated precondition, is in.
+> (`f5a47c0..HEAD`, **pushed, CI green**). `#10(a)`, slice 5's stated precondition, is in.
 >
 > **⚑ SLICE 5 WAS SCOUTED AT THE END OF THAT SESSION — read this before planning it, because four
 > of its assumptions are wrong.** Re-derive if it looks stale [[verify-todo-not-already-shipped]].
