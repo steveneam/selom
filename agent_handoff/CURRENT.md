@@ -27,6 +27,7 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
+| **STATS-TABLES-5** | 2026-08-05 | `main` `3b44a31..6d5c6ce` (**local, 3 ahead — owner pushes**) | **`#4` is CLOSED: slice 5 shipped, both milestone reviews ran, and the fix pass found that compare had been diffing 1 of N tables the whole time.** Slice 5 moved `confusion`'s agreement scalars and `qq`'s λ out of a table TITLE into a one-row table each — a number in a title is prose: no CSV, no diff, no metric reader. ⚑ **The array ORDER turned out to be load-bearing for a reason D4 never anticipated**: `_read_count` answers any count-shaped metric from the FIRST table with rows, falling back to `len(rows)`, so a one-row scalar table in position 0 reports a count of **1** at confidence 0.5 into a reproducibility score. Both runners lead with the detail table; the guard proves it by reading the REVERSED array and asserting the wrong answer comes back. D4's "extracts like every other table" is corrected in the spec — a wide scalar row is also unreadable by `_read_named_cell`, which keys on a row's first STRING cell. **The refusal is the real-corpus case, not the value case**, and it now publishes `n=83659` beside its named reason in a cell, under `["n", "note"]` columns — never `"not defined"` under a header reading *Cohen's kappa*, which is `de_table`'s own honesty rule. Two guards had to be EXTENDED rather than loosened: G3's "no native skill emits a list on DEFAULT params" became a declared two-directional list (these two scalars are computed on every run and gated by no knob, so gating the split on a param would invent a switch to protect a shape rather than a user), and `test_stub_native_skill_yields_a_table` was narrowing the union by calling `.get` on the raw value — `AttributeError` on a list, the union sprouting inside a test. **Then the `outputs` finding, a SEVENTH layer of [[selom-shipped-not-reachable]]**: regenerating the seed showed `outputs:["figure"]` on two skills that had just been made to emit two tables, and checking the rest turned it into **17 of 27 native-table skills declaring they produce no table** — volcano, boxplot, lollipop, venn, forest, line, markers, proteomics_de among them — rendered on three surfaces (Store · Library · Skill Match) and built by the live API from the same `skill.json`. The previous six layers were all *the user cannot get to it*; this one is *the user is told it isn't there*, which is worse in one way: nothing looks broken, so nobody goes looking. **Then the reviews**: gauntlet 13 confirmed / fe-review 16 confirmed + 23 JTBD, every finding re-verified in code before acting. ⚑ **Four independent lenses found the same thing — `compare-view.tsx` diffed `figureTables(a)[0]` only, for the whole of slices 1–5, while its card announced *"The results tables are identical"*.** Re-run lollipop with `correction` none→BH: table 0 is byte-identical and the entire change lives in table 1, so compare said "identical" beside a Parameters card reading `correction: none → bh`. **That falsified decided-question 2's own reachability argument** — the stated reason for preferring a table to a caption was that a table "sorts, exports, DIFFS IN COMPARE and is readable", and one of the four was not true; the slice-5 commit repeated the claim unchecked. Fixed by pairing every index, with the pairing moved OUT of the component into `lineage/diff.pairTableDiffs` precisely because the inline version could not be tested, plus a `structure.guard` rule failing any new `asTables(…)[0]` outside a named allowlist (**which caught one of my own two waiver entries on its first run**). Also fixed: StatsPanel state leaking ACROSS figures (`key={i}` — and slice 5 made it worse, since a one-row table's headers are inert so an inherited sort could not be cleared) · the synthesized disclosure stating a reason slice 4 made false · mouse-only sort headers that this milestone had just given `aria-sort` · `_run.py`'s `ALSO_SYNTHESIZE` branch having **no gated consumer** (deleting it left 1672 tests green) · `_STUB_NATIVE` a drifted hand-copy missing `qq`, so the seam validator's list branch had only ever seen dict literals · `_boxplot` prose naming Welch and Benjamini-Hochberg while returning `[]` citations. Gates on every commit: `verify.sh` **9/9 raw, exit 0, corpus set** · **skill-smoke 43 pass / 0 fail** · **browser-verify 5/5 stats-view + 9/9 editor-chrome/artboard/zoom** — and the first browser run after the fix pass **failed 3/5**, caught by my own CSV `aria-label` colliding with the panel-header locator. |
 | **STATS-TABLES** | 2026-08-05 | `main` `f5a47c0..6be1fad` (**pushed, CI green**) | **`#4` built slices 1→4 in the board's order, plus `#10(a)` interleaved where the board put it. A figure can carry more than one Statistics table, end to end.** Slice 1 is the contract — the wire becomes `StatsTable \| StatsTable[] \| null`, narrowed at **exactly one site per side** (`skills/_table.as_tables`, `lib/skills/stats-tables.asTables`), both guarded structurally. **The spec told me to re-derive its own consumer inventory rather than trust it, and that paid: four more narrowing sites, one of which BREAKS on a list** — `workrail.tsx` reads `figure.table.rows.length` for the Statistics rail row (an array has no `.rows`); `project-workspace.tsx` had `hasStats: !!figureTable(f)` where **`!![]` is `true`**, so a figure with no statistics would claim it has some; and `legends._facts` narrowed with `isinstance(table, dict)`, so a list would have produced a caption with **no facts and no error**. **The single most dangerous line was `extract/readers.py`'s L3 gate** (`if table is None`), permanently False under the normalizer — it would have killed synthesis for every tableless skill and landed them on `NEEDS_RECIPE`, a plumbing regression wearing the costume of an honest verdict. Five guards, **each proven to bite by reverting the fix**, and G2's FE half fired in **`components/`** — the root a `lib/`-only scan would have missed. Slice 2 stacks N panels, every one open up to three: collapsing tables 2..N is wrong **for the same reason tabs are**, since a collapsed panel and an unselected tab hide the same numbers. ⚑ **Mobbin ruled out D2's own `N tables` heading count** — eight mature multi-section report surfaces and not one heads the group with a count of its sections (Laravel Cloud titles each section and lets the stack speak; Braintrust's counts are per-section and describe ROWS, which `StatsPanel` already does). Slice 3 unsqueezed `lollipop` — and ⚑ **the feature was UNREACHABLE**: `lollipop.pairs` was API-only, so a two-table result existed that **no user could produce**. That is [[selom-shipped-not-reachable]] one layer past the 171-knob sweep — not an unreachable route, skill or knob, but an unreachable **contract capability**. `pairs`/`sig_test`/`correction` got controls, the latter two declared **once** (`COMPARISON_STATS`) after reading all three runners' bodies and finding byte-identical `test_pairs(...)` calls; `pairs` deliberately stays OUT of that block because it is the same knob by meaning and a different WIDGET (violin's clusters do not exist until the run). `#10(a)` made the prose↔param guard two-directional; **its first red run is a 269-param backlog across 61 templates**, and it immediately found **two more live printed-vs-computed lies in `methods._boxplot`** — "box-and-whisker … 1.5× the IQR" on a `style="strip"` run that draws **no box at all**, and "ordered by descending median" on a run where `order` puts the user's named categories first. Slice 4 gave `boxplot` both tables via a **declared, executed** opt-in (`ALSO_SYNTHESIZE`) — ⚑ **and its guard's first run proved D3's premise half wrong**: `violin` does NOT belong, because its synthesized table is a PubMed call read back out of an annotation that is a **live network lookup**, so it is not deterministically producible and appending it would make a network-dependent number more reachable by a reproducibility score before NEXT#10(b)'s stamping lands. So `NATIVE_L3_BOTH` **split** rather than dissolved. **The trap slice 4 opens is the part worth reading**: provenance used to be decided by POSITION (only the L3 fallback branch re-tagged), so an appended synthesized table would have been read at **full native confidence** — a re-shaped value silently overstating itself on a score. It follows the table's own `synthesized` flag now: one rule, driven by the data, strictly more correct than before. Gates on every commit: `verify.sh` **9/9 raw, exit 0, corpus set** (1664 passed) · **skill-smoke 43 pass / 0 fail, no regression** (run twice) · **browser-verify 4/4**, all new — the suite had **never opened the Statistics view at all** before this session. |
 | **KNOBS-2** | 2026-08-05 | `main` `60cb4c4..e9334c4` (**pushed**) | **The board's order followed exactly: `#4`'s spec written and PAUSED for review, then `#1(a)+(b)` — `API_ONLY_KNOBS` 148 → 91, 27 skills → 14.** **`docs/stats-tables/spec.md`** widens `StatsTable | null` to `StatsTable | StatsTable[] | null` and rejects two alternatives: a sibling `tables:` field is a hand-maintained mirror (the shape removed from `seed.ts` last session), always-a-list breaks every persisted row and all 27 runners. The squeeze is **shipped, not hypothetical** — `lollipop`/`boxplot`/`violin` each DISCARD a computed table when `pairs=` is set — and the quieter form is worse: **`confusion`'s Cohen's κ and `qq`'s λ live in a TITLE STRING**, so for every machine consumer in this repo (CSV export, `lib/lineage/diff.ts`, the reproduction metric extractor — all of which read `columns`/`rows`) the headline number of the run **is not a result, it is prose**. **D2 was the Mobbin question and Mobbin ruled the obvious pattern OUT**: tabs (Databricks SQL results · Dub) fit tables that are alternative slices of ONE measure, while Selom's are complements and one is the **provenance of marks already drawn on the figure** — stars on the canvas with their p-values behind an unselected tab repeats the failure the one-table trade exists to avoid. Stacked titled panels (Fresha · Gorgias), first open. Two board numbers corrected by the inventory: `NATIVE` is **27 skills not ~18**, and `routers/figures.py` types `table_stats` `dict | None` so **Pydantic REJECTS a list — a two-table figure would 422 at save**; that one field is the whole persistence migration. **Then `#1(a)+(b)`, worked by cluster as instructed — and the instruction to verify before sharing paid for itself four times.** `normalize` appears in 14 skills under **three different meanings**: 11 share it byte-identically (`normalize_total(1e4)` + `log1p`), but **`pvca.normalize` divides each feature by its SD — it is `pca.scale` under another name, and the board had named `pvca` among the 8 that "mean the same thing"**; `scorecard.normalize` min–max scales metric columns; `confusion.normalize` is a str enum. `groupby` split the same way — 4 skills share the grouping column (wording taken from `heatmap`, the clearest of them) while **`pseudotime_genes.groupby` never reaches its figure at all**, only rooting the trajectory. **The rule: read the runner's BODY, not the guard line and not the key name** — a grep returns all fourteen and separates none of them. **Two guards extended rather than restated**: the mock mirror checked fixture keys in both directions but **never the VALUES**, so a fixture could name every key and still render a different control (bounds come from the spec; an unbounded range silently becomes 0–100) — it found `erg_bwave_bar.value_col` pinned to `"b_wave_uv"` where the backend defaults it blank, meaning *derive from `wave`*, which made the **`wave` knob look INERT in dev:mock**; and **`runFromWorkbench` can drive a SWITCH** (a `role="switch"` button — `fill()` threw, `.type` was undefined, so **every bool knob was undrivable**, and `normalize` alone is 11 skills), idempotent by comparing `aria-checked`. **Both reviews then ran (owner-requested) and both earned their keep — gauntlet 10 confirmed / 2 blockers, fe-review ~20 confirmed; every finding re-verified in code before acting, several refuted or downgraded on inspection.** The gauntlet's two blockers were **both in the spec's consumer inventory**: it named `reproduction/core.py`'s `table_extractor` as THE reproduction consumer when that function has **no production caller**, and missed `extract/readers.py` — the reader actually on the score's critical path, which would raise `AttributeError` on a list **outside** drive.py's try/except and take down a whole paper drive; and D1's normalizer would have silently killed the L3 synthesis gate, converting every tableless skill to `NEEDS_RECIPE`, a plumbing regression wearing the costume of an honest verdict. **Same lesson as `normalize`, one level up: a plausible name, a matching docstring, and no caller.** The sharpest catch was against my own reasoning — **D2 ruled tabs out for hiding the p-values behind a click, then specified "first open, rest collapsed", which hides them behind a click.** fe-review found two latent `param-control` defects that 14 new switches made load-bearing: `Boolean("false") === true` drew a string bool in the **opposite** state (worst case: an ON switch under an "AI-staged change" marker for a value the run treats as OFF), and the switch row was a `<label>` wrapping the ✨ AI-marker **button**, so clicking the label text fired **Revert instead of toggle** — proven by a real-Chrome DOM probe. Plus two printed-vs-computed lies this batch made user-facing (`pvca` claimed standardization the run skips; `cepo` described a gene filter that is really a cell-type filter), **both green only because the prose↔param guard is exact in one direction — now NEXT#10(a)**. Gates: `verify.sh` **9/9 raw, exit 0, corpus set** (1571 passed / 5 skipped) · **browser-verify 2/2 new green first run**, both asserting on the RENDERED figure, re-run after the switch change. |
 | **KNOBS-1** | 2026-08-05 | `main` `9a05608..23256ad` (**pushed, CI green**) | **NEXT#1's first pass: `API_ONLY_KNOBS` 171 → 148, 36 skills → 27, and the "no overlay at all" count 18 → 15.** Worked by what a knob DECIDES. **`volcano` first** — the panel said *"Tune the options"* and offered one text box for a gene-set panel while `fc_threshold` · `fdr_threshold` · `top_n` were API-only. `proteomics_de` took the same three plus its preparation knobs, `missing` above all: the default per-protein mean impute biases real MNAR fold-changes toward zero, so it moves a result further than the choice of test does. **The three over-representation skills share ONE declared pair of cutoffs** (`GENE_LIST_CUTOFFS`) rather than three retyped copies, because the same two keys mean something *different* there than on a volcano — they select the QUERY genes, they do not filter the terms drawn, and they are inert on a bare gene list. `pathway` · `go_graph` · `sankey` had no overlay whatsoever; **`sankey` is the one to remember — `max_links` is its ONLY knob, so that skill rendered a literally EMPTY parameter panel**, and nothing about a blank panel distinguishes "no options" from "options nobody wired". **The one judgement call: `fdr_threshold` is deliberately NOT a slider.** Its range is 0–1 while every value anyone uses (0.05 · 0.01 · 0.001) sits in the first tenth of that track, so a linear slider would make the conventional cutoffs fiddly and 0.001 unreachable at any usable step — a new reachability gap created by the fix for a reachability gap. **Two guards added in the same change, about the layer BELOW coverage — a control that renders but cannot express its knob:** a slider must be bounded by the backend spec (an absent min/max silently becomes HTML's **0–100**), and its default must land ON a step. The second **found a real defect on its first run**: `qq.max_points` (min 200, step 500, default 6000) drew its thumb at **5700** while the readout beside it said 6000. **Three harness capabilities**, each needed here and none a one-off: **`setRange`** (Playwright's `fill()` refuses `input[type=range]` outright, so every threshold knob was undrivable — it walks there by KEYBOARD rather than assigning `.value`, which would only prove React's handler works when called), **`overrideDataCheck`** (the QC block card's "Review & run anyway", a first-class path no check had ever taken; opt-in so an unexpected block still fails loudly), and **`/p/[id]` + `/store` added to route warming** — the warm-routes file already documents this exact class and names three false timeouts it fixed, but the route every check navigates to and the heaviest compile in the app **was never in the list**, and it cost three more 180s timeouts in one session. **Recorded, not worked around:** sankey's own corpus file is `gene,cell_type`, so QC blocks it with *"No numeric data to analyze"* and by its own rule is right — while being wrong about sankey, whose values are the pair COUNTS it derives itself. Gates: `verify.sh` **9/9** (raw, exit 0, **with the corpus set** — the first run had `SELOM_DATASETS_DIR` unset and said so) · **browser-verify 23 green / 2 skipped / 0 failed** across filtered passes, incl. the 2 new. |
@@ -50,7 +51,76 @@
 | **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
 | older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · STATS-TABLES · 2026-08-05 13:00 +1000 (Sydney) · branch `main` (**PUSHED at the owner's request — range `f5a47c0..HEAD`, working tree clean, nothing local, `origin/main` == `HEAD`. CI run `30970426817` GREEN on all six jobs at `6be1fad`; the handoff commits on top of it are docs-only. Trust `git log`, not this stamp.**) · Claude (FE+BE, solo, lead)
+## ▸ LIVE · STATS-TABLES-5 · 2026-08-05 14:14 +1000 (Sydney) · branch `main` (**NOT PUSHED — 3 commits ahead of `origin/main`, working tree clean. `3b44a31..6d5c6ce`. Owner pushes. Trust `git log`, not this stamp.**) · Claude (FE+BE, solo, lead)
+
+- **`#4` IS CLOSED.** Slice 5 shipped, both milestone reviews ran over the whole `f5a47c0..HEAD`
+  range, and the fix pass landed. Detail is in the three commit messages; what follows is what a
+  next session needs and could not re-derive.
+- **⚑ THE FINDING THAT MATTERS: a claim in an APPROVED decision can be false, and the decision still
+  be right.** Decided-question 2 justified moving κ and λ into a table because a table "sorts,
+  exports, **diffs in compare**, and is readable by the metric reader". Two of those four were
+  untrue when written. Compare had been diffing `figureTables(a)[0]` only — for the whole of slices
+  1–5 — under a card announcing *"The results tables are identical"*; and a WIDE one-row table is
+  unreadable by `_read_named_cell` (it keys on a row's first string cell) while `_read_count`
+  actively mis-reads it. **The decision was still correct** — the presentational half was real and
+  the fix was to make the other half true. But the rationale went through a spec review, an owner
+  approval and five slices without anyone running it. **Check the capability a decision RESTS on,
+  not just the decision.** Both are recorded as correction blocks in `docs/stats-tables/spec.md`.
+- **⚑ ORDER IS LOAD-BEARING WHEREVER A SCALAR TABLE EXISTS, and this will recur.**
+  `extract.readers._read_count` answers ANY count-shaped metric (`n_*`, `*_total`) from the FIRST
+  table that has rows, falling back to `len(rows)`. A one-row scalar table in position 0 therefore
+  answers "how many?" with **1**, at confidence 0.5, on a reproducibility score. Both slice-5
+  runners lead with the detail table and say so at the site;
+  `test_g3_a_declared_multi_table_skill_leads_with_its_DETAIL_table` proves it by reading the
+  REVERSED array. **Any future "attach a summary beside a detail table" change inherits this** —
+  put the scalar last, or make the reader shape-aware first.
+- **⚑ THE SEVENTH LAYER OF [[selom-shipped-not-reachable]] — and it is a new KIND.** 17 of 27
+  native-table skills declared `outputs: [figure]` while attaching a table on every run, rendered on
+  three surfaces and built by the live API from the same `skill.json`. The first six layers were all
+  *the user cannot get to it*. This one is *the user is told it isn't there* — *nothing looks
+  broken*, so nobody goes looking. Found only because regenerating the seed put two of them side by
+  side. **Ask of any capability: does the catalog admit it exists?** Now `outputs` declares a table
+  IFF the skill is NATIVE, both directions, on the existing native-classification guard.
+- **The reviews earned their keep and the fix pass was most of the value.** gauntlet **13
+  confirmed**, fe-review **16 confirmed + 23 JTBD**. Every finding re-verified in code before
+  acting; several were correctly attributed by the verifier itself as pre-existing or mis-scoped.
+  **Four independent lenses found the compare bug** and none of the nine gates could — reading index
+  0 of an array is perfectly typed. **Run these at a milestone; they do not substitute for gates and
+  gates do not substitute for them.**
+- **Two of my own fixes were caught by the instruments they were meant to satisfy**, which is worth
+  repeating rather than tidying away: the new `structure.guard` waiver list rejected one of its own
+  two entries on its first run (`stats-view.tsx` never matched the pattern), and the browser suite
+  went **3/5 RED** after the fix pass because the CSV `aria-label` I added collided with the
+  panel-header locator. Neither would have been found by reading the diff.
+- **Writing the `ALSO_SYNTHESIZE` route test cost two red runs, both worth pinning**: `pairs=` with
+  the wrong SEPARATOR (`,` rather than `~`) and `pairs=` naming absent LEVELS are both
+  indistinguishable from `pairs=` never being set — the run silently falls through to single-table
+  L3 synthesis. **`pairs=` being SET is not the same condition as `pairs=` being TESTABLE.**
+- **RECORDED, NOT FIXED — read this before picking up reproduction work.** `extract.readers`
+  computes `Reading.layer` / `.source` / `.confidence` and `panel_extractor` **throws all three
+  away** (`out[gold.metric] = r.value`); `MetricValue` carries only `{metric, value}`, so an L3
+  synthesized read the reader itself rated 0.45 lands on the ledger as a VERIFIED / 100-Selom-
+  confidence cell. **Verified end-to-end on the real drive**, but it is **pre-existing, not slice 4's
+  doing** (the gauntlet's own verifier corrected that attribution: the `ALSO_SYNTHESIZE` append
+  lives in `routers/_run.py`, and the drive uses `run_skill_with_table`, which never synthesizes).
+  It also is not synthesis-specific — the score is blind to reader confidence at every layer. The
+  provenance-badge half is defensible; **capping `selom_confidence` is a founder decision** because
+  `Reading.confidence` ("did I read the right number") and `selom_confidence` ("is our reconstruction
+  trustworthy") are different quantities. Related: the run API and the drive **disagree** about which
+  tables an `ALSO_SYNTHESIZE` skill produces.
+- **`PROSE_SILENT` is 261 params / 60 templates** (was 269/61 — `("methods","boxplot")` retired),
+  split evenly legends 131 / methods 130. **The largest single block is the ERG family in methods —
+  50 of the 130**, and NEXT#1(e) already rules those knobs pipeline-level/internal, so the triage
+  likely starts with ~50 confirmed waives in one pass and a load-bearing bucket far smaller than 261.
+- **Gates.** `verify.sh` **9/9 raw, exit 0, corpus set** on every commit (1672 fast / 394 slow) ·
+  **skill-smoke 43 pass / 0 fail**, no regression · **browser-verify 5/5 stats-view + 9/9
+  editor-chrome·artboard·zoom**, raw exit 0. Servers released (`:3152`/`:8152` free).
+- **Not done, deliberately:** the compare fix is unit-pinned and guard-ratcheted but **has no browser
+  check** — no spec drives a two-version family. That is the first thing to verify. Plus the
+  `PROSE_SILENT` triage, `#1(c)`, `#10(b)` (which unblocks `violin`'s second table), and the
+  fe-review JTBD gaps below.
+
+## ▸ (superseded) LIVE · STATS-TABLES · 2026-08-05 13:00 +1000 (Sydney) · branch `main` (**PUSHED at the owner's request — range `f5a47c0..HEAD`, working tree clean, nothing local, `origin/main` == `HEAD`. CI run `30970426817` GREEN on all six jobs at `6be1fad`; the handoff commits on top of it are docs-only. Trust `git log`, not this stamp.**) · Claude (FE+BE, solo, lead)
 
 - **`#4` slices 1→4 are DONE, in the board's order, with `#10(a)` interleaved exactly where the
   board put it (before slice 5).** Slice 5 (`confusion`/`qq` scalar tables) is the only one left,
@@ -434,52 +504,44 @@
 
 0. ~~Gate the `slow` lane~~ · ~~Lane B~~ · ~~§3.2 rows 5/6/9~~ · ~~rows 7/8/10/11~~ ·
    ~~the column / pair picker~~ · ~~sweep the reachability class~~ · ~~pin zizmor + the drift job~~ ·
-   ~~`API_ONLY_KNOBS` first pass~~ · ~~the multi-table contract, slices 1–4~~ ·
-   ~~the two-directional prose↔param guard~~ — **all DONE.** §3.2 is closed except rows 12–13.
-   **Nothing is carried forward.**
+   ~~`API_ONLY_KNOBS` first pass~~ · ~~the multi-table contract, slices 1–5~~ ·
+   ~~the two-directional prose↔param guard~~ · ~~the `#4` milestone reviews + fix pass~~ —
+   **all DONE.** §3.2 is closed except rows 12–13. **Nothing is carried forward.**
 
-> **▶ THE NEXT SESSION — `#4` SLICE 5, THEN THE MILESTONE REVIEWS.** Slices 1→4 shipped 2026-08-05
-> (`f5a47c0..HEAD`, **pushed, CI green**). `#10(a)`, slice 5's stated precondition, is in.
+> **▶ THE NEXT SESSION — `#4` IS CLOSED. START WITH THE ONE THING THE FIX PASS COULD NOT PROVE.**
+> Slices 1→5 + both milestone reviews + the fix pass shipped 2026-08-05 (`f5a47c0..6d5c6ce`,
+> **3 commits UNPUSHED — owner pushes**). Re-derive anything here that looks stale
+> [[verify-todo-not-already-shipped]].
 >
-> **⚑ SLICE 5 WAS SCOUTED AT THE END OF THAT SESSION — read this before planning it, because four
-> of its assumptions are wrong.** Re-derive if it looks stale [[verify-todo-not-already-shipped]].
->
-> 1. **It is REACHABILITY-CLEAN, unlike slice 3.** Both skills have full overlays; `qq` is not in
->    `API_ONLY_KNOBS` at all and `confusion` waives only `true_order`/`predicted_order` (cosmetic).
->    Neither skill's scalars are gated behind a knob — **κ and λ are computed on every run**. So the
->    check slice 3 taught us to do first has been done, and it passes. Go straight to the work.
-> 2. **The scalars live in the *table's* title, NOT the figure's** — `_confusion_table` and
->    `_qq_table` both build `table(columns, rows, "<title carrying the numbers>")`. The rendered
->    figure titles are just `celltypes vs genotype` and `P-value Q-Q — P.Value`. **So slice 5 touches
->    no figure, no golden, and needs no re-render** — it splits one table title into a plain
->    description plus a one-row table. Smaller and safer than the spec's framing suggests.
-> 3. **⚑ `confusion`'s REAL-CORPUS CASE *IS* THE REFUSAL CASE.** On `celltypes x genotype` it emits
->    *"the two label sets differ, so there is no diagonal and no accuracy or kappa is defined"* —
->    the hard half of decided-question 1 is what the corpus produces **by default**, and the κ-value
->    case is the one needing a constructed input. That is the inverse of the natural assumption.
->    A one-row table whose cell reads *"not defined — the two label sets differ"* is the honest
->    shape; **an absent table is not**, because the refusal is a finding.
->    `qq`'s real case gives **λ = 2.141 (inflated) over 14354 tests** — a genuine headline number.
-> 4. **D5's ordering hazard does not bite here.** Neither skill has a `legends` template, so both
->    captions are generic (*"Confusion / agreement matrix of the input data."*) and no caption fact
->    is degraded by whichever table goes first. Order on reading value, not on protecting a caption.
-> 5. **⚑ A ONE-ROW TABLE IS A SHAPE THE PRODUCT HAS NEVER HAD, and three sites print `1 rows`.**
->    `stats-panel.tsx:91` (`{n} rows · {m} columns`), `stats-panel.tsx:126` (`${rows.length} rows`)
->    and `workrail.tsx:432` (`${n} rows · ${m} cols`). One pluralisation fix, three call sites,
->    found by scouting rather than by shipping it. Check the same panel's SORT affordance reads
->    sensibly on a single row while you are there.
-> 6. **Extend `e2e/browser-verify/stats-view.spec.ts`** — do not add a fifth spec file. It already
->    knows the rail auto-collapses after Apply, how to count panels, and how to assert the
->    synthesized disclosure. Prove the REFUSAL renders, not just the value.
-> 7. **THEN THE MILESTONE REVIEWS — this is the genuine `#4` boundary.** `review-gauntlet` +
->    `fe-review` over the whole `f5a47c0..HEAD` range [[review-cadence-phase-not-task]]. Both earned
->    their keep last time (2 blockers, both in the spec's own inventory). Budget real time for the
->    fix pass; re-verify every finding in code before acting on it.
->
-> **After that, in value order:** the `PROSE_SILENT` triage (`#10(a)`'s untriaged half — 269 params;
-> start with `proteomics_de.missing`, `markers.method`, `violin.sig_test`/`correction`; **`deg`'s 15
-> belong with `#1(d)`'s spec, not piecemeal**) · `#1(c)` `gsea`+`ssgsea` · `#10(b)`, which now
-> **unblocks `violin`'s second table**.
+> 1. **⇒ BROWSER-VERIFY THE COMPARE FIX — the only claim from the fix pass with no rendered proof.**
+>    Compare now pairs every table by index and renders one titled card per pair, and that is pinned
+>    by `lib/lineage/diff.test.ts` (`pairTableDiffs`, fails when the loop is cut back to `[0]`) plus
+>    a `structure.guard` rule. **But no browser check drives the compare view at all** — it needs a
+>    two-version FAMILY, which no fixture builds today, so `runFromWorkbench` twice is not enough
+>    (a variant needs `parentFigureId`; the sweep form is the real path). That is a harness
+>    capability worth building once [[compound-capability-each-task]], and the check to write with it
+>    is the exact scenario four review lenses described: re-run `lollipop` with `correction`
+>    none→BH, then assert the ranked table shows NO change while the pairwise card does.
+> 2. **THE `PROSE_SILENT` TRIAGE — and scouting changed its shape.** 261 params / 60 templates,
+>    split legends 131 / methods 130. **The ERG family is 50 of the methods 130**
+>    (`erg_bwave_bar` 16 · `erg_traces` 15 · `erg_intensity_response` 12 · `erg_flicker` 7) and
+>    NEXT#1(e) already rules those knobs pipeline-level/internal — so **open with one confirmed-waive
+>    pass over ERG** and the load-bearing remainder is far smaller than the raw number suggests.
+>    Then the params that change a RESULT: `proteomics_de.missing`, `markers.method`,
+>    `violin.sig_test`/`correction`. **`deg`'s belong with `#1(d)`'s spec, not piecemeal.**
+> 3. **`#1(c)` `gsea` + `ssgsea` (13)** — the best-value `API_ONLY_KNOBS` block left. Verify the
+>    shared meaning by reading each runner's BODY first (the `normalize`/`pvca` lesson).
+> 4. **`#10(b)` provenance stamping — it now has TWO consumers waiting**, not one: `violin`'s second
+>    table is blocked on it, and so is the ledger gap in the LIVE block above. Worth specing them
+>    together; the `selom_confidence` half is a **founder decision**, so surface it rather than
+>    choosing.
+> 5. **The fe-review JTBD backlog** (recorded, none fixed — all are feature gaps, not defects):
+>    **copy-to-clipboard on a table** (the repo already ships Copy-TSV twice — `skill-match-results`
+>    and `library-view` — and `components/methods/copy-button.tsx` is ready-made; reading κ=0.951
+>    currently means downloading a CSV) · a CSV filename carrying the figure + variant, and the
+>    `synthesized` flag surviving export · a path out of the 200-row render cap · a row filter for
+>    non-gene tables · an empty state for a search that matches nothing · "export all tables" as one
+>    source-data file · cross-referencing a p-value row to the bracket drawn on the canvas.
 >
 > **Do not open `facs_gating`** (blocked on a real `.fcs` — DEFERRED).
 1. **⇒ KEEP WORKING DOWN `API_ONLY_KNOBS` — 171 → 148 (`f7d5756`) → 91 (`98e29ce`) → 86 (`bf6a686`);
@@ -713,9 +775,11 @@ journal's own author guidelines**, not cnsplots.
 
 ## ▸ READ FIRST
 
-**`docs/stats-tables/spec.md`** (**NEXT#4 — slices 1–4 SHIPPED 2026-08-05 and struck through in §7;
-only slice 5 remains. Read the two CORRECTION blocks: D3's `violin` prediction and D2's heading
-count, both against decisions already approved**) ·
+**`docs/stats-tables/spec.md`** (**NEXT#4 CLOSED 2026-08-05 — all five slices struck through in §7.
+Read the FOUR correction blocks before trusting anything else in it: D3's `violin` prediction, D2's
+heading count, D4's "extracts like every other table", and decided-question 2's "diffs in compare".
+The last two were premises of an APPROVED decision and both were false when written** —
+[[verify-todo-not-already-shipped]] applies to a spec's own rationale, not just its inventory) ·
 **`docs/auth-multitenancy/spec.md`** (**the entry point — steps 1–3 of §4 are DONE; steps 4–7 are the
 frontend half and are blocked on Clerk keys. §5's route-enumerating isolation guard is the one piece
 NOT built — see NEXT#7**) · **`docs/cnsplots-port/parity-audit.md`** (F1+F2 ledger; its §3 table is
