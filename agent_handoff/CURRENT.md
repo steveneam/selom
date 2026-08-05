@@ -531,10 +531,17 @@
 >    `violin.sig_test`/`correction`. **`deg`'s belong with `#1(d)`'s spec, not piecemeal.**
 > 3. **`#1(c)` `gsea` + `ssgsea` (13)** — the best-value `API_ONLY_KNOBS` block left. Verify the
 >    shared meaning by reading each runner's BODY first (the `normalize`/`pvca` lesson).
-> 4. **`#10(b)` provenance stamping — it now has TWO consumers waiting**, not one: `violin`'s second
->    table is blocked on it, and so is the ledger gap in the LIVE block above. Worth specing them
->    together; the `selom_confidence` half is a **founder decision**, so surface it rather than
->    choosing.
+> 4. **⇒ THE MAIN EVENT — `#10(b)` + the ledger provenance gap, ONE spec, written FIRST and paused.**
+>    They are the same seam and both have a consumer waiting: `violin`'s second table is blocked on
+>    `#10(b)`, and the ledger overstates trust today. **The founder decision is ALREADY MADE —
+>    [[DECISIONS #16]], owner-decided 2026-08-05: BADGE the provenance on the ledger AND CAP
+>    `selom_confidence` for a synthesized read.** Scoped to synthesis; the broader blindness (the
+>    score ignores reader confidence at EVERY layer — a native L2 read at 0.5 also scores 100) is
+>    deliberately NOT in scope, because it re-baselines every published number. Shape: carry
+>    `Reading.layer`/`.source`/`.confidence` onto `reproduction.core.MetricValue`, have
+>    `panel_extractor` return the `Reading` rather than the bare value, populate it at
+>    `drive.py:150-152`, surface it on `PanelScore`, and cap in `_metric_score` the way `substituted`
+>    already caps reproducibility at 92. **So this session does not need to ask anything — go.**
 > 5. **The fe-review JTBD backlog** (recorded, none fixed — all are feature gaps, not defects):
 >    **copy-to-clipboard on a table** (the repo already ships Copy-TSV twice — `skill-match-results`
 >    and `library-view` — and `components/methods/copy-button.tsx` is ready-made; reading κ=0.951
