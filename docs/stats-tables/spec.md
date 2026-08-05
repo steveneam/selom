@@ -251,6 +251,26 @@ Ranks 3–4 introduce a shape the product does not yet have — a **one-row scal
 worth saying plainly that this is the honest home for a headline number, not a compromise: it
 sorts, exports, diffs, and extracts like every other table, which a caption does none of.
 
+> **Correction, 2026-08-05 (slice 5).** Three of those four hold. **"Extracts like every other
+> table" does not**, and the gap runs the wrong way — a one-row scalar table is not merely no
+> better than a caption for extraction, it is a table the generic reader actively MIS-READS.
+> `_read_named_cell` keys on a row's first string cell, so a *wide* scalar row (`[2.141,
+> "inflated", 14354]`) is unreadable by metric name; and `_read_count` answers **any** count-shaped
+> metric (`n_*`, `*_total`) from the **first** table that has rows, falling back to `len(rows)`. A
+> scalar table in position 0 therefore reports a count of **1**, at confidence 0.5, into a
+> reproducibility score.
+>
+> So **array order became load-bearing for a reason D4 did not anticipate**: it is not only "which
+> table the caption reads" (D5) but "which table a count metric resolves against". Both slice-5
+> runners lead with the detail table and say so at the site, and
+> `test_g3_a_declared_multi_table_skill_leads_with_its_DETAIL_table` proves it by reading the
+> reversed array and asserting the wrong answer. Leading with the detail costs the reader nothing —
+> D2 renders both panels open, so the scalars are on screen either way.
+>
+> The presentational half of the claim is real and was worth the change: κ and λ now export to CSV,
+> diff in compare, and read as English at a glance. **Any future scalar table inherits this hazard**
+> — put it last, or make the reader shape-aware first.
+
 ### D5 — the legend and the caption read the **first** table
 
 `companions/legends.build(spec, params, figure=figure, table=table)` derives caption facts from the
@@ -384,11 +404,18 @@ Each extends an existing test file rather than adding a parallel one, per the ra
    (`COMPARISON_STATS`) after reading all three runners' bodies.
 4. ~~**`boxplot` / `violin`**~~ — **`boxplot` DONE 2026-08-05** (`fd89d5b`); **`violin` deferred to
    NEXT#10(b)**, see the D3 correction above. `NATIVE_L3_BOTH` split rather than dissolved.
-5. **`confusion` / `qq`** (ranks 3–4): the scalar table; κ and λ leave the title string per the
-   decided question 1. **Do NEXT#10(a) — the two-directional prose↔param guard — before this slice**,
-   not after: moving a published number between homes is exactly the change whose methods/caption
-   text must be re-checked, and that guard is currently exact in one direction only, which is why
-   two printed-vs-computed lies survived nine green gates on 2026-08-05.
+5. ~~**`confusion` / `qq`**~~ — **DONE 2026-08-05**. κ and λ left the title per decided-question 1;
+   the refusal moved with them into a cell, which is the half that mattered on the real corpus.
+   `#10(a)` went first as instructed and found nothing further to fix in these two — neither skill
+   has a `legends` template and `qq`'s methods template never cited the title.
+   - **Two things the build settled that the spec had left open.** The **array order is
+     load-bearing** (see the D4 correction below), and a **default run may now emit two tables**:
+     `confusion`'s and `qq`'s scalars are computed on every run and gated by no knob, so G3's "a
+     second table is always something the user ASKED for" became a declared two-directional list
+     (`tests/test_table.py:UNCONDITIONAL_MULTI_TABLE`) rather than an empty assertion.
+   - **The refusal keeps its own columns.** `["n", "note"]`, not `"not defined"` under a header
+     reading *Cohen's kappa* — a column promising a number it never holds is the printed-vs-computed
+     lie `de_table`'s `adjusted` flag and `lollipop`'s withheld CI header both exist to avoid.
 
 Slices 3–5 are independent of each other and each is separately shippable.
 

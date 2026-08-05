@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, ChevronDown, Download, Search, Sparkles, Table2, Ta
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/ui/cn";
+import { plural } from "@/lib/ui/plural";
 import type { StatsTable } from "@/lib/skills/api";
 
 /**
@@ -59,8 +60,16 @@ export function StatsPanel({
     return sorted.filter((r) => String(r[labeling.geneColumn] ?? "").toLowerCase().includes(q));
   }, [sorted, labeling, query]);
   const shown = rows.slice(0, MAX_RENDER);
+  // A single-row table cannot be re-ordered, so it offers no sort: no pointer cursor, no hover
+  // affordance on the headers, no "click a header to sort" hint. An affordance that does nothing
+  // is a promise the surface cannot keep, and the one-row scalar table (confusion's agreement,
+  // qq's λ — docs/stats-tables/spec.md D4 ranks 3–4) is the shape that made it reachable. Keyed to
+  // the TABLE's own rows, not the filtered view: a gene search narrowing to one hit is transient,
+  // and having the headers stop responding mid-search would read as a bug.
+  const sortable = table.rows.length > 1;
 
   function toggleSort(col: number) {
+    if (!sortable) return;
     // asc → desc → unsorted
     setSort((s) => (s?.col === col ? (s.dir === 1 ? { col, dir: -1 } : null) : { col, dir: 1 }));
   }
@@ -88,7 +97,7 @@ export function StatsPanel({
         <span className="text-sm font-medium text-foreground">{table.title ?? "Statistics"}</span>
         {table.synthesized && <SynthesizedBadge />}
         <span className="hidden text-xs text-muted-foreground sm:inline">
-          {table.rows.length} rows · {table.columns.length} columns
+          {plural(table.rows.length, "row")} · {plural(table.columns.length, "column")}
         </span>
         <ChevronDown className={cn("ml-auto size-4 text-muted-foreground transition-transform", open && "rotate-180")} />
       </button>
@@ -123,8 +132,14 @@ export function StatsPanel({
           )}
           <div className="flex items-center justify-between gap-2 px-4 py-2">
             <span className="text-[11px] text-muted-foreground">
-              {shown.length < rows.length ? `Showing ${shown.length} of ${rows.length} rows` : `${rows.length} rows`}
-              {labeling ? " · toggle Label to pin a gene on the figure" : " · click a header to sort"}
+              {shown.length < rows.length
+                ? `Showing ${shown.length} of ${plural(rows.length, "row")}`
+                : plural(rows.length, "row")}
+              {labeling
+                ? " · toggle Label to pin a gene on the figure"
+                : sortable
+                  ? " · click a header to sort"
+                  : ""}
             </span>
             <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={exportCsv} data-testid="stats-csv">
               <Download /> CSV
@@ -142,8 +157,14 @@ export function StatsPanel({
                   {table.columns.map((c, i) => (
                     <th
                       key={i}
-                      onClick={() => toggleSort(i)}
-                      className="cursor-pointer select-none border-b border-border px-3 py-2 text-left font-semibold text-muted-foreground hover:text-foreground"
+                      onClick={sortable ? () => toggleSort(i) : undefined}
+                      aria-sort={
+                        sort?.col === i ? (sort.dir === 1 ? "ascending" : "descending") : undefined
+                      }
+                      className={cn(
+                        "select-none border-b border-border px-3 py-2 text-left font-semibold text-muted-foreground",
+                        sortable && "cursor-pointer hover:text-foreground",
+                      )}
                     >
                       <span className="inline-flex items-center gap-1">
                         {c}

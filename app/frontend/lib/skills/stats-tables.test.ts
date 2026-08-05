@@ -80,8 +80,23 @@ describe("the dev:mock fixture mirrors the multi-table contract", () => {
     expect(both[1].columns).toContain("adjusted p");
   });
 
+  it("carries the one-row scalar table for qq — the shape slice 5 introduced", () => {
+    // `qq` is D4 rank 4: λ, its verdict and the test count used to ride in a title string, where
+    // nothing could export, diff or read them. Two differences from lollipop's pair are the point
+    // of mirroring it here rather than assuming lollipop covers the case — the second table has
+    // exactly ONE row (which is what makes "1 rows" and a dead sort affordance reachable), and the
+    // pair is UNCONDITIONAL, so there is no query param that turns it off.
+    const tables = asTables(mockTable("qq", {}));
+    expect(tables).toHaveLength(2);
+    expect(tables.every((t) => (t.title ?? "").trim().length > 0)).toBe(true);
+    expect(tables[1].rows).toHaveLength(1);
+    // The detail table LEADS. On the backend that order is load-bearing (a scalar table first makes
+    // the generic count reader answer "1"), so a mock that reversed it would teach the wrong shape.
+    expect(tables[0].rows.length).toBeGreaterThan(1);
+  });
+
   it("every mocked table is well-formed — rectangular rows under real columns", () => {
-    for (const id of ["umap_scrna", "deg", "volcano", "pca", "composition", "enrichment", "lollipop"]) {
+    for (const id of ["umap_scrna", "deg", "volcano", "pca", "composition", "enrichment", "lollipop", "qq"]) {
       for (const t of asTables(mockTable(id, { pairs: "a,b" }))) {
         expect(t.columns.length, `${id} has columns`).toBeGreaterThan(0);
         for (const row of t.rows) expect(row, `${id} row width`).toHaveLength(t.columns.length);

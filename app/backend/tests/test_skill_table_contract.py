@@ -23,6 +23,7 @@ from __future__ import annotations
 import pytest
 
 from extract.synthesize import ALSO_SYNTHESIZE, _SYNTHESIZERS, synthesize_table
+from skills._table import as_tables
 from skills.contract import _skill_dir, run_skill_with_table
 from skills.registry import list_skill_ids
 
@@ -191,9 +192,15 @@ def test_also_synthesize_entries_really_want_both_tables(skill_id):
 @pytest.mark.parametrize("skill_id", sorted(STUB_NATIVE))
 def test_stub_native_skill_yields_a_table(skill_id):
     """The stub-visible native skills really do emit a non-empty Statistics table from their stub
-    (so the own-data run path and the reproduction reader get a real table, not a synthesized one)."""
+    (so the own-data run path and the reproduction reader get a real table, not a synthesized one).
+
+    Narrowed with ``as_tables`` rather than by ``.get`` on the raw value (D1): a skill attaching a
+    list would otherwise fail with ``AttributeError`` on ``list.get`` — the union sprouting at a
+    call site, in a test, which is exactly the shape the normalizer exists to stop."""
     _figure, native = run_skill_with_table(skill_id, "unused", {})
-    assert native is not None and native.get("columns"), f"{skill_id} stub attached no native table"
+    tables = as_tables(native)
+    assert tables, f"{skill_id} stub attached no native table"
+    assert all(t.get("columns") for t in tables), f"{skill_id} attached an empty table"
 
 
 @pytest.mark.parametrize("skill_id", sorted(L4_ONLY))

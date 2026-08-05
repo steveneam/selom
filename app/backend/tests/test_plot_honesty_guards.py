@@ -105,8 +105,12 @@ def test_confusion_refuses_agreement_when_the_label_sets_differ():
     An "accuracy" there would report an alignment nobody declared — the cell at (Rods, cluster 3)
     is not a 'correct' cell. This is the real-corpus path (`clusters` x `celltypes`), so the
     refusal is what the smoke matrix exercises every run.
+
+    It returns the REASON, not a bare ``None``: the refusal has to reach a table cell, and one
+    site deciding it is one site that can drift.
     """
-    assert _agreement([[5, 1], [2, 9]], ["Rods", "Cones"], ["3", "7"]) is None
+    reason = _agreement([[5, 1], [2, 9]], ["Rods", "Cones"], ["3", "7"])
+    assert isinstance(reason, str) and "label sets differ" in reason
 
 
 def test_confusion_reports_agreement_when_the_vocabularies_match():
@@ -119,10 +123,45 @@ def test_confusion_reports_agreement_when_the_vocabularies_match():
 
 
 def test_confusion_table_names_the_reason_metrics_are_absent():
-    """Silence would read as "these labels agree perfectly" — it has to say why there is no number."""
+    """Silence would read as "these labels agree perfectly" — it has to say why there is no number.
+
+    Post-slice-5 the refusal lives in a table CELL rather than a title string, and that is the
+    stronger home for exactly the reason the move was made: a cell exports, diffs and is readable,
+    while a title is prose. The assertion follows it into the cell rather than being deleted.
+    """
     spec = confusion_spec([[5, 1], [2, 9]], ["Rods", "Cones"], ["3", "7"], {}, "ref", "pred", "t")
-    title = spec["table"]["title"]
-    assert "no diagonal" in title and "kappa" in title
+    agreement = spec["table"][1]
+    assert agreement["columns"] == ["n", "note"], (
+        "a header promising a number it never holds is the printed-vs-computed lie this split "
+        "exists to remove — the kappa column is absent, not filled with 'not defined'"
+    )
+    assert agreement["rows"] == [[17, "not defined — the two label sets differ, so the matrix "
+                                      "has no diagonal"]]
+
+
+def test_confusion_publishes_the_agreement_scalars_from_exactly_one_home():
+    """κ leaves the title (decided question 1). Both halves matter: it must be IN the one-row
+    table, and it must be GONE from the matrix title — publishing from two homes is how the two
+    drift into disagreeing."""
+    labels = ["Rods", "Cones"]
+    spec = confusion_spec([[8, 2], [1, 9]], labels, labels, {}, "ref", "pred", "t")
+    matrix, agreement = spec["table"]
+    assert agreement["columns"] == ["n", "overall agreement (%)", "Cohen's kappa"]
+    assert agreement["rows"] == [[20, 85.0, 0.7]]
+    assert "kappa" not in matrix["title"].lower()
+    assert "agreement" not in matrix["title"].lower()
+    # What stays in the title is what genuinely IS prose: what is counted, and what colour encodes.
+    assert "counts of ref x pred" in matrix["title"]
+
+
+def test_confusion_withholds_the_kappa_column_when_kappa_is_undefined():
+    """Every rating identical → chance agreement is total and κ divides by zero. The agreement it
+    CAN report is still reported; the column it cannot fill is absent, with the reason named."""
+    spec = confusion_spec([[7, 0], [0, 0]], ["a", "b"], ["a", "b"], {}, "ref", "pred", "t")
+    agreement = spec["table"][1]
+    assert agreement["columns"] == ["n", "overall agreement (%)", "note"]
+    assert agreement["rows"][0][:2] == [7, 100.0]
+    assert "undefined" in str(agreement["rows"][0][2])
 
 
 def test_confusion_normalization_keeps_the_raw_count_reachable():

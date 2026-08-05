@@ -20,6 +20,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/ui/cn";
+import { plural } from "@/lib/ui/plural";
 import { useAutoCollapse } from "@/hooks/use-auto-collapse";
 import { StaleBadge } from "./stale-badge";
 import { getSkill } from "@/lib/catalog/seed";
@@ -429,7 +430,7 @@ function statsRowSub(fig: Figure): string {
   const tables = asTables(fig.table);
   const first = tables[0];
   if (!first) return "derived table";
-  const shape = `${first.rows.length} rows · ${first.columns.length} cols`;
+  const shape = `${plural(first.rows.length, "row")} · ${plural(first.columns.length, "col")}`;
   return tables.length > 1 ? `${shape} · +${tables.length - 1} more` : shape;
 }
 

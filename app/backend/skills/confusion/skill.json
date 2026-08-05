@@ -1,6 +1,6 @@
 {
   "id": "confusion",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "title": "Confusion / agreement matrix",
   "engine": "python",
   "omics": "scrna-seq|bulk-rna-seq|proteomics|metabolomics",

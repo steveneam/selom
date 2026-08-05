@@ -75,19 +75,25 @@ def _normalize(counts, mode: str):
     return out, "% of all", True
 
 
-def _agreement(counts, row_labels, col_labels):
-    """Overall agreement + Cohen's κ, or ``None`` with the reason it does not apply.
+def _agreement(counts, row_labels, col_labels) -> tuple[float, float | None, int] | str:
+    """Overall agreement + Cohen's κ as ``(agreement, kappa, n)`` — or a **string naming why they
+    do not apply**.
 
     Requires the two label vocabularies to be the SAME SET. That is the whole guard: with different
     vocabularies (clusters vs cell types) the matrix has no diagonal, and any "accuracy" would be
     reporting an alignment that was never declared — the cell at (Rods, cluster 3) is not a
-    'correct' cell. Returns ``(agreement, kappa, n)`` when it applies.
+    'correct' cell.
+
+    It returns the reason rather than a bare ``None`` because the refusal is a **finding** that now
+    has to reach a table CELL (spec decided-question 1), not merely a caller's decision to print
+    something. The alternative — ``None`` here and a re-test of ``set(row) != set(col)`` at the
+    table builder — puts the same condition in two places, free to drift; this keeps one site.
     """
-    if set(row_labels) != set(col_labels) or not row_labels:
-        return None
+    if not row_labels or set(row_labels) != set(col_labels):
+        return "not defined — the two label sets differ, so the matrix has no diagonal"
     n = float(sum(sum(r) for r in counts))
     if n <= 0:
-        return None
+        return "not defined — the matrix holds no observations"
     col_index = {c: j for j, c in enumerate(col_labels)}
     observed = sum(counts[i][col_index[label]] for i, label in enumerate(row_labels))
     po = observed / n
@@ -192,9 +198,23 @@ def _cell_text(z, counts, row_labels, col_labels, is_pct: bool) -> list:
 
 
 def _confusion_table(counts, row_labels, col_labels, row_title, col_title,
-                     scale_label: str) -> dict:
-    """The matrix + its marginals as a Statistics table, with the agreement metrics when — and only
-    when — the two label vocabularies match."""
+                     scale_label: str) -> list[dict]:
+    """The matrix + its marginals, and the agreement scalars as a SECOND, one-row table.
+
+    The scalars used to ride in this table's TITLE (``…; n=1576, overall agreement 97.2%, Cohen's
+    kappa 0.951``). A number inside a title string is prose, not a result: it does not export to
+    CSV, does not diff in compare, and no metric reader can reach it — which is what made this a
+    defect rather than a preference (spec D4 rank 3, decided question 1). What stays in the title is
+    what genuinely IS prose: what the matrix counts and what its colour encodes.
+
+    ⚑ THE ORDER IS LOAD-BEARING, and not because of the caption. ``extract.readers._read_generic``
+    tries the tables **in array order** and ``_read_count`` answers ANY count-shaped metric from ANY
+    table that has rows, falling back to ``len(rows)``. A one-row scalar table in position 1 would
+    therefore answer ``n_*``/``*_total`` with **1**, at confidence 0.5, on a reproducibility score —
+    a wrong number where there used to be a right one. The matrix leads, so every generic read is
+    exactly what it was before the split. Leading with the detail costs the reader nothing: D2 keeps
+    both panels open, so the scalars are on screen in the same glance either way.
+    """
     columns = [f"{row_title} \\ {col_title}", *col_labels, "total"]
     rows = []
     for i, label in enumerate(row_labels):
@@ -203,16 +223,37 @@ def _confusion_table(counts, row_labels, col_labels, row_title, col_title,
     col_totals = [sum(col) for col in zip(*counts)] if counts else []
     rows.append(["total", *[int(v) for v in col_totals], int(sum(col_totals))])
 
-    agreement = _agreement(counts, row_labels, col_labels)
-    if agreement is None:
-        note = (f"counts of {row_title} x {col_title}; the two label sets differ, so there is no "
-                "diagonal and no accuracy or kappa is defined")
-    else:
-        po, kappa, n = agreement
-        k = "undefined (chance agreement is total)" if kappa is None else f"{kappa:.3f}"
-        note = (f"counts of {row_title} x {col_title}; n={n}, "
-                f"overall agreement {po * 100:.1f}%, Cohen's kappa {k}")
-    return table(columns, rows, f"Confusion matrix ({note}); colour shows {scale_label}")
+    matrix = table(columns, rows,
+                   f"Confusion matrix (counts of {row_title} x {col_title}); "
+                   f"colour shows {scale_label}")
+    return [matrix, _agreement_table(counts, row_labels, col_labels, row_title, col_title)]
+
+
+def _agreement_table(counts, row_labels, col_labels, row_title, col_title) -> dict:
+    """The headline scalars as a one-row table — n, overall agreement, Cohen's κ.
+
+    When the metrics do not apply the table still EXISTS and names the reason in a cell. Silence
+    would read as "these labels agree perfectly", and the refusal is the finding on the real-corpus
+    path (`clusters` x `celltypes` have no diagonal at all), so it must survive the move out of the
+    title at least as prominently as a value would.
+
+    **A column appears only when it holds a number; prose goes in ``note``.** Writing "not defined"
+    under a header reading *Cohen's kappa* would be the printed-vs-computed lie that ``de_table``'s
+    ``adjusted`` flag and ``lollipop``'s withheld "95% CI" header both exist to avoid — a header
+    promising a number it never holds.
+    """
+    title = f"Agreement between {row_title} and {col_title}"
+    n = int(sum(sum(r) for r in counts))
+    result = _agreement(counts, row_labels, col_labels)
+    if isinstance(result, str):
+        return table(["n", "note"], [[n, result]], title)
+    po, kappa, _n = result
+    if kappa is None:
+        return table(["n", "overall agreement (%)", "note"],
+                     [[n, round(po * 100, 1),
+                       "Cohen's kappa is undefined — chance agreement is total"]], title)
+    return table(["n", "overall agreement (%)", "Cohen's kappa"],
+                 [[n, round(po * 100, 1), round(kappa, 3)]], title)
 
 
 def resolve_labels(observed, requested, limit: int = _MAX_LABELS) -> list:

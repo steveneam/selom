@@ -193,3 +193,62 @@ test("boxplot shows its pairwise table AND the synthesized summary, labelled as 
     expect.arrayContaining(["group", "n", "min", "q1", "median", "q3", "max"]),
   );
 });
+
+/**
+ * Slice 5 — `confusion`'s agreement scalars leave the table TITLE for a one-row table.
+ *
+ * ⚑ THE REFUSAL IS THE CASE TO PROVE, not the value, and that is the inverse of the natural
+ * assumption. On real data `confusion` is usually cross-tabulating two DIFFERENT label vocabularies
+ * (clusters against cell types, condition against flash intensity), which have no diagonal — so
+ * "the two label sets differ, so no κ is defined" is what the corpus produces by default, and the
+ * κ-value case is the one needing a constructed input. Decided-question 1 is explicit that the
+ * refusal must survive the move out of the title **as prominently as a value would**, because a
+ * reader who has seen the old figure will go looking for κ in the title and find it gone. An
+ * assertion that only ever checked the happy path would have proven the wrong half.
+ *
+ * It is also the check that makes the one-row SHAPE real: three surfaces printed "1 rows" and the
+ * panel offered a sort on a table with nothing to sort, and neither was reachable before this run.
+ */
+test("confusion publishes its agreement scalars as a one-row table, refusal and all", async ({ page }) => {
+  await runFromWorkbench(page, {
+    projectName: "Browser-verify · Confusion agreement table",
+    // Two label columns in one small real file. `condition` (treatment arm) against
+    // `intensity_group` (flash level) is a genuine cross-tabulation and the vocabularies plainly
+    // differ, so this is the refusal path on a file the browser can actually upload — the skill's
+    // own smoke case is an 83k-cell h5ad.
+    csvRelPath: "erg-fig1e/erg_metrics_long.csv",
+    skillName: "Confusion / agreement matrix",
+    awaitControl: ["Reference labels (rows)", "Compared labels (columns)"],
+    params: {
+      "Reference labels (rows)": "condition",
+      "Compared labels (columns)": "intensity_group",
+    },
+  });
+  await expandWorkrail(page);
+  await page.getByRole("button", { name: /Confusion matrix/i }).first().click();
+
+  const panels = page.getByTestId("stats-panel");
+  await expect(panels).toHaveCount(2, { timeout: 30_000 });
+  // The matrix LEADS. Not a presentation preference: `extract.readers._read_count` answers any
+  // count-shaped metric from the first table with rows, so a scalar table in position 0 would
+  // report a count of 1 into a reproducibility score.
+  await expect(panels.nth(0).getByRole("button", { name: /Confusion matrix/i })).toBeVisible();
+  await expect(panels.nth(1).getByRole("button", { name: /Agreement between/i })).toBeVisible();
+
+  // ⚑ The refusal reaches a CELL. A title string exports to nothing and diffs against nothing;
+  // this is the whole reason the scalars moved home.
+  const scalar = panels.nth(1).locator("table");
+  await expect(scalar).toContainText("the two label sets differ");
+  await expect(scalar.locator("tbody tr")).toHaveCount(1);
+  // And the header does not promise a number it never holds — no "Cohen's kappa" column above a
+  // cell reading "not defined".
+  const scalarHeaders = await scalar.locator("thead th").allInnerTexts();
+  expect(scalarHeaders.map((h) => h.trim())).toEqual(["n", "note"]);
+
+  // The one-row shape reads as English and offers no dead affordance.
+  await expect(panels.nth(1)).toContainText("1 row");
+  await expect(panels.nth(1)).not.toContainText("1 rows");
+  await expect(panels.nth(1)).not.toContainText("click a header to sort");
+  // ...while the matrix beside it, which has rows to order, keeps its sort.
+  await expect(panels.nth(0)).toContainText("click a header to sort");
+});

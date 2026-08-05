@@ -113,19 +113,41 @@ def qq_spec(observed, expected, labels, params: dict, n_total: int, lam: float,
     return spec
 
 
-def _qq_table(observed, expected, labels, params: dict, n_total: int, lam: float) -> dict:
-    """λ + the most extreme points — the tail is what a reader inspects after seeing lift."""
+def _qq_table(observed, expected, labels, params: dict, n_total: int,
+              lam: float) -> list[dict]:
+    """The most extreme points, then λ as a one-row scalar table.
+
+    λ is the reason this skill exists, and it used to live in the points table's TITLE — where it
+    exports to nothing, diffs against nothing and is unreadable by the reproduction metric reader
+    (spec D4 rank 4, decided question 1). Numbers move to cells; what stays in the title is the
+    genuine caption — that λ's interpretation rests on most features being null.
+
+    ⚑ The points table LEADS. ``extract.readers._read_count`` answers any count-shaped metric from
+    the first table with rows, so a scalar table in position 1 would report **1** test; see the
+    matching note in ``skills.confusion.run._confusion_table``. The ``top N of M`` phrasing is the
+    canonical one ``_title_total`` parses, so a count metric now reads the true test total instead
+    of the number of rows shown — the same convention ``de_table`` uses when it caps.
+    """
     top_n = max(1, int(params.get("top_n", 15)))
     rows = []
     for lab, obs, exp in list(zip(labels, observed, expected))[:top_n]:
         p = 10.0 ** (-float(obs))
         rows.append([str(lab), float(f"{p:.3g}"), round(float(exp), 4),
                      round(float(obs), 4), round(float(obs) - float(exp), 4)])
+    points = table(
+        ["feature", "p", "expected −log10(p)", "observed −log10(p)", "excess"],
+        rows,
+        f"Most extreme p-values (top {len(rows)} of {n_total} tested)",
+    )
+    return [points, _inflation_table(n_total, lam)]
+
+
+def _inflation_table(n_total: int, lam: float) -> dict:
+    """λ + its verdict + the number of tests it was computed over, as a one-row table."""
     verdict = ("calibrated" if 0.95 <= lam <= 1.05 else
                "inflated" if lam > 1.05 else "conservative")
     return table(
-        ["feature", "p", "expected −log10(p)", "observed −log10(p)", "excess"],
-        rows,
-        f"λ = {lam:.3f} ({verdict}) over {n_total} tests — λ assumes most features are "
-        f"null; top {len(rows)} shown",
+        ["λ (genomic inflation)", "verdict", "tests"],
+        [[round(float(lam), 3), verdict, int(n_total)]],
+        "Genomic inflation — λ assumes most features are null",
     )

@@ -323,5 +323,35 @@ export function mockTable(
       },
     ];
   }
+  // ── the ONE-ROW scalar table (docs/stats-tables/spec.md D4 rank 4, slice 5) ────────────────────
+  //
+  // A shape the product had never had until `confusion`'s agreement metrics and `qq`'s λ moved out
+  // of their table titles, and one the frontend has real work to do for: three call sites printed
+  // "1 rows", and a sort affordance on a single row is a promise the panel cannot keep. The mock
+  // carries it so both are exercisable offline, in `dev:mock`, instead of only against a live
+  // backend [[mock-must-mirror-backend-contract]].
+  //
+  // Unlike lollipop's, this pair is UNCONDITIONAL — λ is computed on every run and gated by no
+  // knob, so there is no query to branch on. That difference is the whole reason slice 5's backend
+  // guard had to become a declared list (`tests/test_table.py:UNCONDITIONAL_MULTI_TABLE`) rather
+  // than "a second table is always something the user asked for".
+  if (skillId === "qq") {
+    return [
+      {
+        columns: ["feature", "p", "expected −log10(p)", "observed −log10(p)", "excess"],
+        rows: [
+          ["REC8", 2.31e-13, 4.458, 12.6371, 8.1791],
+          ["CDH5", 9.04e-12, 4.157, 11.0438, 6.8868],
+          ["ITGA8", 4.42e-10, 3.981, 9.3546, 5.3736],
+        ],
+        title: "Most extreme p-values (top 3 of 14354 tested)",
+      },
+      {
+        columns: ["λ (genomic inflation)", "verdict", "tests"],
+        rows: [[2.141, "inflated", 14354]],
+        title: "Genomic inflation — λ assumes most features are null",
+      },
+    ];
+  }
   return null;
 }
