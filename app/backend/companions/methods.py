@@ -13,6 +13,7 @@ attribution sentence and returns ``{"text", "citations"}``.
 from __future__ import annotations
 
 from skills import _erg
+from skills._engine import to_bool
 from skills.contract import SkillSpec, resolved_params
 
 # --- Canonical citations, referenced by the per-skill templates -----------------
@@ -581,18 +582,64 @@ def _regression(p: dict):
 
 
 def _boxplot(p: dict):
+    """Both of this template's original claims were UNCONDITIONAL and both are conditional facts —
+    the class of defect the two-directional prose↔param guard exists to surface.
+
+    ``style="strip"`` hides the box entirely (zero width, no fill) and draws every individual value,
+    so "box-and-whisker … whiskers extending to 1.5× the IQR" described furniture the reader could
+    not see. And ``order`` puts the categories the user named FIRST, in the order given, with only
+    the remainder following the descending-median sort — so "groups are ordered by descending
+    median" is true exactly when the user named none.
+    """
     horizontal = str(p.get("orientation", "v")).lower().startswith("h")
     axis = "horizontally" if horizontal else "vertically"
     group = str(p.get("group") or "").strip()
     value = str(p.get("value") or "").strip()
-    what = (
-        f"{value or 'the measured value'} across {group or 'each group'}"
-    )
-    text = (
-        f"The distribution of {what} was summarized as {axis}-oriented box-and-whisker plots, each "
-        "box spanning the interquartile range with the median marked and whiskers extending to 1.5× "
-        "the IQR; groups are ordered by descending median."
-    )
+    what = f"{value or 'the measured value'} across {group or 'each group'}"
+
+    strip = str(p.get("style", "box")).strip().lower() == "strip"
+    if strip:
+        # No box is drawn, so no IQR/whisker claim may be made. Naming the trade is the point of
+        # the mode: a box implies more data than a small n has.
+        body = (f"The distribution of {what} was shown as {axis}-oriented strip plots, with every "
+                "individual value plotted and no box summary drawn")
+    else:
+        notch = (", and notches marking a confidence interval around the median"
+                 if to_bool(p.get("notched", False)) else "")
+        drawn = {"all": ", with every individual value overlaid",
+                 "suspectedoutliers": ", with suspected outliers marked",
+                 "outliers": ", with outliers marked"}.get(
+                     str(p.get("points", "outliers")).strip().lower(), "")
+        body = (f"The distribution of {what} was summarized as {axis}-oriented box-and-whisker "
+                f"plots, each box spanning the interquartile range with the median marked and "
+                f"whiskers extending to 1.5× the IQR{notch}{drawn}")
+
+    named = [s.strip() for s in str(p.get("order") or "").split(",") if s.strip()]
+    ordering = (f"; {', '.join(named)} lead in that order, with the remaining groups by descending "
+                "median" if named else "; groups are ordered by descending median")
+    counts = "; each label carries its group's n" if to_bool(p.get("add_count", False)) else ""
+
+    text = body + ordering + counts + "."
+
+    # The pairwise sentence is emitted ONLY when a comparison was actually requested — the stars are
+    # a published claim, so the test behind them and any multiplicity correction have to be named
+    # rather than left to the Statistics table alone.
+    pairs = str(p.get("pairs") or "").strip()
+    if pairs:
+        label = {"welch": "Welch's t-test (unequal variances)",
+                 "student": "Student's t-test (equal variances)",
+                 "mannwhitney": "the Mann-Whitney U test",
+                 "mwu": "the Mann-Whitney U test",
+                 "u": "the Mann-Whitney U test"}.get(
+                     str(p.get("sig_test", "welch")).strip().lower(), "Welch's t-test")
+        adjust = {"bonferroni": " p-values were adjusted for multiple comparisons using the "
+                                "Bonferroni correction",
+                  "bh": " p-values were adjusted for multiple comparisons using the "
+                        "Benjamini-Hochberg procedure"}.get(
+                      str(p.get("correction", "none")).strip().lower(),
+                      " p-values are uncorrected for multiple comparisons")
+        text += (f" Named pairs of groups were compared with {label}, and significance brackets "
+                 f"drawn on the figure;{adjust}.")
     return text, []
 
 

@@ -88,3 +88,53 @@ def test_unknown_skill_falls_back_to_generic():
     assert "Mystery Skill" in out["text"]
     assert "alpha=0.9" in out["text"]
     assert out["citations"] == []
+
+
+# --- boxplot: two printed-vs-computed lies the prose↔param backlog pointed at -------------------
+
+
+def _boxplot_text(params: dict) -> str:
+    from skills.contract import load_skill
+
+    return methods.build(load_skill("boxplot"), {"group": "condition", "value": "b_wave_uv",
+                                                 **params})["text"]
+
+
+def test_boxplot_strip_mode_claims_no_box_it_does_not_draw():
+    """`style="strip"` hides the box entirely (zero width, no fill) and plots every value. The
+    methods text used to describe "box-and-whisker … whiskers extending to 1.5× the IQR"
+    UNCONDITIONALLY, so a strip figure shipped with prose about furniture the reader cannot see."""
+    strip = _boxplot_text({"style": "strip"})
+    assert "strip plot" in strip
+    assert "every individual value" in strip
+    assert "IQR" not in strip and "whisker" not in strip, "no box is drawn, so no box may be claimed"
+
+    box = _boxplot_text({})
+    assert "box-and-whisker" in box and "1.5× the IQR" in box, "the box branch must keep its claim"
+
+
+def test_boxplot_ordering_sentence_follows_the_order_param():
+    """`resolve_order` puts the categories the user NAMED first, in the order given, and only the
+    remainder follow the descending-median sort. "groups are ordered by descending median" is
+    therefore true exactly when the user named none — it was stated unconditionally."""
+    auto = _boxplot_text({})
+    assert "ordered by descending median" in auto
+
+    named = _boxplot_text({"order": "Control, Untreated"})
+    assert "Control, Untreated lead in that order" in named
+    assert "remaining groups by descending median" in named
+
+
+def test_boxplot_names_the_test_behind_its_stars_only_when_pairs_was_asked_for():
+    """The stars are a published claim, so the test and any multiplicity correction are named. With
+    no `pairs` there is no comparison, and the sentence must not appear at all."""
+    none = _boxplot_text({})
+    assert "compared with" not in none
+
+    bh = _boxplot_text({"pairs": "Control~Untreated", "sig_test": "mannwhitney", "correction": "bh"})
+    assert "Mann-Whitney U" in bh and "Benjamini-Hochberg" in bh
+
+    raw = _boxplot_text({"pairs": "Control~Untreated"})
+    assert "Welch" in raw
+    assert "uncorrected for multiple comparisons" in raw, \
+        "silence about multiplicity reads as 'corrected'; say which it is"

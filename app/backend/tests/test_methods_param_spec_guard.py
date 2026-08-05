@@ -99,6 +99,171 @@ def test_template_references_only_declared_params(module, skill_id):
     )
 
 
+# ── the OTHER direction: a declared param the prose never mentions ─────────────────────────────
+#
+# The guard above is exact in ONE direction — it catches prose naming a param that no longer
+# exists. It cannot catch the defect that actually shipped on 2026-08-05: prose describing a step
+# the run SKIPPED. `pvca`'s methods said "Features were standardized" unconditionally while the
+# runner only scales when `normalize` is set, and `cepo`'s said "genes detected in at least N cells"
+# while the runner filters CELL TYPES. Both were green through nine gates, because a template that
+# never reads `normalize` cannot be caught by a rule about templates that read the wrong key.
+#
+# So this asserts the reverse: every param a skill declares is either named by its prose or listed
+# below, deliberately. The list is a RATCHET in the `API_ONLY_KNOBS` shape — exact in both
+# directions, so it can only shrink and nothing new joins it silently.
+#
+# ⚑ THIS LIST IS A RAW FIRST CAPTURE, NOT A TRIAGED ONE. It is every unmentioned param as of
+# 2026-08-05 (269 across 61 templates), which is the backlog the board predicted this guard would
+# surface. It has NOT been split into "cosmetic, no sentence owed" (`erg_traces.band_color`,
+# `scale_ms`) versus "changes the result and the prose owes it a sentence" — and the second bucket
+# is real and load-bearing: `deg.method` decides WHICH TEST ran, `proteomics_de.missing` decides an
+# imputation that biases fold-changes toward zero, `boxplot.sig_test`/`correction` decide the stars
+# drawn on the figure. Doing that triage is the next session's work on this item.
+#
+# The immediate value does not depend on the triage: a NEW param must now either be described in
+# the prose or be added here on purpose. Both defects of 2026-08-05 arrived exactly that way — a
+# knob became reachable and its methods sentence was never re-checked.
+PROSE_SILENT: dict[tuple[str, str], set[str]] = {
+    ("methods", "annotate"): {"embedding", "normalize"},
+    # ("methods", "boxplot") is GONE — the first entry this ratchet retired. All 11 of its params
+    # are described now, and two of its claims were live printed-vs-computed lies the backlog
+    # pointed straight at: "box-and-whisker … 1.5× the IQR" on a `style="strip"` run that draws no
+    # box at all, and "ordered by descending median" on a run where `order` puts the user's named
+    # categories first. Both read green through nine gates because a template that never mentions a
+    # param cannot be caught by a rule about templates that mention the wrong one.
+    ("methods", "cluster"): {"normalize"},
+    ("methods", "composition"): {"order", "orientation", "sort_by"},
+    ("methods", "deg"): {
+        "condition_col", "covariate_col", "group_col", "group_val", "label_col", "method",
+        "min_cells", "min_count", "normalization", "normalize", "time_col"
+    },
+    ("methods", "diff_abundance"): {"condition_col", "label_col", "min_cells", "sample_col"},
+    ("methods", "enrichment"): {"fc_threshold", "fdr_threshold", "gene_sets"},
+    ("methods", "erg_bwave_bar"): {
+        "bar_fill", "comparisons", "correction", "display_unit", "error", "hline", "hline_label",
+        "intensity_group", "legend", "manual_marks", "points", "show_error", "sig_test",
+        "stimulus_type", "value_col", "wave"
+    },
+    ("methods", "erg_flicker"): {
+        "display_unit", "manual_marks", "mark_labels", "marks", "scale_ms", "scale_uv", "view"
+    },
+    ("methods", "erg_intensity_response"): {
+        "band_alpha", "band_color", "boundary_lines", "display_unit", "error", "fit",
+        "manual_marks", "min_r2", "points", "spread", "stimulus_type", "value_col"
+    },
+    ("methods", "erg_traces"): {
+        "band_alpha", "band_color", "boundary_lines", "central", "display_unit", "error",
+        "error_every", "manual_marks", "mark_labels", "marks", "role", "scale_ms", "scale_uv",
+        "spread", "stimulus_type"
+    },
+    ("methods", "facs_gating"): {
+        "bins", "comp_matrix", "max_events", "transform_t", "x_channel", "y_channel"
+    },
+    ("methods", "gsea"): {"engine"},
+    ("methods", "heatmap"): {"annotations", "cut_k", "quant_track", "split_by", "split_by_cut"},
+    ("methods", "integration"): {"alpha", "harmony2"},
+    ("methods", "line"): {"central", "markers", "points", "x", "y"},
+    ("methods", "markers"): {"normalize"},
+    ("methods", "normalization_qc"): {"max_cells"},
+    ("methods", "pathway"): {"fc_threshold", "fdr_threshold"},
+    ("methods", "pca"): {"group_regex", "label_points"},
+    ("methods", "proteomics_de"): {"group_a", "group_b", "log_input", "missing", "top_n"},
+    ("methods", "pseudotime_genes"): {"groupby", "n_bins", "normalize"},
+    ("methods", "qq"): {"max_points", "p_col", "top_n"},
+    ("methods", "regression"): {"fit", "group", "label"},
+    ("methods", "sankey"): {"max_links"},
+    ("methods", "scorecard"): {"fill", "max_rows"},
+    ("methods", "string_network"): {"fdr_threshold", "max_genes"},
+    ("methods", "trajectory"): {"embedding", "groupby", "normalize"},
+    ("methods", "upset"): {"sort_by"},
+    ("methods", "violin"): {
+        "add_count", "correction", "normalize", "order", "pairs", "resolution", "sig_test"
+    },
+    ("methods", "volcano"): {"highlight"},
+    ("legends", "annotate"): {"embedding", "groupby", "normalize"},
+    ("legends", "boxplot"): {
+        "add_count", "correction", "notched", "order", "orientation", "pairs", "points",
+        "sig_test", "style"
+    },
+    ("legends", "cepo"): {"exprs_pct", "min_cells", "normalize"},
+    ("legends", "cluster"): {"n_neighbors", "n_pcs", "normalize"},
+    ("legends", "composition"): {"order", "orientation", "sort_by"},
+    ("legends", "corr_heatmap"): {"cluster"},
+    ("legends", "deg"): {
+        "condition_col", "covariate_col", "group_col", "group_val", "groupby", "label",
+        "label_col", "method", "min_cells", "min_count", "mode", "normalization", "normalize",
+        "sample_col", "time_col"
+    },
+    ("legends", "diff_abundance"): {
+        "condition_col", "label_col", "min_cells", "normalization", "sample_col"
+    },
+    ("legends", "enrichment"): {"fc_threshold", "fdr_threshold", "gene_sets"},
+    ("legends", "go_graph"): {"fc_threshold", "fdr_threshold", "namespace"},
+    ("legends", "gsea"): {"engine", "gene_set", "gene_sets", "n_perm", "set_name", "weight"},
+    ("legends", "heatmap"): {
+        "annotations", "cluster", "cut_k", "quant_track", "split_by", "split_by_cut"
+    },
+    ("legends", "integration"): {
+        "alpha", "harmony2", "max_iter_harmony", "n_hvg", "n_neighbors", "n_pcs", "normalize",
+        "theta"
+    },
+    ("legends", "markers"): {"method", "normalize", "rank_by", "standard_scale"},
+    ("legends", "normalization_qc"): {
+        "doublet_threshold", "doublets", "filter", "max_cells", "nmads"
+    },
+    ("legends", "pathway"): {"fc_threshold", "fdr_threshold"},
+    ("legends", "pca"): {"group_regex", "label_points", "scale"},
+    ("legends", "proteomics_de"): {
+        "group_a", "group_b", "log_input", "min_valid", "missing", "stats", "top_n"
+    },
+    ("legends", "pseudotime_genes"): {"groupby", "n_bins", "normalize", "root"},
+    ("legends", "pvca"): {"normalize", "pct_threshold"},
+    ("legends", "regression"): {"fit", "group", "label"},
+    ("legends", "sankey"): {"max_links"},
+    ("legends", "scorecard"): {"fill", "invert_metrics", "max_rows", "normalize"},
+    ("legends", "ssgsea"): {"gene_set", "gene_sets", "max_size", "min_size", "weight", "zscore"},
+    ("legends", "string_network"): {"fdr_threshold", "max_genes"},
+    ("legends", "trajectory"): {"embedding", "groupby", "normalize", "root", "threshold"},
+    ("legends", "umap_scrna"): {"n_hvg", "n_neighbors", "n_pcs", "normalize"},
+    ("legends", "upset"): {"mode", "sort_by"},
+    ("legends", "violin"): {
+        "add_count", "context", "correction", "normalize", "order", "pairs", "resolution",
+        "sig_test"
+    },
+    ("legends", "volcano"): {"highlight"},
+}
+@pytest.mark.parametrize("module,skill_id", _CASES)
+def test_every_declared_param_is_described_or_deliberately_silent(module, skill_id):
+    """The reverse direction — a declared param the prose never mentions is either described or
+    written down. Prevents the printed-vs-computed lie: prose asserting a step the run skipped."""
+    refs = {r for r in _template_refs(_MODULES[module], skill_id) if not r.startswith("_")}
+    declared = set(load_skill(skill_id).param_spec)
+    waived = PROSE_SILENT.get((module, skill_id), set())
+
+    undocumented = sorted(declared - refs - waived)
+    assert not undocumented, (
+        f"{module}.py template for {skill_id!r} never mentions param(s) {undocumented}. Either name "
+        f"them in the prose (and make any claim they control CONDITIONAL on their value), or add "
+        f"them to PROSE_SILENT with a reason. Silence is allowed; silence by accident is not."
+    )
+
+    # Stale in the other direction: a param that GAINED a sentence, or was removed from the
+    # skill.json, must leave the list — or the waiver quietly protects a name that no longer needs
+    # protecting and the backlog stops shrinking on paper while standing still in fact.
+    stale = sorted(w for w in waived if w not in declared or w in refs)
+    assert not stale, (
+        f"PROSE_SILENT[({module!r}, {skill_id!r})] still waives {stale}, which the template now "
+        f"describes (or the skill.json no longer declares). Remove them — the list only shrinks."
+    )
+
+
+def test_prose_silent_names_only_live_skills():
+    """Guard the guard: an entry for a template that no longer exists is dead weight pretending to
+    be a tracked debt."""
+    live = set(_CASES)
+    assert sorted(k for k in PROSE_SILENT if k not in live) == []
+
+
 def test_extractor_is_not_vacuous():
     """Guard the guard: the AST reader must actually resolve the known params of representative
     templates (direct refs and a helper-routed one), so it can never pass by extracting nothing."""
