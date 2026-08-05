@@ -84,10 +84,12 @@
 - **Gates.** `verify.sh` **9/9 raw, exit 0, corpus set** (BE 1704 fast + 397 slow · FE 730 ·
   fe-build green) · **skill-smoke 43 pass / 0 fail, no regression**. 22 new pins, **all confirmed
   RED first** by stashing the fix and re-running.
-- **Next:** the rest of `#2` (179 untriaged, `deg`'s belong with `#1(d)`'s spec), `#3`
-  (`#1(c)` gsea+ssgsea), then **`#4` — the main event**: `#10(b)` + the ledger provenance gap as
-  ONE spec, with [[DECISIONS #16]] already owner-decided, so it needs no gate. `#5` is the
-  fe-review JTBD backlog.
+- **⇒ NEXT SESSION IS SCOPED, owner-directed 2026-08-05: `#3` THEN `#4`.** Do `#3` first — it is
+  small and self-contained, so it banks a gate-green commit before the big change starts — then
+  `#4`, **spec written FIRST and then BUILT STRAIGHT THROUGH, no pause** (see the NEXT block; the
+  only founder call is already made in [[DECISIONS #16]]). **If `#4` runs long, finish it rather
+  than starting anything else**; the rest of `#2` (179 untriaged) and `#5` (the fe-review JTBD
+  backlog) wait.
 
 <!-- superseded — COMPARE-VERIFY, kept for its findings -->
 - **The board's `#1` is CLOSED — the compare fix is verified in a browser, and verifying it found a
@@ -605,7 +607,12 @@
 >      written only when they differ from the param-derived answer so defaults stay byte-identical.
 > 3. **`#1(c)` `gsea` + `ssgsea` (13)** — the best-value `API_ONLY_KNOBS` block left. Verify the
 >    shared meaning by reading each runner's BODY first (the `normalize`/`pvca` lesson).
-> 4. **⇒ THE MAIN EVENT — `#10(b)` + the ledger provenance gap, ONE spec, written FIRST and paused.**
+> 4. **⇒ THE MAIN EVENT — `#10(b)` + the ledger provenance gap, ONE spec, written FIRST then BUILT
+>    STRAIGHT THROUGH. ⚑ NO PAUSE — owner-directed 2026-08-05.** The earlier wording ("written FIRST
+>    and paused") contradicted the line under it, so it was put to the owner: the spec is written and
+>    then implemented **in the same session, without stopping for approval**, because [[DECISIONS
+>    #16]] already settled the only founder call. The spec is the design record, not a gate; the
+>    owner reviews it beside the shipped result. **Do not stop and ask.**
 >    They are the same seam and both have a consumer waiting: `violin`'s second table is blocked on
 >    `#10(b)`, and the ledger overstates trust today. **The founder decision is ALREADY MADE —
 >    [[DECISIONS #16]], owner-decided 2026-08-05: BADGE the provenance on the ledger AND CAP
