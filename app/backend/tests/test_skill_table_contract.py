@@ -60,7 +60,7 @@ NATIVE = {
     "lollipop", "confusion", "slope", "ridge",
 }
 
-# `NATIVE_L3_BOTH` was renamed and SPLIT, 2026-08-06, by the change that made half of it false.
+# `NATIVE_L3_BOTH` was renamed and SPLIT, 2026-08-05, by the change that made half of it false.
 #
 # The old set named `boxplot`/`violin` as the one native-AND-L3 overlap, justified by the two
 # sources covering disjoint RUNS: with `pairs=` the native table carried p-values that exist nowhere

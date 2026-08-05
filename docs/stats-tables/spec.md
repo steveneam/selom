@@ -137,7 +137,16 @@ array order**, each keeping the collapsible header, sort, and CSV export it alre
 - Each collapsed header still shows `title · N rows · M columns`, so a table beyond the cap
   announces what it holds. That is the affordance tabs would otherwise be buying.
 - The `StatsView` heading (`stats-view.tsx:73`) currently prints the single table's title. With N it
-  prints `Statistics` and a `N tables` count; each table's own title stays on its panel.
+  prints `Statistics`; each table's own title stays on its panel.
+  > **REFINED 2026-08-05 (slice 2) — Mobbin ruled out the `N tables` count this originally
+  > specified.** Across eight mature multi-section report surfaces, not one heads the group with a
+  > count of its sections. [Laravel
+  > Cloud](https://mobbin.com/screens/32d12b37-22cd-4a53-981e-e338101609ce) — the closest shape to
+  > this one — titles each section and lets the stack speak; Toggl and Quicken do the same.
+  > [Braintrust](https://mobbin.com/screens/5cdf1141-8f00-4e7d-b5f4-729ea894a29a) *does* show
+  > counts, but per-section on its own header and describing **rows**, which `StatsPanel` already
+  > does. A count in the heading tells the reader how many boxes sit below boxes they can already
+  > see. This refines D2's presentation; it does not reverse its decision.
 - **Nothing changes for a single table.** One table renders exactly as today: one panel, open,
   its title in the heading. This is a rendering invariant, not a preference — see §6 G3.
 
@@ -167,6 +176,29 @@ together, and the exception has no reason left.
 That is a follow-up slice (§7), and the ordering is a rule, not a preference: **the exception is
 removed in the same change that makes it false, never before.** Until then `NATIVE_L3_BOTH` stays
 exactly as it is.
+
+> **CORRECTION, 2026-08-05 — this prediction was half wrong, and slice 4's own guard caught it on
+> its first run.** It holds for `boxplot`. It does **not** hold for `violin`: that skill's
+> synthesizer reads a PubMed marker call back out of a figure **annotation**, and the annotation is
+> a **live network lookup at run time** (NEXT#10(b) — not stamped with a query date, and its failure
+> recorded nowhere). Its second table is therefore not deterministically producible: it exists when
+> the network answered and silently does not when it did not. Appending it would put a claim in the
+> runtime that no guard can check, and would make a network-dependent number *more* reachable by a
+> reproducibility score before the provenance stamping NEXT#10(b) owes.
+>
+> So the exception **split** rather than dissolved, which is the honest shape:
+> `NATIVE_L3_OVERLAP` (allowed to be both, `{boxplot, violin}`) with
+> `extract.synthesize.ALSO_SYNTHESIZE` (`{boxplot}`) as a proven subset — those that attach both on
+> **one** run. `violin` joins the subset once NEXT#10(b) lands. Note also where the declaration now
+> lives: in the module the runtime reads, not in the test that documented it.
+>
+> **The trap this opens, and the reason it is worth reading before slice 5 does anything similar:**
+> reading provenance used to be decided by *position* — only `read_metric`'s L3 fallback branch
+> re-tagged, so a synthesized table was known to be synthesized because of **where it was built**.
+> A native table and an L3 summary in one list breaks that, and the appended table would have been
+> read at full native confidence — a re-shaped value silently overstating its provenance on a
+> reproducibility score. Provenance now follows the **table's own `synthesized` flag**, which every
+> synthesizer stamps. One rule, driven by the data rather than by the code path.
 
 **L3 synthesis does not become automatic for everyone.** `routers/_run.py:309` reads
 `if table is None: table = synthesize_table(...)`. It would be a one-line change to *append* a
@@ -337,17 +369,21 @@ Each extends an existing test file rather than adding a parallel one, per the ra
 
 ## §7 Build slices (after review — not part of this spec's approval)
 
-1. **The contract**: D1 normalizers + D6's **two** Pydantic widenings + the `extract/readers.py`
-   consumer (including the restated L3 gate and moving `drive.py:140` inside its `try`) +
-   G1/G2/G2b/G3/G5. No skill changes; the whole product behaves identically. *This slice should be
-   provable as a no-op* — and the reproduction reader is the part of it most worth proving, because
-   its failure mode is a silently lowered score rather than an error.
-2. **The FE stack**: D2 + the mock fixture. Still no skill changes — driven by the fixture, then by
-   a hand-built two-table response.
-3. **`lollipop` unsqueezed** (rank 1): attach both, delete the swap, bump `skill.json` version.
-   Verify in the browser — set `pairs=` through the real control and see **both** tables
-   [[verify-on-real-data-not-mock]].
-4. **`boxplot` / `violin`** (rank 2) + dissolve `NATIVE_L3_BOTH` in the same change (D3).
+1. ~~**The contract**~~ — **DONE 2026-08-05** (`cf5288b`). D1 normalizers + D6's two Pydantic
+   widenings + the `extract/readers.py` consumer + G1/G2/G2b/G3/G5, proved a no-op. Re-deriving the
+   inventory found **four more narrowing sites**, one of which broke on a list: `workrail.tsx` reads
+   `figure.table.rows.length`, `project-workspace.tsx` had `!!figureTable(f)` where `!![]` is `true`,
+   and `legends._facts` narrowed with `isinstance(table, dict)` — a list would have produced a
+   caption with no facts and no error.
+2. ~~**The FE stack**~~ — **DONE 2026-08-05** (`9903021`). D2 + a two-table mock fixture gated on
+   the same `pairs=` condition the runner branches on. G4 landed here rather than in slice 1, because
+   this is the change that makes it load-bearing, and it caught slice 1's own untitled fixtures.
+3. ~~**`lollipop` unsqueezed**~~ — **DONE 2026-08-05** (`bf6a686`). ⚑ And the feature was
+   **unreachable**: `lollipop.pairs` was API-only, so a two-table result existed that no user could
+   produce. `pairs`/`sig_test`/`correction` now have controls, with the latter two declared once
+   (`COMPARISON_STATS`) after reading all three runners' bodies.
+4. ~~**`boxplot` / `violin`**~~ — **`boxplot` DONE 2026-08-05** (`fd89d5b`); **`violin` deferred to
+   NEXT#10(b)**, see the D3 correction above. `NATIVE_L3_BOTH` split rather than dissolved.
 5. **`confusion` / `qq`** (ranks 3–4): the scalar table; κ and λ leave the title string per the
    decided question 1. **Do NEXT#10(a) — the two-directional prose↔param guard — before this slice**,
    not after: moving a published number between homes is exactly the change whose methods/caption
