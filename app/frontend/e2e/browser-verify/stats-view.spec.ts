@@ -34,6 +34,19 @@ const VOLCANO = {
  * its icon spine (`useAutoCollapse`, editor-room R4) — so the Statistics ROW does not exist until
  * the rail is expanded. That is product behaviour, not harness friction, so the check drives it.
  */
+/**
+ * A panel's disclosure header — the button that carries the table's title and opens it.
+ *
+ * Located by ARIA state rather than by accessible name, because a panel now has TWO buttons naming
+ * its table: the header and the CSV download ("Download <title> as CSV", added so N stacked
+ * download buttons are not all announced as just "CSV"). A name-only query matches both and
+ * Playwright fails strict mode. `aria-expanded` is what actually distinguishes a disclosure control
+ * from a command, so the check keys on the thing that makes it a header rather than on its text.
+ */
+function panelHeader(panel: import("@playwright/test").Locator) {
+  return panel.locator("button[aria-expanded]");
+}
+
 async function expandWorkrail(page: import("@playwright/test").Page) {
   const expand = page.getByRole("button", { name: "Expand rail" });
   if (await expand.isVisible().catch(() => false)) await expand.click();
@@ -124,8 +137,8 @@ test("lollipop keeps BOTH tables when pairs= is set through the real control", a
   await expect(panels).toHaveCount(2, { timeout: 30_000 });
   // Scoped to the panels: the work rail names the table too, so an unscoped role query is
   // ambiguous — and that ambiguity is itself the rail correctly announcing the primary table.
-  await expect(panels.nth(0).getByRole("button", { name: /Ranked values/i })).toBeVisible();
-  await expect(panels.nth(1).getByRole("button", { name: /Pairwise comparisons/i })).toBeVisible();
+  await expect(panelHeader(panels.nth(0))).toHaveText(/Ranked values/i);
+  await expect(panelHeader(panels.nth(1))).toHaveText(/Pairwise comparisons/i);
 
   // Both are OPEN, not merely present: a collapsed panel and an unselected tab hide the same
   // numbers, which is the reason D2 ruled tabs out in the first place.
@@ -178,8 +191,8 @@ test("boxplot shows its pairwise table AND the synthesized summary, labelled as 
   await expect(panels).toHaveCount(2, { timeout: 30_000 });
   // Array order: the runner's own table leads, the synthesized one follows (D4/D5 — the caption
   // reads the first, and a skill's own computation outranks a re-shape of its picture).
-  await expect(panels.nth(0).getByRole("button", { name: /Pairwise comparisons/i })).toBeVisible();
-  await expect(panels.nth(1).getByRole("button", { name: /Distribution summary/i })).toBeVisible();
+  await expect(panelHeader(panels.nth(0))).toHaveText(/Pairwise comparisons/i);
+  await expect(panelHeader(panels.nth(1))).toHaveText(/Distribution summary/i);
 
   // ⚑ The synthesized panel must DISCLOSE that it was re-shaped rather than computed. Without this
   // the two tables read as equally authoritative, which is the one thing D3 refuses to allow.
@@ -232,8 +245,8 @@ test("confusion publishes its agreement scalars as a one-row table, refusal and 
   // The matrix LEADS. Not a presentation preference: `extract.readers._read_count` answers any
   // count-shaped metric from the first table with rows, so a scalar table in position 0 would
   // report a count of 1 into a reproducibility score.
-  await expect(panels.nth(0).getByRole("button", { name: /Confusion matrix/i })).toBeVisible();
-  await expect(panels.nth(1).getByRole("button", { name: /Agreement between/i })).toBeVisible();
+  await expect(panelHeader(panels.nth(0))).toHaveText(/Confusion matrix/i);
+  await expect(panelHeader(panels.nth(1))).toHaveText(/Agreement between/i);
 
   // ⚑ The refusal reaches a CELL. A title string exports to nothing and diffs against nothing;
   // this is the whole reason the scalars moved home.

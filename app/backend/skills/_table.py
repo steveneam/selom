@@ -19,7 +19,7 @@ def as_tables(value) -> list[dict]:
     """Narrow the ``StatsTable | list[StatsTable] | None`` wire union to a plain list.
 
     ``None`` → ``[]``, one table → ``[table]``, a list → itself. **This is the only definition of
-    that narrowing in the backend** (spec D1, guarded by ``test_stats_tables_contract.py``): a
+    that narrowing in the backend** (spec D1, guarded by ``tests/test_table.py``): a
     union invites ``isinstance(..., list)`` to sprout at every call site, and the answer is one
     normalizer rather than a convention. ``[]`` must therefore behave everywhere exactly as
     ``None`` did — see ``extract.readers.read_metric``'s L3 gate, where it decides a score.

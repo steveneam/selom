@@ -125,6 +125,51 @@ describe("StatsTable union narrowing", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("reads only the FIRST table where a declared consumer is allowed to", () => {
+    // ⚑ The defect the narrowing guard above cannot see. `asTables`/`figureTables` correctly return
+    // an array and the caller then writes `[0]` — perfectly typed, no `Array.isArray` anywhere, and
+    // tables 2..N are silently dropped. That shipped: `compare-view.tsx` diffed only table[0] for a
+    // whole milestone while its card read "The results tables are identical", so two versions whose
+    // Cohen's κ differed reported themselves identical. Every one of the three surfaces below has a
+    // REASON to read the first table; a fourth needs one too, in writing, which is what this list is.
+    // Only files that narrow and then index — `asTables(x)[0]`. A component handed an already-
+    // narrowed array and taking `[0]` for a heading is NOT this defect as long as it renders the
+    // rest (`stats-view.tsx` does exactly that, and was in this list until the stale-check below
+    // pointed out it never matched the pattern).
+    const FIRST_TABLE_CONSUMERS: Record<string, string> = {
+      // The rail announces the primary table and COUNTS the rest, so nothing is hidden.
+      "components/project/workrail.tsx":
+        "the rail row names the first table and appends '+N more' for the others",
+    };
+    const READS_FIRST = /\b(?:asTables|figureTables)\([^)]*\)\s*\[\s*0\s*\]/;
+    const offenders: string[] = [];
+    for (const root of ["app", "components", "hooks", "lib"]) {
+      for (const file of walkAll(join(ROOT, root))) {
+        const rel = file.slice(ROOT.length + 1).replace(/\\/g, "/");
+        // Tests are skipped: asserting on `[0]` INSPECTS a table, it does not consume one on a
+        // user's behalf, and a diff assertion has to name an index to say anything at all.
+        if (rel in FIRST_TABLE_CONSUMERS || /\.test\.tsx?$/.test(rel)) continue;
+        for (const [i, line] of readFileSync(file, "utf8").split("\n").entries()) {
+          // Comments too — the fix for this defect documents the line it replaced.
+          if (/^\s*(\*|\/\/|\/\*)/.test(line)) continue;
+          if (READS_FIRST.test(line)) offenders.push(`${rel}:${i + 1}`);
+        }
+      }
+    }
+    expect(
+      offenders,
+      "this reads table 1 of N and drops the rest — handle every table, or add the file to " +
+        "FIRST_TABLE_CONSUMERS with the reason it is allowed to",
+    ).toEqual([]);
+
+    // Both directions, the API_ONLY_KNOBS shape: a consumer that stops reading `[0]` must leave the
+    // list, or the waiver quietly protects a line that no longer exists.
+    const stale = Object.keys(FIRST_TABLE_CONSUMERS).filter(
+      (rel) => !READS_FIRST.test(readFileSync(join(ROOT, rel), "utf8")),
+    );
+    expect(stale, "these no longer read the first table only — drop them from the list").toEqual([]);
+  });
+
   it("declares asTables exactly once", () => {
     // The other half: the guard above only stops inline narrowing. A SECOND normalizer that happens
     // to spell the three cases slightly differently is the same defect wearing the right name.

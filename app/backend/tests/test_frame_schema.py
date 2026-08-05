@@ -181,10 +181,19 @@ def _stub(monkeypatch):
     monkeypatch.setenv("SELOM_SKILLS_ENGINE", "stub")
 
 
-# The stub-visible native-table skills (mirrors test_skill_table_contract.STUB_NATIVE) — those that
-# attach a Statistics table from their stub with default params.
-_STUB_NATIVE = ["volcano", "deg", "proteomics_de", "enrichment", "cepo",
-                "erg_traces", "erg_bwave_bar", "erg_intensity_response", "erg_flicker"]
+# IMPORTED, not retyped. This used to be a hand-copy commented "mirrors
+# test_skill_table_contract.STUB_NATIVE" — and it had drifted to 9 of the real 15, missing
+# `mixing_metrics`, `facs_gating`, `venn`, `forest`, `line` and, decisively, `qq`: one of the two
+# skills that emit a LIST. So `validate_result_table`'s list branch and its `untitled_table` rule,
+# both added by this milestone, had never once been handed a real runner's list — only dict
+# literals typed into this file. A duplicated set that has already drifted is the weaker
+# restatement the ratchet ladder says to prune, so the copy is gone rather than corrected.
+from tests.test_skill_table_contract import STUB_NATIVE  # noqa: E402
+
+# `confusion` is in neither list because its stub attaches a table only through the shared
+# `confusion_spec`, which `_attaches_table` sees but `STUB_NATIVE` (a stub-visible subset) predates.
+# It emits two tables on a default run, so the seam validator should meet it here.
+_STUB_NATIVE = sorted(STUB_NATIVE | {"confusion"})
 
 
 @pytest.mark.parametrize("skill_id", _STUB_NATIVE)
@@ -195,3 +204,21 @@ def test_native_result_tables_are_rectangular(skill_id, _stub):
 
     _figure, table = run_skill_with_table(skill_id, "unused", {})
     assert validate_result_table(table, skill_id=skill_id) == []
+
+
+def test_a_conditional_two_table_result_validates_at_the_seam(_stub):
+    """The LIST shape from a real runner, on the branch that only opens when asked.
+
+    `confusion` and `qq` cover the list at the seam on DEFAULT params (they are in the set above),
+    so this covers the other kind: a skill that emits one table normally and two once `pairs=` names
+    groups that actually exist. `lollipop` is the one that does it natively — `boxplot`'s second
+    table is appended by `routers/_run.py`, not by the runner, so at THIS seam it is still a single
+    table and asserting two here would be testing the wrong layer.
+    """
+    from skills._table import as_tables
+    from skills.contract import run_skill_with_table
+
+    _figure, table = run_skill_with_table(
+        "lollipop", "unused", {"pairs": "Phototransduction~Glial activation"})
+    assert len(as_tables(table)) == 2, "lollipop did not emit its two-table shape"
+    assert validate_result_table(table, skill_id="lollipop") == []

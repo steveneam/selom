@@ -75,7 +75,12 @@ export function StatsPanel({
   }
 
   function exportCsv() {
-    const lines = [table.columns, ...table.rows].map((r) => r.map(csvCell).join(","));
+    // Export what the panel SAYS it is showing. It read `table.rows` — the server's original set —
+    // while the footer three lines below reported the sorted, gene-filtered `rows`, so searching a
+    // gene left the panel stating "Showing 0 rows" beside a button that downloaded all 1543 in a
+    // different order. `rows`, not `shown`: the 200-row cap is a rendering budget (the footer names
+    // it), never a choice the user made about which rows they want.
+    const lines = [table.columns, ...rows].map((r) => r.map(csvCell).join(","));
     const blob = new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -91,7 +96,11 @@ export function StatsPanel({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center gap-2.5 rounded-xl px-4 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+        // Matches `data-check.tsx`'s collapsible-card header, the same control one file away:
+        // Tailwind v4's preflight gives a `<button>` `cursor: default`, so without these the whole
+        // header reads as a static caption — and with N panels stacked, "is this thing clickable"
+        // is now asked N times per figure instead of once.
+        className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-4 py-2.5 text-left outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring/60"
       >
         <Table2 className="size-4 text-primary" />
         <span className="text-sm font-medium text-foreground">{table.title ?? "Statistics"}</span>
@@ -107,9 +116,16 @@ export function StatsPanel({
           {table.synthesized && (
             <p className="flex items-start gap-1.5 border-b border-border/60 bg-primary/[0.04] px-4 py-2 text-[11px] leading-relaxed text-muted-foreground">
               <Sparkles className="mt-px size-3 shrink-0 text-primary/80" />
+              {/*
+                The old wording said "this skill doesn't emit a table, so we re-shaped …", which
+                was true while synthesis only ever fired for a tableless skill. Slice 4 broke that:
+                `boxplot` with `pairs=` ships its OWN pairwise table and this one, so the sentence
+                is now contradicted by the panel sitting directly above it. What stays true in both
+                cases — and is the whole point of the disclosure — is where these numbers came from.
+              */}
               <span>
-                Computed by Selom from the figure — this skill doesn&apos;t emit a table, so we re-shaped
-                the values it plotted (read, not re-computed) into an editable one.
+                Computed by Selom from the figure — we re-shaped the values it plots (read, not
+                re-computed) into an editable table.
               </span>
             </p>
           )}
@@ -141,7 +157,16 @@ export function StatsPanel({
                   ? " · click a header to sort"
                   : ""}
             </span>
-            <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={exportCsv} data-testid="stats-csv">
+            {/* One panel had one "CSV" button; N stacked panels have N, and by accessible name
+                they are indistinguishable. Name the table it downloads. */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 px-2 text-xs"
+              onClick={exportCsv}
+              aria-label={`Download ${table.title ?? "statistics"} as CSV`}
+              data-testid="stats-csv"
+            >
               <Download /> CSV
             </Button>
           </div>
@@ -157,19 +182,33 @@ export function StatsPanel({
                   {table.columns.map((c, i) => (
                     <th
                       key={i}
-                      onClick={sortable ? () => toggleSort(i) : undefined}
                       aria-sort={
-                        sort?.col === i ? (sort.dir === 1 ? "ascending" : "descending") : undefined
+                        sortable && sort?.col === i
+                          ? sort.dir === 1
+                            ? "ascending"
+                            : "descending"
+                          : undefined
                       }
-                      className={cn(
-                        "select-none border-b border-border px-3 py-2 text-left font-semibold text-muted-foreground",
-                        sortable && "cursor-pointer hover:text-foreground",
-                      )}
+                      className="select-none border-b border-border px-3 py-2 text-left font-semibold text-muted-foreground"
+                      // A sortable header is a REAL button, not a click handler on a `<th>`. It was
+                      // an onClick-only `<th>` before: no tab stop, no focus ring, no Enter/Space —
+                      // sorting a computed result was mouse-only, which is a whole class of user
+                      // locked out of the panel. `aria-sort` stays on the `th` (that is where the
+                      // spec puts it) while the control that changes it is focusable.
                     >
-                      <span className="inline-flex items-center gap-1">
-                        {c}
-                        {sort?.col === i && (sort.dir === 1 ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />)}
-                      </span>
+                      {sortable ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleSort(i)}
+                          aria-label={`Sort by ${c}`}
+                          className="inline-flex items-center gap-1 rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60"
+                        >
+                          {c}
+                          {sort?.col === i && (sort.dir === 1 ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />)}
+                        </button>
+                      ) : (
+                        <span className="inline-flex items-center gap-1">{c}</span>
+                      )}
                     </th>
                   ))}
                 </tr>
@@ -261,7 +300,7 @@ function SynthesizedBadge() {
   return (
     <span
       className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary"
-      title="Computed by Selom from the figure — this skill emits no native table"
+      title="Computed by Selom from the figure — re-shaped from the values it plots, not re-computed"
     >
       <Sparkles className="size-2.5" />
       Computed by Selom

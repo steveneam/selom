@@ -5,8 +5,9 @@ import { ArrowRight, GitCompare, Lock, Sparkles, X } from "lucide-react";
 import { FigureCanvas } from "@/components/figure/figure-canvas";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/ui/cn";
+import { plural } from "@/lib/ui/plural";
 import { getSkill } from "@/lib/catalog/seed";
-import { changedParams, diffParams, diffTables, type DeltaStatus } from "@/lib/lineage/diff";
+import { changedParams, diffParams, diffTables, pairTableDiffs, type DeltaStatus } from "@/lib/lineage/diff";
 import { datasetChipName } from "@/lib/lineage/family";
 import { figureTables } from "@/lib/lineage/figure-table";
 import type { Dataset, Figure } from "@/lib/projects/types";
@@ -58,11 +59,21 @@ export function CompareView({
   const dataset = a.datasetId ? datasets.find((d) => d.id === a.datasetId) : undefined;
 
   const paramDeltas = changedParams(diffParams(a.provenance?.params, b.provenance?.params));
-  // `diffTables` is a single-table row-alignment algorithm, so the CALLER pairs by index
-  // (stats-tables spec D1). Slice 1 keeps compare on the primary pair — a figure with a second
-  // table diffs its first exactly as before.
-  const tableDiff = diffTables(figureTables(a)[0], figureTables(b)[0]);
-  const changedRows = tableDiff?.rows.filter((r) => r.status !== "same") ?? [];
+  // `diffTables` is a single-table row-alignment algorithm, so the CALLER pairs by index — and it
+  // pairs EVERY index, not just the first (stats-tables spec D1/D4: array order is the runner's and
+  // carries meaning, so index i on one side is the same result as index i on the other).
+  //
+  // ⚑ This read `figureTables(a)[0]` until 2026-08-05, and the milestone review was right that it
+  // was worse than an omission. The card said "The results tables are identical" — plural, a claim
+  // about ALL of them — while comparing one, so two versions whose Cohen's κ differed reported
+  // themselves identical as long as the matrix matched. It also falsified the approved rationale
+  // for moving κ and λ out of their titles in the first place ("a one-row table sorts, exports,
+  // DIFFS IN COMPARE and is readable"), and `lollipop`'s pairwise p-values — the provenance of
+  // stars drawn on the canvas — silently dropped out of every version comparison.
+  //
+  // Stacked, one card per pair, for D2's reason: a diff behind a fold hides the same numbers as a
+  // diff that was never computed.
+  const tableDiffs = pairTableDiffs(figureTables(a), figureTables(b));
 
   return (
     <div className="flex h-full flex-col gap-4">
@@ -132,60 +143,76 @@ export function CompareView({
           )}
         </DiffCard>
 
-        <DiffCard
-          title="Results table"
-          summary={
-            tableDiff ? (
-              <DiffSummary added={tableDiff.added} removed={tableDiff.removed} changed={tableDiff.changed} />
-            ) : undefined
-          }
-        >
-          {!tableDiff ? (
+        {tableDiffs.length === 0 ? (
+          <DiffCard title="Results table">
             <p className="px-3 py-3 text-xs text-muted-foreground">Neither version has a Statistics table.</p>
-          ) : changedRows.length === 0 ? (
-            <p className="px-3 py-3 text-xs text-muted-foreground">The results tables are identical.</p>
-          ) : (
-            <div className="max-h-[260px] overflow-auto">
-              <table className="w-full border-collapse text-xs">
-                <thead className="sticky top-0 bg-card">
-                  <tr>
-                    {tableDiff.columns.map((c) => (
-                      <th key={c} className="border-b border-border px-3 py-1.5 text-left font-semibold text-muted-foreground">
-                        {c}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {changedRows.slice(0, 60).map((row) => (
-                    <tr key={row.key} className="align-top">
-                      {row.cells.map((cell, ci) => (
-                        <td
-                          key={ci}
-                          className="tabular border-b border-border/50 px-3 py-1.5"
-                          style={
-                            cell.status !== "same"
-                              ? { color: DELTA_COLOR[cell.status], background: `color-mix(in oklab, ${DELTA_COLOR[cell.status]} 8%, transparent)` }
-                              : undefined
-                          }
-                        >
-                          {renderCell(cell)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {changedRows.length > 60 && (
-                <p className="px-3 py-2 text-[11px] text-muted-foreground">
-                  Showing the first 60 of {changedRows.length} changed rows.
-                </p>
-              )}
-            </div>
-          )}
-        </DiffCard>
+          </DiffCard>
+        ) : (
+          tableDiffs.map(({ index, title, diff }) => (
+            <TableDiffCard key={index} title={title} diff={diff} />
+          ))
+        )}
       </div>
     </div>
+  );
+}
+
+/**
+ * One table's row-level diff. Titled by the table's OWN title (the same thing that labels its
+ * panel in the Statistics view), so a stack of them is readable — "Ranked values" above
+ * "Pairwise p-values" rather than two cards both called "Results table".
+ */
+function TableDiffCard({ title, diff }: { title: string; diff: NonNullable<ReturnType<typeof diffTables>> }) {
+  const changedRows = diff.rows.filter((r) => r.status !== "same");
+  return (
+    <DiffCard
+      title={title}
+      summary={<DiffSummary added={diff.added} removed={diff.removed} changed={diff.changed} />}
+    >
+      {changedRows.length === 0 ? (
+        // Singular, and scoped to THIS table. The old copy said "The results tables are identical"
+        // while only the first had been compared — a plural claim backed by a single comparison.
+        <p className="px-3 py-3 text-xs text-muted-foreground">This table is identical in both versions.</p>
+      ) : (
+        <div className="max-h-[260px] overflow-auto">
+          <table className="w-full border-collapse text-xs">
+            <thead className="sticky top-0 bg-card">
+              <tr>
+                {diff.columns.map((c) => (
+                  <th key={c} className="border-b border-border px-3 py-1.5 text-left font-semibold text-muted-foreground">
+                    {c}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {changedRows.slice(0, 60).map((row) => (
+                <tr key={row.key} className="align-top">
+                  {row.cells.map((cell, ci) => (
+                    <td
+                      key={ci}
+                      className="tabular border-b border-border/50 px-3 py-1.5"
+                      style={
+                        cell.status !== "same"
+                          ? { color: DELTA_COLOR[cell.status], background: `color-mix(in oklab, ${DELTA_COLOR[cell.status]} 8%, transparent)` }
+                          : undefined
+                      }
+                    >
+                      {renderCell(cell)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {changedRows.length > 60 && (
+            <p className="px-3 py-2 text-[11px] text-muted-foreground">
+              Showing the first 60 of {plural(changedRows.length, "changed row")}.
+            </p>
+          )}
+        </div>
+      )}
+    </DiffCard>
   );
 }
 

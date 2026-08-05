@@ -431,7 +431,20 @@ function statsRowSub(fig: Figure): string {
   const first = tables[0];
   if (!first) return "derived table";
   const shape = `${plural(first.rows.length, "row")} · ${plural(first.columns.length, "col")}`;
-  return tables.length > 1 ? `${shape} · +${tables.length - 1} more` : shape;
+  if (tables.length === 1) return shape;
+  // Two fixes to "…· +1 more", which was both ambiguous and the first thing lost to clipping.
+  //
+  // 1. NAME THE NOUN. "18 rows · 4 cols · +1 more" reads as more COLUMNS — the thing it sits
+  //    directly after — rather than a second table.
+  // 2. PUT IT FIRST. This subtitle renders inside a `truncate` span beside the family chip, so the
+  //    tail is what gets eaten at a real rail width — and the tail held the ONE fact a user cannot
+  //    recover without opening the view. The shape is safe to lose there: it is restated on every
+  //    panel header. Truncation should eat the recoverable half.
+  //
+  // Not in tension with the Mobbin finding that ruled a count out of the Statistics VIEW heading:
+  // that turned on the sections being already visible below it ("how many boxes sit below boxes you
+  // can see"). Here nothing is visible yet — this row is the only pre-open announcement there is.
+  return `${plural(tables.length, "table")} · ${shape}`;
 }
 
 /** The collapsed rail — a thin spine of stage dots; click any to re-open. */

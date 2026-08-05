@@ -591,6 +591,7 @@ def _boxplot(p: dict):
     the remainder following the descending-median sort — so "groups are ordered by descending
     median" is true exactly when the user named none.
     """
+    cites: list[str] = []
     horizontal = str(p.get("orientation", "v")).lower().startswith("h")
     axis = "horizontally" if horizontal else "vertically"
     group = str(p.get("group") or "").strip()
@@ -640,7 +641,15 @@ def _boxplot(p: dict):
                       " p-values are uncorrected for multiple comparisons")
         text += (f" Named pairs of groups were compared with {label}, and significance brackets "
                  f"drawn on the figure;{adjust}.")
-    return text, []
+        # The citations follow the CLAIMS, not the skill. A paragraph that names a statistical test
+        # and the Benjamini-Hochberg procedure and then cites nothing is the same printed-vs-computed
+        # gap in the bibliography that the prose↔param guard closes in the prose: the reader is given
+        # a method they cannot look up. Emitted only inside `if pairs:`, because a box plot that
+        # tested nothing owes no reference.
+        cites.append(SCIPY)
+        if str(p.get("correction", "none")).strip().lower() == "bh":
+            cites.append(BH)
+    return text, cites
 
 
 def _gsea(p: dict):

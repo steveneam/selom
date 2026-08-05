@@ -5,7 +5,7 @@ import type { StatsTable } from "@/lib/skills/api";
  *
  * `null`/`undefined` → `[]`, one table → `[table]`, a list → itself. **This is the only place
  * that union is narrowed on the frontend** (docs/stats-tables/spec.md D1, guarded by
- * `stats-tables.guard.test.ts`): a union invites `Array.isArray(...)` to sprout at every call
+ * `lib/structure.guard.test.ts`): a union invites `Array.isArray(...)` to sprout at every call
  * site, and the answer is one normalizer rather than a convention. Every consumer calls this and
  * then handles an array.
  *

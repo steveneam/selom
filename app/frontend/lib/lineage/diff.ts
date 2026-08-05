@@ -146,3 +146,37 @@ export function diffTables(
 
   return { keyColumn, columns, rows, added, removed, changed };
 }
+
+/** One table's diff, plus the title the compare surface labels it with. */
+export interface PairedTableDiff {
+  /** Index in both runners' arrays — the pairing key (D4: array order carries meaning). */
+  index: number;
+  title: string;
+  diff: TableDiff;
+}
+
+/**
+ * Pair two runs' table arrays BY INDEX and diff every pair — the multi-table half of compare.
+ *
+ * `diffTables` compares one table against one table, so someone has to decide which goes with
+ * which. That decision is spec D4's: array order is the runner's and carries meaning, so index i on
+ * one side is the same result as index i on the other (`lollipop`'s ranked values against its
+ * ranked values, its pairwise p-values against its pairwise p-values).
+ *
+ * ⚑ It lives here, not inline in the view, because the version that lived inline read `[0]` and
+ * nobody could test it. Compare diffed one table for a whole milestone while its card announced
+ * "The results tables are identical" — so two versions differing only in Cohen's κ, or only in the
+ * p-values behind their drawn stars, reported themselves identical. A pure function is the home
+ * where that claim can be pinned.
+ */
+export function pairTableDiffs(a: StatsTable[], b: StatsTable[]): PairedTableDiff[] {
+  const out: PairedTableDiff[] = [];
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const diff = diffTables(a[i], b[i]);
+    // `diffTables` returns null only when NEITHER side has a table at this index, which cannot
+    // happen inside the loop bound — but a table added or removed between versions is a real
+    // asymmetry, and it must yield a diff rather than be dropped.
+    if (diff) out.push({ index: i, title: a[i]?.title ?? b[i]?.title ?? "Results table", diff });
+  }
+  return out;
+}

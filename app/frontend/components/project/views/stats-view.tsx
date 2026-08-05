@@ -103,7 +103,14 @@ export function StatsView({
         <div className="flex flex-col gap-3">
           {tables.map((t, i) => (
             <StatsPanel
-              key={i}
+              // ⚑ Keyed by the FIGURE, not by position alone. `key={i}` kept every panel mounted
+              // across a figure switch, so React reconciled instead of remounting and each panel's
+              // `sort` / `query` / `open` state carried onto a table the user had never touched: a
+              // volcano sorted by column 2, then the confusion figure's matrix silently rendering
+              // sorted by ITS column 2 under an arrow nobody set. Two things this milestone did
+              // made it worse — N panels multiply the leak, and a one-row scalar table's headers
+              // are now INERT, so an inherited sort landed somewhere it could not be cleared.
+              key={`${activeFigure.id}:${i}`}
               table={t}
               // EVERY table is open, up to the wall-guard. Collapsing tables 2..N was an earlier
               // draft and is wrong for the same reason tabs are: a collapsed panel and an

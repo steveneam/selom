@@ -270,6 +270,18 @@ sorts, exports, diffs, and extracts like every other table, which a caption does
 > The presentational half of the claim is real and was worth the change: κ and λ now export to CSV,
 > diff in compare, and read as English at a glance. **Any future scalar table inherits this hazard**
 > — put it last, or make the reader shape-aware first.
+>
+> **Second correction, same day, from the milestone review: "diffs in compare" was itself false when
+> written.** `compare-view.tsx` diffed `figureTables(a)[0]` only — for the whole of slices 1–5 — while
+> its card announced *"The results tables are identical"*, a plural claim backed by a single
+> comparison. Two versions differing only in Cohen's κ, or only in the p-values behind their drawn
+> stars, reported themselves identical. So decided-question 2's reachability argument, the stated
+> reason for choosing a table over a caption, rested on a capability that did not exist. Compare now
+> pairs by index and renders one titled card per table (`lineage/diff.pairTableDiffs`, unit-pinned by
+> a test that fails when the pairing is cut back to `[0]`), and `lib/structure.guard.test.ts` fails
+> any new `asTables(…)[0]` outside a named allowlist. **Three of four review lenses found this
+> independently; none of the nine gates could see it, because reading index 0 of an array is
+> perfectly typed.**
 
 ### D5 — the legend and the caption read the **first** table
 

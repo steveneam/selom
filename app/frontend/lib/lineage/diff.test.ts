@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changedParams, diffParams, diffTables } from "./diff";
+import { changedParams, diffParams, diffTables, pairTableDiffs } from "./diff";
 import type { StatsTable } from "@/lib/skills/api";
 
 describe("diffParams", () => {
@@ -86,5 +86,60 @@ describe("diffTables", () => {
     expect(diffTables(null, undefined)).toBeNull();
     expect(diffTables(null, TA)!.added).toBe(3);
     expect(diffTables(TA, null)!.removed).toBe(3);
+  });
+});
+
+describe("pairTableDiffs", () => {
+  // The two-table shape this milestone made real: a ranked/detail table plus a scalar or pairwise
+  // one. `lollipop`, `boxplot`, `confusion` and `qq` all ship it.
+  const ranked: StatsTable = {
+    columns: ["rank", "arm", "median"],
+    rows: [[1, "WT", 412.5], [2, "KO", 268.9]],
+    title: "Ranked values",
+  };
+  const pairsA: StatsTable = {
+    columns: ["group A", "group B", "p"],
+    rows: [["WT", "KO", 0.031]],
+    title: "Pairwise comparisons",
+  };
+  const pairsB: StatsTable = { ...pairsA, rows: [["WT", "KO", 0.0093]] };
+
+  it("⚑ diffs the SECOND table — the regression that shipped for a whole milestone", () => {
+    // Compare read `figureTables(x)[0]`, so a re-run that changed only the p-values (correction
+    // none → BH) reported "The results tables are identical". Table 0 is byte-identical here; every
+    // difference between these two versions lives in table 1.
+    const paired = pairTableDiffs([ranked, pairsA], [ranked, pairsB]);
+    expect(paired).toHaveLength(2);
+    expect(paired[0].diff.changed, "the ranked table really is unchanged").toBe(0);
+    expect(paired[1].diff.changed, "the p-value change must survive into the diff").toBeGreaterThan(0);
+  });
+
+  it("labels each pair with the table's own title, so a stack of cards is readable", () => {
+    expect(pairTableDiffs([ranked, pairsA], [ranked, pairsB]).map((p) => p.title)).toEqual([
+      "Ranked values",
+      "Pairwise comparisons",
+    ]);
+  });
+
+  it("falls back to a generic title only when neither side named the table", () => {
+    const untitled: StatsTable = { columns: ["a"], rows: [["x"]] };
+    expect(pairTableDiffs([untitled], [untitled])[0].title).toBe("Results table");
+  });
+
+  it("keeps a table that exists on ONE side — an added or removed table is a real difference", () => {
+    // A parameter change can make a second table appear (setting `pairs=`). Dropping it because the
+    // baseline has no counterpart would hide exactly the change the user is comparing to find.
+    const added = pairTableDiffs([ranked], [ranked, pairsB]);
+    expect(added).toHaveLength(2);
+    expect(added[1].title).toBe("Pairwise comparisons");
+    expect(added[1].diff.added).toBeGreaterThan(0);
+
+    const removed = pairTableDiffs([ranked, pairsA], [ranked]);
+    expect(removed).toHaveLength(2);
+    expect(removed[1].diff.removed).toBeGreaterThan(0);
+  });
+
+  it("is empty when neither version has a table — the view says so rather than rendering a shell", () => {
+    expect(pairTableDiffs([], [])).toEqual([]);
   });
 });
