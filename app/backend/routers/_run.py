@@ -310,10 +310,22 @@ async def _execute_skill_run(
         # `not as_tables(table)`, not `table is None`: under the multi-table union (D1) an empty
         # list means the same thing None did — no table — and the gate must read it that way or
         # synthesis silently stops firing for the skills it exists to serve.
-        if not as_tables(table):
-            from extract.synthesize import synthesize_table
+        #
+        # A DECLARED few also take synthesis on top of a native table (`ALSO_SYNTHESIZE`, spec D3
+        # slice 4) — boxplot/violin, whose native pairwise p-values and whose figure-encoded
+        # distribution summary answer different questions and neither of which can produce the
+        # other. It stays an opt-in rather than becoming universal: a "Computed by Selom" table
+        # under EVERY native table is noise at best, and at worst a second, differently derived set
+        # of numbers beside the skill's own with nothing saying which is authoritative.
+        from extract.synthesize import ALSO_SYNTHESIZE, synthesize_table
 
-            table = synthesize_table(skill_id, figure)
+        native = as_tables(table)
+        if not native or skill_id in ALSO_SYNTHESIZE:
+            synth = synthesize_table(skill_id, figure)
+            if synth is not None:
+                # A lone table stays a BARE object — widening the type must not start wrapping
+                # (G3); only a genuine second table makes it a list.
+                table = [*native, synth] if native else synth
         # Data-fit for THIS skill on the user's own data (Slice 2, product-agnostic): the same
         # confidence band Product B shows — "is the data I'm running good/compatible for this
         # analysis?" Computed once above for the D1 contract gate; reused here (no second load/score).

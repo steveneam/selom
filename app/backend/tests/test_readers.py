@@ -292,3 +292,47 @@ def test_panel_extractor_and_readings_accept_the_union():
     assert panel_extractor(panel, None, [table]) == panel_extractor(panel, None, table)
     listed = {r.metric: r.value for r in panel_readings(panel, None, [table])}
     assert listed == {"de_up": 1, "de_down": 1}
+
+
+def test_a_synthesized_table_INLINE_in_a_list_is_still_scored_as_synthesized():
+    """The trap slice 4 opens, and the one worth guarding hardest.
+
+    Provenance used to be decided by POSITION: only `read_metric`'s own L3 fallback branch re-tagged,
+    so a synthesized table was known to be synthesized because of where it was built. Once a skill
+    may attach a native table AND its L3 summary in one list (`ALSO_SYNTHESIZE`), that stops holding
+    — and the appended table would have been read at full native confidence, silently OVERSTATING
+    the provenance of a re-shaped value on a reproducibility score. Every synthesizer stamps
+    `synthesized: True`, so the flag on the table is the honest authority."""
+    native = {"columns": ["group A", "group B", "p"], "rows": [["Control", "KO", 0.004]],
+              "title": "Pairwise comparisons"}
+    synth = {"columns": ["group", "n", "median"],
+             "rows": [["Control", 12, 412.5], ["Rescue", 9, 301.4]],
+             "title": "Distribution summary", "synthesized": True, "source": "figure"}
+
+    # "Rescue" exists ONLY in the appended table, so this read must come from it. The metric is
+    # deliberately not `*_n`/`*_count`: those match `_COUNT_RE`, and a row-count read would be
+    # answered by table 1 first — correctly, but it would not exercise the appended table at all.
+    tagged = read_metric("boxplot", "rescue_median", None, [native, synth], key="Rescue")
+    assert tagged.layer == L3 and tagged.source == SRC_SYNTH
+    assert "via L3-synthesized table" in tagged.note
+
+    # The identical table without the flag is a native read — the flag, not the shape, decides.
+    bare = {k: v for k, v in synth.items() if k not in ("synthesized", "source")}
+    plain = read_metric("boxplot", "rescue_median", None, [native, bare], key="Rescue")
+    assert plain.layer == L2 and plain.source == SRC_TABLE
+    assert tagged.value == plain.value, "only the provenance differs, never the number"
+    assert tagged.confidence < plain.confidence, "synthesized provenance must cost confidence"
+
+
+def test_the_l3_fallback_is_not_double_tagged():
+    """`_read_generic` tags by the table's flag, so the fallback branch must NOT re-tag on top —
+    compounding the penalty twice would quietly halve a legitimate synthesized reading's confidence
+    every time the code path changed."""
+    fig = {"data": [
+        {"type": "scatter", "name": "0", "x": [1, 2, 3], "y": [1, 2, 3]},
+        {"type": "scatter", "name": "1", "x": [4, 5], "y": [4, 5]},
+    ]}
+    r = read_metric("umap_scrna", "n_clusters", fig, None)
+    assert r.layer == L3 and r.source == SRC_SYNTH
+    assert r.note.count("via L3-synthesized table") == 1, "tagged once, by one rule"
+    assert r.confidence == round(min(0.5, 0.6) * 0.9, 3)

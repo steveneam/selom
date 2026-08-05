@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import pytest
 
-from extract.synthesize import _SYNTHESIZERS, synthesize_table
+from extract.synthesize import ALSO_SYNTHESIZE, _SYNTHESIZERS, synthesize_table
 from skills.contract import _skill_dir, run_skill_with_table
 from skills.registry import list_skill_ids
 
@@ -60,21 +60,26 @@ NATIVE = {
     "lollipop", "confusion", "slope", "ridge",
 }
 
-# The reviewed native-AND-L3 overlap. Normally a skill declares ONE table source, and the
-# disjointness assertions below force that decision. These two are deliberate exceptions, and the
-# runtime already models them: `_run.py` attaches the native table and falls back to the L3
-# synthesizer only `if table is None`.
+# `NATIVE_L3_BOTH` was renamed and SPLIT, 2026-08-06, by the change that made half of it false.
 #
-# Both gained `pairs=` (skills/_stats.py), which computes p-values that exist nowhere in the figure
-# except as stars — so when `pairs=` is set the native table carries the numbers behind those stars,
-# because they are IRRECOVERABLE by synthesis. With no `pairs=` there is no native table and L3
-# synthesizes what the figure does encode: boxplot's five-number summary (readable straight off the
-# drawn box) and violin's PubMed marker call. The two sources cover disjoint *runs*, not disjoint
-# skills, which is the distinction the original partition could not express.
+# The old set named `boxplot`/`violin` as the one native-AND-L3 overlap, justified by the two
+# sources covering disjoint RUNS: with `pairs=` the native table carried p-values that exist nowhere
+# in the figure except as stars, and without it L3 synthesized what the figure does encode. That
+# disjointness was never about the science — it existed ONLY because the wire carried one table
+# (docs/stats-tables/spec.md D3). D3 predicted the exception would have "no reason left" once two
+# tables fit. That is true for `boxplot` and NOT true for `violin`, which is the finding:
 #
-# This is a narrow, declared exception, NOT a relaxation: the completeness guard below is unchanged,
-# so a skill still cannot be silently tableless, and anything landing here has to justify itself.
-NATIVE_L3_BOTH = {"boxplot", "violin"}
+#   - `boxplot` now attaches BOTH on the same run, declared where it is EXECUTED rather than merely
+#     documented (`extract.synthesize.ALSO_SYNTHESIZE`). That is the stronger home — the old set was
+#     a note the runtime happened to agree with; this one IS the runtime.
+#   - `violin` stays an across-RUNS overlap. Its synthesized table is a PubMed marker call read back
+#     out of a figure annotation, and that annotation is a live network lookup — so the table is not
+#     deterministically producible and cannot be appended behind a guard that can check it. See the
+#     reason at `ALSO_SYNTHESIZE`; it is blocked on NEXT#10(b), not on this contract.
+#
+# So the partition still needs an overlap allowance, and `ALSO_SYNTHESIZE` is a SUBSET of it: every
+# skill that attaches both on one run is by definition allowed to be both.
+NATIVE_L3_OVERLAP = {"boxplot", "violin"}
 
 # The reviewed L4-only allowlist: node-link skills with no faithful table → the L4 Pro-AI tier. A
 # skill here has NO native table and NO synthesizer *by design* — ``test_l4_only_is_honestly_tableless``
@@ -109,11 +114,15 @@ def test_table_contract_partitions_every_skill():
     all_skills = set(list_skill_ids())
     l3 = set(_SYNTHESIZERS)
 
-    overlap = (NATIVE & l3) - NATIVE_L3_BOTH
+    overlap = (NATIVE & l3) - NATIVE_L3_OVERLAP
     assert not overlap, (
-        f"native ∩ L3 = {sorted(overlap)} — a skill declares ONE table source unless its native "
-        f"table is conditional and L3 covers the other case; then add it to NATIVE_L3_BOTH with "
-        f"the reason."
+        f"native ∩ L3 = {sorted(overlap)} — a skill declares ONE table source unless it can "
+        f"genuinely be both; then add it to NATIVE_L3_OVERLAP, and to "
+        f"extract.synthesize.ALSO_SYNTHESIZE too if it attaches both on the SAME run."
+    )
+    assert ALSO_SYNTHESIZE <= NATIVE_L3_OVERLAP, (
+        f"{sorted(ALSO_SYNTHESIZE - NATIVE_L3_OVERLAP)} append L3 synthesis to a native table but "
+        f"are not declared as a native∩L3 overlap — the two declarations cannot disagree."
     )
     assert NATIVE.isdisjoint(L4_ONLY), f"native ∩ L4-only = {sorted(NATIVE & L4_ONLY)}"
     assert l3.isdisjoint(L4_ONLY), f"L3 ∩ L4-only = {sorted(l3 & L4_ONLY)}"
@@ -140,28 +149,42 @@ def test_native_classification_matches_source():
     )
 
 
-@pytest.mark.parametrize("skill_id", sorted(NATIVE_L3_BOTH))
-def test_native_l3_overlap_really_is_conditional(skill_id):
-    """The exception must EARN itself. A skill in NATIVE_L3_BOTH has to actually behave the way the
-    note claims: no native table on a default run (so L3 is what covers it), a native table once
-    `pairs=` asks a question the figure cannot answer, and a working synthesizer either way.
+@pytest.mark.parametrize("skill_id", sorted(ALSO_SYNTHESIZE))
+def test_also_synthesize_entries_really_want_both_tables(skill_id):
+    """The opt-in must EARN itself, or `ALSO_SYNTHESIZE` becomes a hole in the partition — somewhere
+    to park a skill that is simply double-classified.
 
-    Without this, NATIVE_L3_BOTH would be a hole in the partition — somewhere to park a skill that
-    is simply double-classified."""
+    An entry has to prove all three: a working L3 synthesizer, a native table that appears when
+    `pairs=` asks a question the figure cannot answer, and the two carrying DIFFERENT numbers. The
+    last one is the point of the whole opt-in: if synthesis could reproduce the native table there
+    would be nothing to append, and appending it would just print the same numbers twice under a
+    "Computed by Selom" badge."""
+    assert skill_id in _SYNTHESIZERS, f"{skill_id} has no L3 synthesizer to append"
+
     _fig, default_native = run_skill_with_table(skill_id, "unused", {})
     assert default_native is None, (
-        f"{skill_id} attaches a native table with DEFAULT params — it is unconditionally native, "
-        f"so it does not belong in NATIVE_L3_BOTH"
+        f"{skill_id} attaches a native table with DEFAULT params, so synthesis has nothing to add "
+        f"that the fill-when-absent path would not already cover"
     )
-    assert skill_id in _SYNTHESIZERS, f"{skill_id} has no L3 synthesizer to fall back to"
 
     # The stub groups differ per skill, so ask for a pair drawn from the figure it just built.
     names = [t.get("name") for t in _fig.get("data", []) if t.get("name")]
     assert len(names) >= 2, f"{skill_id} stub has too few groups to test a pair"
-    _fig2, native = run_skill_with_table(skill_id, "unused", {"pairs": f"{names[0]}~{names[1]}"})
+    fig2, native = run_skill_with_table(skill_id, "unused", {"pairs": f"{names[0]}~{names[1]}"})
     assert native is not None and native.get("columns"), (
         f"{skill_id} drew stars from `pairs=` but attached no table — the p-values behind those "
         f"stars exist nowhere else in the figure"
+    )
+
+    synth = synthesize_table(skill_id, fig2)
+    assert synth is not None, f"{skill_id} synthesizer returned nothing for its own pairs= figure"
+    assert synth["columns"] != native["columns"], (
+        f"{skill_id}'s synthesized table has the same columns as its native one — appending it "
+        f"would print the same result twice, which is the noise this opt-in is gated to avoid"
+    )
+    assert synth.get("synthesized") is True, (
+        f"{skill_id}'s appended table must carry the synthesized flag: inline in a list it is the "
+        f"ONLY thing telling the reproduction reader to score it at reduced confidence"
     )
 
 

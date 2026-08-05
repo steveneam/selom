@@ -144,3 +144,52 @@ test("lollipop keeps BOTH tables when pairs= is set through the real control", a
   expect(pairRows.join(" ")).toContain("Control");
   expect(pairRows.join(" ")).toContain("AAV8-RK-PDE6B");
 });
+
+/**
+ * Slice 4 — `boxplot` carries its native pairwise table AND its L3 distribution summary.
+ *
+ * Different from slice 3 in the thing that matters: lollipop's two tables are both the runner's own,
+ * while here the second is SYNTHESIZED from the figure, so the panel must say so. That disclosure is
+ * the whole reason synthesis is allowed to feed a reproducibility score at all — a re-shaped value
+ * is honest only while it is labelled as one.
+ */
+test("boxplot shows its pairwise table AND the synthesized summary, labelled as synthesized", async ({ page }) => {
+  const { openWorkbench } = await import("./fixtures");
+  await openWorkbench(page, {
+    projectName: "Browser-verify · Boxplot both tables",
+    csvRelPath: "erg-fig1e/erg_metrics_long.csv",
+    skillName: "Box / strip plot",
+    awaitControl: ["Group column", "Compare groups"],
+  });
+
+  await page.getByLabel("Group column").selectOption("condition");
+  await page.getByLabel("Value column").selectOption("b_wave_uv");
+  await page.getByRole("button", { name: "Add comparison" }).click();
+  await page.getByLabel("Comparison 1, first group").selectOption("Control");
+  await page.getByLabel("Comparison 1, second group").selectOption("AAV8-RK-PDE6B");
+
+  await page.getByRole("button", { name: "Apply skill" }).click();
+  await expect(page.locator(".js-plotly-plot")).toBeVisible({ timeout: 180_000 });
+
+  await expandWorkrail(page);
+  await page.getByRole("button", { name: /Pairwise comparisons/i }).first().click();
+
+  const panels = page.getByTestId("stats-panel");
+  await expect(panels).toHaveCount(2, { timeout: 30_000 });
+  // Array order: the runner's own table leads, the synthesized one follows (D4/D5 — the caption
+  // reads the first, and a skill's own computation outranks a re-shape of its picture).
+  await expect(panels.nth(0).getByRole("button", { name: /Pairwise comparisons/i })).toBeVisible();
+  await expect(panels.nth(1).getByRole("button", { name: /Distribution summary/i })).toBeVisible();
+
+  // ⚑ The synthesized panel must DISCLOSE that it was re-shaped rather than computed. Without this
+  // the two tables read as equally authoritative, which is the one thing D3 refuses to allow.
+  await expect(panels.nth(1)).toContainText(/Computed by Selom/i);
+  await expect(panels.nth(0)).not.toContainText(/Computed by Selom/i);
+
+  // The summary carries the five-number shape the box literally draws — the thing a `pairs=` run
+  // used to lose entirely.
+  const summaryHeaders = await panels.nth(1).locator("thead th").allInnerTexts();
+  expect(summaryHeaders.map((h) => h.trim())).toEqual(
+    expect.arrayContaining(["group", "n", "min", "q1", "median", "q3", "max"]),
+  );
+});

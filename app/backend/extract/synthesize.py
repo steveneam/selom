@@ -444,3 +444,27 @@ _SYNTHESIZERS = {
     "scorecard": _scorecard,
     "violin": _violin,
 }
+
+# Skills whose L3 synthesis is APPENDED to a native table rather than only filling in for a missing
+# one (docs/stats-tables/spec.md D3, slice 4).
+#
+# Synthesis stays fill-when-absent for everyone else, deliberately: appending a "Computed by Selom"
+# table under every native table is noise at best, and at worst it prints a second, differently
+# derived set of numbers beside the skill's own with no statement of which is authoritative. So this
+# is an OPT-IN each entry has to earn, and a guard makes each one prove it.
+#
+# `boxplot` earns it: with `pairs=` the native table holds p-values that exist nowhere in the figure
+# except as stars — irrecoverable by synthesis — while the synthesized table holds what the figure
+# DOES encode, the five-number summary readable straight off the drawn box. Neither can produce the
+# other, and until the wire carried two tables asking for `pairs=` meant losing the summary of the
+# distribution the box is literally a picture of.
+#
+# ⚑ `violin` IS DELIBERATELY NOT HERE, against the spec's D3 prediction, and the reason is worth
+# keeping. Its synthesizer reads a PubMed marker call back out of a figure ANNOTATION — and that
+# annotation is a LIVE NETWORK LOOKUP at run time (NEXT#10(b), an open repro-integrity finding: the
+# lookup is not stamped with a query date and its failure is recorded nowhere). So the table is not
+# deterministically producible: it exists when the network answered and silently does not when it
+# did not. Appending it would put a claim in the runtime that no guard can check — and worse, would
+# make a network-dependent number MORE reachable by a reproducibility score before the provenance
+# stamping that NEXT#10(b) owes. `violin` joins once that lands.
+ALSO_SYNTHESIZE = {"boxplot"}

@@ -293,7 +293,7 @@ def _read_generic(metric: str, figure: dict | None, tables: list[dict],
         ):
             r = reader()
             if r is not None:
-                return r
+                return _tag_source(r, t)
     return _read_figure_number(metric, figure)
 
 
@@ -312,6 +312,19 @@ def _as_synthesized(r: Reading) -> Reading:
     })
 
 
+def _tag_source(r: Reading, table: dict) -> Reading:
+    """Provenance follows the TABLE the value came out of, not the code path that fetched it.
+
+    This used to be decided by position: only the reader's own L3 fallback branch re-tagged, so a
+    synthesized table was known to be synthesized because of *where* it was built. A skill may now
+    attach a native table AND its L3 summary in one list (`extract.synthesize.ALSO_SYNTHESIZE`), so
+    that no longer holds — the second table would have been read at full native confidence, quietly
+    OVERSTATING the provenance of a re-shaped value on a reproducibility score. Every synthesizer
+    stamps ``synthesized: True`` (``synthesize._tbl``), so the flag on the table is the honest
+    authority and this is the one place that reads it."""
+    return _as_synthesized(r) if table.get("synthesized") else r
+
+
 def read_metric(skill_id: str | None, metric: str, figure: dict | None,
                 table: dict | list | None, *, key: str | None = None) -> Reading | None:
     """Resolve one golden ``metric`` from a skill's output — L1 (skill-specific), L2 (generic),
@@ -328,7 +341,9 @@ def read_metric(skill_id: str | None, metric: str, figure: dict | None,
         for t in tables or [None]:
             r = l1(metric, figure, t)
             if r is not None:
-                return r
+                # A figure-reading L1 (pca/umap) took nothing from the table, so it keeps its own
+                # provenance; a table-reading one inherits the table's.
+                return _tag_source(r, t) if (t and r.source == SRC_TABLE) else r
     r = _read_generic(metric, figure, tables, key)
     if r is not None:
         return r
@@ -343,9 +358,12 @@ def read_metric(skill_id: str | None, metric: str, figure: dict | None,
     if not tables and skill_id:
         synth = synthesize_table(skill_id, figure)
         if synth is not None:
+            # No explicit re-tag here any more: `_read_generic` reads the table's own
+            # `synthesized` flag, so this branch and an inline synthesized table are labelled by
+            # the SAME rule. Tagging in both places would compound the confidence penalty twice.
             r = _read_generic(metric, figure, [synth], key)
             if r is not None:
-                return _as_synthesized(r)
+                return r
     return None
 
 
