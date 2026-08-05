@@ -69,6 +69,34 @@ export function ProvenanceBadge({ provenance }: { provenance: string }) {
   );
 }
 
+/**
+ * How Selom READ the numbers back — distinct from `ProvenanceBadge` above, which says which
+ * DEPOSIT the panel reproduces. Shown only when a value came off a table Selom reconstructed from
+ * the figure rather than one the skill emitted (DECISIONS #16); a native read carries no badge,
+ * because a marker on every panel is a marker nobody reads.
+ *
+ * Mobbin ruled out the obvious alternative: Fey's earnings table separates "Estimated EPS" from
+ * "Actual EPS" into two labelled COLUMNS, which is a stronger disclosure than any inline marker
+ * (https://mobbin.com/screens/57af7ece-6864-41ae-8b9e-94fa35074960). It cannot apply here for a
+ * structural reason — the ledger holds ONE computed value per metric, and the synthesized value IS
+ * the value; there is no native counterpart to put in a second column. So the distinction rides the
+ * value as a marker, in the badge vocabulary this surface already speaks.
+ *
+ * The badge is disclosure, not enforcement: the backend also CAPS `selom_confidence` at 75, because
+ * a badge alone is something a reader can miss while the headline number still says 100.
+ */
+export function ReadingProvenanceBadge({ readingProvenance }: { readingProvenance: string }) {
+  if (readingProvenance !== "synthesized") return null;
+  return (
+    <span
+      className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400"
+      title="Read from a table Selom reconstructed from the figure, not one the skill emitted — Selom confidence is capped at 75"
+    >
+      synthesized read
+    </span>
+  );
+}
+
 const VERDICT_COLOR: Record<string, string> = {
   exact: "#22c55e",
   close: "#f59e0b",

@@ -67,7 +67,15 @@ export interface PanelScore {
   tier: string;
   color: string;
   attribution: Attribution;
+  /** The DEPOSITED-SOURCE badge (e.g. "ST6+ Fig4e−") — which deposits backed this panel. */
   provenance: string;
+  /**
+   * How Selom READ the numbers back — a different question from `provenance` above, which is why
+   * it is a different field. `""` for a value read off a table the skill emitted; `"synthesized"`
+   * when any metric on the panel came from an L3-synthesized table, which also caps
+   * `selom_confidence` at 75 backend-side (DECISIONS #16).
+   */
+  reading_provenance: string;
   in_scope: boolean;
   weight: number;
   note: string;

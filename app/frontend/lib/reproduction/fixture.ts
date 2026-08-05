@@ -999,6 +999,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#f97316",
           "attribution": "paper",
           "provenance": "",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 2.0,
           "note": ""
@@ -1011,6 +1012,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#22c55e",
           "attribution": "selom",
           "provenance": "",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 1.0,
           "note": ""
@@ -1023,6 +1025,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#9ca3af",
           "attribution": "data",
           "provenance": "",
+          "reading_provenance": "",
           "in_scope": false,
           "weight": 1.0,
           "note": "out of scope (wet_lab) — excluded from the denominator"
@@ -1035,6 +1038,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#9ca3af",
           "attribution": "data",
           "provenance": "",
+          "reading_provenance": "",
           "in_scope": false,
           "weight": 1.0,
           "note": "out of scope (wet_lab) — excluded from the denominator"
@@ -1047,6 +1051,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#9ca3af",
           "attribution": "data",
           "provenance": "",
+          "reading_provenance": "",
           "in_scope": false,
           "weight": 1.0,
           "note": "out of scope (wet_lab) — excluded from the denominator"
@@ -1059,6 +1064,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#22c55e",
           "attribution": "selom",
           "provenance": "",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 1.0,
           "note": ""
@@ -1071,6 +1077,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#f97316",
           "attribution": "data",
           "provenance": "",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 1.0,
           "note": ""
@@ -1083,6 +1090,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#f97316",
           "attribution": "data",
           "provenance": "",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 1.0,
           "note": ""
@@ -1095,6 +1103,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#22c55e",
           "attribution": "selom",
           "provenance": "",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 1.0,
           "note": ""
@@ -1107,6 +1116,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#22c55e",
           "attribution": "selom",
           "provenance": "",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 1.0,
           "note": ""
@@ -1754,6 +1764,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#22c55e",
           "attribution": "selom",
           "provenance": "ST2+ Fig1c+",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 2.0,
           "note": ""
@@ -1766,6 +1777,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#15803d",
           "attribution": "selom",
           "provenance": "ST2+ Fig3+",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 0.5,
           "note": ""
@@ -1778,6 +1790,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#15803d",
           "attribution": "selom",
           "provenance": "ST6+ Fig4c+",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 1.0,
           "note": ""
@@ -1790,6 +1803,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#15803d",
           "attribution": "selom",
           "provenance": "ST6+ Fig4d+",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 0.5,
           "note": ""
@@ -1802,6 +1816,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#f59e0b",
           "attribution": "paper",
           "provenance": "ST6+ Fig4e−",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 2.0,
           "note": ""
@@ -1814,6 +1829,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#15803d",
           "attribution": "selom",
           "provenance": "ST5+ ST10+ Fig5D+",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 0.5,
           "note": ""
@@ -1826,6 +1842,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#22c55e",
           "attribution": "selom",
           "provenance": "ST8+ Fig6+",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 1.0,
           "note": ""
@@ -1838,6 +1855,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#9ca3af",
           "attribution": "data",
           "provenance": "GSE153674+ Fig8−",
+          "reading_provenance": "",
           "in_scope": false,
           "weight": 1.0,
           "note": "out of scope (data_not_deposited) — excluded from the denominator"
@@ -1850,6 +1868,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#9ca3af",
           "attribution": "data",
           "provenance": "GSE153674+ Fig8−",
+          "reading_provenance": "",
           "in_scope": false,
           "weight": 1.0,
           "note": "out of scope (data_not_deposited) — excluded from the denominator"
@@ -1862,6 +1881,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#9ca3af",
           "attribution": "data",
           "provenance": "GSE153674+ Fig8−",
+          "reading_provenance": "",
           "in_scope": false,
           "weight": 1.0,
           "note": "out of scope (data_not_deposited) — excluded from the denominator"
@@ -1874,6 +1894,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#9ca3af",
           "attribution": "data",
           "provenance": "GSE153674+ Fig8−",
+          "reading_provenance": "",
           "in_scope": false,
           "weight": 1.0,
           "note": "out of scope (data_not_deposited) — excluded from the denominator"
@@ -2259,6 +2280,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#22c55e",
           "attribution": "selom",
           "provenance": "GSE201356+ Fig1D+",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 1.0,
           "note": ""
@@ -2271,6 +2293,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#15803d",
           "attribution": "selom",
           "provenance": "Fig2A+",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 1.0,
           "note": ""
@@ -2283,6 +2306,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#15803d",
           "attribution": "selom",
           "provenance": "Fig2C+",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 0.5,
           "note": ""
@@ -2295,6 +2319,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#22c55e",
           "attribution": "selom",
           "provenance": "mmc2+ Fig3+",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 2.0,
           "note": ""
@@ -2307,6 +2332,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#9ca3af",
           "attribution": "data",
           "provenance": "Fig6D+",
+          "reading_provenance": "",
           "in_scope": false,
           "weight": 1.0,
           "note": "out of scope (wet_lab) — excluded from the denominator"
@@ -2319,6 +2345,7 @@ export const REPRO_LEDGERS: Record<string, Ledger> = {
           "color": "#15803d",
           "attribution": "selom",
           "provenance": "GSE201356+ Fig6E+",
+          "reading_provenance": "",
           "in_scope": true,
           "weight": 1.0,
           "note": ""

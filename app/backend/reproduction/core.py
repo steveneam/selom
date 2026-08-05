@@ -100,6 +100,15 @@ ATTR_ENGINE = "engine"  # ⚙ a measured engine substitution
 ATTR_PAPER = "paper"    # 📄 paper-side (irreproducible / a different replicate)
 ATTR_DATA = "data"      # 🗄 data-side (structural / upstream / not deposited)
 
+# How Selom READ a value back, when that is not from a table the skill emitted. Mirrors
+# `extract.readers.SRC_SYNTH` by VALUE (the wire string), declared here so `core` does not import
+# the reader layer for one token — the seam runs the other way (readers → drive → core).
+SRC_SYNTHESIZED = "synthesized"
+# A read off an L3-synthesized table caps the Selom-confidence axis. 75 = "we reconstructed a table
+# the skill never emitted and read the number from that" — well short of the 100 a native read
+# earns, and above the 60 of a value we genuinely doubt. A cap, never a floor.
+SYNTH_CONFIDENCE_CAP = 75
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -214,8 +223,19 @@ class Sweep(BaseModel):
 
 
 class MetricValue(BaseModel):
+    """One computed metric on a run — the value, and HOW it was read.
+
+    The provenance triple mirrors ``extract.readers.Reading``: which layer resolved it, whether it
+    came off a real table / the figure / a **synthesized** table, and the confidence the reader
+    gave itself. All three default to ``None`` so a caller that has no readings (``run_panel``,
+    replay from a persisted ledger) is unchanged — the drive path populates them (DECISIONS #16).
+    """
+
     metric: str
     value: float | int | str | None = None
+    layer: str | None = None          # L1 | L2 | L3
+    source: str | None = None         # table | figure | synthesized
+    read_confidence: float | None = None
 
 
 class PanelLift(BaseModel):
@@ -300,6 +320,11 @@ class ValidationResult(BaseModel):
     verdict: str
     blame: str | None = None
     note: str = ""
+    # How the computed value was READ (DECISIONS #16). `score_panel` iterates these results rather
+    # than the run's metric values, so a fact that must reach the score has to travel here.
+    # `None` = the caller supplied no readings, which scores exactly as it did before.
+    source: str | None = None         # table | figure | synthesized
+    read_confidence: float | None = None
 
 
 class Validation(BaseModel):
@@ -327,6 +352,11 @@ class PanelScore(BaseModel):
     color: str
     attribution: str = ATTR_SELOM
     provenance: str = ""                 # the +/− source badge (e.g. "ST6+ Fig4e−")
+    # ⚑ NOT `provenance` — that field is the DEPOSITED-SOURCE badge above and means something else
+    # entirely. This is how Selom READ the numbers back: "" for a native read, "synthesized" when
+    # any metric on the panel came from an L3-synthesized table. A panel takes the worst of its
+    # metrics everywhere else, so it takes this badge if ANY metric earned it (DECISIONS #16).
+    reading_provenance: str = ""
     in_scope: bool = True
     weight: float = 1.0
     note: str = ""
@@ -637,13 +667,21 @@ def validate_panel(
     run_id: str,
     oracles: dict[str, OracleResult] | None = None,
     guards_fired: list[str] | None = None,
+    readings: dict | None = None,
 ) -> Validation:
     """Compare computed vs every golden on the panel → verdicts + blame.
 
     ``computed`` maps metric → value. Per-metric oracles disambiguate blame. Structural
     limits and scope are read from the panel/golden (set upstream by the prepare guards).
+
+    ``readings`` maps metric → ``extract.readers.Reading``, carrying HOW each value was read.
+    Supplied by the drive path so ``score_panel`` — which iterates these results, not the run's
+    metric values — can see that a number came off a SYNTHESIZED table. Omitted (``run_panel``,
+    replay from a persisted ledger, every existing caller) leaves the results and their scores
+    byte-identical to before.
     """
     oracles = oracles or {}
+    readings = readings or {}
     substituted = bool(panel.method_subs)
     results: list[ValidationResult] = []
     for gold in panel.golden:
@@ -660,6 +698,7 @@ def validate_panel(
             oracle=oracle,
             substituted=substituted,
         )
+        read = readings.get(gold.metric)
         results.append(
             ValidationResult(
                 metric=gold.metric,
@@ -669,6 +708,8 @@ def validate_panel(
                 verdict=verdict,
                 blame=blame,
                 note=gold.note,
+                source=getattr(read, "source", None),
+                read_confidence=getattr(read, "confidence", None),
             )
         )
     return Validation(
@@ -751,13 +792,33 @@ def score_to_tier(score: int | None) -> tuple[str, str]:
     return DISCREPANT, TIER_COLORS[DISCREPANT]
 
 
-def _metric_score(verdict: str, blame: str | None, *, substituted: bool) -> tuple[int, int, str]:
+def _metric_score(verdict: str, blame: str | None, *, substituted: bool,
+                  synthesized: bool = False) -> tuple[int, int, str]:
     """One metric → ``(reproducibility, selom_confidence, attribution)``. The panel takes its
     worst-reproducibility metric (matching the panel-verdict "as good as its worst" rule).
 
     Blame drives the tier; the two axes split so the headline color is never accusatory:
     a paper-irreproducible or structural miss scores LOW on reproducibility but HIGH on
-    selom_confidence (Selom did its job — the gap is the paper's or the data's)."""
+    selom_confidence (Selom did its job — the gap is the paper's or the data's).
+
+    ``synthesized`` — the value was read off an L3-SYNTHESIZED table rather than one the skill
+    emitted. That caps the SELOM-CONFIDENCE axis, where ``substituted`` caps reproducibility, and
+    the split is the same one: *can the figure be regenerated* is the paper's property, *how well
+    Selom read the number back* is ours, and a reshaped table is entirely our business. Capping
+    rather than badging alone, because a badge is disclosure a reader can miss while the headline
+    number still reads 100 (DECISIONS #16).
+    """
+    repro, conf, attr = _verdict_score(verdict, blame, substituted=substituted)
+    # A CAP, never a floor: a read that already scores lower for a better reason (a Selom defect at
+    # 15) keeps its lower number rather than being lifted to the synthesis ceiling. Applied to
+    # every verdict, because a synthesized read is no more trustworthy landing CLOSE than EXACT.
+    if synthesized:
+        conf = min(conf, SYNTH_CONFIDENCE_CAP)
+    return repro, conf, attr
+
+
+def _verdict_score(verdict: str, blame: str | None, *, substituted: bool) -> tuple[int, int, str]:
+    """The blame/verdict table itself — unchanged; the provenance overlay is applied by the caller."""
     if blame == SELOM_ENGINE:
         return 15, 15, ATTR_SELOM        # Discrepant — a genuine Selom defect
     if blame == ENGINE_DELTA:
@@ -790,8 +851,12 @@ def score_panel(panel: Panel, validation: Validation, sweep: Sweep | None = None
                           provenance=panel.provenance, in_scope=False, weight=panel.weight,
                           note=f"out of scope ({panel.scope}) — excluded from the denominator")
     substituted = bool(panel.method_subs)
-    scored = [_metric_score(r.verdict, r.blame, substituted=substituted)
+    scored = [_metric_score(r.verdict, r.blame, substituted=substituted,
+                            synthesized=(r.source == SRC_SYNTHESIZED))
               for r in validation.results]
+    # The panel wears the badge if ANY of its metrics earned it — the same "as good as its worst"
+    # rule the two axes already follow.
+    synthesized_read = any(r.source == SRC_SYNTHESIZED for r in validation.results)
     if not scored:
         tier, color = score_to_tier(None)
         return PanelScore(panel_key=panel.key, tier=tier, color=color, weight=panel.weight,
@@ -805,7 +870,8 @@ def score_panel(panel: Panel, validation: Validation, sweep: Sweep | None = None
     tier, color = score_to_tier(repro)
     return PanelScore(panel_key=panel.key, reproducibility=repro, selom_confidence=confidence,
                       tier=tier, color=color, attribution=attribution,
-                      provenance=panel.provenance, weight=panel.weight)
+                      provenance=panel.provenance, weight=panel.weight,
+                      reading_provenance=SRC_SYNTHESIZED if synthesized_read else "")
 
 
 def score_paper(ledger: Ledger, panel_scores: list[PanelScore]) -> PaperScore:

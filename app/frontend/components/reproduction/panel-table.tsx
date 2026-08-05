@@ -6,7 +6,14 @@ import { ScanLine } from "lucide-react";
 
 import { digitizeHref, panelAssetUrl, tierLabel } from "@/lib/reproduction/api";
 import type { Ledger, Panel, PanelScore, Validation } from "@/lib/reproduction/types";
-import { AttributionChip, BlameChip, ProvenanceBadge, TierChip, VerdictChip } from "./atoms";
+import {
+  AttributionChip,
+  BlameChip,
+  ProvenanceBadge,
+  ReadingProvenanceBadge,
+  TierChip,
+  VerdictChip,
+} from "./atoms";
 
 /**
  * The golden-vs-computed evidence table — the non-color reading of the heatmap. Each scored
@@ -123,6 +130,9 @@ function PanelRow({
         {score && <TierChip tier={score.tier} color={score.color} />}
         {score && <AttributionChip attribution={score.attribution} />}
         {score?.provenance && <ProvenanceBadge provenance={score.provenance} />}
+        {score?.reading_provenance && (
+          <ReadingProvenanceBadge readingProvenance={score.reading_provenance} />
+        )}
         <div className="ml-auto flex items-center gap-2.5">
           {lift?.digitizable && panel && (
             <DigitizeLink slug={slug} panelKey={v.panel_key} lift={lift} form={panel.chart_form} />

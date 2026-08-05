@@ -35,7 +35,7 @@ from pydantic import BaseModel, Field
 import reproduction as R
 from engine.match import match_data, merge_ledger, tabular_paths
 from extract.ingest import PaperBundle, ingest_paper
-from extract.readers import panel_extractor, panel_readings
+from extract.readers import panel_extractor_readings, panel_readings
 
 # Back-compat: the JOIN/MATCH stage moved to ``engine.match`` (the spine boundary, P1 step 5).
 # These names stay importable from here so existing callers/tests are unaffected.
@@ -142,14 +142,19 @@ def drive_panel(ledger: R.Ledger, panel: R.Panel, *, tabular: list[str],
     # abort the WHOLE paper drive instead of degrading to the honest per-panel RUN_FAILED this
     # module is built around.
     try:
-        computed = panel_extractor(panel, figure, table)
+        # The RICH read: value + how it was read. One pass, because `read_metric` performs L3
+        # synthesis and calling it twice would re-synthesize every tableless panel (DECISIONS #16).
+        readings = panel_extractor_readings(panel, figure, table)
     except Exception as exc:  # noqa: BLE001 — an unreadable output is this panel's failure, not the drive's
         return PanelDrive(panel_key=panel.key, status=RUN_FAILED, skill_id=key,
                           data_ref=data_path, note=f"metric extraction raised: {exc}")
+    computed = {k: r.value for k, r in readings.items()}
 
     run = R.ReproRun(id=f"{panel.key}-{len(ledger.runs) + 1}", panel_key=panel.key, skill_id=key,
                      params=panel.params, dataset_ref=data_path, figure_spec=figure, table=table,
-                     computed=[R.MetricValue(metric=k, value=v) for k, v in computed.items()])
+                     computed=[R.MetricValue(metric=k, value=r.value, layer=r.layer,
+                                             source=r.source, read_confidence=r.confidence)
+                               for k, r in readings.items()])
     ledger.runs.append(run)
     panel.status = "run"
 
@@ -161,7 +166,7 @@ def drive_panel(ledger: R.Ledger, panel: R.Panel, *, tabular: list[str],
         unread = ", ".join(r.metric for r in readings if r.value is None)
         return PanelDrive(panel_key=panel.key, status=NEEDS_RECIPE, skill_id=key, data_ref=data_path,
                           note=f"ran, but no layer could read: {unread}")
-    validation = R.validate_panel(panel, computed, run_id=run.id)
+    validation = R.validate_panel(panel, computed, run_id=run.id, readings=readings)
     ledger.validations.append(validation)
     panel.status = "validated"
     return PanelDrive(panel_key=panel.key, status=DRIVEN, skill_id=key, data_ref=data_path,

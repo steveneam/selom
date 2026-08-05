@@ -367,18 +367,41 @@ def read_metric(skill_id: str | None, metric: str, figure: dict | None,
     return None
 
 
+def panel_extractor_readings(panel, figure: dict | None,
+                             table: dict | list | None) -> dict[str, Reading]:
+    """Every golden metric that resolved, as its full ``Reading`` — value **plus provenance**.
+
+    The rich half of ``panel_extractor``. It exists because the reader already knows how it got the
+    number — ``layer`` (L1/L2/**L3**), ``source`` (table/figure/**synthesized**) and its own
+    ``confidence`` — and the scorecard was the one consumer that never received any of it: a metric
+    the reader rated 0.45 off an L3-SYNTHESIZED table scored VERIFIED / 100 Selom-confidence,
+    indistinguishable from a value read off the engine's own table (DECISIONS #16).
+
+    The omit-never-``None`` rule lives HERE, and ``panel_extractor`` derives from it, so the two
+    cannot drift on the distinction between "read a value, validate it" and "no reading →
+    needs_recipe" — the latter must never become a Selom-confidence FAIL.
+    """
+    out: dict[str, Reading] = {}
+    for gold in getattr(panel, "golden", []) or []:
+        r = read_metric(getattr(panel, "skill_id", None), gold.metric, figure, table)
+        if r is not None and r.value is not None:
+            out[gold.metric] = r
+    return out
+
+
 def panel_extractor(panel, figure: dict | None, table: dict | list | None) -> dict:
     """A ``reproduction.run_panel``-compatible extractor: read every golden metric on ``panel``.
 
     Only metrics a layer could resolve are returned; an unreadable golden is **omitted** (not set
-    to ``None``) so the drive can tell "read a value, validate it" from "no reading → needs_recipe"
-    — the latter must never become a Selom-confidence FAIL."""
-    out: dict = {}
-    for gold in getattr(panel, "golden", []) or []:
-        r = read_metric(getattr(panel, "skill_id", None), gold.metric, figure, table)
-        if r is not None and r.value is not None:
-            out[gold.metric] = r.value
-    return out
+    to ``None``) — see ``panel_extractor_readings``, which owns that rule and this derives from.
+
+    Deliberately still ``{metric: value}``: ``validate_panel`` compares these against the goldens
+    with ``classify_metric``, so handing it ``Reading`` objects would break the comparison at every
+    call site. A caller that wants provenance asks for the readings instead of re-reading — a
+    second ``read_metric`` pass would re-run L3 SYNTHESIS for every tableless panel, paying the
+    whole cost twice to recover something the first pass already had.
+    """
+    return {k: r.value for k, r in panel_extractor_readings(panel, figure, table).items()}
 
 
 def panel_readings(panel, figure: dict | None, table: dict | list | None) -> list[Reading]:

@@ -30,8 +30,8 @@ function scorecard(over: Partial<Scorecard> = {}): Scorecard {
     findings: { reproduced: 6, paper_irreproducible: 1 },
     provenance_divergences: [],
     panel_scores: [
-      { panel_key: "1a", reproducibility: 80, selom_confidence: 90, tier: "reproduced", color: "#22c55e", attribution: "selom", provenance: "", in_scope: true, weight: 1, note: "" },
-      { panel_key: "1b", reproducibility: 60, selom_confidence: 85, tier: "recoverable", color: "#84cc16", attribution: "paper", provenance: "", in_scope: true, weight: 1, note: "" },
+      { panel_key: "1a", reproducibility: 80, selom_confidence: 90, tier: "reproduced", color: "#22c55e", attribution: "selom", provenance: "", reading_provenance: "", in_scope: true, weight: 1, note: "" },
+      { panel_key: "1b", reproducibility: 60, selom_confidence: 85, tier: "recoverable", color: "#84cc16", attribution: "paper", provenance: "", reading_provenance: "", in_scope: true, weight: 1, note: "" },
     ],
     score: paperScore(),
     generated_at: "2026-06-30",
