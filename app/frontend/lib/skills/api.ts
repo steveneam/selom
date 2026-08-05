@@ -125,8 +125,11 @@ export interface SkillRunResponse {
   methods?: SkillMethods;
   legend?: FigureLegend;
   guardrails?: SkillGuardrail[];
-  // Statistics result (Pillar 1, Decision D7) — null for purely-visual skills.
-  table?: StatsTable | null;
+  // Statistics result (Pillar 1, Decision D7) — null for purely-visual skills, and a LIST when the
+  // skill computes more than one (docs/stats-tables/spec.md D1: a ranked-values table AND the
+  // pairwise p-values behind the stars drawn on the figure). Narrow it with
+  // `lib/skills/stats-tables.ts` `asTables`, never inline.
+  table?: StatsTable | StatsTable[] | null;
   // The is-my-data-clean verdict + suggested next steps for this run (P1c/P3a). Absent when
   // an older backend / mock omits it.
   dataCheck?: DataCheck;

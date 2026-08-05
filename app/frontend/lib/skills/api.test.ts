@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  */
 
 import { DataCheckError, recommendParams, runSkill, runSkillByDataset, stageableRecommendations, type ParamRec } from "./api";
+import { asTables } from "./stats-tables";
 
 function jsonRes(status: number, body: unknown): Response {
   return {
@@ -75,7 +76,7 @@ describe("runSkill — is-my-data-clean guardrail", () => {
     const out = await runSkill("pca", new File(["x"], "counts.csv"));
     expect(out.legend?.text).toBe("Figure caption.");
     expect(out.dataCheck?.kind).toBe("sc_counts");
-    expect(out.table?.synthesized).toBe(true);
+    expect(asTables(out.table)[0]?.synthesized).toBe(true);
   });
 
   it("a non-block 422 still throws a plain error (not a DataCheckError)", async () => {

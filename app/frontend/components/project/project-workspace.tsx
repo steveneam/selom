@@ -26,7 +26,7 @@ import { projectStore, select, useProjects } from "@/lib/projects/store";
 import { useWorkspace, workspaceStore, wselect } from "@/lib/workspace/store";
 import type { Figure } from "@/lib/projects/types";
 import { figureStaleness } from "@/lib/lineage/staleness";
-import { figureTable } from "@/lib/lineage/figure-table";
+import { figureTables } from "@/lib/lineage/figure-table";
 import { versionFamily } from "@/lib/lineage/versions";
 import { familyColorMap } from "@/lib/lineage/family";
 import { subscribeIntent, takeIntent, type WorkspaceTab } from "@/lib/workspace/intent";
@@ -201,9 +201,15 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     rerunFigureWithParams,
   });
 
-  // The Statistics table for the focused figure (stats view) — its stored table or a
-  // fallback derived from its spec (D3).
-  const activeStatsTable = activeFigure ? figureTable(activeFigure) : undefined;
+  // The Statistics tables for the focused figure (stats view) — its stored table(s) or a single
+  // fallback derived from its spec (D3). A run may carry several (stats-tables spec D1).
+  const activeStatsTables = React.useMemo(
+    () => (activeFigure ? figureTables(activeFigure) : []),
+    [activeFigure],
+  );
+  // Gene labelling attaches to the FIRST table only (stats-tables spec §Gene labelling):
+  // `StatsLabeling.geneColumn` is a column index, so it is meaningful against exactly one table.
+  const activeStatsTable = activeStatsTables[0];
   // Versioning (S3): the frozen "paper" flag, the open figure's version family
   // (self + siblings + ancestors), and the figures resolved for the compare view.
   const frozen = !!activeFigure?.frozen;
@@ -225,7 +231,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         return {
           figure: f,
           staleness: figureStaleness(f, { sha256: ds?.currentSha256 }),
-          hasStats: !!figureTable(f),
+          hasStats: figureTables(f).length > 0,
         };
       }),
     [figures, datasets],
@@ -727,7 +733,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
               {view === "stats" && (
                 <StatsView
                   activeFigure={activeFigure}
-                  table={activeStatsTable}
+                  tables={activeStatsTables}
                   labeling={statsLabeling}
                   onOpenFigure={openFigure}
                   onRunSkill={() => setView("skill")}

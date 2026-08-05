@@ -27,6 +27,7 @@ import { datasetChipName, datasetDisplayName } from "@/lib/lineage/family";
 import { groupFamilies } from "@/lib/lineage/versions";
 import type { StalenessResult } from "@/lib/lineage/staleness";
 import type { Dataset, Figure } from "@/lib/projects/types";
+import { asTables } from "@/lib/skills/stats-tables";
 
 /**
  * The workrail (Pillar 1) — the sectioned left navigator that IS the raw-data → output
@@ -207,9 +208,9 @@ export function Workrail({
         key={n.figure.id}
         icon={Table2}
         color="var(--stage-publish)"
-        title={nested ? versionTitle(n.figure) : n.figure.table?.title ?? `${skillName(n.figure)} — statistics`}
+        title={nested ? versionTitle(n.figure) : statsRowTitle(n.figure)}
         family={nested ? undefined : familyOf(n.figure)}
-        sub={n.figure.table ? `${n.figure.table.rows.length} rows · ${n.figure.table.columns.length} cols` : "derived table"}
+        sub={statsRowSub(n.figure)}
         selected={view === "stats" && activeFigureId === n.figure.id}
         linked={lineage.figureId === n.figure.id}
         indent={nested}
@@ -413,6 +414,23 @@ function skillName(fig: Figure): string {
 /** The label for a figure as a version inside its family (its variant, else "Original"). */
 function versionTitle(fig: Figure): string {
   return fig.variantLabel ?? (fig.parentFigureId ? "Variant" : "Original");
+}
+
+/**
+ * The Statistics rail row's title + subtitle. A figure may carry several tables
+ * (docs/stats-tables/spec.md D1): the row names the first and counts the rest, so a second table
+ * is announced here rather than being invisible until the Statistics view is open.
+ */
+function statsRowTitle(fig: Figure): string {
+  return asTables(fig.table)[0]?.title ?? `${skillName(fig)} — statistics`;
+}
+
+function statsRowSub(fig: Figure): string {
+  const tables = asTables(fig.table);
+  const first = tables[0];
+  if (!first) return "derived table";
+  const shape = `${first.rows.length} rows · ${first.columns.length} cols`;
+  return tables.length > 1 ? `${shape} · +${tables.length - 1} more` : shape;
 }
 
 /** The collapsed rail — a thin spine of stage dots; click any to re-open. */

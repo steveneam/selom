@@ -223,3 +223,36 @@ def test_figure_isolation_across_tenants(env):
 
     verifier.user_id = "A"  # back to the owner — still intact
     assert client.get("/figures/f1").status_code == 200
+
+
+# ── the multi-table StatsTable contract (docs/stats-tables/spec.md G5) ─────────────────────────
+def test_g5_a_two_table_figure_round_trips_through_the_typed_model(env):
+    """G5, half one — `FigureIn.table_stats` was `dict | None`, and Pydantic REJECTS a list under
+    that, so a two-table figure would 422 at SAVE: the feature would be silently un-persistable
+    while every runner and every reader worked. The JSON column itself needed nothing.
+
+    Written before any runner emits two, which is the point — it is the test that catches the
+    persistence seam rather than discovering it from a failed save later."""
+    client, _ = env
+    pid = _project(client, pid="p_tables")
+    tables = [
+        {"columns": ["arm", "median"], "rows": [["WT", 12.0]], "title": "Ranked values"},
+        {"columns": ["pair", "p"], "rows": [["WT vs KO", 0.004]], "title": "Pairwise p-values"},
+    ]
+    created = _figure(client, pid, fid="f_two", table_stats=tables)
+    assert created["table_stats"] == tables
+
+    got = client.get("/figures/f_two")
+    assert got.status_code == 200, got.text
+    assert got.json()["table_stats"] == tables, "both tables must survive the round trip, in order"
+
+
+def test_g5_a_single_table_figure_still_stores_a_bare_object(env):
+    """G3 at the persistence seam: widening the type must not start wrapping. A stored single table
+    comes back as an object, exactly as every already-persisted row holds it."""
+    client, _ = env
+    pid = _project(client, pid="p_one")
+    one = {"columns": ["gene", "log2FC"], "rows": [["ACTB", 2.1]], "title": "Differential expression"}
+    _figure(client, pid, fid="f_one", table_stats=one)
+    stored = client.get("/figures/f_one").json()["table_stats"]
+    assert isinstance(stored, dict) and stored == one

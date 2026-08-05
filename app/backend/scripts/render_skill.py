@@ -80,6 +80,7 @@ def main(argv: list[str] | None = None) -> int:
     # see the module docstring.
     smoke.pin_process()
 
+    from skills._table import as_tables
     from skills.contract import run_skill_with_table
 
     import plotly.graph_objects as go
@@ -124,9 +125,11 @@ def main(argv: list[str] | None = None) -> int:
             if reason:
                 failures += 1
                 print(f"        check_figure: {reason}")
-            if table:
-                print(f"        table: {table.get('title', '(untitled)')} "
-                      f"[{len(table.get('rows', []))} rows]")
+            # One line per table — the standing "look at a plot" instrument must show a skill's
+            # SECOND table too, or the first two-table runner looks tableless here.
+            for t in as_tables(table):
+                print(f"        table: {t.get('title', '(untitled)')} "
+                      f"[{len(t.get('rows', []))} rows]")
         except SystemExit:
             raise
         except Exception as exc:  # a broken skill is the OUTPUT here, not a crash

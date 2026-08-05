@@ -137,7 +137,16 @@ def drive_panel(ledger: R.Ledger, panel: R.Panel, *, tabular: list[str],
         return PanelDrive(panel_key=panel.key, status=RUN_FAILED, skill_id=key,
                           data_ref=data_path, note=f"skill raised: {exc}")
 
-    computed = panel_extractor(panel, figure, table)
+    # The extraction is guarded too, and the note names the stage rather than blaming the skill:
+    # `drive_bundle` builds its panels in a bare list comprehension, so a reader raising here would
+    # abort the WHOLE paper drive instead of degrading to the honest per-panel RUN_FAILED this
+    # module is built around.
+    try:
+        computed = panel_extractor(panel, figure, table)
+    except Exception as exc:  # noqa: BLE001 — an unreadable output is this panel's failure, not the drive's
+        return PanelDrive(panel_key=panel.key, status=RUN_FAILED, skill_id=key,
+                          data_ref=data_path, note=f"metric extraction raised: {exc}")
+
     run = R.ReproRun(id=f"{panel.key}-{len(ledger.runs) + 1}", panel_key=panel.key, skill_id=key,
                      params=panel.params, dataset_ref=data_path, figure_spec=figure, table=table,
                      computed=[R.MetricValue(metric=k, value=v) for k, v in computed.items()])

@@ -14,6 +14,7 @@ from companions import methods
 from companions import provenance
 from config import settings
 from routers._errors import RunError, param_out_of_range, unknown_skill
+from skills._table import as_tables
 from skills.contract import (
     load_skill,
     run_bundle_with_table,
@@ -306,7 +307,10 @@ async def _execute_skill_run(
         # renders for purely-visual skills too. None when no synthesizer exists (-> L4 Pro-AI, S4) or
         # the skill already has a native table; never a fabricated table. Symmetric with the
         # reproduction reader, which attaches the same synthesis when a native table is absent.
-        if table is None:
+        # `not as_tables(table)`, not `table is None`: under the multi-table union (D1) an empty
+        # list means the same thing None did — no table — and the gate must read it that way or
+        # synthesis silently stops firing for the skills it exists to serve.
+        if not as_tables(table):
             from extract.synthesize import synthesize_table
 
             table = synthesize_table(skill_id, figure)

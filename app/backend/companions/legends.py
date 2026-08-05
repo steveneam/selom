@@ -23,10 +23,17 @@ from skills.contract import SkillSpec, resolved_params
 # --- result-derived facts (optional enrichment) -------------------------------
 
 
-def _facts(figure: dict | None, table: dict | None) -> dict:
+def _facts(figure: dict | None, table: dict | list | None) -> dict:
     """The few honest quantities a caption may cite, pulled from the run's result. Everything is
-    optional — a builder cites a fact only when present, so a params-only call still reads cleanly."""
+    optional — a builder cites a fact only when present, so a params-only call still reads cleanly.
+
+    With N tables the caption reads the **first** (docs/stats-tables/spec.md D5): a caption is one
+    sentence about one figure, and the runner's array order names the primary table. Named there
+    because silently citing table 1 of 3 is the kind of thing that looks like a bug later."""
+    from skills._table import as_tables
+
     facts: dict = {}
+    table = next(iter(as_tables(table)), None)
     if isinstance(table, dict):
         rows = table.get("rows")
         if isinstance(rows, list):
@@ -317,7 +324,7 @@ def _generic(spec: SkillSpec, p: dict) -> str:
 
 
 def build_caption(spec: SkillSpec, params: dict, *, figure: dict | None = None,
-                  table: dict | None = None) -> str:
+                  table: dict | list | None = None) -> str:
     """The paste-ready figure caption for one run (no leading "Figure N." — the caller numbers it).
 
     Honest from the resolved params alone; enriched with the run's real quantities (DE split, etc.)
@@ -330,6 +337,6 @@ def build_caption(spec: SkillSpec, params: dict, *, figure: dict | None = None,
 
 
 def build(spec: SkillSpec, params: dict, *, figure: dict | None = None,
-          table: dict | None = None) -> dict:
+          table: dict | list | None = None) -> dict:
     """Figure legend for one run, as the run response carries it (mirrors ``methods.build``)."""
     return {"text": build_caption(spec, params, figure=figure, table=table)}

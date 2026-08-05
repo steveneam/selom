@@ -110,7 +110,10 @@ class FigureBody(BaseModel):
     methods: dict | None = None
     legend: dict | None = None
     guardrails: list | None = None
-    table_stats: dict | None = None
+    # StatsTable | list[StatsTable] | None (docs/stats-tables/spec.md D6). Pydantic REJECTS a list
+    # under a bare `dict | None`, so without the union a two-table figure 422s at save and the
+    # feature is silently un-persistable. The column itself is JSON and needs no DB migration.
+    table_stats: dict | list | None = None
     data_check: dict | None = None
     data_fit: dict | None = None
     parent_figure_id: str | None = None

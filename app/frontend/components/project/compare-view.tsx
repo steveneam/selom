@@ -8,7 +8,7 @@ import { cn } from "@/lib/ui/cn";
 import { getSkill } from "@/lib/catalog/seed";
 import { changedParams, diffParams, diffTables, type DeltaStatus } from "@/lib/lineage/diff";
 import { datasetChipName } from "@/lib/lineage/family";
-import { figureTable } from "@/lib/lineage/figure-table";
+import { figureTables } from "@/lib/lineage/figure-table";
 import type { Dataset, Figure } from "@/lib/projects/types";
 
 /** Diff-state colours (DESIGN.md palette): added = emerald, removed = rose, changed = amber. */
@@ -58,7 +58,10 @@ export function CompareView({
   const dataset = a.datasetId ? datasets.find((d) => d.id === a.datasetId) : undefined;
 
   const paramDeltas = changedParams(diffParams(a.provenance?.params, b.provenance?.params));
-  const tableDiff = diffTables(figureTable(a), figureTable(b));
+  // `diffTables` is a single-table row-alignment algorithm, so the CALLER pairs by index
+  // (stats-tables spec D1). Slice 1 keeps compare on the primary pair — a figure with a second
+  // table diffs its first exactly as before.
+  const tableDiff = diffTables(figureTables(a)[0], figureTables(b)[0]);
   const changedRows = tableDiff?.rows.filter((r) => r.status !== "same") ?? [];
 
   return (

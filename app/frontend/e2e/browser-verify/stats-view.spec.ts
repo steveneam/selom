@@ -1,0 +1,85 @@
+import { expect, test } from "@playwright/test";
+
+import { runFromWorkbench } from "./fixtures";
+
+/**
+ * The Statistics surface, driven end-to-end — the seam the multi-table contract changes.
+ *
+ * WHY THIS EXISTS. Before this check, **no browser check opened the Statistics view at all**: the
+ * suite drove the editor, the params and the export menu, and left the one surface that renders a
+ * skill's computed numbers unproven. `docs/stats-tables/spec.md` slice 1 rewires exactly that path
+ * — `figureTables` returns an array, the work rail's Statistics row reads it, and `StatsView` takes
+ * a list — so the claim "slice 1 is a no-op" is not checkable without it. It is also the instrument
+ * slices 2 (the stacked N-table presentation) and 3 (`lollipop` attaching both tables) each need,
+ * so it is built once here rather than twice later [[compound-capability-each-task]].
+ *
+ * Every assertion is on the RENDERED surface, not on the response: a stored `table` that never
+ * reaches a panel is the same class of defect as a param that never reaches the engine
+ * [[selom-shipped-not-reachable]].
+ */
+
+/** A skill whose real-corpus run computes a table with a title the rail and the heading both show. */
+const VOLCANO = {
+  projectName: "Browser-verify · Statistics view",
+  // volcano's own real-corpus smoke case (skills/smoke.py JEV_PROTEOME_DE) — gene / logFC /
+  // P.Value / adj.P.Val, so the emitted de_table's columns are the engine's, not a fixture's.
+  csvRelPath: "jev/proteome_de.csv",
+  skillName: "Volcano plot",
+  // openWorkbench's default wait is the categorical vocabulary, which volcano does not carry.
+  awaitControl: ["Fold-change cutoff (log₂)", "Significance cutoff (adjusted p)"],
+} as const;
+
+/**
+ * After Apply the editor opens on the figure, and at this viewport the work rail auto-collapses to
+ * its icon spine (`useAutoCollapse`, editor-room R4) — so the Statistics ROW does not exist until
+ * the rail is expanded. That is product behaviour, not harness friction, so the check drives it.
+ */
+async function expandWorkrail(page: import("@playwright/test").Page) {
+  const expand = page.getByRole("button", { name: "Expand rail" });
+  if (await expand.isVisible().catch(() => false)) await expand.click();
+  await expect(page.getByRole("navigation", { name: "Project lineage" })).toBeVisible({
+    timeout: 30_000,
+  });
+}
+
+test("a computed table reaches the Statistics view, titled, with its rows", async ({ page }) => {
+  await runFromWorkbench(page, { ...VOLCANO });
+  await expandWorkrail(page);
+
+  // 1. The work rail announces the table BEFORE it is opened — title + shape. This is the site the
+  //    spec's own consumer inventory missed, and the one where a bare list throws on `.rows`.
+  const statsRow = page.getByRole("button", { name: /Differential expression/i }).first();
+  await expect(statsRow, "the work rail must list the computed table").toBeVisible({ timeout: 60_000 });
+  const railSub = await statsRow.innerText();
+  expect(railSub, "the rail row states the table's shape").toMatch(/\d+ rows · \d+ cols/);
+
+  // 2. Opening it renders the panel — the table's own title in the heading (D2's single-table
+  //    invariant), and real rows under real column headers.
+  await statsRow.click();
+  const heading = page.getByRole("heading", { name: /Differential expression/i });
+  await expect(heading, "one table keeps its title in the heading").toBeVisible({ timeout: 30_000 });
+
+  const grid = page.locator("table").first();
+  await expect(grid).toBeVisible();
+  const headers = await grid.locator("thead th").allInnerTexts();
+  expect(headers.map((h) => h.trim().toLowerCase())).toEqual(
+    expect.arrayContaining(["gene", "log2fc", "padj"]),
+  );
+  const bodyRows = await grid.locator("tbody tr").count();
+  expect(bodyRows, "the panel renders the computed rows, not an empty shell").toBeGreaterThan(0);
+});
+
+test("exactly one panel renders for a one-table run — the slice-1 no-op claim", async ({ page }) => {
+  // G3 in the browser. Slice 1 widens the wire, the store and every consumer to a list while no
+  // runner emits one, so the whole product must look identical. Counting PANELS is what makes that
+  // checkable: an off-by-one in the array plumbing (a stray `[null]`, a fallback appended rather
+  // than substituted) shows up here as a second, empty panel and nowhere else.
+  await runFromWorkbench(page, { ...VOLCANO, projectName: "Browser-verify · Statistics single panel" });
+  await expandWorkrail(page);
+
+  await page.getByRole("button", { name: /Differential expression/i }).first().click();
+  await expect(page.getByRole("heading", { name: /Differential expression/i })).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.locator("table"), "one table in, one panel out").toHaveCount(1);
+});

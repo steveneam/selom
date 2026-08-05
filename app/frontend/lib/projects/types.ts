@@ -195,7 +195,9 @@ export interface Figure {
   methods?: SkillMethods;
   legend?: FigureLegend;       // paste-ready figure caption (P4c — the Methods+legend layer)
   guardrails?: SkillGuardrail[];
-  table?: StatsTable;          // the Statistics result (wired in S2)
+  // The Statistics result (wired in S2) — one table, or several (stats-tables spec D1/D6).
+  // A server field: reconcile stays authoritative for it; this widens its type, not its ownership.
+  table?: StatsTable | StatsTable[];
   dataCheck?: DataCheck;       // the is-my-data-clean verdict + routing for this run (P1c/P3a)
   dataFit?: DataFit;           // the data-fit verdict + confidence band for this run (Slice 2)
   // lineage / versioning

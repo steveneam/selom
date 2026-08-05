@@ -18,17 +18,21 @@ import type { Figure } from "@/lib/projects/types";
  */
 export function StatsView({
   activeFigure,
-  table,
+  tables,
   labeling,
   onOpenFigure,
   onRunSkill,
 }: {
   activeFigure: Figure | undefined;
-  table: React.ComponentProps<typeof StatsPanel>["table"] | undefined;
+  // A run may carry several tables (docs/stats-tables/spec.md D1). This slice moves the seam only —
+  // the stacked presentation (D2) is slice 2; today every skill emits at most one, so rendering the
+  // first is the same pixels.
+  tables: React.ComponentProps<typeof StatsPanel>["table"][];
   labeling: StatsLabeling | undefined;
   onOpenFigure: (f: Figure) => void;
   onRunSkill: () => void;
 }) {
+  const table = tables[0];
   // Grade advisory (Layer A Phase 3): the Statistics stage is advisory-only (spine invariant #4).
   // Ground the explain on the figure's actual method — its skill + the deg `mode` param — so the
   // advice names the real test the runner used (DETECTED == EXPLAINED). Deterministic-primary: the

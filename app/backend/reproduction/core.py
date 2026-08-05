@@ -280,7 +280,11 @@ class ReproRun(BaseModel):
     dataset_ref: str = ""
     computed: list[MetricValue] = Field(default_factory=list)
     figure_spec: dict | None = None
-    table: dict | None = None
+    # StatsTable | list[StatsTable] | None (docs/stats-tables/spec.md D6). The second of the two
+    # typed models that reject a list, and this one lands on the LEDGER: drive.py builds every
+    # ReproRun with the runner's table, so a two-table skill would fail validation mid-drive
+    # rather than at an API boundary.
+    table: dict | list | None = None
     provenance: dict | None = None
     methods_text: dict | None = None
     ssim: float | None = None
@@ -857,21 +861,24 @@ def table_extractor(metric_map: dict[str, dict]):
     panel's golden metrics from however the skill happened to lay out its table.
     """
 
-    def extract(panel: Panel, figure: dict | None, table: dict | None) -> dict:
+    def extract(panel: Panel, figure: dict | None, table: dict | list | None) -> dict:
+        from skills._table import as_tables
+
         out: dict = {}
-        if not table:
-            return out
-        cols = table.get("columns", [])
-        rows = table.get("rows", [])
-        for metric, spec in metric_map.items():
-            try:
-                ki, vi = cols.index(spec["key_col"]), cols.index(spec["value_col"])
-            except (ValueError, KeyError):
-                continue
-            for row in rows:
-                if ki < len(row) and row[ki] == spec.get("key"):
-                    out[metric] = row[vi] if vi < len(row) else None
-                    break
+        for t in as_tables(table):
+            cols = t.get("columns", [])
+            rows = t.get("rows", [])
+            for metric, spec in metric_map.items():
+                if metric in out:
+                    continue  # first table in array order wins (spec D4)
+                try:
+                    ki, vi = cols.index(spec["key_col"]), cols.index(spec["value_col"])
+                except (ValueError, KeyError):
+                    continue
+                for row in rows:
+                    if ki < len(row) and row[ki] == spec.get("key"):
+                        out[metric] = row[vi] if vi < len(row) else None
+                        break
         return out
 
     return extract

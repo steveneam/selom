@@ -30,6 +30,7 @@ import re
 from pydantic import BaseModel
 
 from extract.synthesize import synthesize_table
+from skills._table import as_tables
 
 # Reading layers + sources (provenance for the honest classification).
 L1 = "L1"  # skill-specific
@@ -277,17 +278,23 @@ def _read_figure_number(metric: str, figure: dict | None) -> Reading | None:
     return None
 
 
-def _read_generic(metric: str, figure: dict | None, table: dict | None,
+def _read_generic(metric: str, figure: dict | None, tables: list[dict],
                   key: str | None) -> Reading | None:
-    for reader in (
-        lambda: _read_count(metric, table),
-        lambda: _read_named_cell(metric, table, key),
-        lambda: _read_figure_number(metric, figure),
-    ):
-        r = reader()
-        if r is not None:
-            return r
-    return None
+    """The generic read over N tables: try each table **in array order** and take the first that
+    yields the metric (spec D4 — order is the runner's, and no `role` field is needed to pick).
+
+    The figure reader stays the last resort rather than joining the per-table loop: it is the
+    weakest layer (confidence 0.4), so a table read on the *second* table must still beat it. With
+    one table this is byte-identical to the single-table order it replaces."""
+    for t in tables:
+        for reader in (
+            lambda: _read_count(metric, t),
+            lambda: _read_named_cell(metric, t, key),
+        ):
+            r = reader()
+            if r is not None:
+                return r
+    return _read_figure_number(metric, figure)
 
 
 # --- public API ---------------------------------------------------------------
@@ -305,34 +312,44 @@ def _as_synthesized(r: Reading) -> Reading:
     })
 
 
-def read_metric(skill_id: str | None, metric: str, figure: dict | None, table: dict | None,
-                *, key: str | None = None) -> Reading | None:
+def read_metric(skill_id: str | None, metric: str, figure: dict | None,
+                table: dict | list | None, *, key: str | None = None) -> Reading | None:
     """Resolve one golden ``metric`` from a skill's output — L1 (skill-specific), L2 (generic),
     then L3 (synthesize a table from the figure when the skill emits none).
 
-    ``key`` is an optional named entity (a gene/term/cell-type the golden refers to) for table
-    cell lookup. Returns ``None`` when no layer can read it (→ the drive marks ``needs_recipe``)."""
+    ``table`` is the wire union (``StatsTable | list[StatsTable] | None``); it is narrowed here,
+    once, via ``as_tables``. ``key`` is an optional named entity (a gene/term/cell-type the golden
+    refers to) for table cell lookup. Returns ``None`` when no layer can read it (→ the drive marks
+    ``needs_recipe``)."""
+    tables = as_tables(table)
     l1 = _SKILL_READERS.get(skill_id or "")
     if l1 is not None:
-        r = l1(metric, figure, table)
-        if r is not None:
-            return r
-    r = _read_generic(metric, figure, table, key)
+        # `or [None]` so a tableless skill still reaches the figure-reading L1s (pca, umap).
+        for t in tables or [None]:
+            r = l1(metric, figure, t)
+            if r is not None:
+                return r
+    r = _read_generic(metric, figure, tables, key)
     if r is not None:
         return r
     # L3 — no native table yielded the metric: synthesize a canonical table from the figure
     # (read-not-recompute) and re-read it, re-tagged as synthesized. Only when the skill emits no
     # native table (S5: never overrides a real one); a skill with a synthesizer otherwise -> None.
-    if table is None and skill_id:
+    #
+    # ⚑ This gate reads `not tables`, NOT `table is None`. Under the normalizer the latter is
+    # permanently False for a caller that passes a list, which would silently kill synthesis for
+    # every tableless skill and land it on NEEDS_RECIPE — a plumbing regression wearing the costume
+    # of an honest verdict. `[]` must behave exactly as `None` did; guarded by G2b.
+    if not tables and skill_id:
         synth = synthesize_table(skill_id, figure)
         if synth is not None:
-            r = _read_generic(metric, figure, synth, key)
+            r = _read_generic(metric, figure, [synth], key)
             if r is not None:
                 return _as_synthesized(r)
     return None
 
 
-def panel_extractor(panel, figure: dict | None, table: dict | None) -> dict:
+def panel_extractor(panel, figure: dict | None, table: dict | list | None) -> dict:
     """A ``reproduction.run_panel``-compatible extractor: read every golden metric on ``panel``.
 
     Only metrics a layer could resolve are returned; an unreadable golden is **omitted** (not set
@@ -346,7 +363,7 @@ def panel_extractor(panel, figure: dict | None, table: dict | None) -> dict:
     return out
 
 
-def panel_readings(panel, figure: dict | None, table: dict | None) -> list[Reading]:
+def panel_readings(panel, figure: dict | None, table: dict | list | None) -> list[Reading]:
     """Every golden's resolution attempt (found or not) — the drive's honest per-metric record."""
     readings: list[Reading] = []
     for gold in getattr(panel, "golden", []) or []:

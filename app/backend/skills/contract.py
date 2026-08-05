@@ -71,7 +71,7 @@ def load_skill(skill_id: str) -> SkillSpec:
     return SkillSpec(**json.loads(p.read_text(encoding="utf-8")))
 
 
-def _execute(skill_id: str, data_path: str, params: dict) -> tuple[dict, dict | None]:
+def _execute(skill_id: str, data_path: str, params: dict) -> tuple[dict, dict | list | None]:
     from skills import _result_cache, theme  # central publication theme — one look across every skill
 
     spec = load_skill(skill_id)
@@ -107,9 +107,14 @@ def run_skill(skill_id: str, data_path: str, params: dict) -> dict:
     return figure
 
 
-def run_skill_with_table(skill_id: str, data_path: str, params: dict) -> tuple[dict, dict | None]:
-    """Run a skill → (themed figure, StatsTable | None). The Statistics node reads the
-    table; the figure stays a pure {data, layout} spec (Decision D7)."""
+def run_skill_with_table(skill_id: str, data_path: str, params: dict) -> tuple[dict, dict | list | None]:
+    """Run a skill → (themed figure, StatsTable | list[StatsTable] | None). The Statistics node
+    reads the table(s); the figure stays a pure {data, layout} spec (Decision D7).
+
+    The union is the runner's choice and the contract only carries it — a skill that computes two
+    results (ranked values AND the pairwise p-values behind its drawn stars) attaches a list rather
+    than discarding one (docs/stats-tables/spec.md D1). Narrow it with ``skills._table.as_tables``,
+    never inline."""
     return _execute(skill_id, data_path, params)
 
 
@@ -120,7 +125,7 @@ def run_bundle(skill_id: str, bundle, params: dict) -> dict:
     return figure
 
 
-def run_bundle_with_table(skill_id: str, bundle, params: dict) -> tuple[dict, dict | None]:
+def run_bundle_with_table(skill_id: str, bundle, params: dict) -> tuple[dict, dict | list | None]:
     """The engine-spine ANALYZE entry (E4): run a skill from an ingested ``DataBundle``.
 
     Both products flow through ``engine.ingest`` to one classified, QC'd ``DataBundle`` and then

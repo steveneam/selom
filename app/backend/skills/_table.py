@@ -5,9 +5,30 @@ A skill that computes a tabular result attaches it to its returned figure dict a
 out — so the Plotly spec the editor renders stays a pure ``{data, layout}`` — and the
 API ships it alongside the figure. Decision D7: additive; purely-visual skills attach
 nothing (the FE omits the node, D3).
+
+A runner may attach **one table or a list of them** (``docs/stats-tables/spec.md`` D1) — a
+skill whose figure needs both a ranked-values table and the pairwise p-values behind its drawn
+stars calls :func:`table` twice and attaches the list. :func:`as_tables` is the **one** place
+that union is narrowed on this side; every consumer calls it and then handles a list.
 """
 
 from __future__ import annotations
+
+
+def as_tables(value) -> list[dict]:
+    """Narrow the ``StatsTable | list[StatsTable] | None`` wire union to a plain list.
+
+    ``None`` → ``[]``, one table → ``[table]``, a list → itself. **This is the only definition of
+    that narrowing in the backend** (spec D1, guarded by ``test_stats_tables_contract.py``): a
+    union invites ``isinstance(..., list)`` to sprout at every call site, and the answer is one
+    normalizer rather than a convention. ``[]`` must therefore behave everywhere exactly as
+    ``None`` did — see ``extract.readers.read_metric``'s L3 gate, where it decides a score.
+    """
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    return [value]
 
 
 def _cell(v):

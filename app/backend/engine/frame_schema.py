@@ -158,18 +158,32 @@ def validate_result_table(table: Any, *, skill_id: str = "") -> list[FrameViolat
     a non-empty ``columns`` list and rectangular ``rows`` (each row as wide as ``columns``). Returns
     the defects (``[]`` for ``None`` — a purely-visual skill attaches no table, which is valid).
 
+    A runner may attach a **list** of tables (docs/stats-tables/spec.md D1/D3), in which case
+    **every element** is validated: a ragged table in position 2 must fail exactly as loudly as one
+    in position 1, or the second table becomes the unguarded one.
+
     A named schema for the output seam, guarded by a test over the native-table skills — the ratchet
     that keeps a runner from shipping a ragged table the FE Statistics node would choke on.
     """
-    if table is None:
-        return []
+    from skills._table import as_tables
+
+    tables = as_tables(table)
+    # The position prefix only appears when there is more than one, so every existing message —
+    # and the tests pinning them — is unchanged for the single-table case.
+    return [v for i, t in enumerate(tables)
+            for v in _validate_one_table(t, skill_id=skill_id,
+                                         at=f"table {i + 1}: " if len(tables) > 1 else "")]
+
+
+def _validate_one_table(table: Any, *, skill_id: str = "", at: str = "") -> list[FrameViolation]:
+    """One ``StatsTable``'s defects. ``at`` prefixes its position when the skill emitted several."""
     if not isinstance(table, dict):
         return [FrameViolation(stage=STAGE_RESULT, code="not_a_table",
-                               message=f"{skill_id or 'skill'} returned a non-dict table.")]
+                               message=f"{at}{skill_id or 'skill'} returned a non-dict table.")]
     cols = table.get("columns")
     if not isinstance(cols, list) or not cols:
         return [FrameViolation(stage=STAGE_RESULT, code="no_columns",
-                               message=f"{skill_id or 'skill'} table has no columns.")]
+                               message=f"{at}{skill_id or 'skill'} table has no columns.")]
     width = len(cols)
     violations: list[FrameViolation] = []
     for i, row in enumerate(table.get("rows", []) or []):
@@ -177,7 +191,7 @@ def validate_result_table(table: Any, *, skill_id: str = "") -> list[FrameViolat
             got = len(row) if isinstance(row, (list, tuple)) else "non-list"
             violations.append(FrameViolation(
                 stage=STAGE_RESULT, code="ragged_row",
-                message=f"row {i} has {got} cells, expected {width} (one per column)."))
+                message=f"{at}row {i} has {got} cells, expected {width} (one per column)."))
     return violations
 
 

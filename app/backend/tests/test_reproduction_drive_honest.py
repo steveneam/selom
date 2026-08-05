@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import reproduction as R
 from extract.ingest import SUPP_CSV, IngestedPaper, IngestedSupplement, PaperBundle
-from reproduction.drive import DRIVEN, drive_bundle, drive_panel
+from reproduction.drive import DRIVEN, RUN_FAILED, drive_bundle, drive_panel
 
 
 # A paper that PRINTS DE counts (180/61/119, Figure 4) the deposited data won't reproduce.
@@ -113,3 +113,52 @@ def test_needs_recipe_never_validates_a_missing_metric():
     led.scorecard = R.build_scorecard(led)
     _no_selom_bugs(led.scorecard)
     assert led.scorecard.score.n_scored == 0
+
+
+# --- the multi-table union on the LEDGER (docs/stats-tables/spec.md G5 + D6) -------------------
+
+
+def _two_table_runner(skill_id, data_path, params):
+    """A runner that emits BOTH tables — the shape slice 3 gives `lollipop`. The DE table is second
+    on purpose: the reader must reach it, and the ledger must persist both."""
+    ranked = {"columns": ["arm", "median"], "rows": [["WT", 12.0], ["KO", 4.0]],
+              "title": "Ranked values"}
+    return {"data": [], "layout": {}}, [ranked, _de_table(61, 119)]
+
+
+def test_g5_a_two_table_run_survives_the_ledger_and_reads_correctly():
+    """G5, half two — `ReproRun.table` was `dict | None`, and this one lands on the LEDGER rather
+    than at an API boundary: `drive.py` builds every run with the runner's table, so a two-table
+    skill would fail Pydantic validation MID-DRIVE. The reader must also find the DE counts in the
+    SECOND table, or the second table is decorative."""
+    res = drive_bundle(_bundle(with_data=True), paper_id="hard", runner=_two_table_runner)
+    driven = [d for d in res.panel_drives if d.status == DRIVEN]
+    assert driven, "the two-table run must drive, not fail validation"
+
+    run = next(r for r in res.ledger.runs if r.skill_id == "volcano")
+    assert isinstance(run.table, list) and len(run.table) == 2, "both tables persist on the ledger"
+    assert run.table[0]["title"] == "Ranked values", "array order is the runner's order (D4)"
+
+    computed = {m.metric: m.value for m in run.computed}
+    assert computed.get("de_up") == 61 and computed.get("de_down") == 119, \
+        "the metric reader must reach the SECOND table — first-that-yields, in array order"
+    _no_selom_bugs(res.ledger.scorecard)
+
+
+def _exploding_runner(skill_id, data_path, params):
+    """A run whose OUTPUT breaks the metric reader — a malformed table the schema would reject."""
+    return {"data": [], "layout": {}}, {"columns": None, "rows": "not-rows"}
+
+
+def test_a_metric_extraction_failure_degrades_this_panel_not_the_whole_drive():
+    """`drive_bundle` builds its panels in a bare list comprehension, so an extractor raising
+    OUTSIDE the try aborted an entire paper drive. It degrades to this module's honest per-panel
+    RUN_FAILED instead — and the note names the stage rather than blaming the skill, which ran
+    fine."""
+    res = drive_bundle(_bundle(with_data=True), paper_id="hard", runner=_exploding_runner)
+    assert res.panel_drives, "the drive completes rather than raising"
+    failed = [d for d in res.panel_drives if d.status == RUN_FAILED]
+    assert failed, "the unreadable panel is recorded as RUN_FAILED"
+    assert any("extraction" in (d.note or "") for d in failed), \
+        "the note must name the extraction stage, not claim the skill raised"
+    _no_selom_bugs(res.ledger.scorecard)

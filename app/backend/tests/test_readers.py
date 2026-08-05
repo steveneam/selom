@@ -217,3 +217,78 @@ def test_panel_readings_record_every_attempt():
     readings = {r.metric: r for r in panel_readings(panel, None, table)}
     assert readings["de_up"].value == 1
     assert readings["mystery_metric"].value is None and readings["mystery_metric"].confidence == 0.0
+
+
+# --- the multi-table union (docs/stats-tables/spec.md D1/D4) -------------------
+
+
+def test_g2b_the_l3_synthesis_gate_survives_the_union():
+    """G2b — the single most dangerous line in this change.
+
+    ``read_metric`` gates L3 synthesis on "the skill emitted no native table". Under the normalizer
+    the old ``table is None`` test is permanently False for any caller passing a list, which would
+    silently convert every tableless skill to NEEDS_RECIPE — a plumbing regression wearing the
+    costume of an honest verdict. ``[]`` must therefore behave EXACTLY as ``None`` did."""
+    fig = {"data": [
+        {"type": "scatter", "name": "0", "x": [1, 2, 3], "y": [1, 2, 3]},
+        {"type": "scatter", "name": "1", "x": [4, 5], "y": [4, 5]},
+        {"type": "scatter", "name": "2", "x": [6], "y": [6]},
+    ]}
+    from_none = read_metric("umap_scrna", "n_clusters", fig, None)
+    from_empty = read_metric("umap_scrna", "n_clusters", fig, [])
+    assert from_none is not None and from_none.layer == L3 and from_none.value == 3
+    assert from_empty is not None, "[] must synthesize exactly as None did — else the score drops silently"
+    assert from_empty.model_dump() == from_none.model_dump()
+
+
+def test_l3_never_overrides_a_native_table_in_a_list():
+    """S5 through the union: a present table — bare OR in a list — still blocks synthesis."""
+    table = {"columns": ["pathway", "-log10 padj"], "rows": [["P1", 5.0], ["P2", 4.0]]}
+    bare = read_metric("enrichment", "n_terms", None, table)
+    listed = read_metric("enrichment", "n_terms", None, [table])
+    assert bare.layer == L2 and bare.source == SRC_TABLE
+    assert listed.model_dump() == bare.model_dump()
+
+
+def test_a_one_element_list_reads_identically_to_a_bare_table():
+    """G3 at the reader: wrapping the only table in a list changes no reading, on any layer."""
+    table = _de_table([["A", 2.0, 0.01, "up"], ["B", -1.0, 0.02, "down"]])
+    for metric in ("de_up", "de_down", "de_total"):
+        bare = read_metric("volcano", metric, None, table)
+        listed = read_metric("volcano", metric, None, [table])
+        assert listed.model_dump() == bare.model_dump(), metric
+
+
+def test_n_tables_are_tried_in_array_order_and_first_hit_wins():
+    """D4 — no `role` field: order is array order, and a metric is read off the first table that
+    yields it. A second table is genuinely reachable; a first table that answers still wins."""
+    ranked = {"columns": ["arm", "median"], "rows": [["WT", 12.0], ["KO", 4.0]], "title": "Ranked values"}
+    pairwise = {"columns": ["pair", "p"], "rows": [["WT vs KO", 0.004]], "title": "Pairwise p-values"}
+
+    # `n_total` is a row count: table 1 has 2 rows, table 2 has 1 — first in order wins.
+    assert read_metric("lollipop", "n_total", None, [ranked, pairwise]).value == 2
+    assert read_metric("lollipop", "n_total", None, [pairwise, ranked]).value == 1
+    # A named cell only table 2 carries IS reachable — that is the point of the second table.
+    hit = read_metric("lollipop", "wtvsko", None, [ranked, pairwise], key="WT vs KO")
+    assert hit is not None and hit.value == 0.004
+
+
+def test_the_figure_reader_stays_the_last_resort_across_n_tables():
+    """The figure layer is the weakest (confidence 0.4), so a TABLE read on the second table must
+    still beat it — it cannot join the per-table loop or table 2 becomes unreachable for any metric
+    a figure string happens to answer."""
+    fig = {"layout": {"xaxis": {"title": {"text": "PC1 (39.7%)"}}}}
+    empty = {"columns": ["k", "v"], "rows": [], "title": "nothing"}
+    real = {"columns": ["term", "score_pct"], "rows": [["shared_var", 12.5]], "title": "Variance"}
+    r = read_metric("someskill", "shared_var", fig, [empty, real], key="shared_var")
+    assert r is not None and r.source == SRC_TABLE and r.value == 12.5
+
+
+def test_panel_extractor_and_readings_accept_the_union():
+    """Both public entry points take the union — they delegate to `read_metric`, and that delegation
+    is the reason neither needs its own narrowing."""
+    panel = _panel("volcano", ["de_up", "de_down"])
+    table = _de_table([["A", 2.0, 0.01, "up"], ["B", -1.0, 0.02, "down"]])
+    assert panel_extractor(panel, None, [table]) == panel_extractor(panel, None, table)
+    listed = {r.metric: r.value for r in panel_readings(panel, None, [table])}
+    assert listed == {"de_up": 1, "de_down": 1}

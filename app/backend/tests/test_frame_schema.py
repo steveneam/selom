@@ -114,6 +114,39 @@ def test_validate_result_table_accepts_rectangular_rejects_ragged():
     assert [v.code for v in validate_result_table("not a dict")] == ["not_a_table"]
 
 
+def test_validate_result_table_validates_every_element_of_a_list():
+    """G1 (docs/stats-tables/spec.md §6) — a runner may attach a LIST of tables, and a ragged table
+    in position 2 must fail exactly as loudly as one in position 1. Without this the second table is
+    the unguarded one, which is the whole failure mode a result-seam schema exists to stop."""
+    good = {"columns": ["gene", "log2FC"], "rows": [["ACTB", 2.1]]}
+    ragged = {"columns": ["a", "b"], "rows": [["only-one"]]}
+    assert validate_result_table([]) == []
+    assert validate_result_table([good, good]) == []
+
+    second_bad = validate_result_table([good, ragged], skill_id="lollipop")
+    assert [v.code for v in second_bad] == ["ragged_row"]
+    assert second_bad[0].stage == STAGE_RESULT
+    # ...and it says WHICH table, or a two-table failure reads as a one-table failure.
+    assert "table 2" in second_bad[0].message
+
+    # The same defect first or second — same code, only the position differs.
+    first_bad = validate_result_table([ragged, good], skill_id="lollipop")
+    assert [v.code for v in first_bad] == ["ragged_row"]
+    assert "table 1" in first_bad[0].message
+    # A non-dict element is caught too, not silently skipped.
+    assert [v.code for v in validate_result_table([good, "not a dict"])] == ["not_a_table"]
+
+
+def test_single_table_messages_carry_no_position_prefix():
+    """G3's half of the result seam: one table is byte-identical to before — no `table 1:` prefix
+    leaking into a message a user or a test reads."""
+    bare = validate_result_table({"columns": ["a", "b"], "rows": [["only-one"]]})
+    assert bare[0].message == "row 0 has 1 cells, expected 2 (one per column)."
+    # A one-element LIST reads the same — the prefix is a disambiguator, not decoration.
+    one_element = validate_result_table([{"columns": ["a", "b"], "rows": [["only-one"]]}])
+    assert one_element[0].message == bare[0].message
+
+
 def test_frame_validation_message_is_actionable():
     """The 400 message names the skill and folds in every defect's actionable reason."""
     df = _GOOD_DE.assign(log2FoldChange=[None, None, None])
