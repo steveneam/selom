@@ -253,3 +253,54 @@ def test_ridge_leaves_fill_and_line_colour_to_the_theme():
     for trace in ridges:
         assert "fillcolor" not in trace
         assert "color" not in trace.get("line", {})
+
+
+# ------------------------------------------- the theme as an encoding destroyer (2026-08-06)
+def _paga_like_spec():
+    """A trajectory-shaped spec: a pseudotime-coloured cell cloud plus a node trace whose marker
+    SIZE encodes cell count and whose colour is one constant ink."""
+    return {
+        "data": [
+            {"type": "scattergl", "mode": "markers", "name": "cells",
+             "x": [0.0, 1.0, 2.0], "y": [0.0, 1.0, 2.0],
+             "marker": {"color": [0.0, 0.5, 1.0], "colorscale": "Viridis", "showscale": True,
+                        "colorbar": {"title": {"text": "pseudotime"}}, "size": 4}},
+            {"type": "scatter", "mode": "markers+text", "name": "clusters",
+             "x": [0.0, 2.0], "y": [0.0, 2.0], "text": ["0", "1"],
+             "marker": {"size": [28.0, 12.0], "color": "#0f172a"}},
+        ],
+        "layout": {"title": {"text": "Trajectory & pseudotime (PAGA + DPT)"}},
+    }
+
+
+def test_embedding_theme_preserves_a_marker_size_that_ENCODES_something():
+    """A per-point size is data, not decoration.
+
+    ``trajectory``'s PAGA nodes are sized by cell count — its subtitle, its caption and its methods
+    paragraph all say so — and the embedding theme's blanket ``size = 5`` flattened every node to
+    one dot, so all three described an encoding the canvas did not carry. Found by RENDERING the
+    skill; every spec-level assertion was green. Sibling of the enrichment dot-size defect above,
+    one layer later: there the skill mis-encoded, here the theme un-encoded.
+    """
+    from skills import theme
+
+    themed = theme.apply(_paga_like_spec(), "trajectory")
+    nodes = next(t for t in themed["data"] if t["name"] == "clusters")
+    assert nodes["marker"]["size"] == [28.0, 12.0]
+    # the cell cloud carries no encoding in its size, so the theme still normalizes it
+    cells = next(t for t in themed["data"] if t["name"] == "cells")
+    assert cells["marker"]["size"] == 5
+
+
+def test_embedding_theme_gives_a_colourbar_only_to_a_trace_that_maps_colour():
+    """A colourbar is a legend for a colour MAPPING. The node trace is one constant ink colour, and
+    stamping the cells' pseudotime bar onto it drew a second, meaningless colourbar whose ticks
+    interleaved with the real one and whose title landed on top of the legend."""
+    from skills import theme
+
+    themed = theme.apply(_paga_like_spec(), "trajectory")
+    nodes = next(t for t in themed["data"] if t["name"] == "clusters")
+    assert "colorbar" not in nodes["marker"] and "colorscale" not in nodes["marker"]
+
+    cells = next(t for t in themed["data"] if t["name"] == "cells")
+    assert cells["marker"]["colorbar"]["title"]["text"] == "pseudotime"

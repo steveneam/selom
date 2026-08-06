@@ -178,9 +178,20 @@ def _style_embedding(st, spec, pseudotime=False):
         elif tr.get("type") in ("scatter", "scattergl"):
             mk = tr.get("marker")
             if isinstance(mk, dict) and "color" in mk:
-                mk["size"] = 5
+                # A per-point SIZE is an encoding, not a style: `trajectory`'s PAGA nodes are sized
+                # by cell count, which its subtitle, its caption and its methods paragraph all state
+                # — and a blanket `size = 5` flattened every node to one dot, so all three described
+                # an encoding the canvas did not carry. Same rule the legend block above already
+                # follows for `enrichment`: a figure whose marker IS the key wins.
+                if not isinstance(mk.get("size"), list):
+                    mk["size"] = 5
                 mk["opacity"] = 0.9
-                if mk.get("colorbar") is not None or pseudotime:
+                # A colourbar needs a colour MAPPING. The node trace is one constant ink colour, so
+                # stamping the cells' pseudotime bar onto it drew a second, meaningless colourbar
+                # whose ticks interleaved with the real one and whose title landed on top of the
+                # legend.
+                if isinstance(mk.get("color"), list) and (mk.get("colorbar") is not None
+                                                          or pseudotime):
                     mk["colorscale"] = mk.get("colorscale", st.sequential)
                     mk["colorbar"] = dict(
                         title=dict(text="pseudotime", font=dict(size=11, color=st.ink_strong)),
