@@ -269,18 +269,28 @@ def bar_figure(cat_values, *, y_title="value", title="", colors=None, labels=Non
                                    correction=correction)
         shapes += s
         extra_annos += a
+    # A reference line must be INSIDE the window, always. Both ranges below are fitted to the DATA,
+    # so a line placed outside it was drawn into the layout and then clipped away — no line, no
+    # error, no note. The common case is the one that broke: a WT/normal threshold ABOVE the tallest
+    # bar, which is the usual reason to draw one at all. Never fit the window so it crops the
+    # reference the reader is measuring against.
+    y_bot, x_lo, x_hi = 0.0, -0.6, len(cat_values) - 0.4
     if hline is not None:
-        s, a = ref_line(rnd(hline), hline_label, axis="y")
+        hline_y = rnd(hline)      # the SAME rescale the bars got — compare in display units
+        s, a = ref_line(hline_y, hline_label, axis="y")
         shapes.append(s)
         extra_annos += a
+        y_top, y_bot = max(y_top, hline_y), min(y_bot, hline_y)
     if vline is not None:
-        s, a = ref_line(vline, vline_label, axis="x")
+        vline_x = float(vline)
+        s, a = ref_line(vline_x, vline_label, axis="x")
         shapes.append(s)
         extra_annos += a
+        x_lo, x_hi = min(x_lo, vline_x - 0.1), max(x_hi, vline_x + 0.1)
 
     yaxis = {"title": {"text": y_title}, "zeroline": True, "rangemode": "tozero"}
     if y_top > 0 and (comparisons or hline is not None):  # grow the axis so brackets/line aren't clipped
-        yaxis["range"] = [0, round(y_top * 1.08, 4)]
+        yaxis["range"] = [y_bot, round(y_top * 1.08, 4)]
         yaxis.pop("rangemode", None)
     annotations = []
     if caption:
@@ -290,7 +300,7 @@ def bar_figure(cat_values, *, y_title="value", title="", colors=None, labels=Non
     layout = {
         "title": {"text": title},
         "xaxis": {"tickmode": "array", "tickvals": positions, "ticktext": ticktext,
-                  "type": "linear", "range": [-0.6, len(cat_values) - 0.4], "tickangle": -20},
+                  "type": "linear", "range": [x_lo, x_hi], "tickangle": -20},
         "yaxis": yaxis,
         "bargap": 0.35, "showlegend": bool(legend), "plot_bgcolor": "white",
         "annotations": [*annotations, *extra_annos],

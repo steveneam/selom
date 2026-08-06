@@ -200,6 +200,10 @@ PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
     # alphas, scale-bar lengths, legend toggles, display units the prose never quotes.
     ("methods", "erg_bwave_bar"): {
         "bar_fill": _P, "hline": _P, "hline_label": _P, "legend": _P,
+        # The vertical twin of `hline`, declared 2026-08-06 when the runner-vs-skill.json guard
+        # found the runner reading it undeclared. Same verdict as its horizontal half: a dashed
+        # divider between condition blocks asserts nothing about how the bars were measured.
+        "vline": _P, "vline_label": _P,
         # The paragraph quotes no unit; the axis title and the Statistics table carry it.
         "display_unit": _P,
     },

@@ -22,8 +22,10 @@
     "comparisons": { "type": "str", "default": "" },
     "sig_test": { "type": "str", "default": "welch", "options": ["welch", "student", "mannwhitney"] },
     "correction": { "type": "str", "default": "none", "options": ["none", "bonferroni", "bh"] },
-    "hline": { "type": "str", "default": "" },
-    "hline_label": { "type": "str", "default": "" },
+    "hline": { "type": "str", "default": "", "note": "Dashed horizontal reference line at this amplitude, in the displayed unit. Blank = none." },
+    "hline_label": { "type": "str", "default": "", "note": "Optional caption for the horizontal reference line." },
+    "vline": { "type": "str", "default": "", "note": "Dashed VERTICAL divider at this bar position — the bars sit at 0, 1, 2, … left to right, so 1.5 falls between the 2nd and 3rd. Separates condition blocks; blank = none." },
+    "vline_label": { "type": "str", "default": "", "note": "Optional caption for the vertical divider." },
     "display_unit": { "type": "str", "default": "uV", "options": ["auto", "nV", "uV", "mV", "V"] },
     "manual_marks": { "type": "str", "default": "" },
     "ab_detector": { "type": "str", "default": "windowed", "options": ["windowed", "robust"] }

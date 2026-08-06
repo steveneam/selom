@@ -146,6 +146,35 @@ def test_bar_figure_significance_and_refline():
     assert ov_stars == ["ns"]
 
 
+def test_bar_figure_never_clips_the_reference_line_it_was_asked_to_draw():
+    """Named defect, 2026-08-06 — found by RENDERING `erg_bwave_bar`, not by any assertion.
+
+    Both axis ranges are fitted to the DATA (`y_top * 1.08`; the bar positions). A reference line
+    placed outside that window was still written into `layout.shapes`, so every spec-level check
+    passed — and the figure came back with no line, no error and no note. The broken case is the
+    COMMON one: a WT/normal threshold ABOVE the tallest bar, which is the usual reason to draw one.
+    """
+    cat_values = [("a", [1.0, 1.2]), ("b", [2.0, 2.2])]   # data tops out just above 2
+
+    above, _ = _charts.bar_figure(cat_values, hline=9.0, hline_label="WT")
+    lo, hi = above["layout"]["yaxis"]["range"]
+    assert lo <= 9.0 <= hi, f"a reference line at 9.0 sits outside the y-range {[lo, hi]}"
+
+    below, _ = _charts.bar_figure(cat_values, hline=-3.0)
+    lo, hi = below["layout"]["yaxis"]["range"]
+    assert lo <= -3.0 <= hi, f"a reference line at -3.0 sits outside the y-range {[lo, hi]}"
+
+    # The vertical twin, on the bar-position axis (bars sit at 0, 1, … so 5 is off the end).
+    side, _ = _charts.bar_figure(cat_values, vline=5.0, vline_label="split")
+    lo, hi = side["layout"]["xaxis"]["range"]
+    assert lo <= 5.0 <= hi, f"a divider at 5.0 sits outside the x-range {[lo, hi]}"
+
+    # And the default window is untouched: no reference line, no growth.
+    plain, _ = _charts.bar_figure(cat_values)
+    assert plain["layout"]["xaxis"]["range"] == [-0.6, 1.6]
+    assert plain["layout"]["yaxis"].get("range") is None       # rangemode=tozero still governs
+
+
 def test_bar_figure_toggle_error_and_points():
     cat_values = [("a", [1.0, 2.0]), ("b", [3.0, 4.0])]
     full, _ = _charts.bar_figure(cat_values)

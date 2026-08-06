@@ -287,6 +287,8 @@ export const SKILL_PARAM_SPECS: Record<string, BackendParamSpec> = {
     correction: { type: "str", default: "none", options: ["none", "bonferroni", "bh"] },
     hline: { type: "str", default: "" },
     hline_label: { type: "str", default: "" },
+    vline: { type: "str", default: "" },
+    vline_label: { type: "str", default: "" },
     display_unit: { type: "str", default: "uV", options: ["auto", "nV", "uV", "mV", "V"] },
   },
   erg_intensity_response: {

@@ -40,9 +40,12 @@ def _table_frame(data_path: str):
 def _confusion(frame, params: dict, source: str) -> dict:
     import pandas as pd
 
-    true_col = _column(frame, params.get("true") or params.get("y"), "true")
-    pred_col = _column(frame, params.get("predicted") or params.get("x"), "predicted",
-                       avoid=true_col)
+    # `true`/`predicted` are the ONLY names for these two columns. An undeclared `y`/`x` alias sat
+    # here until 2026-08-06 — no caller passed it, no control offered it and no paragraph described
+    # it, but a value arriving under it would have chosen the axis columns and been written into the
+    # reproducibility bundle as config no param_spec could interpret (test_skill_param_declaration_guard).
+    true_col = _column(frame, params.get("true"), "true")
+    pred_col = _column(frame, params.get("predicted"), "predicted", avoid=true_col)
 
     sub = pd.DataFrame({
         "t": frame[true_col].astype(str),

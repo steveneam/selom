@@ -1162,6 +1162,12 @@ const PRESENTATION: Record<string, ParamPresentation[]> = {
     },
     { key: "hline", label: "Reference line (µV)", type: "text", help: "Draw a dashed horizontal line at this amplitude (leave blank for none) — e.g. a threshold or a group reference." },
     { key: "hline_label", label: "Reference line label", type: "text", help: "Optional caption for the reference line." },
+    // The vertical twin. Its unit is the BAR POSITION, not an amplitude — the bars sit at 0, 1, 2…
+    // left to right — so the label says "divider" and the help names the coordinate. Shipped
+    // undeclared from the day the reference line landed (0e1921e wired both axes and declared
+    // neither; a later pass declared the horizontal half only).
+    { key: "vline", label: "Divider line (bar position)", type: "text", help: "Draw a dashed vertical line between bars, to separate condition blocks. Bars are numbered 0, 1, 2… left to right, so 1.5 falls between the 2nd and 3rd. Blank for none." },
+    { key: "vline_label", label: "Divider line label", type: "text", help: "Optional caption for the divider line." },
     {
       key: "display_unit", label: "Display unit", type: "select",
       options: [
