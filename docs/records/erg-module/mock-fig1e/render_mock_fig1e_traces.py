@@ -35,6 +35,11 @@ Style: Okabe-Ito palette, NO grey (the original put AAV8-RK-PDE6B and the polyA-
 same grey, hiding the partial-rescue arm), thick lines, rows packed tight, labels aligned to
 each trace's baseline, shared scale bar in its own matched-scale axes below the grid.
 
+Writes THREE figures from one pass over the same panels (2026-08-06): the canonical seven-flash
+grid, an expanded-scale variant that lets the WT Control clip so the two rescue arms separate,
+and a single-flash (+1.9 log) variant that keeps the grid's scale but gives each trace ~3.5x the
+panel height. Each figure gets its own waveform + a-wave tables.
+
 Usage:  render_mock_fig1e_traces.py [--outdir DIR] [--dpi N] [--real-src PATH]
 Needs matplotlib + numpy + the repo's skills package, e.g.:
     PYTHONPATH=../../../../app/backend ../../../../app/backend/.venv/bin/python \\
@@ -102,6 +107,35 @@ SCALEBAR_MS = 100
 #: Its HEIGHT must stay equal to a panel's (see render) so 200 µV is drawn at exactly the panel
 #: scale — only its position is tunable, which is what this is.
 SCALEBAR_DROP = 0.70
+
+#: The zoom variant expands the y-window until the tallest arm in this list fills the panel,
+#: rather than by a hand-picked factor. Conditions NOT listed may run off-scale and are clipped.
+#:
+#: ⚑ A fixed factor was tried first (2.6x) and was wrong in the way that matters: it clipped the
+#: 3'UTR arm too, and the 3'UTR arm is the REFERENCE the comparison is made against. Cropping the
+#: thing you are measuring against turns "PDE6B is smaller" into "both hit the ceiling". Deriving
+#: the window from the data cannot make that mistake -- only the WT Control, which is explicitly
+#: excluded, is allowed off the top.
+ZOOM_FIT_EXCLUDE = ("Control",)
+#: How far BELOW the baseline the zoomed window reaches, as a fraction of its height above.
+#:
+#: The two sides are treated differently on purpose. The quantity being compared is the b-wave,
+#: a POSITIVE deflection, so the top of the window is fitted to the tallest surviving sample and
+#: nothing being read ever clips. The bottom is a display choice: the deep negative excursions on
+#: the brightest flashes are a-wave and oscillatory potentials, not the amplitude in question, so
+#: they are allowed off the bottom to buy magnification. 0.45 is about the a:b ratio a healthy
+#: trace shows, so the window still looks like an ERG rather than a cropped bar.
+ZOOM_TROUGH_FRAC = 0.45
+#: The one flash the single-row variant draws: the working intensity for this figure, and the
+#: brightest one at which every arm is still on-scale in the b-wave table.
+FOCUS_LOG_I = 1.9
+#: Taller canvas for the single-row variant -- the whole point is vertical room per trace.
+SINGLE_ROW_FIG_SIZE = (13.5, 4.4)
+#: Vertical room reserved above the grid for the column headers, in INCHES. Two of them wrap to
+#: two lines, and on a short canvas the 0.935 top margin cropped the first line clean off -- so
+#: the header block is reserved in absolute units and the top margin derived from the canvas
+#: height, not the other way round.
+HEADER_SPACE_IN = 0.62
 
 T_MAX_MS = 260.0        # trim the long quiet tail; the response is over well before this
 NOISE_TAIL_MS = 220.0   # samples past this are treated as recording noise
@@ -287,27 +321,80 @@ def load_targets(summary_csv: Path) -> dict:
     return out
 
 
-def render(panels, out_path: Path, dpi: int) -> None:
-    lo = min(y.min() for _t, y in panels.values())
-    hi = max(y.max() for _t, y in panels.values())
-    pad = 0.06 * (hi - lo)
-    ylim = (lo - pad, hi + pad)
+#: Round scale-bar values, largest first. Only consulted when the view is ZOOMED — the default
+#: figure keeps SCALEBAR_UV exactly, so the canonical artifact never moves under this code.
+NICE_SCALEBAR_UV = (500, 200, 100, 50, 25, 20, 10, 5)
+
+
+def _nice_scalebar(span: float) -> int:
+    """Largest round µV value that still fits comfortably inside a zoomed panel."""
+    for v in NICE_SCALEBAR_UV:
+        if v <= 0.45 * span:
+            return v
+    return NICE_SCALEBAR_UV[-1]
+
+
+def render(panels, out_path: Path, dpi: int, rows: list[float] | None = None,
+           fit_exclude: tuple[str, ...] = (), figsize: tuple[float, float] | None = None,
+           caption: str | None = None) -> float:
+    """Draw the trace grid. Returns the magnification applied to the y-window.
+
+    ``rows`` selects which flash intensities to draw (default: all seven). ``fit_exclude`` names
+    conditions allowed to run OFF-SCALE: the y-window is then fitted to the arms that remain, so
+    small responses are magnified and the excluded ones are clipped at the panel edge.
+
+    ⚑ The y-window is ALWAYS derived from every panel handed in, never from the subset of ROWS
+    drawn, so a single-intensity render sits on the SAME scale as the full grid and the two
+    figures stay comparable. Cropping rows must not silently rescale the trace it leaves behind.
+    """
+    rows = list(INTENSITIES_LOG) if rows is None else list(rows)
+
+    def _window(items):
+        lo = min(y.min() for _t, y in items)
+        hi = max(y.max() for _t, y in items)
+        pad = 0.06 * (hi - lo)
+        return lo - pad, hi + pad
+
+    full = _window(list(panels.values()))
+    if fit_exclude:
+        kept = [v for (cond, _x), v in panels.items() if cond not in fit_exclude]
+        hi = max(y.max() for _t, y in kept) * 1.06
+        ylim = (-ZOOM_TROUGH_FRAC * hi, hi)
+    else:
+        ylim = full
+    zoom = (full[1] - full[0]) / (ylim[1] - ylim[0])
     t_ref = next(iter(panels.values()))[0]
     xlim = (float(t_ref.min()), float(t_ref.max()))
     baseline_frac = (0.0 - ylim[0]) / (ylim[1] - ylim[0])
+    # A fitted window puts the excluded arms outside the axes. Left unclipped (the default, which
+    # keeps the packed full grid from looking boxed-in) they would draw across their neighbours.
+    clip = bool(fit_exclude)
+    scalebar_uv = SCALEBAR_UV if not fit_exclude else _nice_scalebar(ylim[1] - ylim[0])
 
-    nrows, ncols = len(INTENSITIES_LOG), len(CONDITION_ORDER)
-    fig, axes = plt.subplots(nrows, ncols, figsize=FIG_SIZE, dpi=dpi,
-                             sharex=True, sharey=True)
-    fig.subplots_adjust(left=0.035, right=0.87, top=0.935, bottom=0.20,
+    nrows, ncols = len(rows), len(CONDITION_ORDER)
+    size = figsize or FIG_SIZE
+    # Every one of these three constants was tuned for a SEVEN-row grid and breaks at one row,
+    # so each is re-derived from the row count / canvas height. All three reduce to their old
+    # values at nrows=7 with the default canvas, which is why the canonical figure is untouched.
+    #   top    — a short canvas cropped the two-line column headers; reserve them in inches.
+    #   drop   — the scale bar hangs SCALEBAR_DROP of a PANEL height below the grid, and panels
+    #            grow as rows are dropped; at 0.70 of a tall panel it fell off the canvas.
+    #   bottom — the margin that still clears the scale bar, never tighter than the old 0.20.
+    top = 0.935 if figsize is None else 1.0 - HEADER_SPACE_IN / size[1]
+    drop = SCALEBAR_DROP * nrows / len(INTENSITIES_LOG)
+    below = 0.10
+    bottom = max(0.20, (top * drop / nrows + below) / (1 + drop / nrows))
+    fig, axes = plt.subplots(nrows, ncols, figsize=size, dpi=dpi,
+                             sharex=True, sharey=True, squeeze=False)
+    fig.subplots_adjust(left=0.035, right=0.87, top=top, bottom=bottom,
                         hspace=ROW_GAP, wspace=COL_GAP)
 
-    for ri, x_log in enumerate(INTENSITIES_LOG):
+    for ri, x_log in enumerate(rows):
         for ci, cond in enumerate(CONDITION_ORDER):
             ax = axes[ri][ci]
             t, y = panels[(cond, x_log)]
             ax.plot(t, y, color=COLORS[cond], linewidth=LINE_WIDTH,
-                    solid_capstyle="round", clip_on=False)
+                    solid_capstyle="round", clip_on=clip)
             ax.set_ylim(*ylim)
             ax.set_xlim(*xlim)
             ax.axis("off")
@@ -326,18 +413,18 @@ def render(panels, out_path: Path, dpi: int) -> None:
     # Shared scale bar in its own axes below the grid, given the same width, height and
     # limits as a grid panel so 200 µV and 100 ms are drawn at exactly the panel scale.
     pos = axes[nrows - 1][0].get_position()
-    sb = fig.add_axes([pos.x0, pos.y0 - pos.height * SCALEBAR_DROP - 0.005,
+    sb = fig.add_axes([pos.x0, pos.y0 - pos.height * drop - 0.005,
                        pos.width, pos.height])
     sb.set_xlim(*xlim)
     sb.set_ylim(*ylim)
     sb.axis("off")
     x0 = xlim[0] + 0.04 * (xlim[1] - xlim[0])
     y0 = ylim[0] + 0.05 * (ylim[1] - ylim[0])
-    sb.plot([x0, x0], [y0, y0 + SCALEBAR_UV], color="#000000", lw=2.6,
+    sb.plot([x0, x0], [y0, y0 + scalebar_uv], color="#000000", lw=2.6,
             solid_capstyle="butt", clip_on=False)
     sb.plot([x0, x0 + SCALEBAR_MS], [y0, y0], color="#000000", lw=2.6,
             solid_capstyle="butt", clip_on=False)
-    sb.text(x0 - 0.035 * (xlim[1] - xlim[0]), y0 + SCALEBAR_UV / 2, f"{SCALEBAR_UV} µV",
+    sb.text(x0 - 0.035 * (xlim[1] - xlim[0]), y0 + scalebar_uv / 2, f"{scalebar_uv} µV",
             rotation=90, va="center", ha="right", fontsize=INTENSITY_SIZE,
             fontweight="bold")
     sb.text(x0 + SCALEBAR_MS / 2, y0 - 0.05 * (ylim[1] - ylim[0]), f"{SCALEBAR_MS} ms",
@@ -347,19 +434,34 @@ def render(panels, out_path: Path, dpi: int) -> None:
     # the artwork only has to be cropped off later (owner, 2026-08-03). The MOCK provenance is
     # NOT lost with it -- the caption below still states that the amplitudes are simulated, and
     # the README carries the full warning.
+    # The caption may name the magnification, which is only known once the window is fitted --
+    # so it is formatted HERE rather than assembled by the caller from a guess.
     fig.text(0.5, 0.022,
-             "Waveform shapes are real recordings; condition assignment and amplitudes follow "
-             "the simulated b-wave table. Shared vertical scale across all panels.",
-             ha="center", fontsize=9, color="#555555")
+             (caption or
+              "Waveform shapes are real recordings; condition assignment and amplitudes follow "
+              "the simulated b-wave table. Shared vertical scale across all panels."
+              ).format(zoom=zoom),
+             ha="center", fontsize=9, color="#555555",
+             # Two-line variant captions only: the default single-line caption keeps matplotlib's
+             # baseline alignment so the canonical figure stays byte-identical under this change.
+             **({"va": "bottom", "linespacing": 1.5} if caption else {}))
 
     fig.savefig(out_path, format="jpg", dpi=dpi,
                 pil_kwargs={"quality": 95}, facecolor="white")
     plt.close(fig)
-    print(f"  wrote {out_path.name}  ({nrows}x{ncols} panels, {dpi} dpi)")
+    print(f"  wrote {out_path.name}  ({nrows}x{ncols} panels, {dpi} dpi"
+          f"{f', y-scale {zoom:.2f}x, {scalebar_uv} µV bar' if fit_exclude else ''})")
+    return zoom
 
 
-def write_waveform_csv(panels, out_path: Path) -> None:
-    """Tidy waveform table so the traces can be re-plotted in any tool."""
+def write_waveform_csv(panels, out_path: Path, rows: list[float] | None = None) -> None:
+    """Tidy waveform table so the traces can be re-plotted in any tool.
+
+    ``rows`` restricts the table to the intensities a variant figure draws. ``intensity_group``
+    keeps its number from the FULL seven-flash ladder (1.9 log stays Group 5), so a cropped
+    table still joins to the b-wave tables and to the LabScribe export it mirrors.
+    """
+    rows = list(INTENSITIES_LOG) if rows is None else list(rows)
     with out_path.open("w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh, lineterminator="\n")
         w.writerow(["condition", "condition_order", "intensity_group",
@@ -367,6 +469,8 @@ def write_waveform_csv(panels, out_path: Path) -> None:
         n = 0
         for order, cond in enumerate(CONDITION_ORDER, start=1):
             for group, x_log in enumerate(INTENSITIES_LOG, start=1):
+                if x_log not in rows:
+                    continue
                 t, y = panels[(cond, x_log)]
                 for tv, yv in zip(t, y):
                     w.writerow([cond, order, group, x_log,
@@ -410,7 +514,7 @@ def check_awave(panels, targets) -> None:
         sys.exit("REFUSING to write — a-wave biology check failed:\n  - " + "\n  - ".join(bad))
 
 
-def write_awave_csv(panels, out_path: Path) -> None:
+def write_awave_csv(panels, out_path: Path, rows: list[float] | None = None) -> None:
     """a-wave / b-peak / ratio per condition x intensity, measured off the drawn traces.
 
     WHY THIS EXISTS AND WHAT IT IS NOT. The b-wave tables are simulated PER EYE (30 eyes x 7
@@ -431,6 +535,8 @@ def write_awave_csv(panels, out_path: Path) -> None:
     ONE trace, not a mean of eyes). It is here to make ``a_over_b`` self-contained; the b-wave
     tables remain the amplitude source of record. Named ``_trace`` so the two are not confused.
     """
+    rows = list(INTENSITIES_LOG) if rows is None else list(rows)
+    n = 0
     with out_path.open("w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh, lineterminator="\n")
         w.writerow(["condition", "condition_order", "intensity_group",
@@ -439,6 +545,9 @@ def write_awave_csv(panels, out_path: Path) -> None:
         for order, cond in enumerate(CONDITION_ORDER, start=1):
             capped = AWAVE_RATIO_BY_COND.get(cond, AWAVE_MAX_RATIO)
             for group, x_log in enumerate(INTENSITIES_LOG, start=1):
+                if x_log not in rows:
+                    continue
+                n += 1
                 a_uv, b_uv, ratio, _ = awave_metrics(*panels[(cond, x_log)])
                 # No comma inside the field: these files get pasted into Excel/GraphPad, where a
                 # quoted comma is legal CSV but still splits under a naive text import.
@@ -446,7 +555,7 @@ def write_awave_csv(panels, out_path: Path) -> None:
                           f"capped at a/b <= {capped:g}")
                 w.writerow([cond, order, group, x_log,
                             round(a_uv, 2), round(b_uv, 2), round(ratio, 4), source])
-    print(f"  wrote {out_path.name}  ({len(CONDITION_ORDER) * len(INTENSITIES_LOG)} rows)")
+    print(f"  wrote {out_path.name}  ({n} rows)")
 
 
 def main() -> None:
@@ -475,6 +584,29 @@ def main() -> None:
     render(panels, args.outdir / "mock_fig1e_traces.jpg", args.dpi)
     write_waveform_csv(panels, args.outdir / "mock_fig1e_waveforms_long.csv")
     write_awave_csv(panels, args.outdir / "mock_fig1e_awave_summary.csv")
+
+    # ── The two reading variants (owner, 2026-08-06) ────────────────────────────────────────
+    # Both exist for ONE question the full grid answers badly: how much less does AAV8-RK-PDE6B
+    # rescue than the 3'UTR arm? On the seven-row grid every panel is ~0.8 in tall and the two
+    # rescue columns sit four columns apart, so the comparison is hard to make by eye. Neither
+    # variant re-simulates anything -- same panels, same y-window derivation, different view.
+    for tag, kw, cap in (
+        ("zoom",
+         dict(fit_exclude=ZOOM_FIT_EXCLUDE),
+         "Waveform shapes are real recordings; amplitudes follow the simulated b-wave table.\n"
+         "Vertical scale expanded {zoom:.1f}× to separate the rescue arms — the WT Control "
+         "runs off-scale and is CLIPPED, not reduced."),
+        ("1p9",
+         dict(rows=[FOCUS_LOG_I], figsize=SINGLE_ROW_FIG_SIZE),
+         f"Waveform shapes are real recordings; amplitudes follow the simulated b-wave table.\n"
+         f"Flash {FOCUS_LOG_I:+.1f} log cd·s/m² only, on the same vertical scale as the full "
+         f"seven-flash grid."),
+    ):
+        render(panels, args.outdir / f"mock_fig1e_traces_{tag}.jpg", args.dpi,
+               caption=cap, **kw)
+        rows = kw.get("rows")
+        write_waveform_csv(panels, args.outdir / f"mock_fig1e_waveforms_long_{tag}.csv", rows)
+        write_awave_csv(panels, args.outdir / f"mock_fig1e_awave_summary_{tag}.csv", rows)
 
 
 if __name__ == "__main__":

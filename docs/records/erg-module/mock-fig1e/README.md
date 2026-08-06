@@ -78,6 +78,31 @@ names, plus its own trace figure.
 | AAV8-RK-GFP-polyA-stuffer | 3 | 27.19 | 2.82 |
 | AAV8-CMV-GFP | 3 | 23.44 | 2.4 |
 | AAV8-RK-PDE6B-3UTR | 3 | 159.13 | 12.27 |
+
+## The two reading variants (2026-08-06)
+
+Both answer one question the full grid answers badly: **how much less does AAV8-RK-PDE6B rescue
+than the 3'UTR arm?** On the seven-row grid each panel is ~0.8 in tall and the two rescue columns
+sit four apart, so the comparison is hard to make by eye. Neither variant re-simulates anything —
+same panels, same seed, same numbers, different view.
+
+- **`mock_fig1e_traces_zoom.jpg` — expanded scale (≈2.1×).** The y-window is fitted to the
+  treated and null arms; the WT Control runs off the top and is **clipped**.
+  ⚑ The window is fitted **from the data, not by a hand-picked factor**. A fixed 2.6× was tried
+  first and was wrong in the way that matters: it clipped the *3'UTR arm too*, and the 3'UTR arm
+  is the reference the comparison is made against — cropping it turns "PDE6B is smaller" into
+  "both hit the ceiling". The top of the window is now fitted to the tallest surviving sample, so
+  **no b-wave being read ever clips**; only deep negative excursions (a-wave and oscillatory
+  potentials — not the quantity in question) are allowed off the bottom, to buy magnification.
+- **`mock_fig1e_traces_1p9.jpg` — one flash, +1.9 log.** Keeps the **full grid's** vertical
+  scale, so the two figures stay directly comparable; the magnification is all layout, ~3.5× the
+  panel height. ⚑ The y-window is derived from **every** panel, never from the row actually
+  drawn — cropping rows must not silently rescale the trace it leaves behind.
+
+The canonical `mock_fig1e_traces.jpg` and its two tables are **byte-identical** before and after
+the variants were added; the layout constants they needed (header space, scale-bar drop, bottom
+margin) are re-derived per row-count and all reduce to their old values at seven rows.
+
 ## Files
 
 | File | What it is |
@@ -88,7 +113,11 @@ names, plus its own trace figure.
 | `mock_fig1e_bwave_wide.csv` | Summary as intensity-per-row with mean/SEM/n columns per condition. |
 | `mock_fig1e_bwave_stats.csv` | Welch t-tests at the reference intensity: rescue arms vs each null arm, and the two rescue arms against each other. |
 | `mock_fig1e_waveforms_long.csv` | **The trace data, plottable.** Every sample behind the trace figure: 6 conditions × 7 intensities × 0…260 ms. Columns: `condition`, `intensity_log_cd_s_m2`, `time_ms`, `voltage_uv`. |
-| `mock_fig1e_traces.jpg` | The rendered trace grid. |
+| `mock_fig1e_traces.jpg` | The rendered trace grid — all 7 flashes, all 6 conditions. |
+| `mock_fig1e_traces_zoom.jpg` | **Reading variant — expanded scale.** Same panels, vertical window expanded ≈2.1× so the two rescue arms separate by eye. The WT Control runs off-scale and is **clipped**, not reduced. |
+| `mock_fig1e_traces_1p9.jpg` | **Reading variant — one flash.** Only +1.9 log cd·s/m², on the **same** vertical scale as the full grid, so each trace gets ~3.5× the panel height. |
+| `mock_fig1e_waveforms_long_zoom.csv` `mock_fig1e_awave_summary_zoom.csv` | The zoom variant's tables. **Identical to the canonical pair by construction** — the zoom is a change of VIEW, not of data. Shipped so each figure has a table beside it. |
+| `mock_fig1e_waveforms_long_1p9.csv` `mock_fig1e_awave_summary_1p9.csv` | The single-flash variant's tables — the +1.9 rows only (7 806 and 6 rows). `intensity_group` keeps its number from the full ladder (+1.9 stays **Group 5**), so they still join to the b-wave tables. |
 | `mock_fig1e_awave_summary.csv` | **a-wave per condition x intensity**, measured off the drawn traces: `a_wave_uv` (positive magnitude, baseline to trough), `b_peak_uv_trace`, `a_over_b`, and which of the two the value came from. Added 2026-08-03 — see the caveats below before plotting it. |
 | `generate_mock_fig1e.py` | Generates the b-wave + stats CSVs, and self-checks before writing. Pure standard library. |
 | `render_mock_fig1e_traces.py` | Renders the trace grid + waveform CSV from the real waveform library. Needs matplotlib + numpy + the backend on `PYTHONPATH`. |
@@ -132,7 +161,8 @@ taking mean ± SEM reproduces `mock_fig1e_bwave_summary.csv` exactly — verifie
 # b-wave tables (stdlib only)
 python3 generate_mock_fig1e.py
 
-# trace grid + waveform table (needs matplotlib/numpy + the real waveform source)
+# trace grid + waveform table + BOTH reading variants (needs matplotlib/numpy + the
+# real waveform source). One invocation writes all three figures and all six tables.
 PYTHONPATH=../../../../app/backend ../../../../app/backend/.venv/bin/python \
     render_mock_fig1e_traces.py
 

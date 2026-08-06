@@ -1,0 +1,7 @@
+condition,condition_order,intensity_group,intensity_log_cd_s_m2,a_wave_uv,b_peak_uv_trace,a_over_b,a_wave_source
+Control,1,5,1.9,234.7,240.59,0.9755,source eye (unmodified)
+Untreated,2,5,1.9,8.51,47.28,0.18,capped at a/b <= 0.18
+AAV8-RK-PDE6B,3,5,1.9,18.38,102.14,0.18,capped at a/b <= 0.18
+AAV8-RK-GFP-polyA-stuffer,4,5,1.9,8.17,45.41,0.18,capped at a/b <= 0.18
+AAV8-CMV-GFP,5,5,1.9,12.09,67.19,0.18,capped at a/b <= 0.18
+AAV8-RK-PDE6B-3UTR,6,5,1.9,25.23,203.41,0.124,capped at a/b <= 0.18
