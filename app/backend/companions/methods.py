@@ -694,16 +694,44 @@ def _line(p: dict):
            "individual": "the individual replicate curves",
            "both": "a shaded band and the individual replicate curves",
            "none": "no spread"}.get(spread, "a shaded band")
-    series = str(p.get("series") or "").strip()
-    grouping = f" separately for each {series}" if series else ""
+    # WHAT was plotted. `x`/`y` default to blank and `run_real._xy` then takes the first and second
+    # NUMERIC column — so on the default path the paragraph named neither axis ("plotted against the
+    # x variable"), and a requested column that is absent falls back positionally without a word.
+    # Two column choices are the entire meaning of this figure; only the run knows them.
+    run = p.get("_line_run") or {}
+    series = run.get("series") if run else str(p.get("series") or "").strip()
+    quantity = f"{run['y']} was plotted against {run['x']}" if run else "Values were plotted against the x variable"
+    grouping = f", separately for each {series}" if series else ""
+    substituted = ""
+    if run:
+        missing = [f"{k} ({v})" for k, v in (run.get("requested") or {}).items()
+                   if str(run.get(k) or "") != v]
+        if missing:
+            substituted = (f" The requested {_join(missing)} was not a column in the data, so the "
+                           f"columns above were used instead.")
+    # `central` is NOT always the mean: `representative` draws the FIRST replicate and no spread at
+    # all, `none` draws no central line and promotes the individual replicate curves to the content.
+    # The paragraph claimed "Each point shows the mean" — and a spread for it — on both.
+    central = str(p.get("central", "mean")).lower()
+    if central == "representative":
+        middle = ("Each series is drawn as one representative replicate rather than an average, so "
+                  "no spread is shown")
+    elif central == "none":
+        middle = ("No central line is drawn: the individual replicate curves are shown as they were "
+                  "measured")
+    else:
+        middle = f"Each point shows the mean, and {how} shows {err_txt}"
     text = (
-        f"Values were plotted against the x variable{grouping}, with observations sharing an x "
-        f"treated as replicates at that point. Each point shows the mean, and {how} shows "
-        f"{err_txt}"
+        f"{quantity}{grouping}, with observations sharing an x "
+        f"treated as replicates at that point. {middle}"
     )
     text += "; the x-axis is logarithmic." if _truthy(p.get("log_x")) else "."
+    text += substituted
+    # The table carries mean/spread/n on EVERY path, including the two where the figure draws
+    # neither — worth saying so rather than leaving a reader to wonder where the numbers went.
     text += (" The per-point mean, spread and replicate count are reported in the accompanying "
-             "table.")
+             "table" + (" even where the figure does not draw them." if central in
+                        ("representative", "none") else "."))
     return text, []
 
 
@@ -1749,6 +1777,10 @@ def build_body(spec: SkillSpec, params: dict, figure: dict | None = None) -> tup
         # `top_n` is a cap, not a count, and `zscore` is read through a string-aware truthiness
         # test the prose did not share. Both are answers only the runner has.
         resolved["_ssgsea_run"] = meta["ssgsea"]
+    if isinstance(meta.get("line"), dict):
+        # The two columns the figure IS. `x`/`y` default to blank and resolve positionally (first and
+        # second numeric column), and a requested name that is absent falls back the same way.
+        resolved["_line_run"] = meta["line"]
     if isinstance(meta.get("qc"), dict):
         # The grouping column the QC runner RESOLVED (a missing one falls back, or pools every cell),
         # and how many cells the violins actually show after `max_cells` subsampled them.

@@ -256,7 +256,24 @@ PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
     # dynamic-lambda scale and now appears with it. The paragraph also said "integrated with Scanpy
     # and Harmony", which reads as harmonypy; the runner has never called it — correction is Selom
     # Melody, and the figure TITLE has said so the whole time.
-    ("methods", "line"): _untriaged("central", "markers", "points", "x", "y"),
+    # ── line, TRIAGED 2026-08-06. Two lies, and the first is as big as a lie gets: the paragraph
+    # named NEITHER axis ("Values were plotted against the x variable"). `x`/`y` default to BLANK
+    # and `run_real._xy` then takes the first and second NUMERIC column — on the real ERG table that
+    # makes the x-axis `animal`, a subject ID — and a requested column that is absent falls back the
+    # same way without a word. Two column choices are the entire meaning of this figure.
+    # Second: `central` is not always the mean. `representative` draws the FIRST replicate and no
+    # spread at all, `none` draws no central line — and the paragraph said "Each point shows the
+    # mean, and a shaded band shows the standard error of the mean" on both.
+    ("methods", "line"): {
+        # Named from the run record: the params are blank on the default path, so quoting them
+        # would print "plotted against " and a requested-but-absent column would be printed as
+        # though it had been used.
+        "x": _OUT, "y": _OUT,
+        # Both choose how the same replicate values are DRAWN (a marker per measured x; every
+        # individual value). The prose describes the central tendency and the spread, and neither
+        # of those claims can be falsified by whether the points are also shown.
+        "markers": _P, "points": _P,
+    },
     # ("methods", "markers") is GONE — `normalize` skips log1p, and the dotplot's colour was
     # described as "mean log1p expression" either way.
     ("methods", "normalization_qc"): {
@@ -399,8 +416,8 @@ PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
 # template either gives a param a sentence (it leaves the list) or records a verdict (it stays with
 # PRESENTATION / INTERNAL). Lower this number when you triage; a new UNTRIAGED entry pushes over it
 # and fails, which is the point — nothing joins the backlog silently.
-_UNTRIAGED_CEILING = 104   # 261 raw -> 179 (ERG) -> 166 (GSEA) -> 131 (deg + diff_abundance)
-#                          # -> 104 (heatmap + integration + normalization_qc, 2026-08-06)
+_UNTRIAGED_CEILING = 99    # 261 raw -> 179 (ERG) -> 166 (GSEA) -> 131 (deg + diff_abundance)
+#                          # -> 104 (heatmap + integration + normalization_qc) -> 99 (line), 2026-08-06
 @pytest.mark.parametrize("module,skill_id", _CASES)
 def test_every_declared_param_is_described_or_deliberately_silent(module, skill_id):
     """The reverse direction — a declared param the prose never mentions is either described or

@@ -45,7 +45,20 @@ def run(data_path: str, params: dict) -> dict:
         grouped[y_col] = _by_x(sub, x_col, y_col)
 
     title = f"{y_col} over {x_col}" + (f" by {series_col}" if series_col else "")
-    return jsonable(line_spec(grouped, params, str(x_col), str(y_col), title))
+    spec = line_spec(grouped, params, str(x_col), str(y_col), title)
+    # WHICH columns this figure is actually of (WS1.2 / the `layout.meta` outcome pattern; lifted as
+    # `_line_run` by methods.build_body). `x`/`y` default to BLANK and `_xy` then takes the first and
+    # second numeric column — and a requested name that is not in the file falls back the same way,
+    # silently. Those two choices are the whole meaning of the figure, and the paragraph named
+    # neither: it said "plotted against the x variable". The title has carried them all along.
+    requested = {k: str(params.get(k) or "").strip() for k in ("x", "y", "series")}
+    spec["layout"].setdefault("meta", {})["line"] = {
+        "x": str(x_col), "y": str(y_col),
+        "series": str(series_col) if series_col else None,
+        "requested": {k: v for k, v in requested.items() if v},
+        "n_series": len(grouped),
+    }
+    return jsonable(spec)
 
 
 def _by_x(frame, x_col, y_col) -> dict:

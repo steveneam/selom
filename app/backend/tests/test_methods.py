@@ -507,3 +507,48 @@ def test_integration_caption_does_not_print_the_wrong_method_name():
     spec = load_skill("integration")
     assert "after Harmony correction" in legends.build_caption(spec, {})
     assert "after Harmony2 correction" in legends.build_caption(spec, {"harmony2": True})
+
+
+def _line_fig(x="dose", y="response", series=None, requested=None):
+    """The `layout.meta.line` record `run_real` writes — the resolution the params cannot supply."""
+    return {"layout": {"meta": {"line": {
+        "x": x, "y": y, "series": series,
+        "requested": requested if requested is not None else {"x": x, "y": y},
+        "n_series": 1,
+    }}}}
+
+
+def test_line_prose_names_the_two_columns_the_figure_IS():
+    """`x`/`y` default to BLANK and resolve to the first and second NUMERIC column — on the real ERG
+    table that makes the x-axis `animal`, a subject ID. The paragraph named neither axis: it said
+    "Values were plotted against the x variable", which is true of every line plot ever drawn."""
+    text = _prose("line", {}, figure=_line_fig())
+    assert "response was plotted against dose" in text
+    assert "the x variable" not in text
+
+
+def test_line_prose_discloses_a_column_that_fell_back():
+    """A requested column that is not in the file falls back positionally, silently."""
+    fig = _line_fig(x="animal", y="response", requested={"x": "timepoint", "y": "response"})
+    text = _prose("line", {"x": "timepoint"}, figure=fig)
+    assert "response was plotted against animal" in text
+    assert "requested x (timepoint) was not a column in the data" in text
+
+
+def test_line_prose_does_not_call_a_representative_curve_a_mean():
+    """`central="representative"` draws the FIRST replicate and NO spread; `central="none"` draws no
+    central line at all. The paragraph claimed "Each point shows the mean, and a shaded band shows
+    the standard error of the mean" on both — a mean and a spread that are not on the figure."""
+    mean = _prose("line", {}, figure=_line_fig())
+    assert "Each point shows the mean" in mean and "standard error of the mean" in mean
+
+    rep = _prose("line", {"central": "representative"}, figure=_line_fig())
+    assert "one representative replicate rather than an average" in rep
+    assert "Each point shows the mean" not in rep
+    assert "standard error of the mean" not in rep
+
+    none = _prose("line", {"central": "none"}, figure=_line_fig())
+    assert "No central line is drawn" in none
+    assert "Each point shows the mean" not in none
+    # the numbers still exist in the table — say so rather than leave the reader hunting
+    assert "even where the figure does not draw them" in none
