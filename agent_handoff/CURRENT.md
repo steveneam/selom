@@ -27,6 +27,7 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
+| **PARAM-DECL-GUARD** | 2026-08-06 | `main` `6201e85..<head>` | **`#11` closed — the runner↔`skill.json` guard ships in both directions, and rendering the knob it made reachable found a reference line being clipped out of its own figure.** The board's re-measure held: **4 undeclared params across 2 skills**, so both directions are cleared to **zero with no waiver list**. `confusion.x`/`.y` deleted (undocumented aliases); `erg_bwave_bar.vline`/`.vline_label` declared + controlled (`0e1921e` wired both axes and declared neither). The third test is the load-bearing one: a params dict handed anywhere the walk can't follow is a FAILURE, not a quiet gap. |
 | **ERG-MOCK-FIGS** | 2026-08-06 | `main` `ea68c79..dbd72f9` (**PUSHED**) | **Both open founder gates answered ([[DECISIONS #17]] keep burning down · [[#18]] the app moves to `/app`), the Fig 1E mock retuned so the two rescue arms differ in the FIGURE and not just the table, and two reading variants added — where a hand-picked zoom factor clipped the very arm the comparison is measured against.** Also: `#11` probed and found to be **4 undeclared params, not a campaign**; the board pruned 1083 → 458 lines into `archive/2026-08-06-current-history.md`. |
 | **DEG-PANEL** | 2026-08-05 | `main` `9daa043..3f102ea` (**pushed 2026-08-06**) | **`#1(d)` closed spec-first — and the flagship DE figure had been claiming a fold change it never computed.** `deg` = four disjoint engines behind one `mode` knob that was itself API-only, so it needed a STRUCTURE (mode-gated `showWhen` + an `oneOf` gate), not a list of controls. 75 → 52 knobs, 12 → 10 skills. Shipped the `level` widget with it. |
 | **GSEA-KNOBS + LEDGER-PROVENANCE** | 2026-08-05 | `main` `ea68c79..5ee2b3d` (**pushed 2026-08-06**) | **`#3` and `#4` closed; the control pass found three prose lies the guard could not see.** `API_ONLY_KNOBS` 88 → 75, 14 → 12 skills (⚑ MEASURED — the board's running tally said 86/13 and was already wrong). A synthesized read is now badged and caps `selom_confidence` ([[DECISIONS #16]]). |
@@ -56,72 +57,64 @@
 | **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
 | older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · ERG-MOCK-FIGS · 2026-08-06 06:03 UTC (= 16:03 +1000 Sydney) · branch `main` (**PUSHED — `origin/main` = `dbd72f9`, working tree clean, nothing local**) · Claude (FE+BE, solo, lead)
+## ▸ LIVE · PARAM-DECL-GUARD · 2026-08-06 06:54 UTC (= 16:54 AEST Sydney) · branch `main` (**LOCAL — `21a17bb`, 1 commit ahead of `origin/main` = `6201e85`; working tree clean**) · Claude (FE+BE, solo, lead)
 
-**The board was pruned this session.** It had reached **1083 lines / 165 KB** — a file the BOOT
-block tells a resuming session to read IN FULL, and which the Read tool could no longer open even
-60 lines at a time. Eight LIVE blocks (LANE-A-C → DEG-PANEL) moved write-once to
-`archive/2026-08-06-current-history.md`. **458 lines now.** If this file passes ~250 lines again,
-archive before adding [[archive-currentmd-history-weekly]].
+**Direction is DECIDED and not to be re-litigated** — [[DECISIONS #17]]: keep burning down the
+honesty/reachability backlogs, P-E is not next. [[#18]]: the app moves to `/app` (decided, not
+built — it lands with P-E's frontend half). **Nothing on this board waits on the owner except a
+real `.fcs` file and the Clerk keys.**
 
-**The two founder gates that had been open are CLOSED** — see [[DECISIONS #17]] and [[#18]].
-Direction = **keep burning down the honesty/reachability backlogs**, not P-E. Route split =
-**yes, the app moves to `/app`** (decided, not built — it lands with P-E's frontend half).
-Both were surfaced at boot rather than defaulted, per the board's own instruction.
+**`#11` IS CLOSED (`21a17bb`).** `tests/test_skill_param_declaration_guard.py` compares every
+skill's RUNNER against its `skill.json` in both directions, over all 44:
 
-**Session work was the ERG Fig 1E mock**, owner-directed mid-session, in two pushes:
+- **The class it closes is invisible to every other guard by construction.**
+  `contract._execute` merges unknown caller keys straight through, `validate_param_ranges` skips
+  any key absent from `param_spec`, and `resolved_params` writes them into the **recorded
+  provenance bundle** — so an undeclared param works, changes the figure, lands in the
+  reproducibility record, and `API_ONLY_KNOBS` / the prose↔param guard / `paramFieldsFromSpec` all
+  START from the declaration and cannot see it.
+- **The board's re-measure held: 4 params across 2 skills, so both directions are cleared to ZERO
+  and there is deliberately NO waiver list** — a waiver would be a place for the fifth to hide.
+  `confusion.x`/`.y` **deleted** (undocumented aliases for the declared `true`/`predicted`; no
+  caller, no control, no prose). `erg_bwave_bar.vline`/`.vline_label` **declared + controlled +
+  mirrored into the dev:mock fixture** — not an alias: `0e1921e` wired "a reference line across
+  either axis" and declared NEITHER half; a later pass declared the horizontal one only.
+- ⚑ **The third test is the load-bearing one and is the reusable idea.** Both comparisons are only
+  as strong as the walk, so **a params dict handed anywhere the walk cannot follow is a FAILURE,
+  not a quiet gap** — otherwise moving a `params.get` into an unresolvable helper deletes the
+  finding from one test *and* fabricates a "dead knob" in the other. Chasing that to zero is what
+  pulled the shared `skills/*.py` leaf modules into the pool (`_design.load_design` was the real
+  hole). All three directions **proven to bite by name** and to go green on revert.
+- ⚑ **Resolve the dict by BINDING, never by the variable being spelled `params`** — the board's
+  warning was right: a name-matching probe reports 13 with 3 false positives (`pathway`'s Reactome
+  loop variable `p["stId"]` is a REST response, not config). Seed at the declared entrypoint,
+  re-bind at every hop — positional slot **or keyword** (every runner dispatches
+  `run_real(data_path=…, params=params)`, so keyword binding is not optional).
+  Handle `(params or {}).get(…)` too — three runners use it, and a Name-only reader would call the
+  live knob behind it a dead one.
 
-1. **`b47851c` — the rescue arms were separated in the TABLE but not legibly in the FIGURE.**
-   `AAV8-RK-PDE6B` Vmax 105 → 60 µV (~46 @1.0, ~59 @1.9, against the 3'UTR arm's ~127 / ~166).
-   Both the default and the `n3` variant regenerated, tables and figures together.
-   - ⚑ **The generator's self-check is the thing to read before retuning this again.** It asserts
-     the two rescue arms stay *slightly* apart via a **p-value BAND with a 0.0005 FLOOR** — widen
-     the gap too far and it exits non-zero WITHOUT writing, because the arms would stop reading as
-     a graded effect. The new gap lands at p = 0.002 / 0.0036, inside the band.
-   - **Drive-by, found by re-reading the README's checks against the code:** it claimed two guards
-     hold "at every intensity" / "from 0.1 log up". Both are gated on `x_log >= REFERENCE_LOG_I`
-     (1.0) — below the threshold every rd10 arm sits at the noise floor and **nothing is asserted**.
-     The four per-condition tables were stale too. Corrected to what the code enforces.
-2. **`dbd72f9` — two reading variants** (`_zoom`, `_1p9`), same panels/seed/numbers, different
-   view; one renderer pass writes all three figures with their own waveform + a-wave tables.
-   - ⚑ **A hand-picked 2.6× zoom was tried first and was wrong in the way that matters: it clipped
-     the 3'UTR arm too — the very arm PDE6B is measured AGAINST.** Cropping your reference turns
-     "PDE6B is smaller" into "both hit the ceiling". The window is now derived from the data: the
-     top is fitted to the tallest surviving sample so **no b-wave being read ever clips**, and only
-     deep negative excursions (a-wave / oscillatory potentials — not the quantity in question) go
-     off the bottom to buy magnification. That is what caps it at ~2.1×.
-     **Caught by rendering and LOOKING, not by reading the code** [[plotly-spec-can-encode-a-lie]].
-   - **Three layout constants were tuned for a SEVEN-row grid and broke at one row** — the 0.935
-     top margin sheared the first line off the two-line column headers, and the scale bar (which
-     hangs 0.70 of a PANEL height below the grid) fell off the canvas once a panel got tall. Each
-     is re-derived from row-count/canvas-height and **all reduce to their old values at seven
-     rows**, so `mock_fig1e_traces.jpg` + its tables are **byte-identical** before and after —
-     verified with `git diff --stat`, in BOTH outdirs, not assumed.
-   - **The `_zoom` tables are byte-identical to the canonical pair by construction** (a zoom is a
-     change of VIEW, not of data). Shipped anyway so each figure has a table beside it, and the
-     README says so rather than implying a second measurement.
+**⚑ And rendering the knob it made reachable found a defect no assertion could see:
+`_charts.bar_figure` was CLIPPING the reference line out of its own figure.** Both axis ranges are
+fitted to the DATA (`y_top * 1.08`; the bar positions), so a line outside that window was written
+into `layout.shapes` and then cropped — no line, no error, no note, every spec-level check green.
+**The broken case is the common one: a WT/normal threshold ABOVE the tallest bar, which is the
+usual reason to draw one at all.** Same class as [[dont-clip-the-reference-you-measure-against]],
+one axis over. Both axes now grow to contain the line; the no-reference-line path is untouched and
+every golden is byte-identical. Pinned by a named defect test in `test_charts.py`.
 
-**`#11` (the undeclared-param guard) — RECONNAISSANCE DONE, GUARD NOT BUILT. Read this before
-starting it; the board's estimate of its size was wrong.** A binding-accurate AST probe finds
-**4 undeclared params across 2 skills**, not the class-sized backlog NEXT#11 predicted:
-`confusion.x` · `confusion.y` (real aliases — `params.get("true") or params.get("y")`) and
-`erg_bwave_bar.vline` · `vline_label`. The two `deg` cases that motivated the item are already
-gone (`group_regex` was declared by `#1(d)`; `label_val` was renamed `label`).
-⚑ **A first probe reported 13 and 3 were FALSE POSITIVES** — it aliased `p` as a params name and
-caught `pathway`'s Reactome loop variable (`p["stId"]`). **Resolve the params dict by BINDING** —
-seed from functions taking an arg named `params`, follow calls that pass it on, bind to the
-callee's own arg name — which is the machinery `tests/test_methods_param_spec_guard.py` already
-owns. The probe is at
-`/tmp/claude-1000/-home-deploy-work-selom/6a4d9591-7163-4467-a87d-15cd550eb1dc/scratchpad/probe_undeclared.py`
-(scratch — **re-derive it in the test, don't depend on that path**).
-The guard is still worth building as a ratchet; it is a 4-entry triage, not a campaign.
+**Gates:** `verify.sh` **9/9** — and re-run **with `SELOM_DATASETS_DIR` set**, because the first
+pass ledger says *"real-data tests SKIPPED, so be-test is a weaker gate than CI's"* and `be-slow`
+is corpus-free **by design** (`env -u SELOM_DATASETS_DIR`), so a shared chart-module change is NOT
+covered by a bare `verify.sh`. Goldens on the real corpus **109 pass**; `skill-smoke` **43 pass /
+0 fail / 1 skipped** (`facs_gating`, the staged-`.fcs` gap).
 
 ## ▸ NEXT
 
 0. ~~Gate the `slow` lane~~ · ~~Lane B~~ · ~~§3.2 rows 5/6/9~~ · ~~rows 7/8/10/11~~ ·
    ~~the column / pair picker~~ · ~~sweep the reachability class~~ · ~~pin zizmor + the drift job~~ ·
    ~~`API_ONLY_KNOBS` first pass~~ · ~~the multi-table contract, slices 1–5~~ ·
-   ~~the two-directional prose↔param guard~~ · ~~the `#4` milestone reviews + fix pass~~ —
+   ~~the two-directional prose↔param guard~~ · ~~the `#4` milestone reviews + fix pass~~ ·
+   ~~`#11` the undeclared-param guard~~ —
    **all DONE.** §3.2 is closed except rows 12–13. **Nothing is carried forward.**
 
 > **▶ THE NEXT SESSION — the direction is DECIDED, do not re-litigate it.**
@@ -130,14 +123,14 @@ The guard is still worth building as a ratchet; it is a 4-entry triage, not a ca
 > lands with P-E's frontend half. **The two items that were batched for the owner are now CLOSED,
 > so nothing on this board is waiting on him except a real `.fcs` file.**
 >
-> Value order: **`#11` the undeclared-param guard** → **the rest of `#2`** (131 untriaged; best
-> blocks `heatmap` · `integration` · `normalization_qc`) → **`#5`**.
-> ⚑ **But read `#11`'s entry first — the LIVE block above measured it and the board's estimate was
-> WRONG.** It is **4 undeclared params across 2 skills**, a triage, not a campaign. That is the
-> third time in four sessions a board's own characterisation of a backlog has been wrong (`#2`
-> "confirmed-waive pass" → 26 live lies; `#1`'s `86/13` tally → `88/14`), so:
-> **count the list, never subtract from the tally, and re-derive anything that looks stale**
-> [[verify-todo-not-already-shipped]].
+> Value order: **the rest of `#2`** (131 untriaged; best blocks `heatmap` · `integration` ·
+> `normalization_qc`) → **`#5`** (the audit's open rows 21–23, render-visible collisions) → `#2`'s
+> remainder. **`#11` is CLOSED — see the LIVE block.**
+> ⚑ **Its estimate had been WRONG on the board and right after re-measuring**: 4 params, not a
+> campaign. That was the third time in four sessions a board's own characterisation of a backlog
+> was wrong (`#2` "confirmed-waive pass" → 26 live lies; `#1`'s `86/13` tally → `88/14`), and the
+> re-measure is what saved the session, so: **count the list, never subtract from the tally, and
+> re-derive anything that looks stale** [[verify-todo-not-already-shipped]].
 >
 > `API_ONLY_KNOBS` = **52 across 10 skills**; `PROSE_SILENT` untriaged = **131**. Both MEASURED
 > 2026-08-05 by counting the lists. **`#1`–`#4` are all CLOSED; their detail is in the archive and
@@ -316,40 +309,16 @@ The guard is still worth building as a ratchet; it is a 4-entry triage, not a ca
       **refuted** this for `markers` specifically — it is a documented decision there — so treat it
       as a convention question, not a defect.
 
-11. **⇒ THE UNDECLARED-PARAM GUARD — MEASURED 2026-08-06; still worth building, but it is a
-    4-ENTRY TRIAGE, not the campaign this entry originally described.**
-    ⚑ **The probe found `confusion.x` · `confusion.y` · `erg_bwave_bar.vline` ·
-    `erg_bwave_bar.vline_label` — 4 across 2 skills, out of 44.** The two `deg` cases that motivated
-    the item are already gone: `group_regex` was DECLARED by `#1(d)`, `label_val` was renamed
-    `label`. So "expect real finds" below was right in kind and wrong in scale — the class is real,
-    the backlog is small, and the guard's value is now **holding the line** rather than clearing a
-    debt. Build it; don't budget a session for it.
-    ⚑ **And resolve the params dict by BINDING, not by variable name.** A first probe that aliased
-    `p` reported 13 and **3 were false positives** — `pathway`'s Reactome loop variable
-    (`p["stId"]`, `p["entities"]`, `p["name"]`). Seed from functions taking an arg named `params`,
-    follow calls that pass it on, bind to the callee's own arg name. That is exactly what
-    `tests/test_methods_param_spec_guard.py::_referenced_keys` already does — extend it, don't
-    re-invent it. **Triage each hit as *declare it* or *delete the alias*;** `confusion`'s two are
-    live aliases (`params.get("true") or params.get("y")`), so they are a real fork in the road.
-    _Original framing, kept because the mechanism is why the class is invisible:_
-    An **eighth** layer of [[selom-shipped-not-reachable]], and the first one **no existing guard can
-    detect by construction**. `deg`'s runner read `group_regex` and `label_val`, neither declared in
-    its `skill.json`: `skills/contract._execute` merges unknown caller keys straight through
-    (`contract.py:78,90`), `validate_param_ranges` skips any key absent from `param_spec`
-    (`:164-166`), and `resolved_params` passes them into the **recorded provenance bundle**
-    (`:210-212`). So the param works, changes the result, and is written into the reproducibility
-    record — while `API_ONLY_KNOBS`, the prose↔param guard and `paramFieldsFromSpec` all START from
-    the declaration and therefore cannot see it. Two were found by reading ONE skill's runner.
-    - **Shape:** walk `skills/**/run*.py` by AST for `params.get("<key>")` / `params["<key>"]`,
-      subtract that skill's `param_spec` and the reserved `_`-prefixed keys, and fail on the
-      remainder — with a NAMED waiver in the `API_ONLY_KNOBS` shape (exact both directions), because
-      the first run will have a backlog. Extend `tests/test_methods_param_spec_guard.py`, which
-      already loads every `skill.json` and already owns the "declared vs referenced" comparison —
-      this is the same comparison against a different source.
-    - **Expect real finds.** Every skill was written before any of these guards existed, and an
-      undeclared param has had no reason to surface: it does not break, it does not warn, and it
-      passes every gate. Triage each as *declare it* (it changes the result — `group_regex` did) or
-      *delete it* (an undocumented alias — `label_val` was).
+11. ~~**THE UNDECLARED-PARAM GUARD**~~ — **BUILT + CLOSED 2026-08-06 (`21a17bb`),
+    `tests/test_skill_param_declaration_guard.py`. Both directions at ZERO with no waiver list.**
+    The full account is in the LIVE block; the two things worth carrying forward:
+    - **Resolve the params dict by BINDING, never by variable name** (a name-matcher reports 13 with
+      3 false positives), and re-bind on **keyword** passes too — every runner dispatches
+      `run_real(data_path=…, params=params)`, so positional-only binding stops at the front door of
+      every real engine. `(params or {}).get(…)` is a third shape three runners use.
+    - **A guard that walks a call graph needs a third test asserting the walk did not go blind.**
+      Unfollowable hand-offs are a FAILURE, not a gap — without it, hiding a read behind an
+      unresolvable helper silently deletes one finding and fabricates another.
 
 **Owed follow-ups still open:** ~~the one-table `StatsTable` limit~~ **CLOSED 2026-08-05 — spec
 written, reviewed, corrected, and APPROVED TO BUILD ([[DECISIONS #15]]); both open questions
