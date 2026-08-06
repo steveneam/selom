@@ -27,6 +27,7 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
+| **PROSE-TRIAGE-3** | 2026-08-06 | `main` `bb6895b..186dc29` | **`trajectory` + `annotate` triaged — and the biggest lie in the pair was not a param at all, while a SECOND defect had the theme deleting an encoding all three of subtitle, caption and paragraph claim.** `annotate` cited **nobody** for its marker panel (every panel carries a source; the paragraph credited only the scoring machinery) and claimed "for each cell type in the panel" while types with <2 markers present are skipped and types no cluster wins are drawn nowhere. `trajectory`'s caption called a UMAP **"Diffusion-map embedding"**, and its **five bold lineage curves come from SimplePPT, not PAGA/DPT** — undescribed and uncited. `PROSE_SILENT` 99 → **86**. Then rendering it found `_embedding_theme` flattening the PAGA node **size array** (the cell-count encoding) and stamping a second, meaningless colourbar on a constant-colour trace. |
 | **PROSE-TRIAGE-2** | 2026-08-06 | `main` `a17c8ec..c1d39c6` | **`#2`'s three named blocks triaged — and reading the runners' bodies found SIX more printed-vs-computed lies, one of them in the CITATIONS.** `heatmap` described its whole column half from params that over-claim in both directions (a `split_by` split DROPS the column dendrogram the prose printed; `split_by_cut` cuts unsupervised blocks it never mentioned). `integration` cited **Korsunsky for Harmony2 runs** and credited "Harmony" for work Selom Melody did. `normalization_qc` named a `groupby` column that had been substituted, and hid that the violins are a subsample while the table is not. `PROSE_SILENT` 131 → **99** across FOUR blocks — `line` added by the new pick-by-size-of-the-lie rule, where the paragraph named **neither axis** and called a representative curve a mean. |
 | **PARAM-DECL-GUARD** | 2026-08-06 | `main` `6201e85..a17c8ec` | **`#11` closed — the runner↔`skill.json` guard ships in both directions, and rendering the knob it made reachable found a reference line being clipped out of its own figure.** The board's re-measure held: **4 undeclared params across 2 skills**, so both directions are cleared to **zero with no waiver list**. `confusion.x`/`.y` deleted (undocumented aliases); `erg_bwave_bar.vline`/`.vline_label` declared + controlled (`0e1921e` wired both axes and declared neither). The third test is the load-bearing one: a params dict handed anywhere the walk can't follow is a FAILURE, not a quiet gap. |
 | **ERG-MOCK-FIGS** | 2026-08-06 | `main` `ea68c79..dbd72f9` (**PUSHED**) | **Both open founder gates answered ([[DECISIONS #17]] keep burning down · [[#18]] the app moves to `/app`), the Fig 1E mock retuned so the two rescue arms differ in the FIGURE and not just the table, and two reading variants added — where a hand-picked zoom factor clipped the very arm the comparison is measured against.** Also: `#11` probed and found to be **4 undeclared params, not a campaign**; the board pruned 1083 → 458 lines into `archive/2026-08-06-current-history.md`. |
@@ -58,100 +59,64 @@
 | **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
 | older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · PARAM-DECL-GUARD + PROSE-TRIAGE-2 · 2026-08-06 08:25 UTC (= 18:25 AEST Sydney) · branch `main` (**`c1d39c6` — `21a17bb..73104a6` PUSHED + CI green on all six jobs (run `31083092714`); `c1d39c6` local. Working tree clean**) · Claude (FE+BE, solo, lead)
+## ▸ LIVE · PROSE-TRIAGE-3 · 2026-08-06 09:25 UTC (= 19:25 AEST Sydney) · branch `main` (**`186dc29` — `21a17bb..bb6895b` PUSHED + CI green; `0347665`+`186dc29` local. Working tree clean**) · Claude (FE+BE, solo, lead)
 
 **Direction is DECIDED and not to be re-litigated** — [[DECISIONS #17]]: keep burning down the
 honesty/reachability backlogs, P-E is not next. [[#18]]: the app moves to `/app` (decided, not
 built — it lands with P-E's frontend half). **Nothing on this board waits on the owner except a
 real `.fcs` file and the Clerk keys.**
 
-### `#2` — four blocks TRIAGED (`0f0a056`, `c1d39c6`). `PROSE_SILENT` 131 → **99**.
+### `#2` — `trajectory` + `annotate` TRIAGED (`186dc29`). `PROSE_SILENT` 99 → **86**.
 
-**`line` (`c1d39c6`) was picked by the new rule — size of the LIE, not size of the list — and the
-rule paid on its first use:** 5 waivers, 2 lies, one of them as large as this class gets.
-- The paragraph named **neither axis**: *"Values were plotted against the x variable"*, a sentence
-  true of every line plot ever drawn. `x`/`y` default to **blank** and resolve to the first and
-  second NUMERIC column — on the real ERG table that makes the x-axis **`animal`, a subject ID** —
-  and a requested column that is absent falls back the same way, silently.
-- **`central` is not always the mean.** `representative` draws the FIRST replicate and no spread;
-  `none` draws no central line at all. The paragraph claimed *"Each point shows the mean, and a
-  shaded band shows the standard error of the mean"* on both.
+The size-of-the-lie rule picked them (the two runners that RESOLVE what the figure is of,
+NEXT#10(c)) and it paid a second time — **13 waivers, five printed-vs-computed lies, and the
+biggest one was not a param at all.**
 
-Reading each runner's BODY against its paragraph found **six more printed-vs-computed lies**, and
-one of them reaches the **citations** — the part of a methods section a reader follows to reproduce
-the work. The board's "best next blocks" call was right.
+- **`annotate` cited NOBODY for its marker panel.** Every panel in `panels.json` carries a
+  literature source (Lu 2021 · Kim 2023 · Swamy 2021 · the 10x/Seurat tutorial), the panel **is**
+  the content of the figure, and the paragraph cited only Scanpy + Tirosh — the *scoring
+  machinery*. **Fourth** instance of the shape that retired the `gsea` and `integration`
+  paragraphs. ⚑ The citation now lives **in `panels.json` beside the genes it credits**, so a new
+  panel brings its source with it instead of needing a constant in `methods.py`; a ratchet fails
+  if any panel lacks one.
+- **"for each cell type in the panel" was false twice over** — a type with fewer than two of its
+  markers present is skipped, and a scored type that no cluster wins is drawn nowhere (**7 of 10**
+  on the declared smoke case). And the label is an **argmax with no floor**: a cluster with no real
+  marker support is labelled as confidently as one with strong support.
+- **`trajectory`'s CAPTION called a UMAP "Diffusion-map embedding"** while the figure's own axes
+  said UMAP 1 / UMAP 2 — the diffusion map ORDERS the cells, the embedding PLACES them. A caption
+  that is wrong on its own, the `harmony2` shape.
+- **A `root` naming a cluster absent from the grouping falls through to the automatic root
+  silently**, while the paragraph printed it from the param. Pseudotime is measured FROM the root,
+  so it is the origin of every number on the figure.
+- ⚑ **The largest lie was NOT a param: the five bold lineage curves that dominate the rendered
+  figure come from neither PAGA nor DPT** — a **SimplePPT** principal tree + a spline — and were
+  described by neither template and cited nowhere. They also degrade to nothing when the optional
+  import or the fit fails, so only the run can say whether a reader is looking at them. **A
+  param-by-param triage would never have found it; rendering the skill did.**
 
-- **`heatmap`** described its whole COLUMN half from params that over-claim in **both** directions:
-  a `split_by` block-split **drops** column clustering, so `cluster="both"` printed *"Samples were
-  likewise clustered … and a column dendrogram is drawn above the columns"* over a figure with
-  neither; and `split_by_cut` turns clustering **on** at `cluster="none"` and cuts it into blocks
-  labelled *"Cluster 1 / Cluster 2"* — an **unsupervised** partition that reads exactly like a
-  declared sample grouping — while the paragraph said nothing about columns at all.
-- **`integration`** cited **Korsunsky 2019 on every Harmony2 run**, though `harmony2` is a different
-  penalty and a different ridge (Patikas 2026); and it credited "Harmony" for work **Selom Melody**
-  did — the runner has never called harmonypy, and the figure TITLE has said "Melody" the whole
-  time. Third instance of the shape that retired the GSEA paragraph.
-- **`normalization_qc`** named the `groupby` column the user ASKED for after silently substituting
-  another (or pooling every cell), and hid that `max_cells` makes the **violins a subsample while
-  the table beside them counts every cell**. Not an edge case: the declared smoke case draws
-  **3,000 of 10,000**.
+Both runners now record what they RESOLVED (`layout.meta.trajectory` / `.annotate` → `_traj_run` /
+`_annot_run`), and both **reuse `violin`'s existing `clustered` record and its two prose helpers**
+rather than inventing a second vocabulary for the same substitution
+[[share-vocabulary-by-meaning-not-name]].
 
-⚑ **The reusable half: none of the six could be fixed by quoting the param harder.** `split_by`,
-`annotations` and `logfc` need a sample sheet and **silently no-op without one**; `split_by_cut`
-silently turns clustering on; whether `max_cells` bites depends on the file's cell count. A
-param-driven sentence would have swapped one false claim for another — so both runners now record
-what they **BUILT** (`layout.meta.heatmap` / `layout.meta.qc` → `_heatmap_run` / `_qc_run`), the
-same outcome pattern `deg`/`gsea`/`violin` already use. **Assert the ABSENCE of the old claim, not
-just the presence of the new one**, and prove each pin fails when its fix is reverted.
+**⚑ And rendering it found a SECOND defect, in a shared module (`0347665`): `_embedding_theme` was
+deleting an encoding that three separate sentences claim.** It treated every scatter trace with a
+`marker.color` as a cell cloud, so it overwrote the PAGA node trace's **size ARRAY — the cluster
+cell counts — with a scalar 5**. "Nodes sized by cell count" is stated in the figure's own
+subtitle, in the caption and in the methods paragraph; **17 clusters rendered at one dot size**.
+Same class as the `enrichment` dot-size defect one layer later — there the skill mis-encoded, here
+the theme un-encoded. It also stamped the cells' pseudotime **colourbar onto a constant-colour
+trace**, drawing a second meaningless bar whose ticks interleaved with the real one. Exactly one
+golden moves and its diff is only those two things.
 
-⚑ **Do not revert an injection with `git checkout <path>` when the file also holds uncommitted
-work** — it restores to HEAD and takes your edits with it. It cost a full redo of `methods.py` and
-`normalization_qc/run_real.py` here. Back up the file, or commit first
-[[static-analysis-guard-needs-blindspot-test]].
-
-### `#11` IS CLOSED (`21a17bb`). `tests/test_skill_param_declaration_guard.py` compares every
-skill's RUNNER against its `skill.json` in both directions, over all 44:
-
-- **The class it closes is invisible to every other guard by construction.**
-  `contract._execute` merges unknown caller keys straight through, `validate_param_ranges` skips
-  any key absent from `param_spec`, and `resolved_params` writes them into the **recorded
-  provenance bundle** — so an undeclared param works, changes the figure, lands in the
-  reproducibility record, and `API_ONLY_KNOBS` / the prose↔param guard / `paramFieldsFromSpec` all
-  START from the declaration and cannot see it.
-- **The board's re-measure held: 4 params across 2 skills, so both directions are cleared to ZERO
-  and there is deliberately NO waiver list** — a waiver would be a place for the fifth to hide.
-  `confusion.x`/`.y` **deleted** (undocumented aliases for the declared `true`/`predicted`; no
-  caller, no control, no prose). `erg_bwave_bar.vline`/`.vline_label` **declared + controlled +
-  mirrored into the dev:mock fixture** — not an alias: `0e1921e` wired "a reference line across
-  either axis" and declared NEITHER half; a later pass declared the horizontal one only.
-- ⚑ **The third test is the load-bearing one and is the reusable idea.** Both comparisons are only
-  as strong as the walk, so **a params dict handed anywhere the walk cannot follow is a FAILURE,
-  not a quiet gap** — otherwise moving a `params.get` into an unresolvable helper deletes the
-  finding from one test *and* fabricates a "dead knob" in the other. Chasing that to zero is what
-  pulled the shared `skills/*.py` leaf modules into the pool (`_design.load_design` was the real
-  hole). All three directions **proven to bite by name** and to go green on revert.
-- ⚑ **Resolve the dict by BINDING, never by the variable being spelled `params`** — the board's
-  warning was right: a name-matching probe reports 13 with 3 false positives (`pathway`'s Reactome
-  loop variable `p["stId"]` is a REST response, not config). Seed at the declared entrypoint,
-  re-bind at every hop — positional slot **or keyword** (every runner dispatches
-  `run_real(data_path=…, params=params)`, so keyword binding is not optional).
-  Handle `(params or {}).get(…)` too — three runners use it, and a Name-only reader would call the
-  live knob behind it a dead one.
-
-**⚑ And rendering the knob it made reachable found a defect no assertion could see:
-`_charts.bar_figure` was CLIPPING the reference line out of its own figure.** Both axis ranges are
-fitted to the DATA (`y_top * 1.08`; the bar positions), so a line outside that window was written
-into `layout.shapes` and then cropped — no line, no error, no note, every spec-level check green.
-**The broken case is the common one: a WT/normal threshold ABOVE the tallest bar, which is the
-usual reason to draw one at all.** Same class as [[dont-clip-the-reference-you-measure-against]],
-one axis over. Both axes now grow to contain the line; the no-reference-line path is untouched and
-every golden is byte-identical. Pinned by a named defect test in `test_charts.py`.
-
-**Gates:** `verify.sh` **9/9** — and re-run **with `SELOM_DATASETS_DIR` set**, because the first
-pass ledger says *"real-data tests SKIPPED, so be-test is a weaker gate than CI's"* and `be-slow`
-is corpus-free **by design** (`env -u SELOM_DATASETS_DIR`), so a shared chart-module change is NOT
-covered by a bare `verify.sh`. Goldens on the real corpus **109 pass**; `skill-smoke` **43 pass /
-0 fail / 1 skipped** (`facs_gating`, the staged-`.fcs` gap).
+**Gates:** `verify.sh` **9/9** re-run with `SELOM_DATASETS_DIR` set (a shared chart/theme change is
+not covered by a bare run); goldens **89 pass** (stub-pinned, so the `run_real` changes leave them
+byte-identical); `skill-smoke` **43 pass / 0 fail / 1 skipped**. All **11** pins proven to fail with
+their fix reverted and green on restore, via file backups — [[static-analysis-guard-needs-blindspot-test]].
+`tests/test_scrna_run_records.py` drives both REAL runners so a runner that stops writing its record
+cannot leave the prose pins green; slow-marked, and `be-slow` runs corpus-free so it is gated in
+both `verify.sh` and CI.
 
 ## ▸ NEXT
 
@@ -168,17 +133,26 @@ covered by a bare `verify.sh`. Goldens on the real corpus **109 pass**; `skill-s
 > lands with P-E's frontend half. **The two items that were batched for the owner are now CLOSED,
 > so nothing on this board is waiting on him except a real `.fcs` file.**
 >
-> Value order: **the rest of `#2`** (**99** untriaged) → **`#5`** (the audit's open rows 21–23,
-> render-visible collisions) → `#7` (the isolation-coverage guard).
-> **`#11` and `#2`'s four triaged blocks are CLOSED — see the LIVE block.**
-> ⚑ **Pick the next `#2` block by SIZE OF THE LIE, not size of the list — the rule paid on its
-> first use (`line`: 5 waivers, 2 lies, one of them "the paragraph named neither axis").** The
-> remaining best candidates are the same shape — skills whose runners RESOLVE or SUBSTITUTE
-> something: **`trajectory` + `annotate`** (`embedding` + `groupby`, which the scRNA runners
-> RECOMPUTE on a miss — **NEXT#10(c) names this exact class and it is still unfixed in these
-> four**), then **`pseudotime_genes`** (`groupby` never reaches its figure, already flagged at
-> `#1`). The big list entries (`legends.boxplot` 9) are mostly presentation and will triage fast
-> but find nothing.
+> Value order: **the rest of `#2`** (**86** untriaged) → **`#5`** (the audit's open rows 21–23,
+> render-visible collisions — **and `trajectory` is now a live instance: its colourbar title
+> overlaps the legend on shipped output**) → `#7` (the isolation-coverage guard).
+> **`#11` and `#2`'s six triaged blocks are CLOSED — see the LIVE block.**
+> ⚑ **Pick the next `#2` block by SIZE OF THE LIE, not size of the list — the rule has now paid
+> TWICE** (`line`: "the paragraph named neither axis"; `annotate`/`trajectory`: an uncited marker
+> panel and a whole inference method nobody mentioned). **`pseudotime_genes` is next by the same
+> reading** — `groupby` never reaches its figure (flagged at `#1`), and it shares `trajectory`'s
+> DPT root, which is now known to fall back silently. The big list entries (`legends.boxplot` 9)
+> are mostly presentation and will triage fast but find nothing.
+> ⚑ **THE LESSON THIS BLOCK ADDS, and it changes how to run the next one: read the runner's body
+> AND RENDER THE SKILL.** The two biggest findings here were invisible to a param-by-param read —
+> the five SimplePPT lineage curves are not a param at all, and the theme deleting the PAGA node
+> size encoding is not in the runner. **A `PROSE_SILENT` entry is a starting point, not the scope**
+> [[plotly-spec-can-encode-a-lie]].
+> ⚑ **Also found, NOT fixed, recorded here:** `annotate.marker_set` declares **2 options
+> (`retinal`, `retinal_cepo`) while `panels.json` ships FOUR** — `pbmc` and `retinal_swamy` work
+> through the API and are unreachable from the UI. `_load_panel` accepts any key. That is a
+> **`#1`-class reachability gap**, not prose, and it is a one-line `skill.json` change plus the
+> registry-completeness mirror [[selom-shipped-not-reachable]].
 > ⚑ **`#11`'s estimate had been WRONG on the board and right after re-measuring**: 4 params, not a
 > campaign. That was the third time in four sessions a board's own characterisation of a backlog
 > was wrong (`#2` "confirmed-waive pass" → 26 live lies; `#1`'s `86/13` tally → `88/14`), and the
@@ -186,7 +160,7 @@ covered by a bare `verify.sh`. Goldens on the real corpus **109 pass**; `skill-s
 > re-derive anything that looks stale** [[verify-todo-not-already-shipped]].
 >
 > `API_ONLY_KNOBS` = **52 across 10 skills** (measured 2026-08-05); `PROSE_SILENT` untriaged =
-> **104** (measured 2026-08-06 — the ceiling test prints the live count, so read it there, never
+> **86** (measured 2026-08-06 — the ceiling test prints the live count, so read it there, never
 > from this line). **`#1`–`#4` and `#11` are CLOSED; their detail is in the archive and the commit
 > range.**
 >
@@ -343,7 +317,17 @@ covered by a bare `verify.sh`. Goldens on the real corpus **109 pass**; `skill-s
     - **(c) A typo'd `groupby` silently substitutes Leiden and draws a plausible, differently-grouped
       figure** (`markers`/`trajectory`/`annotate`/`violin` run_real all recompute on a miss). `slope`
       already sets the precedent — it labels its columns "(required)" and refuses to guess, because
-      *the wrong choice still looks right*. Nothing reports the substitution.
+      *the wrong choice still looks right*.
+      **⚑ HALF-CLOSED 2026-08-06 (`186dc29`): the substitution is now REPORTED by three of the four.**
+      `violin` (2026-08-05), then `trajectory` + `annotate`, all write the same
+      `layout.meta.clustered` record and read it back through the same two prose helpers
+      (`methods._grouping_phrase` / `legends._group_noun`) — so the paragraph and the caption name
+      the groups the figure IS rather than the column the user asked for. **`markers` is the one
+      left**, and it is a drop-in: write the record in its `run_real`, and both templates already
+      know what to do with it. What is still NOT done is the other half of (c) — *refusing* to
+      guess, or surfacing the substitution in the FE. Reporting it honestly is strictly the smaller
+      fix, and it was worth doing first because a silent substitution is a lie while a disclosed one
+      is only a default.
     - **(d) The param grid has no reset-to-default and no per-knob revert** — and the AI half already
       has one (`AiMarker onRevert`), so a manual edit is strictly worse served than an AI proposal.
       The all-or-nothing Reset got much more expensive at 57 new knobs (`violin` is now 12 controls).
