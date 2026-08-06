@@ -18,8 +18,12 @@ Two deliberate departures from the printed figure (requested 2026-08-02):
   1. AAV8-CMV-GFP is pulled DOWN to a clean null. In the real extraction it
      reads ~42 uV at 1.0 log cd.s/m2 -- level with Untreated, which is more
      residual signal than a GFP-only control should show.
-  2. AAV8-RK-PDE6B takes that vacated partial-response level (~48 uV): a
-     visible rescue over the nulls, well short of the 3'UTR arm (~135 uV).
+  2. AAV8-RK-PDE6B takes that vacated partial-response level (~46 uV at
+     1.0 log): a visible rescue over the nulls, well short of the 3'UTR arm
+     (~127 uV). Widened 2026-08-06 (Vmax 105 -> 60) so the gap between the two
+     rescue arms is legible in the TRACE GRID, not only in the summary table --
+     at Vmax 105 the two arms drew similar-looking bumps. The `slight`
+     p-value band still holds (p ~ 0.002-0.004, well inside its 0.0005 floor).
 
 Model: each condition is a Naka-Rushton saturating intensity-response curve
 
@@ -68,7 +72,7 @@ CONDITIONS = [
     # label,                        vmax,  log_k,   n,    cv,   n_eyes   @1.0    @1.9
     ("Control",                    235.0,  -1.55, 0.85, 0.10,  8),   # ~233   ~235  WT
     ("Untreated",                   34.0,   1.15, 1.40, 0.22,  4),   # ~13    ~31   null
-    ("AAV8-RK-PDE6B",              105.0,   0.78, 2.30, 0.30,  7),   # ~80    ~105  partial rescue
+    ("AAV8-RK-PDE6B",               60.0,   0.78, 2.30, 0.30,  7),   # ~46    ~60   partial rescue
     ("AAV8-RK-GFP-polyA-stuffer",   30.0,   1.18, 1.40, 0.22,  3),   # ~11    ~27   null
     ("AAV8-CMV-GFP",                26.0,   1.22, 1.40, 0.22,  4),   # ~9     ~23   null (pulled down)
     ("AAV8-RK-PDE6B-3UTR",         165.0,   0.75, 2.40, 0.20,  4),   # ~132   ~165  best rescue

@@ -15,8 +15,9 @@ scotopic intensity ladder, per-group n, realistic eye-to-eye spread.
    1.0 log — level with Untreated, more residual signal than a GFP-only control should show.
    Here it is the lowest of the six.
 2. **AAV8-RK-PDE6B shows partial rescue**, significantly above every null arm.
-3. **The two rescue arms are separated only *slightly*** (p ≈ 0.02–0.03, `*`), so they read as
-   a graded effect rather than two unrelated results.
+3. **The two rescue arms are separated only *slightly*** (p ≈ 0.002–0.004, `**`), so they read
+   as a graded effect rather than two unrelated results. The gap was widened on 2026-08-06 so
+   the difference is legible in the trace grid, not only in the summary table.
 4. **Every rd10 arm is silent until flash 1.0.** Only the WT Control responds to the dim
    flashes; the treated and null arms sit at the noise floor below 1.0 and climb sharply
    through it, matching the real recordings. This is enforced, not hoped for — see the
@@ -28,7 +29,7 @@ scotopic intensity ladder, per-group n, realistic eye-to-eye spread.
 |---|---:|---:|---:|
 | Control | 8 | 234.51 | 8.48 |
 | Untreated | 4 | 12.32 | 1.39 |
-| AAV8-RK-PDE6B | 7 | 79.81 | 12.74 |
+| AAV8-RK-PDE6B | 7 | 45.56 | 7.28 |
 | AAV8-RK-GFP-polyA-stuffer | 3 | 10.64 | 2.24 |
 | AAV8-CMV-GFP | 4 | 8.12 | 1.48 |
 | AAV8-RK-PDE6B-3UTR | 4 | 126.81 | 12.18 |
@@ -39,7 +40,7 @@ scotopic intensity ladder, per-group n, realistic eye-to-eye spread.
 |---|---:|---:|---:|
 | Control | 8 | 234.65 | 7.47 |
 | Untreated | 4 | 30.56 | 3.24 |
-| AAV8-RK-PDE6B | 7 | 103.94 | 11.15 |
+| AAV8-RK-PDE6B | 7 | 59.36 | 6.33 |
 | AAV8-RK-GFP-polyA-stuffer | 3 | 26.41 | 3.52 |
 | AAV8-CMV-GFP | 4 | 22.94 | 1.9 |
 | AAV8-RK-PDE6B-3UTR | 4 | 165.99 | 16.06 |
@@ -50,7 +51,7 @@ no gaps — so mean and SEM are fully recomputable from the raw points.
 ### Significance (Welch's t-test)
 
 Checked and reported at **both** 1.0 and 1.9 log. Both rescue arms clear every null arm; the
-3'UTR-vs-RK-PDE6B gap is `*` at both. Full numbers in `mock_fig1e_bwave_stats.csv`.
+3'UTR-vs-RK-PDE6B gap is `**` at both. Full numbers in `mock_fig1e_bwave_stats.csv`.
 
 The Welch implementation is pure stdlib (`statistics` has no t-distribution) and was validated
 against `scipy.stats.ttest_ind(equal_var=False)` — agreement to 1.5e-15 relative.
@@ -64,7 +65,7 @@ names, plus its own trace figure.
 |---|---:|---:|---:|
 | Control | 3 | 230.69 | 17.27 |
 | Untreated | 3 | 12.75 | 1.4 |
-| AAV8-RK-PDE6B | 3 | 77.05 | 1.75 |
+| AAV8-RK-PDE6B | 3 | 44.05 | 1.04 |
 | AAV8-RK-GFP-polyA-stuffer | 3 | 10.65 | 2.26 |
 | AAV8-CMV-GFP | 3 | 8.75 | 2.55 |
 | AAV8-RK-PDE6B-3UTR | 3 | 127.13 | 8.06 |
@@ -73,7 +74,7 @@ names, plus its own trace figure.
 |---|---:|---:|---:|
 | Control | 3 | 238.79 | 17.69 |
 | Untreated | 3 | 30.32 | 2.29 |
-| AAV8-RK-PDE6B | 3 | 107.75 | 9.4 |
+| AAV8-RK-PDE6B | 3 | 61.82 | 5.48 |
 | AAV8-RK-GFP-polyA-stuffer | 3 | 27.19 | 2.82 |
 | AAV8-CMV-GFP | 3 | 23.44 | 2.4 |
 | AAV8-RK-PDE6B-3UTR | 3 | 159.13 | 12.27 |
@@ -159,9 +160,10 @@ Re-run the renderer afterwards so the traces follow the new numbers.
 writing** if a retune breaks it:
 
 - Control above the 3'UTR arm at every intensity
-- 3'UTR above AAV8-RK-PDE6B at every intensity
-- AAV8-RK-PDE6B clearly above every null arm (from 0.1 log up; below that all groups sit at
-  the noise floor and none separate)
+- 3'UTR above AAV8-RK-PDE6B **from flash 1.0 up** (below the threshold both arms sit at the
+  noise floor, where noise decides the order — so nothing is asserted there)
+- AAV8-RK-PDE6B clearly above every null arm, also **from flash 1.0 up**; below that all
+  groups sit at the noise floor and none separate
 - AAV8-CMV-GFP at or below Untreated at the reference intensity — the requested change
 - every condition rising across the intensity ladder
 - both rescue arms beating every null arm **significantly** (Welch, p < 0.05), at 1.0 **and** 1.9
