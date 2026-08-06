@@ -27,17 +27,18 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
-| **DEG-PANEL** | 2026-08-05 | `main` `9daa043..<head>` (**local — owner pushes**) | **`#1(d)` closed as one spec-first change, and the flagship DE figure had been claiming a fold change it never computed.** `deg` is not the shape the earlier knob batches were: **FOUR disjoint engines behind one `mode` knob, and `mode` itself was API-only** — the knob deciding which of the other seventeen do anything could not be touched. `API_ONLY_KNOBS` **75 → 52, 12 skills → 10** (measured by counting the list; the LIVE block's own "73 across 11" was stale again, the same derived-number error the board flagged last session). `diff_abundance` had **no overlay at all** — the `sankey` shape, where an empty panel is indistinguishable from "this skill has no options". ⚑ **THE FIGURE DEFECT: `_scrna` plots scanpy's `scores`, which its own docstring calls "the z-score underlying the computation of a p-value", under an axis and a Statistics column both reading *"log2 fold-change"*.** On the real corpus render that puts **44.6** under a log2 fold change — a 26-trillion-fold change — on the DEFAULT path of the flagship skill and on its own smoke case, green through nine gates. Re-ranking by `logfoldchanges` would not fix it (absent on the default Wilcoxon run), so the LABEL changes, computed from `method`. **Bounded honestly: no reproduction score reads it** — `de_counts` needs a `direction` column and `deg` emits none (`diff_abundance` does, and its numbers were always right). ⚑ **SIX PROSE LIES, from reading all four runner bodies**, every one green because the guard checks a param is MENTIONED not that the sentence is TRUE: `method` reaches `rank_genes_groups` untouched while the paragraph always said Wilcoxon · an absent `groupby` makes the runner **cluster the cells itself** and the paragraph named the requested column (the `violin` case, a **fifth** skill) · a blank `sample_col`/`condition_col` resolves through an alias list while the paragraph defaulted to the literal word *"sample"* · `mode="auto"` picks ONE engine and the sentence described both (`erg_flicker.view`) · and the sharpest, **`_bulk_deseq`'s ImportError fallback returns a log2 of mean CPM with NO model and NO p-values while the paragraph claimed a PyDESeq2 Wald test and Benjamini-Hochberg and CITED all three** (the `_boxplot` family, third time). Plus two undisclosed exclusion criteria and a TMM degrade that lived only in the figure subtitle. All ride `layout.meta.deg` — the `meta.significance` pattern, **fourth** use. ⚑ **AN EIGHTH LAYER OF [[selom-shipped-not-reachable]]: a param NO DECLARATION KNOWS ABOUT.** `deg`'s runner reads `group_regex` and `label_val`, absent from its `skill.json`; `_execute` passes unknown keys straight through, `validate_param_ranges` skips them, `resolved_params` **records** them. They work — and every guard in this repo starts from the declaration, so **none of them can see one**. The previous seven layers were *the user cannot get to it*; this is *no declaration admits it exists*. `group_regex` is now declared (it decides what the two bulk groups ARE), `label_val` deleted as an undocumented alias, and `mode`/`method` gain `options` so an unknown value is a **400** instead of a silent run of a different engine (`run()` lowercases but does not strip — `mode=" bulk"` ran the single-cell path). **The level widget** (`#2`'s converged half) is the single-select sibling of `pairs` with ONE added rule: blank column + exactly one candidate uses it, because a bulk counts CSV has **no condition column at all** and publishes its levels under the `__column_names__` sentinel. It deliberately does **not** fall back to `best_group` — that IS the engine's deg pick and agrees with the runner whenever an alias is present, but where none is **the runner RAISES while `best_group` guesses**, so the picker would offer levels for a run the backend refuses. Obs knobs read `groups`/`sample_col_candidates`, not `columns` (`[]` for an h5ad by construction — finding (f)); `groupby` is a **combobox** because Leiden does not exist until the run. ⚑ **TWO CORRECTIONS AGAINST MY OWN SPEC, recorded in it**: D1's *"under `auto`, only the shared knobs render"* would have **hidden the contrast boxes that ship today** — a regression dressed as a reachability fix (the `fdr_threshold` lesson), so `auto` shows the two engines it can resolve to and hides the other nine; and D6 had the stub's axis moving to meet its table when the stub's numbers are invented and *"score (signed)"* is the honest label, so the **table** moved — more truthful **and** it moves no golden. **Mobbin ruled radio cards OUT for `mode`**: attested five times (Wise · User Interviews · Gusto · Revolut · Cake) and **every instance is a full-page wizard step**, which a narrow dock has nowhere to host; what transferred is Copilot's mode-select-with-the-block-beneath and Gusto's per-option statement of what the option DOES. `PROSE_SILENT` untriaged **166 → 131** (equality-asserted). Gates: `verify.sh` **9/9 raw, exit 0, corpus set** · **skill-smoke 43 pass / 0 fail** · **browser-verify `deg-panel` 4/4** + `param-pickers`/`api-only-knobs`/`shared-vocab-knobs` **10/10** regression. Every new pin confirmed RED first. Also fixed, unrelated and blocking: **`wf-lint` was red on `main`** — `dorny/paths-filter`'s pinned commit gained an upstream `v3.0.3` tag so the bare `# v3` comment stopped naming a version. |
-| **GSEA-KNOBS + LEDGER-PROVENANCE** | 2026-08-05 | `main` `ea68c79..<head>` (**local — owner pushes**) | **`#3` and `#4` both closed in the owner's order, and the control pass found three prose lies the guard could not.** `#3`: `API_ONLY_KNOBS` **88 → 75, 14 skills → 12** (⚑ **MEASURED, not derived — the board's running tally said 86/13 and was already wrong by 2 knobs / 1 skill before this session; my first write-up compounded it by subtracting from the stale number instead of counting.** Count the list, never the tally). `gsea` (6) + `ssgsea` (7) share `gene_sets`/`gene_set` — verified identical by reading both bodies (same `_SOURCE_ALIASES` → `load_collection`, same `_parse_panel`), and `enrichment` adopts the same block so the library wording has ONE home. What is NOT shared is named: `weight` is the same exponent but its conventional value is the METHOD's (1.0 prerank / 0.25 ssGSEA, already carried by the spec default), and `top_n` is `enrichment`'s *most enriched* vs `ssgsea`'s *most VARIABLE across samples* — same key, different rule. ⚑ **Establishing that meaning is what surfaced three live printed-vs-computed lies in `methods._gsea`, all green through nine gates**: `engine` defaults to `auto` and resolves from what is IMPORTABLE, yet the paragraph said *"(gseapy.prerank)"* and cited GSEApy on **every** run — including blitzGSEA's gamma-fit p-values and the in-house numpy weighted-KS; `n_perm` was quoted RAW while `_perm_count` floors both library engines at 100 and reads an explicit 0 as **1000**, so `n_perm=50` claimed a resolution the run never had; and **Benjamini-Hochberg was claimed AND CITED on single-set and in-house runs, which correct nothing across sets** (the `_boxplot` "cites Welch and BH while returning `[]`" family, inverted). Plus ssGSEA's `top_n` quoted as a COUNT in both paragraph and caption when `order[:top_n]` is a CAP — the figure's own title has always carried the real number. **The guard was green because it checks a param is MENTIONED, not that the sentence is TRUE** — its known one-directional blind spot. All four are answers only the runner has, so they ride `layout.meta` and are lifted by `build_body`/`legends._facts` (`meta.significance` pattern, third use). Also: choosing the in-house engine in library mode raised *"needs gseapy or blitzgsea installed"* — blaming an absent dependency that IS installed, newly reachable now that `engine` has a control; and ssgsea's local `_truthy` is DELETED because `skills._engine.to_bool` is byte-identical (grep before you extract, again). ⚑ **Mobbin ruled the obvious pattern OUT**: an override should be an EXPLICIT mode (Google AI Studio folds "Write my own instructions" into the preset dropdown; WRITER uses segmented Upload/Paste-URL/Paste-text), which Selom cannot copy without inventing a backend `mode` param — so the library select **greys out** the instant a set is pasted, making the silent override visible exactly when it takes effect. **`overridable` defaults OFF for a reason caught before it shipped: `enrichment` declares no `gene_set` at all, and a gate naming an absent key never matches — it would have been PERMANENTLY DISABLED.** `PROSE_SILENT` **179 → 166**; `("methods","gsea")` retired. **`#4`** (DECISIONS #16, spec written first then built straight through, no pause): a metric the reader itself rated **0.45**, read off an L3-SYNTHESIZED table, rendered on `/reproduction/<slug>` as **VERIFIED / 100** Selom-confidence — `panel_extractor` did `out[gold.metric] = r.value` and dropped `layer`/`source`/`confidence`. Now `panel_extractor_readings` keeps the `Reading`, the provenance rides `MetricValue` + `ValidationResult`, and `_metric_score` caps `selom_confidence` at **75** — capping and not badging alone, because a badge is disclosure a reader can miss while the headline still says 100, and the cap is the pattern already in that function (`substituted` caps reproducibility at 92). ⚑ **TWO BOARD PREMISES NEEDED CORRECTING**: `PanelScore.provenance` was **already taken** (the deposited-source badge "ST6+ Fig4e−") → new field `reading_provenance`; and `run_panel` has **no production caller**, the same "plausible name, matching docstring, no caller" shape as `table_extractor`, so only `drive.py` was stamped. Rejected re-reading via `panel_readings` — `read_metric` PERFORMS synthesis, so a second pass re-synthesizes every tableless panel. ⚑ **The badge cannot appear on any published ledger and that is CORRECT** — rpgrip1/jev/hani are captured replays with no readings, so all 29 panels are `""` and `fixture.ts` (real engine output) still matches a regeneration; verified against the live engine, recorded in spec §7 so nobody reads it as broken. New capability: **vitest now includes `components/**/*.test.ts`**, so a component predicate is testable without a DOM. Gates: `verify.sh` **9/9 raw, exit 0, corpus set** on both commits · **skill-smoke 43 pass / 0 fail** · **browser-verify `shared-vocab-knobs` 5/5** real backend + real corpus. Every new pin confirmed RED first **except one, labelled as such** — the ssGSEA string-`"false"` test passes pre-fix because `resolved_params` already casts by declared type, so that expected defect was **not real**. |
-| **PROSE-TRIAGE** | 2026-08-05 | `main` `5eb8274..91ed4a4` (**pushed**) | **The board's `#2` opened on the ERG family expecting a confirmed-waive pass, and it was half printed-vs-computed lies: 26 of those 50 params decide what the figure CLAIMS while the paragraph said something else.** The two-directional prose↔param guard shipped as a RAW capture (261 params / 60 templates, none examined); the board's note said ERG was "mostly pipeline-level/internal". **Reading the four runners' BODIES said otherwise** [[share-vocabulary-by-meaning-not-name]]. ⚑ **`erg_traces` with `central="mean"` titles the figure *"Mean … ERG"* while the methods text said a representative eye is shown *"rather than shown as group means"* — prose contradicting the figure's own title.** `erg_intensity_response` with `fit=false` fits nothing, and the entire Naka-Rushton paragraph **plus its two citations** described a model that never ran (the `_boxplot` "cites Welch and BH while returning `[]`" family, inverted); *"did not support a saturating fit"* **IS `min_r2`**, the number saying which conditions were dropped. `erg_bwave_bar` hard-coded *"b-wave"* while `wave`/`value_col` select the a-wave — a **different construction** (baseline-to-trough, not trough-to-peak) — printed *"the standard error of the mean"* under `error=sd|ci95|minmax` **and under `show_error=false`, which draws no bar at all**, claimed *"every eye is overlaid"* with `points=false`, and drew significance brackets from `comparisons`/`sig_test`/`correction` **with no test named anywhere**. `erg_flicker`'s `view` picks ONE of two figures and the sentence claimed both at once, so the *"N1–P1 also plotted against frequency"* half was **false on the DEFAULT path**. Then the board's named result-changers: `proteomics_de` said *"mean-imputed"* on every run while `missing=mindet|minprob` fill from the detection-limit tail — **the choice that moves a fold-change further than the choice of test does** — and `log_input=true` means the intensities ARRIVED log-scaled while the paragraph still opened *"were log2-transformed"*; `markers`' CAPTION was wrong on the **default** path (`standard_scale` is default-TRUE, so the colour is [0,1]-scaled and the caption called it the mean). ⚑ **TWO WERE FIGURE DEFECTS, NOT PROSE.** `_erg_adaptation` read `adaptation` alone, but every runner resolves through `_erg.resolve_flash_mode` where an explicit `stimulus_type` **WINS** — so a photopic figure got a paragraph about overnight dark-adapted mice; worse, **all three flash runners hard-coded `adapt or "scotopic"` in their TITLE**, so on the iWorx path (no `stimulus_type` column) a run asked for `adaptation="photopic"` was **titled *Scotopic***. And **`violin` clusters the cells itself when the requested `groupby` is absent** — the figure disclosed the substitution in its title and axis while the paragraph *and* the caption named the column the user asked for, and the **`resolution` that produced those clusters was recorded nowhere at all**; its value axis also hard-coded *"expression (log1p)"* while `normalize=false` skips log1p. **The param cannot always answer** (`auto` resolves from the DATA; whether violin's fallback fired is a fact about the data), so both ride `layout.meta` lifted by `build_body` as `_`-prefixed facts — the `meta.significance` pattern — **written ONLY when they differ from the param-derived answer**, so every default run is byte-identical and no golden moves. **The structural half: every waiver now carries a VERDICT** — `PRESENTATION` · `INTERNAL` · **`VIA_OUTCOME`** (the claim IS made, from the recorded outcome, because the param is inert unless a data-dependent branch fired) · `IN_METHODS` (legends only) · `UNTRIAGED` — and **UNTRIAGED is a counted ratchet asserted by EQUALITY, not `<=`**, so the backlog cannot shrink on paper while the ceiling stays slack; **it caught exactly that on its first run**. **There is deliberately no `OWED` verdict** — a param whose fix is owed gets the fix and LEAVES the list, because a waiver admitting it protects a known lie is worse than no waiver. **261 → 179 untriaged**; `methods.proteomics_de` · `methods.markers` · `legends.markers` retired entirely. Also: `_pairwise_prose` is one home for every skill drawing brackets off `_stats.test_pairs` (boxplot · violin · erg_bwave_bar) and adds the clause they all owed — **a pair carrying an override (`A~B:**`) was NOT computed, so neither the named test nor SciPy may be credited with it** — and `erg_bwave_bar`'s local `_parse_comparisons` is DELETED because `_stats.parse_pairs` already existed and is strictly more capable (**I had started writing the third copy before checking**). Gates: `verify.sh` **9/9 raw, exit 0, corpus set** (BE 1704 fast + 397 slow · FE 730 · fe-build green) · **skill-smoke 43 pass / 0 fail, no regression**. **22 new pins, every one confirmed RED against the pre-fix code before being kept.** |
-| **COMPARE-VERIFY** | 2026-08-05 | `main` `5eb8274..9dafd55` (**pushed**) | **The board's `#1` closed: the fix pass's one unproven claim now has rendered proof — and proving it found a SECOND silent under-report in the same surface.** Compare was unreachable to every browser check because a comparison needs **sibling** figures: running a skill twice makes two unrelated ones, and only a sweep sets `parentFigureId`. **`sweepIntoCompare`** is the fourth browser-verify entry fixture (beside `openRealFigure`/`openWorkbench`/`runFromWorkbench`) — it forks the open figure into a version family over one knob and lands in compare. The check is the scenario four review lenses described: `lollipop` with real pairs, swept `correction` none→BH, asserting two titled cards, table 0 *identical*, table 1 *changed*, and the old plural copy nowhere. **TWO comparison pairs, not one, and that is load-bearing** — BH on a SINGLE p-value returns it unchanged (rank n of n), so a one-pair check would pass on the added `p (bh)` column alone and keep passing if the correction silently did nothing. ⚑ **THE FIND: `diffTables` indexed rows by `String(row[0])` into a Map, so a repeated first-column value overwrote its predecessor — no `added`, no `removed`, no trace.** That is the NORMAL shape of a pairwise table (`group A` repeats whenever one control is compared against several treatments): the real two-pair run rendered **ONE** row and reported *"~1 changed"* — a confident, specific, wrong number, the same family as the bug the check exists to prove fixed. Rows are keyed by first-column value **disambiguated by occurrence** — byte-identical to the old key wherever that column is unique (gene · cluster · rank · group = every other table this repo emits), never a dropped row; a composite key over the leading string columns would survive reordering but would report a changed second column as removed+added, which is worse reporting for a real edit. **Why the unit pins missed it is the part to keep: every fixture in `diff.test.ts` used a UNIQUE first column — the pairwise one included, with a single row. The tests used the one shape that cannot exhibit the defect.** Both new tests confirmed RED first. Also recorded: **locate a control inside a wrapping `<label>` BY ROLE** — Playwright's `getByLabel` matches the label's `textContent`, which for a wrapped `<select>` includes every `<option>`, so `getByLabel("Parameter",{exact:true})` finds nothing on the sweep form while the accessible name is correctly "Parameter". Gates: `verify.sh` **9/9 raw, exit 0, corpus set** (BE 1682 fast + 394 slow, FE 730, fe-build green) · **browser-verify compare-tables green + stats-view 5/5 green**. |
-| **STATS-TABLES-5** | 2026-08-05 | `main` `3b44a31..6d5c6ce` (**local, 3 ahead — owner pushes**) | **`#4` is CLOSED: slice 5 shipped, both milestone reviews ran, and the fix pass found that compare had been diffing 1 of N tables the whole time.** Slice 5 moved `confusion`'s agreement scalars and `qq`'s λ out of a table TITLE into a one-row table each — a number in a title is prose: no CSV, no diff, no metric reader. ⚑ **The array ORDER turned out to be load-bearing for a reason D4 never anticipated**: `_read_count` answers any count-shaped metric from the FIRST table with rows, falling back to `len(rows)`, so a one-row scalar table in position 0 reports a count of **1** at confidence 0.5 into a reproducibility score. Both runners lead with the detail table; the guard proves it by reading the REVERSED array and asserting the wrong answer comes back. D4's "extracts like every other table" is corrected in the spec — a wide scalar row is also unreadable by `_read_named_cell`, which keys on a row's first STRING cell. **The refusal is the real-corpus case, not the value case**, and it now publishes `n=83659` beside its named reason in a cell, under `["n", "note"]` columns — never `"not defined"` under a header reading *Cohen's kappa*, which is `de_table`'s own honesty rule. Two guards had to be EXTENDED rather than loosened: G3's "no native skill emits a list on DEFAULT params" became a declared two-directional list (these two scalars are computed on every run and gated by no knob, so gating the split on a param would invent a switch to protect a shape rather than a user), and `test_stub_native_skill_yields_a_table` was narrowing the union by calling `.get` on the raw value — `AttributeError` on a list, the union sprouting inside a test. **Then the `outputs` finding, a SEVENTH layer of [[selom-shipped-not-reachable]]**: regenerating the seed showed `outputs:["figure"]` on two skills that had just been made to emit two tables, and checking the rest turned it into **17 of 27 native-table skills declaring they produce no table** — volcano, boxplot, lollipop, venn, forest, line, markers, proteomics_de among them — rendered on three surfaces (Store · Library · Skill Match) and built by the live API from the same `skill.json`. The previous six layers were all *the user cannot get to it*; this one is *the user is told it isn't there*, which is worse in one way: nothing looks broken, so nobody goes looking. **Then the reviews**: gauntlet 13 confirmed / fe-review 16 confirmed + 23 JTBD, every finding re-verified in code before acting. ⚑ **Four independent lenses found the same thing — `compare-view.tsx` diffed `figureTables(a)[0]` only, for the whole of slices 1–5, while its card announced *"The results tables are identical"*.** Re-run lollipop with `correction` none→BH: table 0 is byte-identical and the entire change lives in table 1, so compare said "identical" beside a Parameters card reading `correction: none → bh`. **That falsified decided-question 2's own reachability argument** — the stated reason for preferring a table to a caption was that a table "sorts, exports, DIFFS IN COMPARE and is readable", and one of the four was not true; the slice-5 commit repeated the claim unchecked. Fixed by pairing every index, with the pairing moved OUT of the component into `lineage/diff.pairTableDiffs` precisely because the inline version could not be tested, plus a `structure.guard` rule failing any new `asTables(…)[0]` outside a named allowlist (**which caught one of my own two waiver entries on its first run**). Also fixed: StatsPanel state leaking ACROSS figures (`key={i}` — and slice 5 made it worse, since a one-row table's headers are inert so an inherited sort could not be cleared) · the synthesized disclosure stating a reason slice 4 made false · mouse-only sort headers that this milestone had just given `aria-sort` · `_run.py`'s `ALSO_SYNTHESIZE` branch having **no gated consumer** (deleting it left 1672 tests green) · `_STUB_NATIVE` a drifted hand-copy missing `qq`, so the seam validator's list branch had only ever seen dict literals · `_boxplot` prose naming Welch and Benjamini-Hochberg while returning `[]` citations. Gates on every commit: `verify.sh` **9/9 raw, exit 0, corpus set** · **skill-smoke 43 pass / 0 fail** · **browser-verify 5/5 stats-view + 9/9 editor-chrome/artboard/zoom** — and the first browser run after the fix pass **failed 3/5**, caught by my own CSV `aria-label` colliding with the panel-header locator. |
-| **STATS-TABLES** | 2026-08-05 | `main` `f5a47c0..6be1fad` (**pushed, CI green**) | **`#4` built slices 1→4 in the board's order, plus `#10(a)` interleaved where the board put it. A figure can carry more than one Statistics table, end to end.** Slice 1 is the contract — the wire becomes `StatsTable \| StatsTable[] \| null`, narrowed at **exactly one site per side** (`skills/_table.as_tables`, `lib/skills/stats-tables.asTables`), both guarded structurally. **The spec told me to re-derive its own consumer inventory rather than trust it, and that paid: four more narrowing sites, one of which BREAKS on a list** — `workrail.tsx` reads `figure.table.rows.length` for the Statistics rail row (an array has no `.rows`); `project-workspace.tsx` had `hasStats: !!figureTable(f)` where **`!![]` is `true`**, so a figure with no statistics would claim it has some; and `legends._facts` narrowed with `isinstance(table, dict)`, so a list would have produced a caption with **no facts and no error**. **The single most dangerous line was `extract/readers.py`'s L3 gate** (`if table is None`), permanently False under the normalizer — it would have killed synthesis for every tableless skill and landed them on `NEEDS_RECIPE`, a plumbing regression wearing the costume of an honest verdict. Five guards, **each proven to bite by reverting the fix**, and G2's FE half fired in **`components/`** — the root a `lib/`-only scan would have missed. Slice 2 stacks N panels, every one open up to three: collapsing tables 2..N is wrong **for the same reason tabs are**, since a collapsed panel and an unselected tab hide the same numbers. ⚑ **Mobbin ruled out D2's own `N tables` heading count** — eight mature multi-section report surfaces and not one heads the group with a count of its sections (Laravel Cloud titles each section and lets the stack speak; Braintrust's counts are per-section and describe ROWS, which `StatsPanel` already does). Slice 3 unsqueezed `lollipop` — and ⚑ **the feature was UNREACHABLE**: `lollipop.pairs` was API-only, so a two-table result existed that **no user could produce**. That is [[selom-shipped-not-reachable]] one layer past the 171-knob sweep — not an unreachable route, skill or knob, but an unreachable **contract capability**. `pairs`/`sig_test`/`correction` got controls, the latter two declared **once** (`COMPARISON_STATS`) after reading all three runners' bodies and finding byte-identical `test_pairs(...)` calls; `pairs` deliberately stays OUT of that block because it is the same knob by meaning and a different WIDGET (violin's clusters do not exist until the run). `#10(a)` made the prose↔param guard two-directional; **its first red run is a 269-param backlog across 61 templates**, and it immediately found **two more live printed-vs-computed lies in `methods._boxplot`** — "box-and-whisker … 1.5× the IQR" on a `style="strip"` run that draws **no box at all**, and "ordered by descending median" on a run where `order` puts the user's named categories first. Slice 4 gave `boxplot` both tables via a **declared, executed** opt-in (`ALSO_SYNTHESIZE`) — ⚑ **and its guard's first run proved D3's premise half wrong**: `violin` does NOT belong, because its synthesized table is a PubMed call read back out of an annotation that is a **live network lookup**, so it is not deterministically producible and appending it would make a network-dependent number more reachable by a reproducibility score before NEXT#10(b)'s stamping lands. So `NATIVE_L3_BOTH` **split** rather than dissolved. **The trap slice 4 opens is the part worth reading**: provenance used to be decided by POSITION (only the L3 fallback branch re-tagged), so an appended synthesized table would have been read at **full native confidence** — a re-shaped value silently overstating itself on a score. It follows the table's own `synthesized` flag now: one rule, driven by the data, strictly more correct than before. Gates on every commit: `verify.sh` **9/9 raw, exit 0, corpus set** (1664 passed) · **skill-smoke 43 pass / 0 fail, no regression** (run twice) · **browser-verify 4/4**, all new — the suite had **never opened the Statistics view at all** before this session. |
-| **KNOBS-2** | 2026-08-05 | `main` `60cb4c4..e9334c4` (**pushed**) | **The board's order followed exactly: `#4`'s spec written and PAUSED for review, then `#1(a)+(b)` — `API_ONLY_KNOBS` 148 → 91, 27 skills → 14.** **`docs/stats-tables/spec.md`** widens `StatsTable | null` to `StatsTable | StatsTable[] | null` and rejects two alternatives: a sibling `tables:` field is a hand-maintained mirror (the shape removed from `seed.ts` last session), always-a-list breaks every persisted row and all 27 runners. The squeeze is **shipped, not hypothetical** — `lollipop`/`boxplot`/`violin` each DISCARD a computed table when `pairs=` is set — and the quieter form is worse: **`confusion`'s Cohen's κ and `qq`'s λ live in a TITLE STRING**, so for every machine consumer in this repo (CSV export, `lib/lineage/diff.ts`, the reproduction metric extractor — all of which read `columns`/`rows`) the headline number of the run **is not a result, it is prose**. **D2 was the Mobbin question and Mobbin ruled the obvious pattern OUT**: tabs (Databricks SQL results · Dub) fit tables that are alternative slices of ONE measure, while Selom's are complements and one is the **provenance of marks already drawn on the figure** — stars on the canvas with their p-values behind an unselected tab repeats the failure the one-table trade exists to avoid. Stacked titled panels (Fresha · Gorgias), first open. Two board numbers corrected by the inventory: `NATIVE` is **27 skills not ~18**, and `routers/figures.py` types `table_stats` `dict | None` so **Pydantic REJECTS a list — a two-table figure would 422 at save**; that one field is the whole persistence migration. **Then `#1(a)+(b)`, worked by cluster as instructed — and the instruction to verify before sharing paid for itself four times.** `normalize` appears in 14 skills under **three different meanings**: 11 share it byte-identically (`normalize_total(1e4)` + `log1p`), but **`pvca.normalize` divides each feature by its SD — it is `pca.scale` under another name, and the board had named `pvca` among the 8 that "mean the same thing"**; `scorecard.normalize` min–max scales metric columns; `confusion.normalize` is a str enum. `groupby` split the same way — 4 skills share the grouping column (wording taken from `heatmap`, the clearest of them) while **`pseudotime_genes.groupby` never reaches its figure at all**, only rooting the trajectory. **The rule: read the runner's BODY, not the guard line and not the key name** — a grep returns all fourteen and separates none of them. **Two guards extended rather than restated**: the mock mirror checked fixture keys in both directions but **never the VALUES**, so a fixture could name every key and still render a different control (bounds come from the spec; an unbounded range silently becomes 0–100) — it found `erg_bwave_bar.value_col` pinned to `"b_wave_uv"` where the backend defaults it blank, meaning *derive from `wave`*, which made the **`wave` knob look INERT in dev:mock**; and **`runFromWorkbench` can drive a SWITCH** (a `role="switch"` button — `fill()` threw, `.type` was undefined, so **every bool knob was undrivable**, and `normalize` alone is 11 skills), idempotent by comparing `aria-checked`. **Both reviews then ran (owner-requested) and both earned their keep — gauntlet 10 confirmed / 2 blockers, fe-review ~20 confirmed; every finding re-verified in code before acting, several refuted or downgraded on inspection.** The gauntlet's two blockers were **both in the spec's consumer inventory**: it named `reproduction/core.py`'s `table_extractor` as THE reproduction consumer when that function has **no production caller**, and missed `extract/readers.py` — the reader actually on the score's critical path, which would raise `AttributeError` on a list **outside** drive.py's try/except and take down a whole paper drive; and D1's normalizer would have silently killed the L3 synthesis gate, converting every tableless skill to `NEEDS_RECIPE`, a plumbing regression wearing the costume of an honest verdict. **Same lesson as `normalize`, one level up: a plausible name, a matching docstring, and no caller.** The sharpest catch was against my own reasoning — **D2 ruled tabs out for hiding the p-values behind a click, then specified "first open, rest collapsed", which hides them behind a click.** fe-review found two latent `param-control` defects that 14 new switches made load-bearing: `Boolean("false") === true` drew a string bool in the **opposite** state (worst case: an ON switch under an "AI-staged change" marker for a value the run treats as OFF), and the switch row was a `<label>` wrapping the ✨ AI-marker **button**, so clicking the label text fired **Revert instead of toggle** — proven by a real-Chrome DOM probe. Plus two printed-vs-computed lies this batch made user-facing (`pvca` claimed standardization the run skips; `cepo` described a gene filter that is really a cell-type filter), **both green only because the prose↔param guard is exact in one direction — now NEXT#10(a)**. Gates: `verify.sh` **9/9 raw, exit 0, corpus set** (1571 passed / 5 skipped) · **browser-verify 2/2 new green first run**, both asserting on the RENDERED figure, re-run after the switch change. |
-| **KNOBS-1** | 2026-08-05 | `main` `9a05608..23256ad` (**pushed, CI green**) | **NEXT#1's first pass: `API_ONLY_KNOBS` 171 → 148, 36 skills → 27, and the "no overlay at all" count 18 → 15.** Worked by what a knob DECIDES. **`volcano` first** — the panel said *"Tune the options"* and offered one text box for a gene-set panel while `fc_threshold` · `fdr_threshold` · `top_n` were API-only. `proteomics_de` took the same three plus its preparation knobs, `missing` above all: the default per-protein mean impute biases real MNAR fold-changes toward zero, so it moves a result further than the choice of test does. **The three over-representation skills share ONE declared pair of cutoffs** (`GENE_LIST_CUTOFFS`) rather than three retyped copies, because the same two keys mean something *different* there than on a volcano — they select the QUERY genes, they do not filter the terms drawn, and they are inert on a bare gene list. `pathway` · `go_graph` · `sankey` had no overlay whatsoever; **`sankey` is the one to remember — `max_links` is its ONLY knob, so that skill rendered a literally EMPTY parameter panel**, and nothing about a blank panel distinguishes "no options" from "options nobody wired". **The one judgement call: `fdr_threshold` is deliberately NOT a slider.** Its range is 0–1 while every value anyone uses (0.05 · 0.01 · 0.001) sits in the first tenth of that track, so a linear slider would make the conventional cutoffs fiddly and 0.001 unreachable at any usable step — a new reachability gap created by the fix for a reachability gap. **Two guards added in the same change, about the layer BELOW coverage — a control that renders but cannot express its knob:** a slider must be bounded by the backend spec (an absent min/max silently becomes HTML's **0–100**), and its default must land ON a step. The second **found a real defect on its first run**: `qq.max_points` (min 200, step 500, default 6000) drew its thumb at **5700** while the readout beside it said 6000. **Three harness capabilities**, each needed here and none a one-off: **`setRange`** (Playwright's `fill()` refuses `input[type=range]` outright, so every threshold knob was undrivable — it walks there by KEYBOARD rather than assigning `.value`, which would only prove React's handler works when called), **`overrideDataCheck`** (the QC block card's "Review & run anyway", a first-class path no check had ever taken; opt-in so an unexpected block still fails loudly), and **`/p/[id]` + `/store` added to route warming** — the warm-routes file already documents this exact class and names three false timeouts it fixed, but the route every check navigates to and the heaviest compile in the app **was never in the list**, and it cost three more 180s timeouts in one session. **Recorded, not worked around:** sankey's own corpus file is `gene,cell_type`, so QC blocks it with *"No numeric data to analyze"* and by its own rule is right — while being wrong about sankey, whose values are the pair COUNTS it derives itself. Gates: `verify.sh` **9/9** (raw, exit 0, **with the corpus set** — the first run had `SELOM_DATASETS_DIR` unset and said so) · **browser-verify 23 green / 2 skipped / 0 failed** across filtered passes, incl. the 2 new. |
-| **REACHABILITY-SWEEP** | 2026-08-04 | `main` `18c8cbd..<head>` (**pushed**) | **NEXT#1 closed on all three bullets, and the sweep found a THIRD layer of the same class.** The board asked for three things and each one turned up something bigger than itself. ⚑ **171 of 313 backend knobs render no control at all** — 37 skills, **18 with no presentation overlay whatsoever**. `paramFieldsFromSpec` iterates the OVERLAY, not the backend spec, so a skill without one renders zero controls and the panel says *"Runs with smart defaults — ready to apply"*, which reads as a product decision and is usually just an absent overlay. The sharpest case is **`volcano`, the flagship**: the panel says *"Tune the options"* while `fc_threshold` · `fdr_threshold` · `top_n` — the three knobs deciding what a volcano SHOWS — are API-only. That is now `API_ONLY_KNOBS`, a **named waiver list exact in BOTH directions** (a new knob cannot join it quietly; a knob that gains a control must leave it), the `test_reachability_guard.py` shape. **The progression is the point: 17 unreachable routes → 19 unrunnable skills → 171 untouchable knobs**, each invisible to every gate, each found by asking *can a user reach this* rather than *does it work*. **The seed is GENERATED, not refilled** — the board said "refill `seed.ts`", but refilling a hand-maintained mirror of a live registry only resets the clock, so `scripts/gen-catalog-seed.mjs` writes the Selom half from the backend's own `skill.json` and the drift guard re-runs the generator in memory. It found a live divergence at once: the seed named `umap_scrna` *"UMAP (single-cell)"* while the backend serves *"scRNA UMAP"* — and a test was pinning the seed's string, asserting a name **no user ever saw**. **`runFromWorkbench`** is new harness capability (Store install → real file → intake → **params set through the real controls** → Apply → rendered figure); `lollipop` · `slope` · `ridge` · `line` all reach a real figure on `erg_metrics_long.csv`. **Two defects the browser found in the SERVER LOG, which nobody had been reading:** (1) **5 requests died with a 500 on every cold start** — three repos each called `metadata.create_all` from a lazily-built constructor, and `checkfirst=True` reflects-then-CREATEs non-atomically, so the first concurrent burst against a fresh DB lost with `table analysis_jobs already exists`; hidden because the FE re-fetches and the retry finds the schema built. Fixed via `db.engine.ensure_schema` (lock + a post-condition-checked catch for the cross-process case), regression-tested with **threads on a barrier** because a race is a timing fact a mock cannot express. (2) A Radix **Select mounted uncontrolled and flipped to controlled on every upload** (`data-type-strip` passed `value={undefined}` until `qc.profileCode` landed) — not cosmetic, since Radix keeps its own selection while uncontrolled and silently overwrites an override chosen in that window. **The last board's `catalog.name` footnote was 21 skills, not one**: every one a lossy re-brand of the title it shadowed ("Box / strip plot" → "Selom Box Plot"), dropping exactly the searchable words; `title` is the one display name now and the key is **refused** rather than merely unread. Also: **`venn`/`upset` PASS smoke through a `membership` adapter no user path provides** (unlike `celeris`, which mirrors a real ingest) — recorded in `smoke.py`, not fixed, because a reshape step is a feature. Gates: `verify.sh` **9/9** (raw, exit 0 — BE 1571 fast + 392 slow, FE 704, fe-build green) · **browser-verify 21 green / 2 skipped by precondition / 0 failed**, but **only across two passes** — the shared box OOM-kills the Next dev server mid-suite, so a single 23-check run has not completed; see the LIVE block. |
-| **PICKERS** | 2026-08-04 | `main` `5aa9190..<head>` (**pushed**) | **NEXT#1 shipped: a column knob is a picker over the columns that exist, and `pairs=` is a row-list of real level names — and the live browser verify found a bug far bigger than the feature.** ⚑ **`getSkill(id)` read the STATIC SEED alone, so 19 of the 44 live skills were unreachable**: installed from the Store, they rendered in the Workbench as their **raw id, badged "Queued", with Apply DISABLED**. That is `boxplot` · `slope` · `lollipop` · `ridge` · `confusion` · `line` · `regression` · `qq` · `venn` · `forest` — **every plot type built in the preceding sessions** — plus cepo/pathway/ssgsea/pvca/diff_abundance/facs_gating/go_graph/mixing_metrics/pseudotime_genes. `registry.ts` already declared "the backend is the source of truth for what runs now", but only the **Store** honoured it (`useCatalog`); the ~20 other surfaces went through `getSkill`. **Invisible to all 9 gates** — the backend serves them, the param specs merge, the FE overlays exist — and visible in the first real browser [[selom-shipped-not-reachable]]. Fixed via `lib/catalog/live-skills.ts` (a shared cell so `getSkill` stays synchronous at 20 call sites and seed↔registry stays acyclic) + `useLiveSkills()` on the Workbench, whose Apply is gated on the tier `getSkill` returns; ratcheted into `registry-completeness.test.ts` (which already reads the real `skill.json` files) and **proven to bite — reverting `getSkill` fails it with all 19 named**. **The picker itself:** `paramFieldsFromSpec(id, spec, ctx?)` gains ONE optional input — the dataset's own schema, already fetched by `/data/inspect` and already persisted — so it stays the single place dataset knowledge enters and `visibleParamFields`/`isFieldDisabled` stay pure. `column`/`pairs` are **resolved** widgets: emitted only when the vocabulary exists, else byte-identical to the old text field (pinned by a test that a context perturbs *nothing else*). **The pair picker deliberately has NO fallback while the group column is blank** — blank means the backend's auto-detect, a dtype rule the FE cannot evaluate, and on the real ERG table it picks `sample_id` while `best_group` is `condition`, so a guess would offer levels from a column the run is not grouping by. **One backend change was needed and the board's premise was half wrong**: `design.group_candidates` was **empty for `generic_table`** — the exact kind a long-form CSV lands in, i.e. the only kind that uses `pairs=`. `engine/questionnaire._table_hints` fills it **without claiming a design** (`needs_design`/`source` untouched, or every dropped CSV grows an intake confirm-card). Mobbin was unanimous on the row-list (beehiiv · Confluence · ClickUp · Braintrust · AutoSend · Glide) and **ruled OUT** the drag-a-field-into-a-well pattern (Fibery/Sigma/Deputy) and Databricks' per-channel popover — both need a second surface. **Two more defects only the browser could show:** every control's accessible NAME swept in its whole help paragraph (implicit `<label>` wrapping), making two fields mutually ambiguous; and long arm names clip in a narrow select. Gates: `verify.sh` **9/9** (raw, exit 0) · **browser-verify 17/17** (14 + 3 new, real backend + real corpus) · **skill-smoke 43 pass / 0 fail**. |
-| **PLOT-ROWS-DONE** | 2026-08-04 | `main` `9dd24ce..26af5a9` (**pushed**) | **§3.2 is CLOSED: `lollipop` · `ridge` · `slope` · `confusion` shipped, and this is the first row in five where the "missing" premise HELD** — no engine existed for any of them, so the grep-first rule cost minutes and correctly said *build*. The content is what each carries beyond its shape. **`lollipop`**: a bootstrap CI on the **median**, because `bar_figure` is mean±SEM *by construction* and a non-parametric interval could not ride a golden-pinned parametric spine; seeded, so it redraws byte-identically. A **pre-aggregated** table (one row per category — how a ranked list actually arrives) is n=1 everywhere, so it gets no interval, no brackets, **and no CI column header**, rather than `n/a` under a "95% CI" heading. **`confusion`**: two labellings of the SAME rows — how an annotation gets validated. Agreement + Cohen's κ **only when the label sets match**; against Leiden ids there is no diagonal, so it NAMES that instead of computing a number from an alignment nobody declared, and that refusal is the real-corpus path. **`slope`**: cnsplots draws this geometry and **computes nothing** — so Selom tests it, and tests it **paired** (`_stats.compare_paired`), because an unpaired Welch compares marginals and throws away the structure the picture is built on; it reports the **up/down split**, the finding a flat mean conceals, and refuses to guess `subject`/`condition` (the wrong guess pairs the wrong rows and still looks right). **`ridge`**: hand-rolled Gaussian KDE + Silverman so the dependency-free **stub draws the same curve as the real engine** (pinned against scipy), and it **discloses its bandwidth** — a curve is exactly as bimodal as its smoothing allows. **⚑ THE SESSION'S REAL YIELD IS THE THREE DEFECTS RENDERING FOUND, all of which passed every assertion**: (1) **the D2 numeric-string class lives in the ANNOTATION layer too** — `type:"category"` fixes the *trace*, but Plotly coerces a numeric-looking string annotation coordinate to a number and a category axis reads it as a **slot index**, so `confusion`'s cell counts scrambled across a correctly-laid-out heatmap and one label drew clean **off the plot**; (2) `lollipop`'s **stem took the next colourway slot**, rendering one mark as two unrelated series; (3) `ridge` went **entirely grey** when the outline was pinned — a `fill:"toself"` scatter derives its **fill from the line colour**. Classes 1 and the `marker.size` area-vs-diameter trap are now **standing invariants in `smoke.check_figure`** (every skill, every run, zero false positives across 43); 2 and 3 are named defect tests. **`scripts/render_skill.py`** turns the loop into one command with `pin_process()` — the render cache twice served the pre-fix figure at 0.00s, which is indistinguishable from the fix not working. Gates: `verify.sh` **9/9** (true exit 0, read raw), **skill-smoke 43 pass / 0 fail** (was 39). |
+| **ERG-MOCK-FIGS** | 2026-08-06 | `main` `ea68c79..dbd72f9` (**PUSHED**) | **Both open founder gates answered ([[DECISIONS #17]] keep burning down · [[#18]] the app moves to `/app`), the Fig 1E mock retuned so the two rescue arms differ in the FIGURE and not just the table, and two reading variants added — where a hand-picked zoom factor clipped the very arm the comparison is measured against.** Also: `#11` probed and found to be **4 undeclared params, not a campaign**; the board pruned 1083 → 458 lines into `archive/2026-08-06-current-history.md`. |
+| **DEG-PANEL** | 2026-08-05 | `main` `9daa043..3f102ea` (**pushed 2026-08-06**) | **`#1(d)` closed spec-first — and the flagship DE figure had been claiming a fold change it never computed.** `deg` = four disjoint engines behind one `mode` knob that was itself API-only, so it needed a STRUCTURE (mode-gated `showWhen` + an `oneOf` gate), not a list of controls. 75 → 52 knobs, 12 → 10 skills. Shipped the `level` widget with it. |
+| **GSEA-KNOBS + LEDGER-PROVENANCE** | 2026-08-05 | `main` `ea68c79..5ee2b3d` (**pushed 2026-08-06**) | **`#3` and `#4` closed; the control pass found three prose lies the guard could not see.** `API_ONLY_KNOBS` 88 → 75, 14 → 12 skills (⚑ MEASURED — the board's running tally said 86/13 and was already wrong). A synthesized read is now badged and caps `selom_confidence` ([[DECISIONS #16]]). |
+| **PROSE-TRIAGE** | 2026-08-05 | `main` `5eb8274..91ed4a4` (**pushed**) | **`#2` opened on the ERG family expecting a confirmed-waive pass; it was half printed-vs-computed lies — 26 of those 50 params decide what the figure CLAIMS while the paragraph said otherwise.** 261 → 179 untriaged, each entry now carrying a verdict. |
+| **COMPARE-VERIFY** | 2026-08-05 | `main` `5eb8274..9dafd55` (**pushed**) | **Proving the compare fix found a SECOND silent under-report in the same surface.** Compare was unreachable to every browser check because a comparison needs SIBLING figures — hence the `sweepIntoCompare` fixture. `diffTables` keyed rows on the bare first column, collapsing a pairwise table's repeated `group A` into one row. |
+| **STATS-TABLES-5** | 2026-08-05 | `main` `3b44a31..6d5c6ce` (**pushed**) | **`#4` CLOSED: slice 5 shipped, both milestone reviews ran, and the fix pass found compare had been diffing 1 of N tables the whole time.** `confusion`'s κ and `qq`'s λ moved out of a table TITLE into one-row tables — a headline number was prose to every machine consumer. |
+| **STATS-TABLES** | 2026-08-05 | `main` `f5a47c0..6be1fad` (**pushed, CI green**) | **Slices 1→4: a figure can carry more than one Statistics table, end to end** ([[DECISIONS #15]]). Wire becomes `StatsTable \| StatsTable[] \| null`, narrowed at exactly ONE normalizer per side. |
+| **KNOBS-2** | 2026-08-05 | `main` `60cb4c4..e9334c4` (**pushed**) | **`#4`'s spec written and PAUSED for review, then `#1(a)+(b)`: `API_ONLY_KNOBS` 148 → 91, 27 → 14 skills.** ⚑ The (a) lesson the later blocks ran on: **share on a matching MEANING, never a matching KEY NAME** — `normalize` is declared by 14 skills under three different meanings. |
+| **KNOBS-1** | 2026-08-05 | `main` `9a05608..23256ad` (**pushed, CI green**) | **`#1`'s first pass: `API_ONLY_KNOBS` 171 → 148, 36 → 27 skills.** Worked by what a knob DECIDES — `volcano` first, where the panel said *"Tune the options"* and offered one text box while the thresholds that define significance were unreachable. |
+| **REACHABILITY-SWEEP** | 2026-08-04 | `main` `18c8cbd..7b9c73c` (**pushed**) | **`#1` closed on all three bullets, and the sweep found a THIRD layer of the same class.** ⚑ **171 of 313 backend knobs rendered no control at all** — 37 skills, 18 with none. The origin of the `API_ONLY_KNOBS` backlog. |
+| **PICKERS** | 2026-08-04 | `main` `5aa9190..<head>` (**pushed**) | **A column knob became a picker over the columns that exist, and `pairs=` a row-list of real level names — and the live browser verify found a bug far bigger than the feature.** ⚑ **`getSkill(id)` read the STATIC SEED alone, so 19 of 44 live skills sat behind a disabled Apply.** |
+| **PLOT-ROWS-DONE** | 2026-08-04 | `main` `9dd24ce..26af5a9` (**pushed**) | **§3.2 CLOSED: `lollipop` · `ridge` · `slope` · `confusion` shipped — the first row in five where the "missing" premise HELD**, so the grep-first rule cost minutes and correctly said *build*. |
 | **STRIP** | 2026-08-03 | `main` `62e2bcc..1d1176a` (**pushed**) | **§3.2 row 9 `strip` was the FOURTH wrong premise** — Plotly's own box trace draws a strip (`boxpoints="all"` + a hidden box) and `boxplot` already exposed the points knob, so it is a **`style` mode, not a skill**. Mode for a concrete reason: a strip must keep the shared categorical vocabulary (`order` · `add_count` · `pairs` + brackets from `_stats.py`), and a sibling skill would have had to re-import all of it and could then drift from the box it is the companion to. **The bug worth knowing: hiding the box with a transparent LINE COLOUR renders the panel completely empty** — a box trace's points inherit the trace colour, so the markers vanish with it; correct axes, correct `n=` labels, not one point drawn, and every spec assertion still green. Hide it by zero **width** instead. Pinned by a named defect test. Retitled "Box / strip plot" for discoverability (same fix `regression` needed). Golden byte-identical. `verify.sh` **9/9**. |
 | **SCATTER-LINE** | 2026-08-03 | `main` `c63275d..88ae4b1` (**pushed**) | **Lane B continued, and the review's premise was wrong twice more.** `scatter` (§3.2 row 5, "the most-requested shape Selom cannot draw") **already existed as `regression`** — x/y/group/label were all there; only the mandatory OLS separated it from a generic scatter. So it became a `fit` flag, not a second skill that would have duplicated the column resolution, grouping, labelling and point cap for one boolean. **The bug found on the way is the real content**: `group` emitted `transforms:[{type:groupby}]`, which **Plotly removed in plotly.js 3 / plotly.py 6** — this repo runs plotly.js 3.6.0 and plotly.py 6.8, and the latter *refuses the key outright* — but skills return raw dicts so nothing validated it. The figure shipped, rendered, and drew **every point one flat colour**: an advertised knob that silently did nothing. That is a CLASS (valid JSON, correct-looking, encodes nothing), so `smoke.check_figure` now fails any trace carrying a removed-from-Plotly key, on every skill every run — the same treatment the numeric-string-axis class got, with a test asserting both directions. `regression` also had **no FE overlay at all** (API-only knobs, the `boxplot` gap again) and is retitled so a user searching "scatter" finds it. `line` (row 6, "the ERG skills each hand-roll one") was **also already built** — `_charts.line_figure` is explicitly "the line analogue of `bar_figure`" and is not ERG-specific; only a CSV front end was missing. It now shares the ERG grid's exact spread vocabulary because it is the same code, takes long-form x/y/series where repeated rows ARE replicates, never auto-detects `series` (the one guess that changes what the figure MEANS), and carries **n per point** — the number that tells a reader whether to believe the band and which is nowhere on the canvas. Gates: `verify.sh` **9/9**, **skill-smoke 39 pass / 0 fail** (was 38). |
 | **SLOW-GATE-LANE-B** | 2026-08-03 | `main` `ced7f31..454b974` (**pushed**) | **The slow lane is gated, then Lane B shipped its three plot types.** **STEP 0**: the `slow` lane was enforced NOWHERE — 385 of 1907 tests. The blocker was *assumed*: "slow" reads as "needs the real corpus", which would have made it a real question about what CI can run. Measured in a throwaway venv built with CI's own light closure, corpus-free: **352 pass / 21 skip / 0 fail in 16s** — the 21 skips are the omics-gated tests, and they skip cleanly rather than error. So it needed no new extras, no new job, no nightly, no self-hosted runner: one step in the existing backend job, plus `be-slow` in `verify.sh` (8 gates now, 70s → 95s), because gating only CI would leave the pre-commit gate of record still green on the exact class of breakage it exists to catch. **Proven to bite**: a failing assertion injected into a slow-marked test leaves the fast lane green at exit 0 (1511 passed) while `be-slow` goes red and `verify.sh` exits 1. `!cancelled()` on the CI step so a fast failure cannot hide a slow one. **Lane B**: `venn` · `forest` · `qq`, each closing all seven §5 wiring points. `venn` takes the SAME membership matrix as `upset` and draws circles as **filled traces, not `layout.shapes`** — a shapes-only diagram renders identically and fails `check_figure`'s non-empty-`data` rule, correctly, because it would be a picture rather than an editable figure; above 3 sets it refuses and names `upset`. `forest`'s interval IS the plot, so its provenance is never silent: explicit CI columns → standard error → **t-statistic (`se = effect/t`, the limma identity)**, with the table stating which, and a raise rather than an invented bar when none exist. `qq` carries λ + the Beta(i, n−i+1) null band and catches what a volcano *hides* — an inflated test makes a volcano look better. **λ forced the one real contract decision**: every DE runner wants the adjusted p and `resolve_significance` is tiered to guarantee it, but an adjusted p is a monotone transform whose quantiles are not uniform, so λ would read "conservative" no matter how inflated the test — the raw-first read went into `engine/columns.py` as `pick_raw_significance` beside its twin, not forked in the skill (the drift guard caught that fork and was right). **Rendering found what no assertion did**: `qq` drew `y = x` to `max(observed)`, so on real data (λ=2.14: observed 12.6 vs expected 4.5) the line trailed into an empty half and stretched the x-axis; and the first re-render looked byte-identical because **the C1 cache served the pre-fix figure** — `smoke.pin_process()` exists for exactly that. **Two pre-existing gaps found while wiring**: the golden list was hand-maintained *and duplicated* in `regen_golden.py` (a new skill could ship unpinned, silently) — it lives once now with a completeness test; and that test immediately found **`umap_scrna`, the flagship P0 skill, has never had a golden** (its own `SELOM_UMAP_ENGINE` selector was never pinned by the fixture, so it hit the real scanpy engine and raised). Gates: `verify.sh` **8/8**, **skill-smoke 38 pass / 0 fail** on the real corpus (was 35). |
@@ -55,631 +56,65 @@
 | **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
 | older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · DEG-PANEL · 2026-08-06 02:02 +1000 (Sydney) · branch `main` (**LOCAL — the pushed BASE is `ea68c79`; several sessions now sit on top of it. Working tree clean. ⚑ NO AHEAD-COUNT HERE ON PURPOSE: a handoff commit cannot know its own SHA. Trust `git log --oneline origin/main..HEAD`, not this stamp. Owner pushes.**) · Claude (FE+BE, solo, lead)
+## ▸ LIVE · ERG-MOCK-FIGS · 2026-08-06 06:03 UTC (= 16:03 +1000 Sydney) · branch `main` (**PUSHED — `origin/main` = `dbd72f9`, working tree clean, nothing local**) · Claude (FE+BE, solo, lead)
 
-- **The board's `#1(d)` is DONE**, spec-first, as one change (`docs/deg-panel/spec.md` → `3f102ea`).
-  Detail is in the commit; what follows is what a next session needs and could not re-derive.
-- **⚑ AN EIGHTH LAYER OF [[selom-shipped-not-reachable]], AND IT IS THE ONE NO GUARD CAN SEE.**
-  `deg`'s runner honoured two params its `skill.json` never declared (`group_regex`, `label_val`):
-  `_execute` merges unknown caller keys straight through, `validate_param_ranges` skips them, and
-  `resolved_params` **records them into the provenance bundle**. So they work — and because every
-  guard in this repo is driven by the DECLARATION (`API_ONLY_KNOBS` iterates the spec, the
-  prose↔param guard compares against `param_spec`, `paramFieldsFromSpec` drops an overlay key with
-  no spec entry), **not one of them can look down that arrow.** The previous seven layers were all
-  *the user cannot reach it*; this is *the param works and nothing admits it exists*.
-  **The guard for it is NOT built** — see NEXT#11, which is the highest-value item this session
-  leaves behind.
-- **⚑ A CONTROL PASS FOUND A FIGURE DEFECT, NOT JUST PROSE.** Two sessions running, reading a
-  runner's body for a REACHABILITY job is what surfaced the honesty defect. Here the axis of the
-  flagship DE skill named a quantity the figure does not contain, and the tell was on screen the
-  whole time: **a "log2 fold-change" of 44.6**. Nine gates green, `skill-smoke` green, and the
-  golden untouched — because the golden pins the STUB. **Render the figure and read the axis.**
-- **⚑ `layout.meta` IS NOW THE DEFAULT ANSWER FOR ANYTHING `auto`, FOURTH USE.** `meta.significance`
-  → `meta.adaptation` → `meta.clustered`/`meta.gsea` → `meta.deg`. If a param resolves at run time
-  (from the file, from an alias list, from what is importable), the prose must read the runner's
-  record. Expect this shape in `heatmap`/`integration`/`normalization_qc` too.
-- **⚑ THE LEVEL WIDGET'S ONE JUDGEMENT CALL, so nobody re-opens it.** It does NOT fall back to
-  `design.best_group` when several candidates exist. `best_group` genuinely IS the engine's deg
-  contrast pick, and `questionnaire._obs_aliases()` imports `deg.run_real`'s own
-  `_CONDITION_FALLBACKS` rather than shadow-copying them — so the two agree **whenever an alias
-  column is present**. Where none is, the runner **raises** while `best_group` falls back to the
-  lowest-cardinality candidate, so the picker would offer levels for a run the backend refuses.
-  One rule with no exception beat two.
-- **Two corrections against my own spec, written into it rather than quietly fixed.** D1's "under
-  `auto` only the shared knobs render" would have **hidden controls that ship today** — a
-  regression created by a reachability fix, the `fdr_threshold` lesson one level up. D6 had the
-  stub's axis moving to meet its table; the table was the dishonest half, and moving it instead is
-  more truthful AND moves no golden. **A spec's own decisions are re-checkable while building.**
-- **⚑ RECORDED, NOT WORKED AROUND: `rpgrip1_merged.h5ad` (1.2 GB) CANNOT BE DRIVEN THROUGH THE
-  BROWSER HARNESS.** The dev proxy drops the upload (`socket hang up`), the dataset is never
-  inspected, and every data-derived control then degrades to text **through no fault of its own** —
-  which reads exactly like a broken picker. It is the best-designed file in the corpus (`genotype`
-  WT/C3/FS/PT · `sample` ×9 · `celltypes` ×7) and the engine detects all of it correctly when
-  called directly. The picker check runs on `hani_irpe_subset` (131 MB) instead. **Anything needing
-  a large-file browser path is blocked on this.**
-- **Also worth knowing: `jev/retina_fadl.h5ad` has only TWO obs columns** (`n_genes`, `leiden`) —
-  **no condition column at all.** The standard scRNA smoke file cannot exercise any design-derived
-  control, and a check that assumes it can will fail on a correct fail-soft degrade.
-- **Gates.** `verify.sh` **9/9 raw, exit 0, corpus set** · **skill-smoke 43 pass / 0 fail, no
-  regression** · **browser-verify `deg-panel` 4/4** plus a 10/10 regression pass over
-  `param-pickers`/`api-only-knobs`/`shared-vocab-knobs` (the shared merge + gate machinery changed).
-  Every new pin confirmed RED first. **`wf-lint` was RED on `main` before I started** and is fixed
-  in its own commit (`aba600b`) — upstream tagged `dorny/paths-filter`'s pinned commit `v3.0.3`, so
-  the bare `# v3` comment stopped naming a version. It would have failed CI too.
-- **⇒ NEXT SESSION.** `#1`–`#4` are closed. **`API_ONLY_KNOBS` is 52 across 10 skills · PROSE_SILENT
-  untriaged is 131** — both MEASURED. In value order: **NEXT#11, the undeclared-param guard** (new,
-  and the only one of these that closes a whole invisible class) · **`#2`'s remaining 131**
-  (`heatmap`/`integration`/`normalization_qc` are the biggest blocks) · **`#5`'s JTBD backlog**.
-  ⚑ **But read the strategic call in DEFERRED first — it is still unanswered, and its own
-  recommendation was "do `#1(d)`, then pivot to P-E". `#1(d)` is now done.**
+**The board was pruned this session.** It had reached **1083 lines / 165 KB** — a file the BOOT
+block tells a resuming session to read IN FULL, and which the Read tool could no longer open even
+60 lines at a time. Eight LIVE blocks (LANE-A-C → DEG-PANEL) moved write-once to
+`archive/2026-08-06-current-history.md`. **458 lines now.** If this file passes ~250 lines again,
+archive before adding [[archive-currentmd-history-weekly]].
 
-<!-- superseded — GSEA-KNOBS + LEDGER-PROVENANCE, kept for its findings -->
-- **The board's `#3` and `#4` are BOTH DONE, in the owner's order.** Detail is in the two commits;
-  what follows is what a next session needs and could not re-derive.
-- **⚑ READING THE RUNNER'S BODY FOR A *CONTROL* PASS FOUND THREE PROSE LIES.** `#3` was scoped as a
-  reachability job (13 knobs). Establishing what `gene_sets`/`gene_set`/`weight` actually MEAN
-  required reading both runners end to end — and that read, not the guard, is what surfaced:
-  `engine` defaults to `auto` and resolves from what is IMPORTABLE, yet the paragraph said
-  "(gseapy.prerank)" and cited GSEApy on every run, including blitzGSEA's and the in-house engine's;
-  `n_perm` was quoted RAW while both library engines floor it at 100 (`n_perm=0` → 1000); and
-  Benjamini-Hochberg was claimed **and cited** on single-set and in-house runs that correct nothing.
-  **The prose↔param guard was green throughout, because it checks a param is MENTIONED, not that
-  the sentence is TRUE.** That is the guard's known blind spot and it is worth expecting again.
-- **⚑ `VIA_OUTCOME` is now the default reach for anything `auto`.** All four fixes (three above +
-  ssGSEA's `top_n` cap-quoted-as-a-count) are facts only the runner has, so they ride `layout.meta`
-  and are lifted by `build_body` / `legends._facts` — the `meta.significance` pattern, third use.
-- **⚑ A SHARED BLOCK'S OPT-IN DEFAULT SAVED A REAL BUG.** `geneSetLibrary(..., overridable=false)`:
-  `enrichment` declares **no `gene_set` param at all**, and a gate naming an absent key never
-  matches — sharing it unconditionally would have left `enrichment`'s library select **permanently
-  disabled**. Verify what is actually shared before sharing it, again.
-- **Mobbin ruled a pattern OUT twice, both recorded in code.** An override should be an EXPLICIT
-  mode (Google AI Studio's preset dropdown; WRITER's segmented Upload/Paste-URL/Paste-text) — Selom
-  cannot without a backend `mode` param, so the library select GREYS OUT instead. And Fey's
-  Estimated-vs-Actual EPS **columns** cannot apply to the ledger, which holds ONE value per metric.
-- **⚑ `#4`'s two corrected premises are the reusable part.** `PanelScore.provenance` was **already
-  taken** (the deposited-source badge) → new field `reading_provenance`; and `run_panel` has **no
-  production caller**, so only `drive.py` was stamped. Both found by reading, not by trusting the
-  board [[verify-todo-not-already-shipped]].
-- **⚑ THE LEDGER BADGE CANNOT APPEAR ON ANY PUBLISHED LEDGER, AND THAT IS CORRECT.** rpgrip1 · jev ·
-  hani all ship as CAPTURED replays (`validate_panel(panel, entry["computed"])`, no readings), so
-  all 29 panels are `""` and `fixture.ts` still matches a regeneration. **Do not read "the badge
-  never shows" as a defect** — it fires on a LIVE `drive_bundle`, proven end-to-end by a tableless
-  `cluster` panel (reader confidence 0.45: was VERIFIED/100, now VERIFIED/75 + badge). Spec §7.
-- **New capability: vitest now includes `components/**/*.test.ts`** — a component PREDICATE ("does
-  this badge appear at all") is testable without a DOM. The repo could not test any component
-  before. [[compound-capability-each-task]]
-- **⚑ MY OWN MISTAKE, WORTH NOT REPEATING: `git checkout <file>` to undo a temporary probe
-  DISCARDED every uncommitted change in that file.** I had disabled one line to prove a guard bit,
-  then reverted the file — losing seven edits to `reproduction/core.py`. Re-apply the probe in
-  reverse, or copy the file first (which is what I did for the second such check).
-- **Gates.** `verify.sh` **9/9 raw, exit 0, corpus set** on both commits · **skill-smoke 43 pass /
-  0 fail, no regression** · **browser-verify `shared-vocab-knobs` 5/5** on real backend + real
-  corpus. Every new pin confirmed RED first — **except one, and it is labelled as such**: the
-  ssGSEA string-`"false"` zscore test passes pre-fix too, because `resolved_params` already casts
-  by declared type. The defect I expected there was **not real**; it is kept as a contract pin.
-- **⇒ NEXT SESSION.** `#1`–`#4` are closed. The board's remaining items, in value order: **`#2`'s
-  166 untriaged prose waivers** (best blocks: `deg` 26 — which the board says belong WITH `#1(d)`'s
-  spec, not piecemeal — then `heatmap`/`integration`/`normalization_qc`) · **`#1(d)` `deg` (16), the
-  largest knob gap and the one that WANTS A SPEC** (fold NEXT#2's level widget in: `deg.reference`/
-  `treatment` and `diff_abundance`'s 7 are the same "pick a level, not a column" shape) · **`#5` the
-  fe-review JTBD backlog** (all feature gaps, not defects; copy-to-clipboard on a table is the
-  cheapest — `components/methods/copy-button.tsx` is ready-made). `API_ONLY_KNOBS` is **73 across
-  11 skills**. Do not open `facs_gating` (blocked on a real `.fcs`).
+**The two founder gates that had been open are CLOSED** — see [[DECISIONS #17]] and [[#18]].
+Direction = **keep burning down the honesty/reachability backlogs**, not P-E. Route split =
+**yes, the app moves to `/app`** (decided, not built — it lands with P-E's frontend half).
+Both were surfaced at boot rather than defaulted, per the board's own instruction.
 
-<!-- superseded — PROSE-TRIAGE, kept for its findings -->
-- **The board's `#2` is done for the ERG family and for every result-changing param it named.**
-  Detail is in the commit; what follows is what a next session needs and could not re-derive.
-- **⚑ THE BOARD'S GUESS AT A BACKLOG'S SHAPE IS A CLAIM, NOT A FINDING.** It predicted ERG would be
-  a confirmed-waive pass ("mostly pipeline-level/internal"). **26 of its 50 params decided what the
-  figure CLAIMS**, and two of the defects were in the FIGURE (a title hard-coding "scotopic", a
-  value axis hard-coding "log1p"), not the prose at all. The rule that found them is the same one
-  the `normalize`/`pvca` block established: **read the runner's BODY.** A waiver list inherits the
-  confidence of whoever wrote it, and nobody had read these.
-- **⚑ THE VERDICT VOCABULARY IS THE REUSABLE PART, and `VIA_OUTCOME` is the one to remember.**
-  A param that is **inert unless a data-dependent branch fired** must be described from the
-  runner's RECORDED outcome, never from the param — only the runner knows whether the branch ran.
-  `adaptation="auto"` resolves from the data; whether `violin` had to cluster the cells itself is a
-  fact about the data. Both now ride `layout.meta` and are lifted by `build_body` as `_`-prefixed
-  facts (the `meta.significance` pattern), **written only when they differ from the param-derived
-  answer**, so a default run is byte-identical and no golden moves. Expect this shape again the
-  next time a knob "usually does nothing". [[waiver-list-needs-a-verdict-per-entry]]
-- **⚑ A COUNTED RATCHET MUST ASSERT EQUALITY, NOT `<=`.** `_UNTRIAGED_CEILING` is compared with
-  `==`; with `<=` the backlog shrinks on paper while the ceiling stays slack and the next new param
-  slides in under the old headroom. **It caught me leaving 211 in place when the count was 179**, on
-  its first run.
-- **`_pairwise_prose` is the one home for the significance sentence** — boxplot · violin ·
-  erg_bwave_bar all draw brackets off `_stats.test_pairs`, so they get one sentence, and it carries
-  the clause none of them had: **an overridden pair (`A~B:**`) was not computed, so neither the
-  named test nor SciPy may be credited with it.** Related: I nearly wrote a THIRD copy of the pairs
-  parser — `_stats.parse_pairs` already existed and is strictly more capable than the local
-  `_parse_comparisons` I was moving. Grep before you extract.
-- **Gates.** `verify.sh` **9/9 raw, exit 0, corpus set** (BE 1704 fast + 397 slow · FE 730 ·
-  fe-build green) · **skill-smoke 43 pass / 0 fail, no regression**. 22 new pins, **all confirmed
-  RED first** by stashing the fix and re-running.
-- **⇒ NEXT SESSION IS SCOPED, owner-directed 2026-08-05: `#3` THEN `#4`.** Do `#3` first — it is
-  small and self-contained, so it banks a gate-green commit before the big change starts — then
-  `#4`, **spec written FIRST and then BUILT STRAIGHT THROUGH, no pause** (see the NEXT block; the
-  only founder call is already made in [[DECISIONS #16]]). **If `#4` runs long, finish it rather
-  than starting anything else**; the rest of `#2` (179 untriaged) and `#5` (the fe-review JTBD
-  backlog) wait.
+**Session work was the ERG Fig 1E mock**, owner-directed mid-session, in two pushes:
 
-<!-- superseded — COMPARE-VERIFY, kept for its findings -->
-- **The board's `#1` is CLOSED — the compare fix is verified in a browser, and verifying it found a
-  second defect of the same family.** Detail is in the commit; what follows is what a next session
-  needs and could not re-derive.
-- **⚑ THE LESSON IS ABOUT THE TESTS, NOT THE BUG.** `diffTables` dropped every duplicate-labelled row
-  and the unit suite was green, because **every fixture in `diff.test.ts` used a UNIQUE first
-  column** — the pairwise one included, with a single row. The tests used the one shape that cannot
-  exhibit the defect. **When a pin is written from the same mental model as the code, it inherits the
-  blind spot; the browser had the real corpus and a second pair, and that is the whole difference.**
-  Ask of any fixture: *is this the shape where the thing could go wrong, or the shape I had handy?*
-- **⚑ A ONE-ELEMENT CASE CAN MAKE A CHECK VACUOUS.** BH on a single p-value returns it unchanged
-  (rank n of n), so a one-pair `correction` sweep would have passed on the added `p (bh)` column
-  alone — and gone on passing if the correction silently did nothing. The check uses **two** pairs so
-  at least one adjusted value actually moves. Same trap anywhere a correction, a rank, a normalization
-  or a dedup is exercised on a single item.
-- **`sweepIntoCompare` is new harness capability** [[compound-capability-each-task]] — the fourth
-  entry fixture. Compare needs SIBLINGS (`parentFigureId`); two runs of a skill are two unrelated
-  figures, which is why the surface had never been driven. Any future compare/lineage/version check
-  starts here rather than re-improvising.
-- **Playwright: locate a control inside a wrapping `<label>` BY ROLE, not `getByLabel`** — getByLabel
-  matches the label's `textContent`, which for a wrapped `<select>` sweeps in every `<option>`. The
-  a11y name is correct; the locator algorithm is not the same thing. Cost one red run.
-- **Gates.** `verify.sh` **9/9 raw, exit 0, corpus set** (BE 1682 fast + 394 slow · FE 730 ·
-  fe-build green) · **browser-verify `compare-tables` green, `stats-view` 5/5 green.**
-  ⚑ **A COMBINED `stats-view + compare-tables` pass FAILED at check 4** (`lollipop`, 180s timeout
-  inside the Store install) **while the same check passes in 16.9s alone** — box contention, not a
-  regression [[browser-suite-oom-looks-like-regression]]. No `ERR_CONNECTION_REFUSED`, the server
-  survived, and check 5 passed straight after. **Run filtered passes on this box; a single slow
-  failure mid-suite is the environment.**
+1. **`b47851c` — the rescue arms were separated in the TABLE but not legibly in the FIGURE.**
+   `AAV8-RK-PDE6B` Vmax 105 → 60 µV (~46 @1.0, ~59 @1.9, against the 3'UTR arm's ~127 / ~166).
+   Both the default and the `n3` variant regenerated, tables and figures together.
+   - ⚑ **The generator's self-check is the thing to read before retuning this again.** It asserts
+     the two rescue arms stay *slightly* apart via a **p-value BAND with a 0.0005 FLOOR** — widen
+     the gap too far and it exits non-zero WITHOUT writing, because the arms would stop reading as
+     a graded effect. The new gap lands at p = 0.002 / 0.0036, inside the band.
+   - **Drive-by, found by re-reading the README's checks against the code:** it claimed two guards
+     hold "at every intensity" / "from 0.1 log up". Both are gated on `x_log >= REFERENCE_LOG_I`
+     (1.0) — below the threshold every rd10 arm sits at the noise floor and **nothing is asserted**.
+     The four per-condition tables were stale too. Corrected to what the code enforces.
+2. **`dbd72f9` — two reading variants** (`_zoom`, `_1p9`), same panels/seed/numbers, different
+   view; one renderer pass writes all three figures with their own waveform + a-wave tables.
+   - ⚑ **A hand-picked 2.6× zoom was tried first and was wrong in the way that matters: it clipped
+     the 3'UTR arm too — the very arm PDE6B is measured AGAINST.** Cropping your reference turns
+     "PDE6B is smaller" into "both hit the ceiling". The window is now derived from the data: the
+     top is fitted to the tallest surviving sample so **no b-wave being read ever clips**, and only
+     deep negative excursions (a-wave / oscillatory potentials — not the quantity in question) go
+     off the bottom to buy magnification. That is what caps it at ~2.1×.
+     **Caught by rendering and LOOKING, not by reading the code** [[plotly-spec-can-encode-a-lie]].
+   - **Three layout constants were tuned for a SEVEN-row grid and broke at one row** — the 0.935
+     top margin sheared the first line off the two-line column headers, and the scale bar (which
+     hangs 0.70 of a PANEL height below the grid) fell off the canvas once a panel got tall. Each
+     is re-derived from row-count/canvas-height and **all reduce to their old values at seven
+     rows**, so `mock_fig1e_traces.jpg` + its tables are **byte-identical** before and after —
+     verified with `git diff --stat`, in BOTH outdirs, not assumed.
+   - **The `_zoom` tables are byte-identical to the canonical pair by construction** (a zoom is a
+     change of VIEW, not of data). Shipped anyway so each figure has a table beside it, and the
+     README says so rather than implying a second measurement.
 
-<!-- superseded — STATS-TABLES-5, kept for its findings -->
-- **`#4` IS CLOSED.** Slice 5 shipped, both milestone reviews ran over the whole `f5a47c0..HEAD`
-  range, and the fix pass landed. Detail is in the three commit messages; what follows is what a
-  next session needs and could not re-derive.
-- **⚑ THE FINDING THAT MATTERS: a claim in an APPROVED decision can be false, and the decision still
-  be right.** Decided-question 2 justified moving κ and λ into a table because a table "sorts,
-  exports, **diffs in compare**, and is readable by the metric reader". Two of those four were
-  untrue when written. Compare had been diffing `figureTables(a)[0]` only — for the whole of slices
-  1–5 — under a card announcing *"The results tables are identical"*; and a WIDE one-row table is
-  unreadable by `_read_named_cell` (it keys on a row's first string cell) while `_read_count`
-  actively mis-reads it. **The decision was still correct** — the presentational half was real and
-  the fix was to make the other half true. But the rationale went through a spec review, an owner
-  approval and five slices without anyone running it. **Check the capability a decision RESTS on,
-  not just the decision.** Both are recorded as correction blocks in `docs/stats-tables/spec.md`.
-- **⚑ ORDER IS LOAD-BEARING WHEREVER A SCALAR TABLE EXISTS, and this will recur.**
-  `extract.readers._read_count` answers ANY count-shaped metric (`n_*`, `*_total`) from the FIRST
-  table that has rows, falling back to `len(rows)`. A one-row scalar table in position 0 therefore
-  answers "how many?" with **1**, at confidence 0.5, on a reproducibility score. Both slice-5
-  runners lead with the detail table and say so at the site;
-  `test_g3_a_declared_multi_table_skill_leads_with_its_DETAIL_table` proves it by reading the
-  REVERSED array. **Any future "attach a summary beside a detail table" change inherits this** —
-  put the scalar last, or make the reader shape-aware first.
-- **⚑ THE SEVENTH LAYER OF [[selom-shipped-not-reachable]] — and it is a new KIND.** 17 of 27
-  native-table skills declared `outputs: [figure]` while attaching a table on every run, rendered on
-  three surfaces and built by the live API from the same `skill.json`. The first six layers were all
-  *the user cannot get to it*. This one is *the user is told it isn't there* — *nothing looks
-  broken*, so nobody goes looking. Found only because regenerating the seed put two of them side by
-  side. **Ask of any capability: does the catalog admit it exists?** Now `outputs` declares a table
-  IFF the skill is NATIVE, both directions, on the existing native-classification guard.
-- **The reviews earned their keep and the fix pass was most of the value.** gauntlet **13
-  confirmed**, fe-review **16 confirmed + 23 JTBD**. Every finding re-verified in code before
-  acting; several were correctly attributed by the verifier itself as pre-existing or mis-scoped.
-  **Four independent lenses found the compare bug** and none of the nine gates could — reading index
-  0 of an array is perfectly typed. **Run these at a milestone; they do not substitute for gates and
-  gates do not substitute for them.**
-- **Two of my own fixes were caught by the instruments they were meant to satisfy**, which is worth
-  repeating rather than tidying away: the new `structure.guard` waiver list rejected one of its own
-  two entries on its first run (`stats-view.tsx` never matched the pattern), and the browser suite
-  went **3/5 RED** after the fix pass because the CSV `aria-label` I added collided with the
-  panel-header locator. Neither would have been found by reading the diff.
-- **Writing the `ALSO_SYNTHESIZE` route test cost two red runs, both worth pinning**: `pairs=` with
-  the wrong SEPARATOR (`,` rather than `~`) and `pairs=` naming absent LEVELS are both
-  indistinguishable from `pairs=` never being set — the run silently falls through to single-table
-  L3 synthesis. **`pairs=` being SET is not the same condition as `pairs=` being TESTABLE.**
-- **RECORDED, NOT FIXED — read this before picking up reproduction work.** `extract.readers`
-  computes `Reading.layer` / `.source` / `.confidence` and `panel_extractor` **throws all three
-  away** (`out[gold.metric] = r.value`); `MetricValue` carries only `{metric, value}`, so an L3
-  synthesized read the reader itself rated 0.45 lands on the ledger as a VERIFIED / 100-Selom-
-  confidence cell. **Verified end-to-end on the real drive**, but it is **pre-existing, not slice 4's
-  doing** (the gauntlet's own verifier corrected that attribution: the `ALSO_SYNTHESIZE` append
-  lives in `routers/_run.py`, and the drive uses `run_skill_with_table`, which never synthesizes).
-  It also is not synthesis-specific — the score is blind to reader confidence at every layer. The
-  provenance-badge half is defensible; **capping `selom_confidence` is a founder decision** because
-  `Reading.confidence` ("did I read the right number") and `selom_confidence` ("is our reconstruction
-  trustworthy") are different quantities. Related: the run API and the drive **disagree** about which
-  tables an `ALSO_SYNTHESIZE` skill produces.
-- **`PROSE_SILENT` is 261 params / 60 templates** (was 269/61 — `("methods","boxplot")` retired),
-  split evenly legends 131 / methods 130. **The largest single block is the ERG family in methods —
-  50 of the 130**, and NEXT#1(e) already rules those knobs pipeline-level/internal, so the triage
-  likely starts with ~50 confirmed waives in one pass and a load-bearing bucket far smaller than 261.
-- **Gates.** `verify.sh` **9/9 raw, exit 0, corpus set** on every commit (1672 fast / 394 slow) ·
-  **skill-smoke 43 pass / 0 fail**, no regression · **browser-verify 5/5 stats-view + 9/9
-  editor-chrome·artboard·zoom**, raw exit 0. Servers released (`:3152`/`:8152` free).
-- **Not done, deliberately:** the compare fix is unit-pinned and guard-ratcheted but **has no browser
-  check** — no spec drives a two-version family. That is the first thing to verify. Plus the
-  `PROSE_SILENT` triage, `#1(c)`, `#10(b)` (which unblocks `violin`'s second table), and the
-  fe-review JTBD gaps below.
-
-## ▸ (superseded) LIVE · STATS-TABLES · 2026-08-05 13:00 +1000 (Sydney) · branch `main` (**PUSHED at the owner's request — range `f5a47c0..HEAD`, working tree clean, nothing local, `origin/main` == `HEAD`. CI run `30970426817` GREEN on all six jobs at `6be1fad`; the handoff commits on top of it are docs-only. Trust `git log`, not this stamp.**) · Claude (FE+BE, solo, lead)
-
-- **`#4` slices 1→4 are DONE, in the board's order, with `#10(a)` interleaved exactly where the
-  board put it (before slice 5).** Slice 5 (`confusion`/`qq` scalar tables) is the only one left,
-  and `#10(a)` — its stated precondition — is now in place. Detail is in the five commit messages;
-  what follows is what a next session needs and could not re-derive.
-- **⚑ THE FINDING THAT MATTERS: a feature can be unreachable even when every layer of it works.**
-  Slice 3 shipped `lollipop` attaching two tables — and `lollipop.pairs`, the knob that MAKES the
-  second table exist, was in `API_ONLY_KNOBS`. A two-table result existed that no user could
-  produce; it would have worked only from curl. That is the **sixth** layer of
-  [[selom-shipped-not-reachable]] — 17 routes → 19 skills → 171 knobs → a slider that cannot reach
-  its own value → a control silently overridden → **an unreachable contract capability**. The
-  question to ask of any new capability is not "does it work" but "can a user get to it", and
-  slice 5 has the same shape: `confusion`/`qq` scalars are only worth moving if the run that
-  produces them is reachable.
-- **The spec's instruction to RE-DERIVE its own consumer inventory rather than trust it was the
-  highest-value line in it.** Four more narrowing sites, one a crash: `workrail.tsx` reads
-  `figure.table.rows.length`; `project-workspace.tsx` had `!!figureTable(f)`, and **`!![]` is
-  `true`**, so an empty result claimed to have statistics; `legends._facts` narrowed with
-  `isinstance(table, dict)` and would have produced a caption with no facts and no error. Keep
-  doing this — a spec inventory is a starting point [[verify-todo-not-already-shipped]].
-- **⚑ PROVENANCE MUST FOLLOW THE DATA, NOT THE CODE PATH — the trap slice 4 opened and the one most
-  likely to recur.** A synthesized table used to be *known* to be synthesized because of **where it
-  was built** (only `read_metric`'s L3 fallback branch re-tagged). The moment a native table and an
-  L3 summary share one list, that stops holding, and the appended table reads at **full native
-  confidence** — a re-shaped value overstating its provenance on a reproducibility score, silently.
-  It now reads the table's own `synthesized` flag, which every synthesizer stamps. **Any future
-  "attach two things of different trust levels" change has this bug waiting in it.**
-- **`violin` is NOT in `ALSO_SYNTHESIZE`, against the spec's own D3 prediction, and the reason is a
-  blocker for someone else's item.** Its synthesized table is a PubMed marker call read back out of
-  a figure ANNOTATION, and that annotation is a **live network lookup at run time** — so the table
-  exists when the network answered and silently does not when it did not. Appending it would put a
-  claim in the runtime no guard can check, and would make a network-dependent number MORE reachable
-  by a reproducibility score **before** the provenance stamping NEXT#10(b) owes. `violin` joins the
-  moment 10(b) lands; that is now a concrete unblock, not a vague backlog row.
-- **`#10(a)`'s first red run is the backlog, and it is 269 params across 61 templates.**
-  `PROSE_SILENT` is a RAW FIRST CAPTURE and says so in the file — it has **not** been triaged into
-  "cosmetic, no sentence owed" (`erg_traces.band_color`, `scale_ms`) versus "changes the result, so
-  the prose owes it a sentence". **That second bucket is load-bearing**: `deg.method` decides WHICH
-  TEST ran, `proteomics_de.missing` decides an imputation that biases fold-changes toward zero,
-  `boxplot.sig_test`/`correction` decide the stars drawn. The triage is the next session's work on
-  this item. The ratchet's value does not wait for it: a NEW param must now be described or waived
-  on purpose, which is exactly how both 2026-08-05 defects arrived.
-- **It paid immediately: `methods._boxplot` held two MORE live printed-vs-computed lies**, both
-  stated unconditionally — "box-and-whisker … whiskers extending to 1.5× the IQR" on a
-  `style="strip"` run that draws **no box at all**, and "groups are ordered by descending median"
-  when `order` puts the user's named categories first. `("methods", "boxplot")` is the first entry
-  the ratchet retired, and the **stale-waiver** half is what forced it out.
-- **Mobbin ruled out a decision the approved spec had already made** [[selom-fe-review-framework]].
-  D2 specified a `Statistics · N tables` heading count; eight mature multi-section report surfaces
-  and **not one** heads a group with a count of its sections. Recorded in the spec as a refinement
-  of D2's presentation, not a reversal of its decision — **say so if that reading is wrong.**
-- **New harness capability** [[compound-capability-each-task]] — **`e2e/browser-verify/stats-view.spec.ts`
-  is the first browser check that opens the Statistics view at all.** The suite drove the editor, the
-  params and the export menu and left the surface that renders a skill's computed numbers unproven,
-  so "slice 1 is a no-op" was not checkable. It also encodes a product fact worth knowing: after
-  Apply the work rail **auto-collapses** at this viewport, so the Statistics ROW does not exist until
-  `Expand rail` is clicked. Slice 5 should extend this file rather than add another.
-- **Every guard in this session was proven to bite by reverting the fix** — nine separate proofs.
-  Worth continuing: G2's FE half fired in **`components/`**, the root the spec's own `lib/`-only
-  instinct would have missed, and that is only visible because the revert was actually run.
-- **Gates.** `verify.sh` **9/9 raw, exit 0, `SELOM_DATASETS_DIR` exported** on every commit (1664
-  passed / 5 skipped) · **skill-smoke 43 pass / 0 fail**, no regression, run after slice 3 and again
-  after slice 4 · **browser-verify 4/4 green**, all four new this session.
-- **Not done, and deliberately:** slice 5 (`confusion`/`qq`) — but it was **SCOUTED** at the wrap
-  and four of its assumptions turned out wrong, all written into the RECOMMENDED ORDER block: it is
-  reachability-clean, it touches no figure or golden (the scalars are in the TABLE's title, not the
-  plot's), **`confusion`'s real-corpus case IS the refusal case** rather than the value case, and a
-  one-row table makes three call sites print *"1 rows"*. Also not done: the `PROSE_SILENT` triage,
-  and `violin`'s append (blocked on 10(b)).
-- **The `#4` MILESTONE BOUNDARY IS THE END OF SLICE 5** — run `review-gauntlet` + `fe-review` over
-  `f5a47c0..HEAD` there, not per slice [[review-cadence-phase-not-task]].
-
-## ▸ (superseded) LIVE · KNOBS-1 · 2026-08-05 00:47 +1000 (Sydney) · branch `main` (**PUSHED — `origin/main` = `23256ad`, working tree clean, nothing local; CI green on both pushes, runs `30920091848` + `30920304922`**) · Claude (FE+BE, solo, lead)
-
-- **NEXT#1's first pass is done: 171 → 148 untouchable knobs, 36 → 27 skills, 18 → 15 with no
-  overlay.** Ranked by what each knob DECIDES, per the board. Detail in the SESSIONS row; what
-  follows is what a next session needs and could not re-derive.
-- **⚑ THE FINDING THAT MATTERS: the layer below coverage is a control that RENDERS but cannot
-  express its knob.** `mergeField` takes `min`/`max` straight from the backend spec and hands them
-  to `<input type="range">`, which **silently falls back to 0–100** when either is absent — so a
-  float knob bounded 0–1 would render a slider whose whole meaningful range is the first 1% of the
-  track. Same class as the API-only knob (the user cannot reach the value), one layer further in,
-  and invisible to every gate because the field object is perfectly well-typed either way. Now two
-  guards, and the step one **found a live defect immediately**: `qq.max_points` (min 200, step 500,
-  default 6000) put its thumb at **5700** while the readout said 6000. Expect more of this shape —
-  the question "can the widget express the value?" has only just started being asked.
-- **`fdr_threshold` is a typed number, not a slider, and the reasoning generalizes.** 0–1 range,
-  conventional values 0.05 · 0.01 · 0.001 all inside the first tenth. A slider there would have
-  created a NEW reachability gap while closing one. **When a knob's useful values cluster at one end
-  of its declared range, the slider is the wrong instrument** — that is the rule, not the incident.
-- **The over-representation trio share one declared pair of cutoffs and that was not tidiness.**
-  `fdr_threshold`/`fc_threshold` on `enrichment`/`pathway`/`go_graph` select the QUERY GENE LIST;
-  the identical keys on `volcano`/`proteomics_de` ARE the significance test and are drawn as dashed
-  lines. Same names, opposite jobs. Retyping the help three times is how those two get conflated, so
-  `GENE_LIST_CUTOFFS` is the one home. Both are also **inert on a bare gene list** (no adjusted-p
-  column to filter on) and the help says so, rather than leaving a control that silently does
-  nothing on half the inputs.
-- **⚑ `sankey` PASSES skill-smoke on a file the real user path GATES — the venn/upset note again,
-  a second instance.** Its corpus case is `hani/mmc2_markers_long.csv`, which is `gene,cell_type`:
-  two text columns. QC blocks it with *"No numeric data to analyze"* and **by its own rule it is
-  right**; it is wrong about *sankey*, whose values are the pair COUNTS the engine derives itself —
-  an edge table has no numeric column by construction. smoke passes because it calls the engine
-  directly and never meets the ingest gate. The browser check takes the UI's own "Review & run
-  anyway", which is the honest user path here. **Not fixed:** whether QC should know a skill derives
-  its own numeric column is a real question, and bigger than this change.
-- **Three harness capabilities** [[compound-capability-each-task]] — `setRange` (keyboard-driven
-  sliders; `fill()` refuses `input[type=range]`, so every threshold knob was undrivable, and
-  assigning `.value` would only prove React's handler works when called), `overrideDataCheck` (the
-  QC block card's escape hatch, opt-in so an unexpected block still fails loudly), and **`/p/[id]` +
-  `/store` in route warming**.
-- **⚑ READ THIS BEFORE BELIEVING A BROWSER-VERIFY FAILURE — it is NOT the OOM signature.** Three
-  180s timeouts this session, in three different checks (`param-pickers` ×2, `cloud-export`'s Drive
-  leg ×1), **each on the FIRST check of its run, each dying at `getByLabel("Project name")` right
-  after navigating to `/p/<id>`, and every later check in the same run passing.** That last part is
-  what rules out the OOM mode (there, everything after dies in ~200 ms with
-  `ERR_CONNECTION_REFUSED`). Cause: `next dev` compiles per route on first request and **`/p/[id]`
-  was never in the warm list** — the route every check drives to. Fixed; the first check passes now.
-- **A SECOND, still-open harness flake, distinct from the above.** Once, in `openWorkbench` step 1:
-  `clickWhenLive(page, install, …)` spent its whole 180s clicking the Store's **Install** toggle
-  without `installed.count()` ever going > 0. Installs are account-wide + localStorage-backed, so
-  the toggle should already read "Installed" for every spec after the first, and the `count() === 0`
-  read appears to race the hydration that flips it. **One occurrence, not reproduced** — recorded
-  with the exact location (`fixtures.ts` step 1) rather than fixed blind, because guessing at a fix
-  for a race seen once is how a real cause gets papered over. Re-running the spec alone cleared it.
-- **`hasParamControls` is a DEAD EXPORT** — no call site anywhere; the workbench's "Runs with smart
-  defaults" copy branches on `schema.length`, not on it. Its test used to pin `go_graph` as the
-  false case, so giving that skill an overlay failed a test whose subject is the function, not the
-  backlog. It names an unknown id now. Left in place (one small pure function, legitimate question),
-  but a next session working this backlog should decide whether it earns its keep.
-- **Gates.** `verify.sh` **9/9 raw, exit 0** — and note the first run said *"SELOM_DATASETS_DIR is
-  unset — real-data tests SKIPPED, so be-test is a weaker gate than CI's."* It was re-run with the
-  corpus exported (1571 passed / 5 skipped, vs 1565 / 11). **Export it; the gate tells you when you
-  have not.** browser-verify **23 green / 2 skipped / 0 failed** across filtered passes.
-
-## ▸ (superseded) LIVE · REACHABILITY-SWEEP · 2026-08-04 23:35 +1000 (Sydney) · branch `main` (**PUSHED — `origin/main` = `7b9c73c`+, working tree clean, nothing local**) · Claude (FE+BE, solo, lead)
-
-- **NEXT#1 is closed on all three bullets, and the sweep found more than it was sent for.** The four
-  newest plot types are driven to a rendered figure by a real user path; the seed is generated
-  instead of hand-listed; and the "what else is unusable?" question has a number and a guard.
-- **⚑ THE FINDING THAT MATTERS: 171 of 313 backend knobs render NO control at all** — 37 skills,
-  18 of them with no overlay whatsoever. `paramFieldsFromSpec` iterates the presentation OVERLAY,
-  not the backend spec, so a skill without one shows zero controls and the panel says *"Runs with
-  smart defaults — ready to apply"* — which reads as a product decision and is usually just an
-  absent overlay. **The sharpest case is `volcano`, the flagship**: the panel says *"Tune the
-  options"* while `fc_threshold`, `fdr_threshold` and `top_n` — the three knobs that decide what a
-  volcano SHOWS — are unreachable. Now a named, two-directional waiver list (`API_ONLY_KNOBS`) so it
-  can only shrink and nothing new joins it silently. **This is the third layer of the same class:**
-  17 unreachable routes → 19 unrunnable skills → 171 untouchable knobs. Each was invisible to every
-  gate and each was found by asking "can a user actually reach this?" rather than "does it work?"
-- **The seed is GENERATED now, not refilled.** The board said "refill `seed.ts` from the live
-  registry", and refilling by hand would only reset the clock — a hand-maintained mirror of a live
-  registry goes stale again, which is the lesson rather than the incident. `npm run gen:seed` writes
-  the Selom half from the backend's own `skill.json`; the drift guard re-runs the generator in memory
-  and fails on any difference. **It caught a live divergence immediately:** the seed named
-  `umap_scrna` "UMAP (single-cell)" while the backend serves "scRNA UMAP" — and a test was pinning
-  the seed's string, i.e. asserting a name no user ever saw.
-- **Two defects the browser found that no gate could — again, and this time in the SERVER log rather
-  than on screen.** Both were sitting in plain sight in `browser-verify` output that nobody read:
-  1. **5 requests died with a 500 on every cold start.** `UploadRepo`/`LibraryRepo`/`SqlJobStore`
-     each called `metadata.create_all` from their own lazily-built constructor, and
-     `create_all(checkfirst=True)` reflects-then-CREATEs non-atomically — so the first burst of
-     concurrent requests against a fresh database raced and lost with `table analysis_jobs already
-     exists`. Invisible because the frontend re-fetches and the retry finds the schema built. Fixed
-     with `db.engine.ensure_schema` (lock + a post-condition-checked catch for the cross-process
-     case); the regression test uses **threads on a barrier**, because the race is a timing fact a
-     mock cannot express.
-  2. **A Radix Select mounted uncontrolled and flipped to controlled on every single upload.**
-     `data-type-strip` passed `value={undefined}` until `qc.profileCode` landed. Not cosmetic: while
-     uncontrolled Radix keeps its own selection, so a data-type override chosen in that window is
-     silently overwritten when the prop takes over. `""` is Radix's own "no selection".
-- **`runFromWorkbench` is the new harness capability** [[compound-capability-each-task]] — Store
-  install → real file → intake → **set params through the real controls** → Apply → a rendered
-  figure. `openWorkbench` stops before Apply and `openRealFigure` cannot set a parameter, so neither
-  could make the claim "this skill ships" in full. Params are set by ACCESSIBLE NAME, so a knob whose
-  widget never renders fails the check instead of being silently defaulted.
-- **The `catalog.name` note from the last board turned out to be 21 skills, not one.** Every one was
-  a lossy re-brand of the title beneath it ("Box / strip plot" → "Selom Box Plot", "Ridge plot
-  (joyplot)" → "Selom Ridge Plot"), and the dropped words were the searchable ones. Removed; `title`
-  is the one display name, and the key is now REFUSED rather than merely unread — an unread key that
-  still parses invites someone to re-add one and wonder why the title does not move.
-- **`venn`/`upset` PASS the smoke matrix through an adapter no user path provides.** The `membership`
-  crosstab has no equivalent in `engine.ingest` or the frontend, unlike `celeris` which mirrors a real
-  ingest. So that PASS proves the engine and says nothing about reachability; `smoke.py`'s docstring
-  claimed parity for both adapters and now distinguishes them. Not fixed — a reshape step is a
-  feature, not a patch.
-- **⚑ ENV, NOT CODE — but read this before trusting a browser-verify number.** `verify.sh` is a
-  clean **9/9** (raw, exit 0). The 23-check browser suite is **21 green / 2 skipped / 0 failed**,
-  and that is a UNION OF TWO PASSES, not one run: **syd4 OOM-kills the Next dev server partway
-  through**, and it did so twice at different points (once at check #4, once at #18). The signature
-  is unmistakable and worth recognising instantly — one check dies slowly (a 37 s or 3 min timeout
-  while the server is going), then **every remaining check fails in ~200 ms with
-  `ERR_CONNECTION_REFUSED`**, and the log shows Next's `[?25h` cursor-restore where the process
-  exited. **Those are not 20 failures; they are one.** Re-running the survivors as a smaller filtered
-  pass cleared all of them. The box is shared (a thalon dev server holds 1.6 GB, plus
-  chrome-devtools-mcp and several agent sessions) and sits on ~2–3 GB of swap; nothing of mine is
-  orphaned — `:3152`/`:8152` are released on exit. **So: split the suite when the box is loaded, and
-  never read a wall of fast failures as a regression without checking for the server's exit first.**
-  The 2 skips are correct and pre-existing: V-2's cloud imports skip unless
-  `SELOM_BV_GDRIVE_REF`/`SELOM_BV_DROPBOX_REF` name a file, because both providers are sandboxed to
-  what Selom itself created, so there is nothing to discover [[selom-cloud-scope-sandbox]].
-- **NEXT#3 also landed (`6bf12a6`) and is VERIFIED IN CI**: zizmor pinned at 1.29.0 in both blocking
-  gates, `@latest` moved to a weekly drift job, `hygiene-scan` given the cross-file check so the two
-  pins can never drift apart silently. **`main` is pushed and CI is green** — run `30914180768`, all
-  six jobs, `workflow-lint` 12s at the pin; the drift job was dispatched by hand (`30914228111`,
-  8s green) instead of waiting for Monday, which is what proved its minimal `contents: read` is
-  actually sufficient [[verify-ci-in-its-target-event]]. Detail in NEXT#3.
-- **Two things I got wrong mid-session, both caught by the guards I was writing.** The
-  `API_ONLY_KNOBS` list was first derived with a regex over `params.ts` and was wrong for
-  `erg_traces` — the stale-waiver direction of my own guard caught it, which is the argument for
-  making it exact in both directions. And a `git checkout` to revert an experiment silently wiped an
-  uncommitted test in the same file; **revert an experiment with a targeted edit, never `git
-  checkout <path>` on a file that has uncommitted work.**
-
-## ▸ (superseded) LIVE · PICKERS · 2026-08-04 19:17 +1000 (Sydney) · branch `main` · Claude (FE+BE, solo, lead)
-
-- **NEXT#1 is DONE and reachable.** Column pickers on `boxplot` · `slope` · `lollipop` · `ridge` ·
-  `confusion` · `line` · `regression` · `qq` · `composition`; the pair row-list on `boxplot`. Both
-  surfaces carry it — the Workbench (run a skill) and Figure-data (re-run with different columns),
-  so changing a column on an existing figure is the same gesture as choosing it the first time.
-- **⚑ THE FINDING THAT MATTERS MOST IS NOT THE FEATURE: 19 of 44 live skills could not be run at
-  all.** Detail in the SESSIONS row. Three things to carry:
-  1. **A green `verify.sh` says nothing about reachability.** All 9 gates passed while ten shipped
-     plot types sat behind a disabled button. Only driving the real Workbench in a real browser
-     showed it.
-  2. **The previous board predicted this and it was not acted on.** STRIP's LIVE block says
-     *"reachability was verified against a live backend… **I did not click through the Store in a
-     browser** — the contract half is proven, the visual half is not."* The visual half was broken.
-     **When a wrap says a half is unproven, that IS the next action, not a footnote.**
-  3. **The seed is still hand-maintained.** `getSkill` now prefers the live registry so the drift
-     cannot hide, but `lib/catalog/seed.ts` still lists only 25 Selom skills. The guard makes that
-     safe, not correct — a backend-down session shows the seed, and it is 19 skills stale.
-- **The premise pattern is 5-for-6 now, and this time it was MY board note that was half wrong.**
-  NEXT#1 said the pair vocabulary was already client-side because `design.group_candidates[].levels`
-  is persisted. True in general, **false for `generic_table`** — where it was empty, which is the
-  only kind that uses `pairs=`. **Grepping the FE was not enough; the payload had to be run.** One
-  `uv run python` against the real file settled in seconds what the note had asserted.
-- **Three defects came out of writing the tests and driving the browser, not from design:** a column
-  whose every value is distinct passes the cardinality cap but groups nothing; `sample_id` sat
-  *exactly* on the 12-level cap so it needed the deg alias rule, not the cap; and every param
-  control's accessible NAME included its whole help paragraph, which made "Group column" and
-  "Compare groups" mutually ambiguous to `getByLabel` — and to a screen reader.
-- **`openWorkbench` is new harness capability, not a one-off** [[compound-capability-each-task]] —
-  it drives Store-install → project → real file → intake → skill SELECTED, stopping one step short
-  of `openRealFigure` because a param panel only renders while a skill is selected and un-applied.
-  Any future check about *inputs* (rather than the figure) starts here.
-- **`dev:mock` cannot show the pair picker, and that is correct.** The mock is header-only, so it has
-  no row values to derive levels from; it returns no group candidates rather than inventing any
-  [[mock-fallback-never-fabricates-data]]. The COLUMN picker does work there (real header). Recorded
-  in `mocks/data-inspect-fixture.ts` so it is not debugged as a regression.
-- **Small finding, not fixed (out of scope):** `catalog.name` in `skill.json` overrides `title`, so
-  the STRIP session's retitle to *"Box / strip plot"* never reached the Store or the Workbench —
-  both display **"Selom Box Plot"**. Discoverability survives only because the summary contains
-  "strip plot" and the search covers it.
-
-## ▸ (superseded) LIVE · PLOT-ROWS-DONE · 2026-08-04 16:27 +1000 (Sydney) · branch `main` · Claude (FE+BE, solo, lead)
-
-- **§3.2 is fully closed.** Rows 7/8/10/11 (`confusion` · `ridge` · `slope` · `lollipop`) are built,
-  wired through all seven §5 points, reachable, and green. `docs/cnsplots-port/source-review.md`
-  §3.2 now has only rows **12 (`hist`/`kde`/`dist` as one skill)** and **13 (`donut`/`pie`, low
-  scientific value)** left, both explicitly ranked last.
-- **The premise pattern has ENDED — and knowing that is itself the result.** It was wrong four times
-  running (`pairs=`, `scatter`, `line`, `strip`: capability existed, reachability didn't). This time
-  the grep took minutes and said *build*: nothing in `_charts.py` does a stem, a paired line, a
-  contingency table or a 1-D KDE. **Keep grepping first — the rule is cheap and it now has a
-  negative result to calibrate against, not just four positives.**
-- **⚑ THE FINDING THAT SHOULD CHANGE THE NEXT BUILD: three of this session's defects were invisible
-  to every gate and visible in the first render.** Not a new lesson in kind, but the *sharpest*
-  instance yet, because two were in code that had just been written to fix a rendering problem —
-  the grey-ridge bug was CAUSED by a fix for the stacking order. **Render after every visual change,
-  including the ones that are themselves visual fixes.** `scripts/render_skill.py <skill>` is now
-  one command and turns the caches off.
-- **The annotation-layer D2 finding generalizes beyond these four skills.** Any skill that labels
-  cells or points on a category axis by NAME is exposed, and cluster ids reach a figure as numeric
-  strings on every scRNA path. `check_figure` now fails it everywhere, but **existing skills were
-  only proven clean by the 43-skill smoke run** — if a new labelled-matrix skill appears, this is
-  the first thing to check.
-- **The render cache cost two debugging rounds.** It served the pre-fix `confusion` twice at 0.00 s
-  while I inspected `theme.py` for a rewrite that never happened. `smoke.pin_process()` is the fix
-  and it is now baked into `render_skill.py`; the documentary form (a board note from the `qq`
-  session) did **not** hold, which is why it became a script.
-- **One contract limit found, not fixed:** `contract.run_skill_with_table` returns `StatsTable |
-  None` — exactly ONE table. So `lollipop` with `pairs=` swaps its ranked-values table for the
-  pairwise p-values (the same trade `boxplot` makes) rather than showing both. Recorded below.
-- **⚑ CORRECTION, same session (2026-08-04): I recorded the live-schema column picker as "ruled
-  out / impossible" and that was WRONG — it is the premise pattern again, this time in my own note.**
-  Databricks · Confluence · Better Stack · Glide · GitHub Insights all populate column pickers from
-  the dataset's live schema, and I wrote that `ParamField` cannot see the dataset's columns. It
-  can — or rather, the data is already there and nobody threads it:
-  - `POST /data/inspect` **already** returns `data_fit.columns` (every column + `n_numeric_cols`)
-    and `design.group_candidates[]`, **each carrying its `levels`, `n_levels` and a
-    `reference_guess`**. Both are **persisted on the dataset** in the FE store
-    (`lib/projects/types.ts` → `dataFit` / `design`) and survive reload.
-  - **`components/project/workbench-panel.tsx` already holds `route.dataFit` in its props (line ~49)
-    and calls `useSkillParams` at line ~103.** The columns are in scope in the very component that
-    renders the controls.
-  - The ONLY real blockers are (a) `paramFieldsFromSpec(id, spec)` is pure over the backend spec, so
-    nothing threads a data context into the merge, and (b) `ParamField` has no repeatable-list
-    widget (needed for `pairs=`, not for a single-column select).
-  **So `pairs=` is not blocked on data either** — pairs are between LEVELS, and levels are exactly
-  what `group_candidates[].levels` carries. The stale "impossible" claim has been corrected in
-  `lib/catalog/params.ts` at both notes; do not re-derive it from an older comment.
-  What still transfers from Mobbin regardless: GitHub Insights' explicit "(optional)" convention
-  **inverted** — `slope` marks its REQUIRED columns, because a text field that silently fails at run
-  time is the worst of both. That marking stays useful after the picker ships.
-
-## ▸ (superseded) LIVE · STRIP · 2026-08-03 · branch `main` (**PUSHED — `origin/main` = `1d1176a`, nothing local**) · Claude (FE+BE, solo, lead)
-
-- **NEXT#0 and NEXT#1 are DONE, and Lane B continued into rows 5-6.** The slow lane is gated in
-  CI *and* `verify.sh`; `venn`/`forest`/`qq`/`line` are built, wired and reachable, and `scatter`
-  turned out to be `regression` with a dead knob. Detail in the two newest SESSIONS rows.
-- **⚑ THE PATTERN THAT SHOULD CHANGE HOW THE NEXT ROWS ARE APPROACHED: the plot review's "missing"
-  premise has been wrong three times running** — `pairs=`, `scatter`, `line`. In every case the
-  ENGINE existed and only the REACHABILITY was missing. Grep for the engine before writing one;
-  budget the work as wiring, not building.
-- **The slow gate is verified in its target event** [[verify-ci-in-its-target-event]] — run
-  `30834926456` on `c8ddbbb`, backend step 7 *"Slow test gate"* → **361 passed, 21 skipped in
-  8.65s** (faster than the local 16s: CI runs `-n auto` on its own runner). Not inferred; read off
-  the run.
-- **⚑ `ci` was ALREADY RED on `main` before this session's work** — the two preceding doc-only
-  commits (`ced7f31`, `8de5e39`) both failed, so the last board's "CI green" assumption was stale.
-  Cause: **zizmor `ref-version-mismatch`** on all five `actions/checkout` uses. The SHA pins were
-  correct — the SHA is an annotated-tag object dereferencing to the commit tagged **v5.0.1** while
-  the comment said `# v5`. Fixed in `c8ddbbb`; `ci` is green now.
-- **⚑ AND HOW IT HID — now CLOSED in the gate, not in a note.** `zizmor` starts OFFLINE unless it
-  finds a token, and that audit needs the API to resolve tags → SHAs, so a local run said *"No
-  findings. Good job!"* while CI (which sets `GH_TOKEN`) reported five. **No new credential was ever
-  involved** — `gh` was authenticated throughout; zizmor just does not look. `verify.sh` now carries
-  a **`wf-lint`** gate that resolves `GH_TOKEN` (falling back to `gh auth token`, exported not
-  passed as argv) and reports **NOT RUN with the fix** when it can't, never a pass. Proven both
-  ways, and reverting one `# v5.0.1` → `# v5` turns it FAIL (exit 13) — CI's exact failure,
-  reproduced locally. **9 gates now.**
-- **⚑ OWNER CALL OWED (small, no spend): the `workflow-lint` job runs `zizmor@latest`,** so a new
-  audit in a new zizmor release turns `main` red with **no repo change** — which is exactly what
-  happened here. Pinning it makes the gate reproducible but stops new audits arriving for free.
-  Both are defensible; it is a policy choice, so it is not being made unilaterally.
-- **Reachability was verified against a live backend, not inferred**: `GET /skills` serves all three
-  as `verified`/`production` and `GET /skills/{id}` serves their `param_spec`, which is what the
-  panel merges with the FE overlay. **I did not click through the Store in a browser** — the
-  contract half is proven, the visual half is not.
-- **The lesson worth carrying: a "cheap gate we can't afford" was never measured.** The slow lane
-  was written off as corpus-dependent for long enough to hide a real breakage; it was 16 seconds.
-  Measure the blocker before designing around it.
-
-## ▸ (superseded) LIVE · LANE-A-C · 2026-08-03 21:55 +1000 (Sydney)
-
-- **STEP 0 is cleared.** `0a`: the owner asked mid-session, so `main` was pushed —
-  `46d5c6c..f608feb`, all 31 commits. Phase F, the ERG corrections and cloud-export are on
-  `origin` now; that loss-risk is closed. `0b`: the `slow` suite runs (detail in the SESSIONS row).
-- **The board's three-lane fork was NOT used, deliberately.** Lane A turned out to be a change to a
-  shared module (`_charts.py` → `_stats.py`) and Lane C touches every router — both are the class
-  of work that is *worse* in a worktree, and B depends on A's validators. Built sequentially on the
-  main checkout instead. **Lane B (venn/forest/qq) is untouched and is the obvious next slice.**
-- **Lane A is done, and its premise was wrong in a useful way.** `pairs=` was not "nowhere" — it
-  existed, ERG-scoped and bar-shaped. The work was generalization, so the ERG figures are
-  byte-identical and every categorical skill now speaks one vocabulary. Correction is default-`none`
-  everywhere, so no existing figure moved.
-- **Lane C steps 1–3 are done.** Deny-by-default + tenant-scoped artifacts / reproduction runs /
-  `uploads/local`. **Authentication and authorization were closed separately and in that order** —
-  step 1 alone would have reduced the artifact leak from "anyone on the internet" to "any logged-in
-  user", which is a reduction, not a fix. Steps 4–7 (the frontend half) are **blocked on Clerk keys**
-  and stay batched to the owner.
-- **⚑ THE FINDING THAT OUTLIVES THIS SESSION: the `slow` test lane is enforced NOWHERE.**
-  `.github/workflows/ci.yml` runs `pytest -m "not slow"` and `verify.sh` does the same, so **385 of
-  the 1907 tests have no gate at all.** It is how the pandas-3/pyarrow h5ad breakage survived, and
-  this session it let **7 tests broken by a signature change report PASS**.
-  **Run `uv run pytest` with no `-m` before trusting a green gate on any signature change.**
-- **The fix is small, and my first read of it was WRONG — measured 2026-08-03, trust the number.**
-  I assumed "slow" meant "needs the real corpus", which would have made this a real decision about
-  what CI can run. It does not. `env -u SELOM_DATASETS_DIR uv run pytest -m slow -n 2` gives
-  **373 passed, 12 skipped, 0 failed in 16s** — the same 12 skips as with the corpus. The lane is
-  mostly *heavy-import* tests (scanpy, pydeseq2), not *real-data* tests.
-  **So: add a corpus-free `pytest -m slow` step to the EXISTING backend CI job** (which already has
-  a 20-minute budget) — not a new job, not a nightly, not a self-hosted runner. It would have caught
-  this session's 7 breakages exactly, since `test_reproduction_runs.py` needs no corpus.
-  Be honest that it is a WEAKER gate: with the corpus that same lane takes ~7½ min because the real
-  engines chew on real matrices, so this catches breakage, not numerical regression —
-  `scripts/skill-smoke.sh` + a local full run stay the deeper check. CI triggers on `push: [main]`
-  and `pull_request`, so it self-verifies on the next push [[verify-ci-in-its-target-event]].
+**`#11` (the undeclared-param guard) — RECONNAISSANCE DONE, GUARD NOT BUILT. Read this before
+starting it; the board's estimate of its size was wrong.** A binding-accurate AST probe finds
+**4 undeclared params across 2 skills**, not the class-sized backlog NEXT#11 predicted:
+`confusion.x` · `confusion.y` (real aliases — `params.get("true") or params.get("y")`) and
+`erg_bwave_bar.vline` · `vline_label`. The two `deg` cases that motivated the item are already
+gone (`group_regex` was declared by `#1(d)`; `label_val` was renamed `label`).
+⚑ **A first probe reported 13 and 3 were FALSE POSITIVES** — it aliased `p` as a params name and
+caught `pathway`'s Reactome loop variable (`p["stId"]`). **Resolve the params dict by BINDING** —
+seed from functions taking an arg named `params`, follow calls that pass it on, bind to the
+callee's own arg name — which is the machinery `tests/test_methods_param_spec_guard.py` already
+owns. The probe is at
+`/tmp/claude-1000/-home-deploy-work-selom/6a4d9591-7163-4467-a87d-15cd550eb1dc/scratchpad/probe_undeclared.py`
+(scratch — **re-derive it in the test, don't depend on that path**).
+The guard is still worth building as a ratchet; it is a 4-entry triage, not a campaign.
 
 ## ▸ NEXT
 
@@ -689,67 +124,27 @@
    ~~the two-directional prose↔param guard~~ · ~~the `#4` milestone reviews + fix pass~~ —
    **all DONE.** §3.2 is closed except rows 12–13. **Nothing is carried forward.**
 
-> **▶ THE NEXT SESSION — `#1` (incl. `(d)`) · `#2`(ERG+named+deg) · `#3` · `#4` ARE ALL CLOSED
-> (2026-08-05).** ⚑ **FIRST, ANSWER THE STRATEGIC CALL IN DEFERRED** — it has been open two
-> sessions and its own recommendation ("do `#1(d)`, then pivot to P-E") is now spent, because
-> `#1(d)` shipped. Absent an answer, the value order is: **`#11` the undeclared-param guard** (new
-> this session — the only item that closes a whole class the existing guards are structurally blind
-> to) → **the rest of `#2` (131 untriaged**; best blocks `heatmap` · `integration` ·
-> `normalization_qc`) → **`#5`**. `API_ONLY_KNOBS` is **52 across 10 skills** and `PROSE_SILENT`
-> untriaged is **131** — both MEASURED 2026-08-05 by counting the lists. ⚑ **Every running tally in
-> this file has been wrong at least once** (`86/13` when it was 88/14; `73/11` when it was 75/12).
-> **Count the list. Never subtract from the tally.**
-> Re-derive anything here that looks stale [[verify-todo-not-already-shipped]] — **`#2` is the
-> standing proof that a board's own characterisation of a backlog can be wrong.**
+> **▶ THE NEXT SESSION — the direction is DECIDED, do not re-litigate it.**
+> [[DECISIONS #17]] (owner, 2026-08-06): **keep burning down the honesty/reachability backlogs;
+> P-E is not next.** [[DECISIONS #18]]: the app moves to **`/app`** — decided, not built, and it
+> lands with P-E's frontend half. **The two items that were batched for the owner are now CLOSED,
+> so nothing on this board is waiting on him except a real `.fcs` file.**
 >
-> 1. ~~**BROWSER-VERIFY THE COMPARE FIX**~~ — **DONE 2026-08-05** (`5975003`).
->    `e2e/browser-verify/compare-tables.spec.ts` drives the exact scenario on a real backend, via the
->    new **`sweepIntoCompare`** fixture. **It found a second defect**: `diffTables` keyed rows on the
->    bare first column, so a pairwise table's repeated `group A` collapsed every duplicate into the
->    last one — one control against several treatments rendered ONE row and reported "~1 changed".
->    Fixed by occurrence-disambiguated keys; both directions pinned, confirmed red first. **The
->    transferable lesson is in the LIVE block: every `diff.test.ts` fixture used a unique first
->    column, so the pins inherited the code's blind spot.**
-> 2. ~~**THE `PROSE_SILENT` TRIAGE**~~ — **ERG + every named result-changer DONE 2026-08-05**
->    (`60ee74e`). **261 → 179 untriaged.** ⚑ **The premise that sent me there was wrong**: NEXT#1(e)
->    ruled the ERG knobs pipeline-level/internal, so the board called it "one confirmed-waive pass".
->    **26 of the 50 decided what the figure CLAIMS**, and two were defects in the FIGURE (three
->    titles hard-coding `"scotopic"`; violin's value axis hard-coding `"log1p"`). `proteomics_de`,
->    `markers` and `violin` went the same way. **What a next session inherits:**
->    - **179 UNTRIAGED remain and the list now says which is which** — `PRESENTATION` · `INTERNAL` ·
->      `VIA_OUTCOME` · `IN_METHODS` · `UNTRIAGED`, with `_UNTRIAGED_CEILING` asserted by **equality**
->      so it can only fall. Triage a template = read its runner's body, give each param a verdict or
->      a sentence, lower the ceiling. **Do not add an `OWED` verdict** — the fix leaves the list.
->    - **The highest-value blocks left are `deg` (26 across both modules) and `heatmap`/`integration`
->      /`normalization_qc`.** ⚑ **`deg`'s belong with `#1(d)`'s spec, not piecemeal** — `method`,
->      `mode` and `group_col`/`group_val` are the same knobs that spec has to reach.
->    - **Reach for `VIA_OUTCOME` whenever a param is inert unless a data-dependent branch fired.**
->      Three lifts exist to copy (`meta.significance` · `meta.adaptation` · `meta.clustered`), all
->      written only when they differ from the param-derived answer so defaults stay byte-identical.
-> 3. ~~**`#1(c)` `gsea` + `ssgsea` (13)**~~ — **DONE 2026-08-05.** **88 → 75 knobs, 14 → 12 skills** (measured; the tally's "86/13" was already wrong).
->    The shared-meaning check paid for itself: `gene_sets`/`gene_set` are byte-identical across
->    `gsea`/`ssgsea`/`enrichment` and now share one block, while `weight` (same exponent, different
->    CONVENTIONAL value per method) and `top_n` (`enrichment` = most enriched, `ssgsea` = most
->    VARIABLE) deliberately do not. ⚑ **And reading the bodies found three prose lies the guard
->    could not see — see the SESSIONS row.**
-> 4. ~~**`#10(b)` + the ledger provenance gap**~~ — **DONE 2026-08-05** (`docs/provenance-stamping/
->    spec.md`, written first then built straight through as directed). A synthesized read is badged
->    and caps `selom_confidence` at 75. **Two board premises were wrong and are corrected in the
->    spec §3**: `PanelScore.provenance` was already taken (new field = `reading_provenance`), and
->    `run_panel` has no production caller so only `drive.py` was stamped. **Read spec §7 before
->    concluding the badge is broken** — no published ledger can show it, by construction.
->    _Original brief, kept for its rationale:_
->    They are the same seam and both have a consumer waiting: `violin`'s second table is blocked on
->    `#10(b)`, and the ledger overstates trust today. **The founder decision is ALREADY MADE —
->    [[DECISIONS #16]], owner-decided 2026-08-05: BADGE the provenance on the ledger AND CAP
->    `selom_confidence` for a synthesized read.** Scoped to synthesis; the broader blindness (the
->    score ignores reader confidence at EVERY layer — a native L2 read at 0.5 also scores 100) is
->    deliberately NOT in scope, because it re-baselines every published number. Shape: carry
->    `Reading.layer`/`.source`/`.confidence` onto `reproduction.core.MetricValue`, have
->    `panel_extractor` return the `Reading` rather than the bare value, populate it at
->    `drive.py:150-152`, surface it on `PanelScore`, and cap in `_metric_score` the way `substituted`
->    already caps reproducibility at 92. **So this session does not need to ask anything — go.**
-> 5. **The fe-review JTBD backlog** (recorded, none fixed — all are feature gaps, not defects):
+> Value order: **`#11` the undeclared-param guard** → **the rest of `#2`** (131 untriaged; best
+> blocks `heatmap` · `integration` · `normalization_qc`) → **`#5`**.
+> ⚑ **But read `#11`'s entry first — the LIVE block above measured it and the board's estimate was
+> WRONG.** It is **4 undeclared params across 2 skills**, a triage, not a campaign. That is the
+> third time in four sessions a board's own characterisation of a backlog has been wrong (`#2`
+> "confirmed-waive pass" → 26 live lies; `#1`'s `86/13` tally → `88/14`), so:
+> **count the list, never subtract from the tally, and re-derive anything that looks stale**
+> [[verify-todo-not-already-shipped]].
+>
+> `API_ONLY_KNOBS` = **52 across 10 skills**; `PROSE_SILENT` untriaged = **131**. Both MEASURED
+> 2026-08-05 by counting the lists. **`#1`–`#4` are all CLOSED; their detail is in the archive and
+> the commit range.**
+>
+> **Still carried from the `#4` fe-review — the JTBD backlog** (recorded, none fixed — all are
+> feature gaps, not defects):
 >    **copy-to-clipboard on a table** (the repo already ships Copy-TSV twice — `skill-match-results`
 >    and `library-view` — and `components/methods/copy-button.tsx` is ready-made; reading κ=0.951
 >    currently means downloading a CSV) · a CSV filename carrying the figure + variant, and the
@@ -921,7 +316,22 @@
       **refuted** this for `markers` specifically — it is a documented decision there — so treat it
       as a convention question, not a defect.
 
-11. **⇒ THE UNDECLARED-PARAM GUARD — new 2026-08-05, and the highest-value item on this board.**
+11. **⇒ THE UNDECLARED-PARAM GUARD — MEASURED 2026-08-06; still worth building, but it is a
+    4-ENTRY TRIAGE, not the campaign this entry originally described.**
+    ⚑ **The probe found `confusion.x` · `confusion.y` · `erg_bwave_bar.vline` ·
+    `erg_bwave_bar.vline_label` — 4 across 2 skills, out of 44.** The two `deg` cases that motivated
+    the item are already gone: `group_regex` was DECLARED by `#1(d)`, `label_val` was renamed
+    `label`. So "expect real finds" below was right in kind and wrong in scale — the class is real,
+    the backlog is small, and the guard's value is now **holding the line** rather than clearing a
+    debt. Build it; don't budget a session for it.
+    ⚑ **And resolve the params dict by BINDING, not by variable name.** A first probe that aliased
+    `p` reported 13 and **3 were false positives** — `pathway`'s Reactome loop variable
+    (`p["stId"]`, `p["entities"]`, `p["name"]`). Seed from functions taking an arg named `params`,
+    follow calls that pass it on, bind to the callee's own arg name. That is exactly what
+    `tests/test_methods_param_spec_guard.py::_referenced_keys` already does — extend it, don't
+    re-invent it. **Triage each hit as *declare it* or *delete the alias*;** `confusion`'s two are
+    live aliases (`params.get("true") or params.get("y")`), so they are a real fork in the road.
+    _Original framing, kept because the mechanism is why the class is invisible:_
     An **eighth** layer of [[selom-shipped-not-reachable]], and the first one **no existing guard can
     detect by construction**. `deg`'s runner read `group_regex` and `label_val`, neither declared in
     its `skill.json`: `skills/contract._execute` merges unknown caller keys straight through
@@ -956,24 +366,16 @@ journal's own author guidelines**, not cnsplots.
 
 ### ⚑ Batched for the owner — NEXT WEEK (owner-directed 2026-08-02: "anything that needs me")
 
-- **⇒ THE ONE STRATEGIC CALL, raised 2026-08-05 and UNANSWERED — surface it early, don't default.**
-  **Keep burning down the honesty backlogs, or unblock P-E?** The measured position
-  (`docs/build-plan-2026-08/plan.md` §0–§1): **P-A and P-C are done, P-B/P-D partial, the engine
-  spine P1–P4 is effectively complete, and P5 is data-bound not code-bound.** Roughly ten sessions
-  have gone to a reachability/honesty thread no phase anticipated — it keeps finding real defects
-  (a catalog denying capabilities that ship, compare diffing 1 of N tables, a paragraph citing an
-  engine that never ran), **but it is open-ended (75 knobs · 166 prose waivers · ~23 JTBD) and none
-  of it moves Selom toward being usable by anyone but the owner.** **P-E is the only phase that
-  does, and it is the one blocked on the owner** (Clerk keys + the route split, both below).
-  Recommendation was: do `#1(d)` `deg`, then pivot to P-E. ⚑ **`#1(d)` SHIPPED 2026-08-05, so the
-  recommendation is spent and this question is now the live one.** For what it is worth as evidence:
-  that one pass found a 26-trillion-fold mislabel on the flagship figure's axis and an eighth class
-  of unreachable-by-declaration, so the thread is still paying — but it is still open-ended, and it
-  still moves nothing toward a second user.
-- **Clerk keys** (publishable + secret + issuer URL) — the only thing blocking P-E's frontend half.
-- **The route split** — does the app move to `/app` so `/` can be public? Recommended in
-  `docs/auth-multitenancy/spec.md` D5; **owed to Thalon's landing-page build** and much cheaper
-  before that ships.
+- ~~**THE ONE STRATEGIC CALL**~~ — **ANSWERED 2026-08-06 → [[DECISIONS #17]]: keep burning down
+  the honesty/reachability backlogs; P-E is not next.** It was surfaced at boot rather than
+  defaulted, and the trade was put honestly on both sides (the thread keeps finding real defects
+  but is open-ended and moves nothing toward a second user; P-E is the only phase that does).
+  Owner chose the backlogs with the P-E blockers still on his side. **Do not re-open it.**
+- ~~**The route split**~~ — **ANSWERED 2026-08-06 → [[DECISIONS #18]]: YES, the app moves to
+  `/app`.** Decided, **not built** — it lands with P-E's frontend half, or earlier if the landing
+  page forces it. `docs/auth-multitenancy/spec.md` D5.
+- **Clerk keys** (publishable + secret + issuer URL) — **now the ONLY owner-blocked item other than
+  the `.fcs` file.** Blocks P-E's frontend half. Not urgent under [[DECISIONS #17]].
 - **A real `.fcs` file** staged into `SELOM_DATASETS_DIR` — the ONLY reason `facs_gating` is the one
   skill the smoke matrix cannot run. The engine is real; the corpus is the gap.
 - ~~Push `main`~~ **DONE 2026-08-03.** The 31-commit backlog *and* this session's Lane A + Lane C
