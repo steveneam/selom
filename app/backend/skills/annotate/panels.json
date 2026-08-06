@@ -4,6 +4,7 @@
     "organism": "human",
     "attribution": "Marker genes per retinal cell class compiled from Lu et al., 'Single-Cell RNA Sequencing of the Retina', Front. Mol. Biosci. 8:699906 (2021) (doi:10.3389/fmolb.2021.699906) and corroborating retinal scRNA-seq atlases; RPE markers from RPE transcriptome literature (RPE65/BEST1/MITF). Gene symbols are facts — cited for provenance. A Microglia class (AIF1/CX3CR1/P2RY12/TMEM119/C1Q/CSF1R) was added from canonical microglial markers — the panel previously lacked it; the gap was surfaced by Kim et al., Stem Cell Reports 18 (2023).",
     "license": "public (gene symbols; cited for provenance)",
+    "citation": "Lu, Q. et al. Single-Cell RNA Sequencing of the Retina. Frontiers in Molecular Biosciences 8, 699906 (2021).",
     "markers": {
       "Rod photoreceptors": [
         "RHO",
@@ -128,6 +129,7 @@
     "organism": "human",
     "attribution": "Canonical peripheral-blood mononuclear cell (PBMC) marker genes per immune cell type, compiled from the 10x Genomics / Seurat pbmc3k tutorial cell-type assignments and standard immunology references (e.g. CD3D/IL7R for T cells, MS4A1/CD79A for B cells, GNLY/NKG7 for NK, CD14/LYZ and FCGR3A/MS4A7 for monocyte subsets, FCER1A/CST3 for dendritic cells, PPBP/PF4 for megakaryocytes/platelets). Gene symbols are facts — cited for provenance. Provided so the bundled pbmc3k demo dataset self-annotates out of the box.",
     "license": "public (gene symbols; cited for provenance)",
+    "citation": "Marker genes per PBMC cell type as assigned in the 10x Genomics pbmc3k / Seurat guided-clustering tutorial (no primary publication for the assignment itself).",
     "markers": {
       "CD4+ T cells": [
         "IL7R",
@@ -194,6 +196,7 @@
     "organism": "human",
     "attribution": "Cepo-derived per-cell-class marker genes (top 50/class) from the supplementary marker table (mmc2) of Kim et al., Stem Cell Reports 18 (2023) — the same CMRI lab as the Selom retinal-organoid dogfood data. A complementary panel to the canonical retinal panel: Cepo selects class-discriminative genes (cilia / transport-enriched) with near-zero overlap with the canonical marker panel, and includes a Microglia class. Gene symbols are facts — cited for provenance.",
     "license": "public (gene symbols; cited for provenance)",
+    "citation": "Kim, H.J., O'Hara-Wright, M., Kim, D., Loi, T.H., Lim, B.Y., Jamieson, R.V., Gonzalez-Cordero, A. & Yang, P. Comprehensive characterization of fetal and mature retinal cell identity to assess the fidelity of retinal organoids. Stem Cell Reports 18, 175-189 (2023).",
     "markers": {
       "Rod photoreceptors": [
         "CABP5",
@@ -670,6 +673,7 @@
     "organism": "human",
     "attribution": "Top AUC-ranked marker genes per major retinal cell type (FDR<0.05, top 12/type) from the integrated human-retina reference of Swamy et al., 'Building the mega single-cell transcriptome ocular meta-atlas (scEiaD)', GigaScience 10:giab061 (2021) (supplemental_file__celltype_markers.tsv). Rod Bipolar Cells merged into Bipolar cells. Provided as the reference-derived marker substitute for Seurat reference label-transfer when the reference expression matrix is unavailable. Gene symbols are facts — cited for provenance.",
     "license": "public (gene symbols; cited for provenance)",
+    "citation": "Swamy, V., Fufa, T., Hufnagel, R.B. & McGaughey, D.J. Building the mega single-cell transcriptome ocular meta-atlas (scEiaD). GigaScience 10, giab061 (2021).",
     "markers": {
       "Rod photoreceptors": [
         "ROM1",

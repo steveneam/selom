@@ -552,3 +552,167 @@ def test_line_prose_does_not_call_a_representative_curve_a_mean():
     assert "Each point shows the mean" not in none
     # the numbers still exist in the table — say so rather than leave the reader hunting
     assert "even where the figure does not draw them" in none
+
+
+# --- trajectory + annotate: the 2026-08-06 PROSE_SILENT triage ---------------------------------
+#
+# Both runners RESOLVE what the figure is of and neither paragraph said so (NEXT#10(c)). Every
+# assertion below has an ABSENCE half: a template that gains a true sentence while keeping the
+# false one it replaced has not been fixed.
+
+
+def _traj_fig(embedding="X_umap", computed=False, requested=None, root=None, lineages=5,
+              clustered=None):
+    """The `layout.meta` record `trajectory/run_real` writes — the resolution the params cannot
+    supply."""
+    meta = {"trajectory": {
+        "embedding": embedding, "embedding_computed": computed,
+        "requested_embedding": requested if requested is not None else embedding,
+        "root": root if root is not None else {"mode": "auto", "cluster": "6", "requested": ""},
+        "n_clusters": 17, "n_edges": 35, "threshold": 0.05, "lineages": lineages,
+    }}
+    if clustered:
+        meta["clustered"] = clustered
+    return {"layout": {"meta": meta}}
+
+
+def _annot_fig(scored=None, skipped=(), n_panel_types=10, n_assigned=7, embedding="X_umap",
+               computed=False, requested=None, citation="Lu, Q. et al. Frontiers 8, 699906 (2021).",
+               clustered=None):
+    meta = {"annotate": {
+        "panel": "retinal", "panel_name": "Retinal cell types", "citation": citation,
+        "embedding": embedding, "embedding_computed": computed,
+        "requested_embedding": requested if requested is not None else embedding,
+        "n_panel_types": n_panel_types,
+        "scored": list(scored) if scored is not None else [f"type {i}" for i in range(10)],
+        "skipped": list(skipped), "n_assigned": n_assigned, "n_clusters": 17,
+    }}
+    if clustered:
+        meta["clustered"] = clustered
+    return {"layout": {"meta": meta}}
+
+
+def test_trajectory_caption_does_not_call_a_umap_a_diffusion_map():
+    """The caption said "Diffusion-map embedding" while the figure's own axes said UMAP 1 / UMAP 2.
+    The diffusion map ORDERS the cells along pseudotime; the stored embedding PLACES them, and it
+    is the one the reader is looking at."""
+    spec = load_skill("trajectory")
+    cap = legends.build_caption(spec, {}, figure=_traj_fig())
+    assert "The UMAP embedding coloured by diffusion pseudotime" in cap
+    assert "Diffusion-map embedding" not in cap
+
+    tsne = legends.build_caption(spec, {"embedding": "X_tsne"}, figure=_traj_fig("X_tsne"))
+    assert "The TSNE embedding" in tsne and "UMAP" not in tsne
+
+
+def test_trajectory_prose_discloses_the_lineage_curves_and_cites_them():
+    """Five bold lineage curves are the most prominent layer on the canvas and come from NEITHER
+    PAGA nor DPT — a SimplePPT principal tree plus a spline. Both the paragraph and the caption
+    said nothing, so a reader credits them to the pseudotime; and nothing cited SimplePPT."""
+    spec = load_skill("trajectory")
+    out = methods.build(spec, {}, figure=_traj_fig(lineages=5))
+    assert "5 smooth lineage curves" in out["text"] and "SimplePPT principal tree" in out["text"]
+    assert any("SimplePPT" in c and "Mao" in c for c in out["citations"])
+    assert any("LouisFaure/SimplePPT" in c for c in out["citations"])
+    assert "5 SimplePPT principal-curve lineages" in legends.build_caption(
+        spec, {}, figure=_traj_fig(lineages=5))
+
+    # They degrade to nothing when the optional import or the fit fails — then no claim, no citation.
+    none = methods.build(spec, {}, figure=_traj_fig(lineages=0))
+    assert "lineage" not in none["text"]
+    assert not any("SimplePPT" in c for c in none["citations"])
+    assert "lineage" not in legends.build_caption(spec, {}, figure=_traj_fig(lineages=0))
+
+
+def test_trajectory_prose_does_not_print_a_root_the_run_did_not_use():
+    """A `root` naming a cluster absent from the grouping falls through to the automatic root
+    silently — and the paragraph printed "a root placed at cluster <root>" from the param either
+    way. Pseudotime is measured FROM the root, so it is the origin of every number on the figure."""
+    honoured = _prose("trajectory", {"root": "3"},
+                      figure=_traj_fig(root={"mode": "requested", "cluster": "3", "requested": "3"}))
+    assert "from a root at cluster 3" in honoured
+
+    fell_back = _prose("trajectory", {"root": "3"},
+                       figure=_traj_fig(root={"mode": "auto", "cluster": "6", "requested": "3"}))
+    assert "the requested cluster '3' was not among the groups" in fell_back
+    assert "a root at cluster 3" not in fell_back
+    assert "which fell in cluster 6" in fell_back
+
+
+def test_trajectory_and_annotate_disclose_a_substituted_grouping():
+    """NEXT#10(c): an absent `groupby` makes both runners cluster the cells THEMSELVES, and the
+    PAGA nodes / assigned labels the prose describes are those clusters, not the user's column."""
+    clustered = {"requested": "cell_type", "groupby": "leiden"}
+    traj = _prose("trajectory", {"groupby": "cell_type"}, figure=_traj_fig(clustered=clustered))
+    assert "grouped by Leiden clusters computed on the data" in traj
+    assert "the requested 'cell_type' was not present in the data" in traj
+    assert "grouped by cell_type" not in traj
+
+    ann = _prose("annotate", {"groupby": "cell_type"}, figure=_annot_fig(clustered=clustered))
+    assert "grouped by Leiden clusters computed on the data" in ann
+    assert "grouped by cell_type" not in ann
+    cap = legends.build_caption(load_skill("annotate"), {"groupby": "cell_type"},
+                                figure=_annot_fig(clustered=clustered))
+    assert "to their Leiden cluster computed by Selom" in cap and "'cell_type'" not in cap
+
+
+def test_single_cell_prose_names_the_embedding_and_says_when_it_computed_one():
+    """A requested `embedding` that is not stored in the file is silently replaced by a UMAP the
+    runner computes on the spot — and both paragraphs said only "the embedding"."""
+    stored = _prose("annotate", {}, figure=_annot_fig())
+    assert "on the stored UMAP embedding" in stored
+    assert "on the embedding," not in stored
+
+    made = _prose("annotate", {"embedding": "X_tsne"},
+                  figure=_annot_fig(embedding="X_umap", computed=True, requested="X_tsne"))
+    assert "a UMAP embedding computed for this figure" in made
+    assert "the requested 'X_tsne' was not stored in the file" in made
+    assert "the stored" not in made
+
+
+def test_annotate_prose_cites_the_marker_panel_it_used():
+    """The panel IS the content of this figure and every panel carries a literature source; the
+    paragraph cited only Scanpy and Tirosh — the machinery — and credited the markers to nobody."""
+    out = methods.build(load_skill("annotate"), {}, figure=_annot_fig())
+    assert "the Retinal cell types marker panel" in out["text"]
+    assert any("699906" in c for c in out["citations"])
+
+    cepo = methods.build(load_skill("annotate"), {"marker_set": "retinal_cepo"},
+                         figure=_annot_fig(citation="Kim, H.J. et al. Stem Cell Reports 18 (2023)."))
+    assert any("Stem Cell Reports" in c for c in cepo["citations"])
+    assert not any("699906" in c for c in cepo["citations"])
+
+
+def test_annotate_prose_does_not_claim_every_panel_type_was_scored_or_drawn():
+    """"for each cell type in the panel" was false twice over: a type with fewer than two of its
+    markers present is skipped, and a scored type that no cluster wins is drawn nowhere. And the
+    label is an argmax with no floor, so every cluster is labelled however weak its support."""
+    full = _prose("annotate", {}, figure=_annot_fig())
+    assert "All 10 types in the panel had markers present and were scored" in full
+    assert "7 of the 10 scored types won at least one cluster" in full
+    assert "no minimum score, so every one of the 17 clusters receives a type" in full
+
+    partial = _prose("annotate", {}, figure=_annot_fig(
+        scored=["Rod photoreceptors", "Müller glia"], skipped=["RPE", "Microglia"], n_assigned=2))
+    assert "2 of the panel's 10 types (RPE and Microglia) had fewer than two of their marker "\
+           "genes present in this dataset and were not scored" in partial
+    assert "All 10 types in the panel" not in partial
+
+
+def test_every_marker_panel_carries_the_citation_it_will_be_credited_by():
+    """The ratchet on the fix above: `annotate`'s paragraph credits the panel from the panel's OWN
+    record, so a new panel added to `panels.json` without a `citation` would ship its genes to a
+    methods section that credits nobody for them — silently, and only for that panel. Keeping the
+    citation beside the genes it credits is what makes a new panel bring its source with it."""
+    import json
+    import pathlib
+
+    panels = json.loads(
+        (pathlib.Path(methods.__file__).parents[1] / "skills/annotate/panels.json")
+        .read_text(encoding="utf-8"))
+    assert panels, "no marker panels found — the path moved"
+    missing = sorted(k for k, v in panels.items() if not str(v.get("citation") or "").strip())
+    assert missing == [], (
+        f"marker panel(s) {missing} carry no 'citation'. Every panel's markers come from somewhere "
+        f"and the methods paragraph cites that source; add one beside its 'attribution'."
+    )

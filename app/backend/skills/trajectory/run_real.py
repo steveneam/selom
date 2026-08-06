@@ -26,6 +26,7 @@ def run(data_path: str, params: dict) -> dict:
 
     groupby = params.get("groupby") or "leiden"
     emb_key = params.get("embedding") or "X_umap"
+    requested_groupby, requested_emb = str(groupby), str(emb_key)
     need_graph = groupby not in adata.obs.columns
     need_emb = emb_key not in adata.obsm
     have_neighbors = "neighbors" in adata.uns
@@ -59,9 +60,16 @@ def run(data_path: str, params: dict) -> dict:
         dc1 = np.asarray(adata.obsm["X_diffmap"])[idx, 1]
         adata.uns["iroot"] = int(idx[int(np.argmin(dc1))])
         root_note = f"root cluster {root}"
+        root_run = {"mode": "requested", "cluster": root, "requested": root}
     else:
+        # A `root` naming a cluster that is not in this grouping falls through to the automatic
+        # root WITHOUT a word — and the paragraph printed "a root placed at cluster <root>" from
+        # the param either way. Pseudotime is measured FROM the root, so this is the origin of
+        # every number on the figure.
         adata.uns["iroot"] = int(np.argmin(np.asarray(adata.obsm["X_diffmap"])[:, 1]))
-        root_note = f"auto root (cluster {obs_groups[adata.uns['iroot']]})"
+        auto_cluster = str(obs_groups[adata.uns["iroot"]])
+        root_note = f"auto root (cluster {auto_cluster})"
+        root_run = {"mode": "auto", "cluster": auto_cluster, "requested": root}
 
     sc.tl.dpt(adata)
     pseudotime = np.asarray(adata.obs["dpt_pseudotime"], dtype=float)
@@ -114,6 +122,28 @@ def run(data_path: str, params: dict) -> dict:
     )
     spec["layout"]["xaxis"]["title"]["text"] = f"{emb_name} 1"
     spec["layout"]["yaxis"]["title"]["text"] = f"{emb_name} 2"
+    # WHAT this figure is of (WS1.2 / the `layout.meta` outcome pattern; lifted as `_traj_run` by
+    # methods.build_body and read by legends._facts). Four things the params cannot say:
+    #   · the embedding DRAWN — the caption called it "the diffusion-map embedding" while the axes
+    #     say UMAP, and a requested `embedding` that is absent is silently replaced by a UMAP the
+    #     runner computes here;
+    #   · whether the `root` was honoured or fell through to the automatic one;
+    #   · how many principal-curve lineages were drawn — they are the boldest thing on the canvas,
+    #     come from a DIFFERENT algorithm (SimplePPT + a spline, not PAGA/DPT), and degrade to
+    #     nothing when the optional import or the fit fails, so only the run knows;
+    #   · and, via the shared `clustered` record, whether these clusters are the user's column at
+    #     all — an absent `groupby` makes the runner cluster the cells itself, and the PAGA nodes
+    #     the paragraph describes ARE those clusters.
+    meta = spec["layout"].setdefault("meta", {})
+    meta["trajectory"] = {
+        "embedding": str(emb_key), "embedding_computed": bool(need_emb),
+        "requested_embedding": requested_emb,
+        "root": root_run,
+        "n_clusters": len(groups), "n_edges": len(edges), "threshold": threshold,
+        "lineages": len(lineages),
+    }
+    if need_graph:  # same shape/vocabulary as violin's — one record, one pair of prose helpers
+        meta["clustered"] = {"requested": requested_groupby, "groupby": "leiden"}
     return jsonable(spec)
 
 

@@ -28,7 +28,8 @@ def run(data_path: str, params: dict) -> dict:
     from skills._plotly import jsonable
     from skills.annotate.run import _umap_by_type_spec
 
-    panel = _load_panel(params.get("marker_set") or "retinal")
+    marker_set = str(params.get("marker_set") or "retinal")
+    panel = _load_panel(marker_set)
     markers = panel["markers"]
 
     from skills._genes import read_anndata
@@ -43,6 +44,7 @@ def run(data_path: str, params: dict) -> dict:
     need_graph = groupby not in adata.obs.columns
     emb_key = params.get("embedding") or "X_umap"
     need_emb = emb_key not in adata.obsm
+    requested_groupby, requested_emb = str(groupby), str(emb_key)
 
     if need_graph or need_emb:
         n_pcs = max(2, min(50, adata.n_obs - 1, adata.n_vars - 1))
@@ -65,7 +67,7 @@ def run(data_path: str, params: dict) -> dict:
         scored.append(cell_type)
     if not scored:
         raise ValueError(
-            f"none of the '{params.get('marker_set')}' panel markers were found in the data "
+            f"none of the '{marker_set}' panel markers were found in the data "
             "(check the organism / gene symbols)"
         )
 
@@ -101,9 +103,30 @@ def run(data_path: str, params: dict) -> dict:
     emb_name = emb_key.replace("X_", "").upper()
     spec = _umap_by_type_spec(
         traces,
-        f"Cell-type annotation — {panel.get('name', params.get('marker_set'))}",
+        f"Cell-type annotation — {panel.get('name', marker_set)}",
         f"{n_types} types assigned across {n_clusters} clusters · scored {len(scored)} marker sets",
     )
     spec["layout"]["xaxis"]["title"]["text"] = f"{emb_name} 1"
     spec["layout"]["yaxis"]["title"]["text"] = f"{emb_name} 2"
+    # WHAT the panel actually did to this dataset (WS1.2 / the `layout.meta` outcome pattern; lifted
+    # as `_annot_run` by methods.build_body and read by legends._facts). The panel IS the content of
+    # this figure and four of its facts exist only here:
+    #   · its literature SOURCE — every panel carries one and the paragraph cited none of them,
+    #     crediting only Scanpy and Tirosh for the scoring machinery;
+    #   · which types were SCORABLE — a type with fewer than two of its markers present in the data
+    #     is skipped, so "for each cell type in the panel" was false on any partial dataset;
+    #   · which types a cluster actually WON — an unassigned type is drawn nowhere, and the panel
+    #     count overstates the legend (7 of 10 here);
+    #   · the embedding drawn, and whether the runner had to compute it.
+    meta = spec["layout"].setdefault("meta", {})
+    meta["annotate"] = {
+        "panel": marker_set, "panel_name": panel.get("name"), "citation": panel.get("citation"),
+        "embedding": str(emb_key), "embedding_computed": bool(need_emb),
+        "requested_embedding": requested_emb,
+        "n_panel_types": len(markers), "scored": list(scored),
+        "skipped": [t for t in markers if t not in scored],
+        "n_assigned": n_types, "n_clusters": n_clusters,
+    }
+    if need_graph:  # same shape/vocabulary as violin's — one record, one pair of prose helpers
+        meta["clustered"] = {"requested": requested_groupby, "groupby": "leiden"}
     return jsonable(spec)

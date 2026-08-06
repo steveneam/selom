@@ -159,7 +159,38 @@ def _untriaged(*keys: str) -> dict[str, Silence]:
 
 
 PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
-    ("methods", "annotate"): _untriaged("embedding", "normalize"),
+    # ── annotate + trajectory, TRIAGED 2026-08-06. Picked by the board's size-of-the-lie rule as
+    # the two runners that RESOLVE what the figure is of (NEXT#10(c)), and both were worse than the
+    # backlog line suggested. Between them, five printed-vs-computed lies:
+    #   · `annotate` cited NOBODY for its marker panel — every panel in `panels.json` carries a
+    #     literature source (Lu 2021 / Kim 2023 / Swamy 2021), the panel IS the content of the
+    #     figure, and the paragraph cited only Scanpy + Tirosh, the scoring machinery. Fourth
+    #     instance of the shape that retired the `gsea` and `integration` paragraphs;
+    #   · "for each cell type in the panel" was false twice — a type with fewer than two markers
+    #     present is skipped, and a scored type no cluster wins is drawn nowhere (7 of 10 on the
+    #     declared smoke case). The label is an argmax with NO floor, so a cluster with no real
+    #     marker support is labelled as confidently as one with strong support;
+    #   · `trajectory`'s CAPTION called a UMAP "Diffusion-map embedding" while the figure's own
+    #     axes said UMAP 1 / UMAP 2 — the diffusion map orders the cells, the embedding places them;
+    #   · a `root` naming a cluster absent from the grouping falls through to the automatic root
+    #     silently, while the paragraph printed "a root placed at cluster <root>" from the param —
+    #     and pseudotime is measured FROM the root, so it is the origin of every number drawn;
+    #   · and the FIVE bold lineage curves that dominate the rendered figure come from neither PAGA
+    #     nor DPT (a SimplePPT principal tree + a spline), were described by neither template, and
+    #     were cited nowhere. They also degrade to nothing when the optional import or the fit
+    #     fails, so only the run can say whether a reader is looking at them — found by RENDERING
+    #     the skill, not by reading its spec [[plotly-spec-can-encode-a-lie]].
+    # Both runners now record what they RESOLVED (`layout.meta.trajectory` / `.annotate` →
+    # `_traj_run` / `_annot_run`), and both reuse violin's existing `clustered` record rather than
+    # inventing a second vocabulary for the same substitution.
+    ("methods", "annotate"): {
+        # Named from the run record, never the param: a requested embedding that is not stored in
+        # the file is silently replaced by a UMAP the runner computes on the spot, so quoting the
+        # param would name a space the points are not in. (`normalize` LEFT this list — it skips
+        # normalize_total AND log1p, so score_genes scores a different scale, and the paragraph
+        # now names the one it scored.)
+        "embedding": _OUT,
+    },
     # ("methods", "boxplot") is GONE — the first entry this ratchet retired. All 11 of its params
     # are described now, and two of its claims were live printed-vs-computed lies the backlog
     # pointed straight at: "box-and-whisker … 1.5× the IQR" on a `style="strip"` run that draws no
@@ -296,7 +327,11 @@ PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
     ("methods", "sankey"): _untriaged("max_links"),
     ("methods", "scorecard"): _untriaged("fill", "max_rows"),
     ("methods", "string_network"): _untriaged("fdr_threshold", "max_genes"),
-    ("methods", "trajectory"): _untriaged("embedding", "groupby", "normalize"),
+    ("methods", "trajectory"): {
+        # Same verdict as annotate's, same reason: the drawn embedding is a run outcome, and the
+        # caption had been naming the diffusion map — a space these points are not plotted in.
+        "embedding": _OUT,
+    },
     ("methods", "upset"): _untriaged("sort_by"),
     ("methods", "violin"): {
         # Leiden `resolution` applies ONLY when the requested `groupby` column is absent and the
@@ -306,7 +341,14 @@ PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
         "resolution": _OUT,
     },
     ("methods", "volcano"): _untriaged("highlight"),
-    ("legends", "annotate"): _untriaged("embedding", "groupby", "normalize"),
+    ("legends", "annotate"): {
+        # The caption names the panel, the embedding the cells are drawn on, and the groups the
+        # labels were assigned to (`groupby` LEFT this list with that clause). The embedding stays
+        # here because it is stated from the run record — a requested one that is absent is
+        # replaced silently. `normalize` is the recipe and the Methods paragraph states it; a
+        # caption that claims no scale cannot be made wrong by it.
+        "embedding": _OUT, "normalize": _M,
+    },
     ("legends", "boxplot"): _untriaged(
         "add_count", "correction", "notched", "order", "orientation", "pairs", "points",
         "sig_test", "style"
@@ -399,7 +441,16 @@ PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
         "zscore": _M,
     },
     ("legends", "string_network"): _untriaged("fdr_threshold", "max_genes"),
-    ("legends", "trajectory"): _untriaged("embedding", "groupby", "normalize", "root", "threshold"),
+    ("legends", "trajectory"): {
+        # The embedding is stated from the run record — the caption had been calling it the
+        # "diffusion-map embedding", which is the space the ORDERING was computed in and not the
+        # one the points are drawn in.
+        "embedding": _OUT,
+        # The recipe: the scale, the root the pseudotime is measured from and the connectivity
+        # cutoff are all in the Methods paragraph. The caption claims a colour encoding and an
+        # overlay, and none of these three can make either claim wrong.
+        "normalize": _M, "root": _M, "threshold": _M,
+    },
     ("legends", "umap_scrna"): _untriaged("n_hvg", "n_neighbors", "n_pcs", "normalize"),
     ("legends", "upset"): _untriaged("mode", "sort_by"),
     ("legends", "violin"): {
@@ -416,8 +467,9 @@ PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
 # template either gives a param a sentence (it leaves the list) or records a verdict (it stays with
 # PRESENTATION / INTERNAL). Lower this number when you triage; a new UNTRIAGED entry pushes over it
 # and fails, which is the point — nothing joins the backlog silently.
-_UNTRIAGED_CEILING = 99    # 261 raw -> 179 (ERG) -> 166 (GSEA) -> 131 (deg + diff_abundance)
-#                          # -> 104 (heatmap + integration + normalization_qc) -> 99 (line), 2026-08-06
+_UNTRIAGED_CEILING = 86    # 261 raw -> 179 (ERG) -> 166 (GSEA) -> 131 (deg + diff_abundance)
+#                          # -> 104 (heatmap + integration + normalization_qc) -> 99 (line)
+#                          # -> 86 (annotate + trajectory), 2026-08-06
 @pytest.mark.parametrize("module,skill_id", _CASES)
 def test_every_declared_param_is_described_or_deliberately_silent(module, skill_id):
     """The reverse direction — a declared param the prose never mentions is either described or

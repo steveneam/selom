@@ -67,7 +67,31 @@ def _facts(figure: dict | None, table: dict | list | None) -> dict:
     # so a caption that stays silent lets "Cluster 1 / Cluster 2" pass for a design factor.
     if isinstance(meta.get("heatmap"), dict):
         facts["heatmap"] = meta["heatmap"]
+    # `trajectory`/`annotate`: the embedding the figure is DRAWN on. The trajectory caption called
+    # it "the diffusion-map embedding" while the figure's own axes said UMAP — the diffusion map
+    # orders the cells, the stored embedding places them — and a requested embedding that is absent
+    # is replaced by one the runner computes. A caption names what the reader is looking at, and it
+    # was naming a space the points are not in.
+    if isinstance(meta.get("trajectory"), dict):
+        facts["trajectory"] = meta["trajectory"]
+    if isinstance(meta.get("annotate"), dict):
+        facts["annotate"] = meta["annotate"]
     return facts
+
+
+def _embedding_name(run: dict, fallback: str = "the stored embedding") -> str:
+    """``the UMAP embedding`` — the space the points are plotted in, from the run's own record."""
+    key = str((run or {}).get("embedding") or "").strip()
+    return f"the {key.replace('X_', '').upper()} embedding" if key else fallback
+
+
+def _group_noun(p: dict, facts: dict, plural: bool = False) -> str:
+    """The groups a caption is pointing AT, as a noun phrase — ``'leiden' group`` or, when the
+    requested column was absent and the runner clustered the cells itself, ``Leiden cluster
+    computed by Selom``. The sibling of ``_grouping``, which returns a bare label."""
+    if isinstance(facts.get("clustered"), dict):
+        return f"Leiden cluster{'s' if plural else ''} computed by Selom"
+    return f"'{p.get('groupby', '')}' group{'s' if plural else ''}"
 
 
 def _grouping(p: dict, facts: dict) -> str:
@@ -247,14 +271,33 @@ def _markers(p, f):
 
 
 def _annotate(p, f):
-    return f"Single cells coloured by the cell type assigned from the '{p['marker_set']}' marker panel."
+    run = f.get("annotate") or {}
+    panel = run.get("panel_name") or f"'{p['marker_set']}'"
+    # A reader sees blocks of colour on a UMAP and reads them as per-CELL calls; the label is
+    # assigned to the whole group and every cell in it inherits it. That changes how the figure is
+    # read, so it belongs in the one sentence about it — the recipe stays in Methods.
+    return (
+        f"Single cells on {_embedding_name(run)}, coloured by the cell type assigned from the "
+        f"{panel} marker panel to their {_group_noun(p, f)}; every cell in a group carries its "
+        f"group's label."
+    )
 
 
 def _trajectory(p, f):
-    return (
-        "Diffusion-map embedding coloured by diffusion pseudotime, with the PAGA cluster graph "
-        "overlaid (nodes sized by cell count)."
-    )
+    run = f.get("trajectory") or {}
+    # NOT "diffusion-map embedding": the diffusion map orders the cells along pseudotime, but the
+    # points are placed in the stored embedding — the figure's own axes said UMAP the whole time.
+    emb = _embedding_name(run, "the stored embedding")
+    text = (f"{emb[0].upper()}{emb[1:]} coloured by diffusion pseudotime, with the PAGA "
+            f"connectivity graph over the {_group_noun(p, f, plural=True)} overlaid "
+            f"(nodes sized by cell count)")
+    n_lin = run.get("lineages")
+    # The lineage curves are the boldest thing on the canvas and are a different inference from
+    # both PAGA and DPT; a caption that omits them lets a reader credit them to the pseudotime.
+    if n_lin:
+        text += (f", and {n_lin} SimplePPT principal-curve lineage{'s' if n_lin != 1 else ''} "
+                 f"fitted to the embedding drawn over it")
+    return text + "."
 
 
 def _pseudotime_genes(p, f):

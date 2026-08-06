@@ -34,6 +34,12 @@ SCIPY = "Virtanen, P. et al. SciPy 1.0: fundamental algorithms for scientific co
 PAGA = "Wolf, F.A. et al. PAGA: graph abstraction reconciles clustering with trajectory inference through a topology preserving map of single cells. Genome Biology 20, 59 (2019)."
 DPT = "Haghverdi, L., Büttner, M., Wolf, F.A., Buettner, F. & Theis, F.J. Diffusion pseudotime robustly reconstructs lineage branching. Nature Methods 13, 845-848 (2016)."
 TIROSH = "Tirosh, I. et al. Dissecting the multicellular ecosystem of metastatic melanoma by single-cell RNA-seq. Science 352, 189-196 (2016)."
+# The lineage backbone `trajectory` draws over the PAGA graph is a principal TREE, not PAGA and not
+# DPT — a separate algorithm with a separate implementation, and it was the boldest thing on the
+# canvas while both the paragraph and the caption said nothing about it. Cited as a pair, the way
+# FlowIO/FlowUtils are: the method, then the implementation that actually ran.
+SIMPLEPPT = "Mao, Q., Wang, L., Goodison, S. & Sun, Y. SimplePPT: A Simple Principal Tree Algorithm. In Proceedings of the 2015 SIAM International Conference on Data Mining (SDM) (2015)."
+SIMPLEPPT_PY = "Faure, L. SimplePPT: a Python implementation of the SimplePPT algorithm. https://github.com/LouisFaure/SimplePPT (BSD-3-Clause)."
 SKLEARN = "Pedregosa, F. et al. Scikit-learn: Machine Learning in Python. Journal of Machine Learning Research 12, 2825-2830 (2011)."
 UPSET = "Lex, A., Gehlenborg, N., Strobelt, H., Vuillemot, R. & Pfister, H. UpSet: Visualization of Intersecting Sets. IEEE Transactions on Visualization and Computer Graphics 20, 1983-1992 (2014)."
 STRING = "Szklarczyk, D. et al. The STRING database in 2023: protein-protein association networks and functional enrichment analyses for any sequenced genome of interest. Nucleic Acids Research 51, D638-D646 (2023)."
@@ -545,27 +551,107 @@ def _markers(p: dict):
 
 
 def _annotate(p: dict):
+    # The PANEL is the content of this figure, and three of its facts live only in the run:
+    # its literature source (every panel carries one; the paragraph cited none of them), which of
+    # its types were scorable in THIS dataset (a type with fewer than two markers present is
+    # skipped, so "for each cell type in the panel" was false on any partial dataset), and which
+    # types a cluster actually won — an unassigned type is drawn nowhere.
+    run = p.get("_annot_run") or {}
+    panel = run.get("panel_name") or f"'{p['marker_set']}'"
+    scored, skipped = run.get("scored") or [], run.get("skipped") or []
+    coverage = ""
+    if skipped:
+        coverage = (f" {len(skipped)} of the panel's {run['n_panel_types']} types "
+                    f"({_join(skipped)}) had fewer than two of their marker genes present in this "
+                    f"dataset and were not scored.")
+    elif scored:
+        coverage = f" All {len(scored)} types in the panel had markers present and were scored."
+    # `normalize=False` skips normalize_total AND log1p, so the per-cell scores are computed on the
+    # matrix as supplied — score_genes subtracts a control set, but the scale it subtracts on is
+    # not the same one.
+    scale = ("counts normalized to 10,000 per cell and log1p-transformed"
+             if to_bool(p.get("normalize", True)) else "the expression matrix as supplied")
     text = (
-        f"Cell types were assigned by marker-set scoring: for each cell type in the "
-        f"'{p['marker_set']}' panel, its marker genes were scored per cell with Scanpy's "
-        "score_genes (mean expression of the set minus a randomly sampled control set), "
-        f"averaged per {p['groupby']} cluster, and each cluster was labelled with its "
-        "top-scoring type. Cells are displayed on the embedding coloured by assigned type."
+        f"Cell types were assigned by marker-set scoring on {scale}: for each cell type in the "
+        f"{panel} marker panel, its marker genes were scored per cell with Scanpy's score_genes "
+        "(mean expression of the set minus a randomly sampled control set), averaged over the "
+        f"cells {_grouping_phrase(p, str(p['groupby']))}, and each group was labelled with its "
+        f"top-scoring type.{coverage}"
     )
-    return text, [SCANPY, TIROSH]
+    # Ranking alone decides the label: argmax always returns a winner, so a cluster with no real
+    # marker support is still labelled, and types that win no cluster never appear on the figure.
+    if run.get("n_assigned") is not None:
+        text += (f" Labels are assigned by rank alone, with no minimum score, so every one of the "
+                 f"{run['n_clusters']} clusters receives a type; {run['n_assigned']} of the "
+                 f"{len(scored) or run['n_panel_types']} scored types won at least one cluster and "
+                 f"only those appear on the figure.")
+    emb = _embedding_phrase(run)
+    text += f" Cells are displayed on {emb}, coloured by assigned type."
+    # The panel's own source, carried in panels.json beside the genes it credits, so a new panel
+    # brings its citation with it instead of needing a constant added here.
+    return text, [SCANPY, TIROSH] + ([run["citation"]] if run.get("citation") else [])
 
 
 def _trajectory(p: dict):
-    root = str(p.get("root") or "").strip()
-    root_txt = f"cluster {root}" if root else "the diffusion-component extreme"
+    # `root` was printed from the PARAM: a cluster name that is not in the grouping falls through
+    # to the automatic root without a word, and pseudotime is measured FROM the root, so it is the
+    # origin of every number on this figure.
+    run = p.get("_traj_run") or {}
+    root_run = run.get("root") or {}
+    if root_run.get("mode") == "requested":
+        root_txt = f"a root at cluster {root_run['cluster']}"
+    elif root_run.get("mode") == "auto":
+        asked = str(root_run.get("requested") or "").strip()
+        fell_back = (f" (the requested cluster '{asked}' was not among the groups, so the root was "
+                     f"placed automatically)" if asked else "")
+        root_txt = (f"a root placed automatically at the diffusion-component extreme, which fell in "
+                    f"cluster {root_run['cluster']}{fell_back}")
+    else:  # params-only replay: the run's record is the only thing that can resolve this
+        root = str(p.get("root") or "").strip()
+        root_txt = f"a root at cluster {root}" if root else "a root at the diffusion-component extreme"
+    scale = (" after normalizing counts to 10,000 per cell and log1p-transforming"
+             if to_bool(p.get("normalize", True)) else " on the expression matrix as supplied")
     text = (
-        "A diffusion map was computed and the cluster graph abstracted with partition-based "
-        "graph abstraction (PAGA). Cells were ordered along diffusion pseudotime (DPT) from a "
-        f"root placed at {root_txt}. The embedding is coloured by pseudotime with the PAGA "
-        "graph overlaid (nodes = clusters sized by cell count; edges = connectivity above "
-        f"{p['threshold']})."
+        f"A diffusion map was computed{scale} and the graph of the cells "
+        f"{_grouping_phrase(p, str(p['groupby']))} abstracted with partition-based graph "
+        f"abstraction (PAGA). Cells were ordered along diffusion pseudotime (DPT) from {root_txt}."
     )
-    return text, [SCANPY, PAGA, DPT]
+    emb = _embedding_phrase(run)
+    text += (f" {emb[0].upper()}{emb[1:]} is coloured by pseudotime with the PAGA graph overlaid "
+             f"(nodes = clusters sized by cell count; edges = connectivity at or above "
+             f"{p['threshold']}).")
+    citations = [SCANPY, PAGA, DPT]
+    # The lineage curves are the boldest layer on the canvas and come from NEITHER PAGA nor DPT.
+    # They are also optional — an unavailable import or a failed fit silently draws none — so only
+    # the run can say whether the reader is looking at them.
+    n_lin = run.get("lineages")
+    if n_lin:
+        text += (f" The {n_lin} smooth lineage curve{'s' if n_lin != 1 else ''} drawn over the graph "
+                 f"are a separate inference: a SimplePPT principal tree fitted to the embedding, "
+                 f"with each root-to-tip path smoothed by a cubic spline. They summarize the "
+                 f"embedding's branching structure and are not themselves a statistical test.")
+        citations += [SIMPLEPPT, SIMPLEPPT_PY, SCIPY]
+    return text, citations
+
+
+def _embedding_phrase(run: dict) -> str:
+    """The embedding a single-cell figure is DRAWN on — which is not the one the analysis ran in.
+
+    ``trajectory``'s caption called this "the diffusion-map embedding" while the axes said UMAP: the
+    diffusion map orders the cells, the stored embedding places them. And a requested ``embedding``
+    key that is absent from the file is silently replaced by a UMAP the runner computes on the spot,
+    which the params cannot express — so both skills record what they drew.
+    """
+    key = str(run.get("embedding") or "").strip()
+    if not key:
+        return "the stored embedding"
+    name = key.replace("X_", "").upper()
+    if run.get("embedding_computed"):
+        asked = str(run.get("requested_embedding") or "").strip()
+        why = (f"the requested '{asked}' was not stored in the file" if asked and asked != key
+               else "none was stored in the file")
+        return f"a {name} embedding computed for this figure ({why})"
+    return f"the stored {name} embedding"
 
 
 def _pseudotime_genes(p: dict):
@@ -1777,6 +1863,16 @@ def build_body(spec: SkillSpec, params: dict, figure: dict | None = None) -> tup
         # `top_n` is a cap, not a count, and `zscore` is read through a string-aware truthiness
         # test the prose did not share. Both are answers only the runner has.
         resolved["_ssgsea_run"] = meta["ssgsea"]
+    if isinstance(meta.get("trajectory"), dict):
+        # The embedding the figure is DRAWN on (a requested one that is absent is replaced by a
+        # freshly computed UMAP), whether the `root` was honoured, and how many principal-curve
+        # lineages were drawn — an optional, degrade-to-nothing layer from a different algorithm.
+        resolved["_traj_run"] = meta["trajectory"]
+    if isinstance(meta.get("annotate"), dict):
+        # The marker panel's own literature source, which types were scorable in THIS dataset, and
+        # how many of them a cluster actually won. The panel is the content of the figure and none
+        # of these are knowable from the param, which is just the panel's key.
+        resolved["_annot_run"] = meta["annotate"]
     if isinstance(meta.get("line"), dict):
         # The two columns the figure IS. `x`/`y` default to blank and resolve positionally (first and
         # second numeric column), and a requested name that is absent falls back the same way.
