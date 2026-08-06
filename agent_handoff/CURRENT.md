@@ -27,7 +27,8 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
-| **PARAM-DECL-GUARD** | 2026-08-06 | `main` `6201e85..<head>` | **`#11` closed — the runner↔`skill.json` guard ships in both directions, and rendering the knob it made reachable found a reference line being clipped out of its own figure.** The board's re-measure held: **4 undeclared params across 2 skills**, so both directions are cleared to **zero with no waiver list**. `confusion.x`/`.y` deleted (undocumented aliases); `erg_bwave_bar.vline`/`.vline_label` declared + controlled (`0e1921e` wired both axes and declared neither). The third test is the load-bearing one: a params dict handed anywhere the walk can't follow is a FAILURE, not a quiet gap. |
+| **PROSE-TRIAGE-2** | 2026-08-06 | `main` `a17c8ec..0f0a056` | **`#2`'s three named blocks triaged — and reading the runners' bodies found SIX more printed-vs-computed lies, one of them in the CITATIONS.** `heatmap` described its whole column half from params that over-claim in both directions (a `split_by` split DROPS the column dendrogram the prose printed; `split_by_cut` cuts unsupervised blocks it never mentioned). `integration` cited **Korsunsky for Harmony2 runs** and credited "Harmony" for work Selom Melody did. `normalization_qc` named a `groupby` column that had been substituted, and hid that the violins are a subsample while the table is not. `PROSE_SILENT` 131 → **104**. |
+| **PARAM-DECL-GUARD** | 2026-08-06 | `main` `6201e85..a17c8ec` | **`#11` closed — the runner↔`skill.json` guard ships in both directions, and rendering the knob it made reachable found a reference line being clipped out of its own figure.** The board's re-measure held: **4 undeclared params across 2 skills**, so both directions are cleared to **zero with no waiver list**. `confusion.x`/`.y` deleted (undocumented aliases); `erg_bwave_bar.vline`/`.vline_label` declared + controlled (`0e1921e` wired both axes and declared neither). The third test is the load-bearing one: a params dict handed anywhere the walk can't follow is a FAILURE, not a quiet gap. |
 | **ERG-MOCK-FIGS** | 2026-08-06 | `main` `ea68c79..dbd72f9` (**PUSHED**) | **Both open founder gates answered ([[DECISIONS #17]] keep burning down · [[#18]] the app moves to `/app`), the Fig 1E mock retuned so the two rescue arms differ in the FIGURE and not just the table, and two reading variants added — where a hand-picked zoom factor clipped the very arm the comparison is measured against.** Also: `#11` probed and found to be **4 undeclared params, not a campaign**; the board pruned 1083 → 458 lines into `archive/2026-08-06-current-history.md`. |
 | **DEG-PANEL** | 2026-08-05 | `main` `9daa043..3f102ea` (**pushed 2026-08-06**) | **`#1(d)` closed spec-first — and the flagship DE figure had been claiming a fold change it never computed.** `deg` = four disjoint engines behind one `mode` knob that was itself API-only, so it needed a STRUCTURE (mode-gated `showWhen` + an `oneOf` gate), not a list of controls. 75 → 52 knobs, 12 → 10 skills. Shipped the `level` widget with it. |
 | **GSEA-KNOBS + LEDGER-PROVENANCE** | 2026-08-05 | `main` `ea68c79..5ee2b3d` (**pushed 2026-08-06**) | **`#3` and `#4` closed; the control pass found three prose lies the guard could not see.** `API_ONLY_KNOBS` 88 → 75, 14 → 12 skills (⚑ MEASURED — the board's running tally said 86/13 and was already wrong). A synthesized read is now badged and caps `selom_confidence` ([[DECISIONS #16]]). |
@@ -57,14 +58,48 @@
 | **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
 | older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · PARAM-DECL-GUARD · 2026-08-06 06:54 UTC (= 16:54 AEST Sydney) · branch `main` (**LOCAL — `21a17bb`, 1 commit ahead of `origin/main` = `6201e85`; working tree clean**) · Claude (FE+BE, solo, lead)
+## ▸ LIVE · PARAM-DECL-GUARD + PROSE-TRIAGE-2 · 2026-08-06 07:57 UTC (= 17:57 AEST Sydney) · branch `main` (**LOCAL — `0f0a056`, 3 commits ahead of `origin/main` = `6201e85`; working tree clean. PUSH IS OWED**) · Claude (FE+BE, solo, lead)
 
 **Direction is DECIDED and not to be re-litigated** — [[DECISIONS #17]]: keep burning down the
 honesty/reachability backlogs, P-E is not next. [[#18]]: the app moves to `/app` (decided, not
 built — it lands with P-E's frontend half). **Nothing on this board waits on the owner except a
 real `.fcs` file and the Clerk keys.**
 
-**`#11` IS CLOSED (`21a17bb`).** `tests/test_skill_param_declaration_guard.py` compares every
+### `#2` — the three named blocks, TRIAGED (`0f0a056`). `PROSE_SILENT` 131 → **104**.
+
+Reading each runner's BODY against its paragraph found **six more printed-vs-computed lies**, and
+one of them reaches the **citations** — the part of a methods section a reader follows to reproduce
+the work. The board's "best next blocks" call was right.
+
+- **`heatmap`** described its whole COLUMN half from params that over-claim in **both** directions:
+  a `split_by` block-split **drops** column clustering, so `cluster="both"` printed *"Samples were
+  likewise clustered … and a column dendrogram is drawn above the columns"* over a figure with
+  neither; and `split_by_cut` turns clustering **on** at `cluster="none"` and cuts it into blocks
+  labelled *"Cluster 1 / Cluster 2"* — an **unsupervised** partition that reads exactly like a
+  declared sample grouping — while the paragraph said nothing about columns at all.
+- **`integration`** cited **Korsunsky 2019 on every Harmony2 run**, though `harmony2` is a different
+  penalty and a different ridge (Patikas 2026); and it credited "Harmony" for work **Selom Melody**
+  did — the runner has never called harmonypy, and the figure TITLE has said "Melody" the whole
+  time. Third instance of the shape that retired the GSEA paragraph.
+- **`normalization_qc`** named the `groupby` column the user ASKED for after silently substituting
+  another (or pooling every cell), and hid that `max_cells` makes the **violins a subsample while
+  the table beside them counts every cell**. Not an edge case: the declared smoke case draws
+  **3,000 of 10,000**.
+
+⚑ **The reusable half: none of the six could be fixed by quoting the param harder.** `split_by`,
+`annotations` and `logfc` need a sample sheet and **silently no-op without one**; `split_by_cut`
+silently turns clustering on; whether `max_cells` bites depends on the file's cell count. A
+param-driven sentence would have swapped one false claim for another — so both runners now record
+what they **BUILT** (`layout.meta.heatmap` / `layout.meta.qc` → `_heatmap_run` / `_qc_run`), the
+same outcome pattern `deg`/`gsea`/`violin` already use. **Assert the ABSENCE of the old claim, not
+just the presence of the new one**, and prove each pin fails when its fix is reverted.
+
+⚑ **Do not revert an injection with `git checkout <path>` when the file also holds uncommitted
+work** — it restores to HEAD and takes your edits with it. It cost a full redo of `methods.py` and
+`normalization_qc/run_real.py` here. Back up the file, or commit first
+[[static-analysis-guard-needs-blindspot-test]].
+
+### `#11` IS CLOSED (`21a17bb`). `tests/test_skill_param_declaration_guard.py` compares every
 skill's RUNNER against its `skill.json` in both directions, over all 44:
 
 - **The class it closes is invisible to every other guard by construction.**
@@ -123,18 +158,27 @@ covered by a bare `verify.sh`. Goldens on the real corpus **109 pass**; `skill-s
 > lands with P-E's frontend half. **The two items that were batched for the owner are now CLOSED,
 > so nothing on this board is waiting on him except a real `.fcs` file.**
 >
-> Value order: **the rest of `#2`** (131 untriaged; best blocks `heatmap` · `integration` ·
-> `normalization_qc`) → **`#5`** (the audit's open rows 21–23, render-visible collisions) → `#2`'s
-> remainder. **`#11` is CLOSED — see the LIVE block.**
-> ⚑ **Its estimate had been WRONG on the board and right after re-measuring**: 4 params, not a
+> Value order: **the rest of `#2`** (**104** untriaged) → **`#5`** (the audit's open rows 21–23,
+> render-visible collisions) → `#7` (the isolation-coverage guard).
+> **`#11` and `#2`'s three named blocks are CLOSED — see the LIVE block.**
+> ⚑ **Pick the next `#2` block by SIZE OF THE LIE, not size of the list.** The three biggest
+> remaining entries are `legends.boxplot` (9), `legends.integration`-style recipe dumps, and
+> `legends.trajectory`/`normalization_qc` (5 each) — but the six lies found this session came from
+> reading **runner bodies**, and the best candidates are the skills whose runners RESOLVE or
+> SUBSTITUTE something: `line` (5, and `x`/`y` decide what the figure MEANS), `pseudotime_genes`
+> (`groupby` never reaches its figure — already flagged at `#1`), `trajectory`/`annotate`
+> (`embedding` + `groupby`, both of which the scRNA runners recompute on a miss —
+> NEXT#10(c) names this exact class and it is still unfixed in four skills).
+> ⚑ **`#11`'s estimate had been WRONG on the board and right after re-measuring**: 4 params, not a
 > campaign. That was the third time in four sessions a board's own characterisation of a backlog
 > was wrong (`#2` "confirmed-waive pass" → 26 live lies; `#1`'s `86/13` tally → `88/14`), and the
 > re-measure is what saved the session, so: **count the list, never subtract from the tally, and
 > re-derive anything that looks stale** [[verify-todo-not-already-shipped]].
 >
-> `API_ONLY_KNOBS` = **52 across 10 skills**; `PROSE_SILENT` untriaged = **131**. Both MEASURED
-> 2026-08-05 by counting the lists. **`#1`–`#4` are all CLOSED; their detail is in the archive and
-> the commit range.**
+> `API_ONLY_KNOBS` = **52 across 10 skills** (measured 2026-08-05); `PROSE_SILENT` untriaged =
+> **104** (measured 2026-08-06 — the ceiling test prints the live count, so read it there, never
+> from this line). **`#1`–`#4` and `#11` are CLOSED; their detail is in the archive and the commit
+> range.**
 >
 > **Still carried from the `#4` fe-review — the JTBD backlog** (recorded, none fixed — all are
 > feature gaps, not defects):
