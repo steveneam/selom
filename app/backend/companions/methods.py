@@ -45,6 +45,11 @@ SSGSEA = "Barbie, D.A. et al. Systematic RNA interference reveals that oncogenic
 CEPO = "Kim, H.J., Wang, K., Chen, C. et al. Uncovering cell identity through differential stability with Cepo. Nature Computational Science 1, 784-790 (2021)."
 PVCA = "Boedigheimer, M.J. et al. Sources of variation in baseline gene expression levels from toxicogenomics study control animals across multiple laboratories. BMC Genomics 9, 285 (2008)."
 HARMONY = "Korsunsky, I. et al. Fast, sensitive and accurate integration of single-cell data with Harmony. Nature Methods 16, 1289-1296 (2019)."
+# The Harmony2 preprint, cited ONLY on a `harmony2=True` run — it is a different diversity penalty
+# and a different ridge, so crediting Korsunsky 2019 alone described a method that did not run.
+# `docs/proprietary-skills.md` already recorded that this skill "Cites Korsunsky 2019 + Patikas 2026";
+# the paragraph is what had never been told. Reference from `docs/records/harmony2-scope/scope.md`.
+HARMONY2 = "Patikas, N., Yao, S., Madhu, B., Raychaudhuri, S., Hemberg, M. & Korsunsky, I. Integration of large, complex single-cell datasets with Harmony2. bioRxiv 2026.03.16.711825 (2026)."
 ENTREZ = "Sayers, E.W. et al. Database resources of the National Center for Biotechnology Information. Nucleic Acids Research 50, D20-D26 (2022)."
 ISCEV = "Robson, A.G. et al. ISCEV Standard for full-field clinical electroretinography (2022 update). Documenta Ophthalmologica 144, 165-177 (2022)."
 NAKA_RUSHTON = "Naka, K.I. & Rushton, W.A.H. S-potentials from luminosity units in the retina of fish (Cyprinidae). Journal of Physiology 185, 587-599 (1966)."
@@ -55,6 +60,14 @@ FLOWIO = "White, S. et al. FlowIO: a pure-Python FCS file reader/writer. https:/
 FLOWUTILS = "White, S. et al. FlowUtils: numpy/C utilities for flow cytometry — compensation and GatingML transforms. https://github.com/whitews/FlowUtils (BSD-3-Clause)."
 LOGICLE = "Parks, D.R., Roederer, M. & Moore, W.A. A new 'Logicle' display method avoids deceptive effects of logarithmic scaling for low signals and compensated data. Cytometry Part A 69A, 541-551 (2006)."
 GATINGML = "Spidlen, J. et al. Gating-ML 2.0: International Society for Advancement of Cytometry (ISAC) standard for representing gating descriptions in flow cytometry. Cytometry Part A 87, 683-687 (2015)."
+
+
+def _join(items) -> str:
+    """``[a, b, c]`` → ``"a, b and c"`` — a list read out in a sentence, not a CSV dump."""
+    names = [str(i) for i in items if str(i).strip()]
+    if len(names) <= 1:
+        return names[0] if names else ""
+    return f"{', '.join(names[:-1])} and {names[-1]}"
 
 
 def _umap(p: dict):
@@ -90,18 +103,36 @@ def _integration(p: dict):
     color = str(p.get("color_by") or "").strip() or batch
     n_hvg = int(p.get("n_hvg", 0) or 0)
     hvg = f"the top {n_hvg} highly variable genes were selected, " if n_hvg > 0 else ""
+    # WHICH implementation, and WHICH variant of the method. The runner has never called harmonypy —
+    # correction is Selom Melody, a clean-room implementation of the Harmony algorithm (the figure
+    # title has said "Melody" the whole time while this paragraph said "Harmony", which reads as the
+    # reference package). And `harmony2` swaps in a DIFFERENT penalty and ridge (Patikas et al.
+    # 2026): describing the validated 2019 method — and citing Korsunsky for it — was wrong on every
+    # Harmony2 run. Same defect the GSEA paragraph had (crediting gseapy for another engine's work).
+    harmony2 = to_bool(p.get("harmony2", False))
+    if harmony2:
+        variant = (
+            f"Harmony2 mode was used (stabilized scale-invariant diversity penalty and a dynamic "
+            f"per-batch ridge, lambda = {float(p.get('alpha', 0.2)):g} x E), which is a different "
+            f"penalty and shrinkage from the 2019 method"
+        )
+        cites = [SCANPY, HARMONY, HARMONY2, LEIDEN, UMAP, SKLEARN]
+    else:
+        variant = "the 2019 method was used as published"
+        cites = [SCANPY, HARMONY, LEIDEN, UMAP, SKLEARN]
     text = (
-        "Multiple single-cell libraries were integrated with Scanpy and Harmony. "
+        "Multiple single-cell libraries were integrated with Scanpy and Selom Melody, an "
+        "independent implementation of the Harmony algorithm. "
         f"{prep}{hvg}principal-component analysis was computed, and batch effects across "
-        f"{batch} were corrected by running Harmony on the top {p['n_pcs']} principal "
+        f"{batch} were corrected on the top {p['n_pcs']} principal "
         f"components (diversity penalty theta = {float(p.get('theta', 2.0)):g}, up to "
-        f"{int(p.get('max_iter_harmony', 10))} iterations). A nearest-neighbour graph "
-        f"({p['n_neighbors']} neighbours) was built on the Harmony-corrected embedding, "
+        f"{int(p.get('max_iter_harmony', 10))} iterations); {variant}. A nearest-neighbour graph "
+        f"({p['n_neighbors']} neighbours) was built on the batch-corrected embedding, "
         "Leiden-clustered, and embedded in two dimensions with UMAP; cells are coloured "
         f"by {color}. Integration quality was assessed as the change in the mean per-cell "
         "k-nearest-neighbour batch-mixing entropy before versus after correction."
     )
-    return text, [SCANPY, HARMONY, LEIDEN, UMAP, SKLEARN]
+    return text, cites
 
 
 def _cluster(p: dict):
@@ -389,20 +420,63 @@ def _volcano(p: dict):
 
 
 def _heatmap(p: dict):
+    """Rows are ALWAYS reordered into clustering leaf order (``run_real._cluster``'s contract); the
+    ``cluster`` param governs only which TREES are drawn and whether the columns are reordered too.
+
+    Everything about the COLUMNS is stated from ``_heatmap_run`` — the runner's record of what it
+    actually built — because the params over-claim in both directions: a ``split_by`` block-split
+    DROPS column clustering (so ``cluster="both"`` printed a column dendrogram that is not on the
+    figure), and ``split_by_cut`` turns column clustering ON at ``cluster="none"`` and cuts it into
+    unsupervised blocks the paragraph never mentioned. Both were live until 2026-08-06.
+    """
+    run = p.get("_heatmap_run") or {}
     cluster = str(p.get("cluster") or "none").lower()  # none | row | column | both
-    cols = (
-        " Samples were likewise clustered (correlation distance, average linkage) and a column "
-        "dendrogram is drawn above the columns."
-        if cluster in ("column", "both") else ""
-    )
-    tree = (
-        " and the clustering dendrogram is drawn alongside the rows"
-        if cluster in ("row", "both") else ""
-    )
+    requested_split = bool(str(p.get("split_by") or "").strip()) or str(
+        p.get("split_by_cut") or "").strip().lower() in ("true", "1", "yes", "on")
+
+    if run:
+        columns, blocks = run.get("columns"), run.get("blocks") or []
+        row_tree = run.get("row_tree")
+    else:
+        # No figure to read (litsynth replay / a stub run): claim only what the params GUARANTEE.
+        # A requested split suppresses the column-clustering sentence rather than risking it — the
+        # split either happened (no tree) or silently no-oped (nothing to describe).
+        columns = "clustered" if cluster in ("column", "both") and not requested_split else "as-given"
+        blocks, row_tree = [], cluster in ("row", "both")
+
+    tree = " and the clustering dendrogram is drawn alongside the rows" if row_tree else ""
+    if columns == "clustered":
+        cols = (" Samples were likewise clustered (correlation distance, average linkage) and a "
+                "column dendrogram is drawn above the columns.")
+    elif columns == "split-sheet":
+        cols = (f" Samples were grouped into {_join(blocks)} by "
+                f"{run.get('split_by') or 'a sample-sheet factor'} and drawn as separate column "
+                f"blocks; the columns are therefore ordered by that factor and were not clustered.")
+    elif columns == "split-cut":
+        # The blocks read like sample groups but nobody assigned them — say whose idea they were.
+        cols = (f" Samples were clustered (correlation distance, average linkage) and the column "
+                f"dendrogram was cut into {len(blocks)} unsupervised blocks "
+                f"({_join(blocks)}), which replace the tree; the blocks come from the expression "
+                f"data alone and correspond to no declared sample grouping.")
+    else:
+        # Not "input order": on the scRNA path the columns are the `groupby` levels in their own
+        # resolved order, which is not the file's column order at all.
+        cols = " The columns were not clustered and keep their incoming order."
+
+    cut_k = run.get("cut_k") if run else (
+        int(p.get("cut_k") or 0) if int(p.get("cut_k") or 0) >= 2 and cluster != "none" else None)
+    cut = (f" The dendrogram branches are coloured by cutting the tree into {cut_k} clusters."
+           if cut_k and columns != "split-cut" else "")
+    quant = run.get("quant_track")
+    bar = (f" A per-gene {quant} side bar is aligned to the rows." if quant else "")
+    tracks = run.get("annotations")
+    ann = (f" Sample-level {_join(tracks)} annotation track(s) are painted above the columns."
+           if tracks else "")
+
     text = (
         f"Expression of the top {p['n_genes']} genes was z-scored per gene and displayed as a heatmap "
         f"grouped by {p['groupby']}. Rows were ordered by hierarchical clustering (correlation distance, "
-        f"average linkage; SciPy){tree}.{cols}"
+        f"average linkage; SciPy){tree}.{cols}{cut}{bar}{ann}"
     )
     return text, [SCIPY]
 
@@ -712,11 +786,32 @@ def _scorecard(p: dict):
 
 
 def _normalization_qc(p: dict):
-    groupby = p.get("groupby", "sample")
+    """Two claims here can only come from the run, and both were wrong from the params alone:
+
+    * the requested ``groupby`` column, when absent, falls back through ``_GROUP_FALLBACKS`` or to
+      no split at all — while the paragraph named the column the user ASKED for (the ``violin`` /
+      ``deg`` substitution shape, third family);
+    * ``max_cells`` randomly subsamples the cells the VIOLINS show, while the filter/doublet counts
+      and the summary table are computed on every cell. The figure and its own table therefore
+      describe different populations, and nothing disclosed it.
+    """
+    run = p.get("_qc_run") or {}
+    groupby = run.get("groupby", p.get("groupby", "sample")) if run else p.get("groupby", "sample")
+    requested = run.get("requested_groupby")
+    split = f"split by {groupby}" if groupby else "pooled across all cells (no grouping column was found)"
+    substituted = (f" The requested grouping column {requested} was not present, so {groupby} was "
+                   f"used instead." if requested and groupby and requested != groupby else "")
+    if requested and not groupby:
+        substituted = (f" The requested grouping column {requested} was not present and no "
+                       f"sample/batch column could be substituted.")
+    shown, total = run.get("shown"), run.get("total")
+    sampled = (f" The distributions show a random subsample of {shown:,} of the {total:,} cells "
+               f"(seeded, so the figure is reproducible); all reported counts below are over the "
+               f"full set." if shown and total and shown < total else "")
     text = (
         "Per-cell quality-control metrics — total counts, genes detected per cell, and the "
         "percentage of mitochondrial reads — were computed with Scanpy and displayed as violin "
-        f"distributions split by {groupby}."
+        f"distributions {split}.{substituted}{sampled}"
     )
     citations = [SCANPY]
     if str(p.get("filter")).lower() in ("true", "1", "yes"):
@@ -1654,6 +1749,16 @@ def build_body(spec: SkillSpec, params: dict, figure: dict | None = None) -> tup
         # `top_n` is a cap, not a count, and `zscore` is read through a string-aware truthiness
         # test the prose did not share. Both are answers only the runner has.
         resolved["_ssgsea_run"] = meta["ssgsea"]
+    if isinstance(meta.get("qc"), dict):
+        # The grouping column the QC runner RESOLVED (a missing one falls back, or pools every cell),
+        # and how many cells the violins actually show after `max_cells` subsampled them.
+        resolved["_qc_run"] = meta["qc"]
+    if isinstance(meta.get("heatmap"), dict):
+        # How the COLUMNS ended up ordered, and which optional layers were actually painted.
+        # `split_by` / `annotations` / `quant_track="logfc"` all need a sample sheet and silently
+        # no-op without one, and `split_by_cut` turns column clustering on even at `cluster="none"` —
+        # so the params can neither confirm a split happened nor deny a clustering did.
+        resolved["_heatmap_run"] = meta["heatmap"]
     if isinstance(meta.get("deg"), dict):
         # WHICH of four engines ran (`mode="auto"` resolves from the file extension), which obs
         # columns it resolved through the alias lists, whether it had to cluster the cells itself,

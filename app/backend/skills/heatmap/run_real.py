@@ -302,12 +302,13 @@ def _scrna(data_path: str, params: dict) -> dict:
     col_tracks = _col_tracks(xlabels, params)
     row_quant = _build_row_quant(rq, genes)
     z_list = z if isinstance(z, list) else z.tolist()
-    return jsonable(
-        heatmap_spec(
-            z_list, xlabels, genes, "Marker heatmap", "cluster", row_dendro, col_dendro,
-            col_tracks, row_quant, col_headers,
-        )
+    spec = heatmap_spec(
+        z_list, xlabels, genes, "Marker heatmap", "cluster", row_dendro, col_dendro,
+        col_tracks, row_quant, col_headers,
     )
+    spec["layout"]["meta"]["heatmap"] = _run_record(
+        params, row_dendro, col_dendro, col_headers, col_tracks, row_quant)
+    return jsonable(spec)
 
 
 def _bulk(data_path: str, params: dict) -> dict:
@@ -327,12 +328,41 @@ def _bulk(data_path: str, params: dict) -> dict:
     col_tracks = _col_tracks(xlabels, params)
     row_quant = _build_row_quant(rq, ylabels)
     z_list = z if isinstance(z, list) else z.tolist()
-    return jsonable(
-        heatmap_spec(
-            z_list, xlabels, ylabels, "Top-variable genes", "sample", row_dendro, col_dendro,
-            col_tracks, row_quant, col_headers,
-        )
+    spec = heatmap_spec(
+        z_list, xlabels, ylabels, "Top-variable genes", "sample", row_dendro, col_dendro,
+        col_tracks, row_quant, col_headers,
     )
+    spec["layout"]["meta"]["heatmap"] = _run_record(
+        params, row_dendro, col_dendro, col_headers, col_tracks, row_quant)
+    return jsonable(spec)
+
+
+def _run_record(params, row_dendro, col_dendro, col_headers, col_tracks, row_quant):
+    """What this run ACTUALLY did to the figure, derived from the built pieces — never from the
+    params (WS1.2 / the ``layout.meta`` outcome pattern). ``companions.methods.build_body`` lifts it
+    as ``_heatmap_run`` and the paragraph states each claim from it.
+
+    Params alone cannot describe this figure, and the failure is not hypothetical:
+    ``split_by``/``annotations``/``quant_track="logfc"`` all need a sample sheet and **silently
+    no-op without one**, while ``split_by_cut`` silently turns column clustering ON even at
+    ``cluster="none"``. So a paragraph written from the params claims a column dendrogram that a
+    split dropped, or a block split that never happened. Both directions were live before 2026-08-06.
+    """
+    if col_headers:
+        columns = "split-sheet" if str(params.get("split_by") or "").strip() else "split-cut"
+    else:
+        columns = "clustered" if col_dendro else "as-given"
+    return {
+        "columns": columns,
+        # The block labels the reader can SEE — sheet levels, or "Cluster N" for the unsupervised cut.
+        "blocks": [h["group"] for h in col_headers] if col_headers else None,
+        "split_by": str(params.get("split_by") or "").strip() or None if col_headers else None,
+        "row_tree": bool(row_dendro),
+        "cut_k": _resolve_cut_k(params) if (row_dendro or col_dendro or col_headers) else None,
+        # The realized track NAME ("log2FC wt/ko"), which carries the contrast the param cannot.
+        "quant_track": (row_quant or {}).get("name"),
+        "annotations": [t["name"] for t in col_tracks] if col_tracks else None,
+    }
 
 
 def _row_zscore(frame, np):

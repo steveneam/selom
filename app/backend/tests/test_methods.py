@@ -471,3 +471,39 @@ def test_markers_colour_claim_follows_normalize():
     assert "mean log1p expression" in _prose("markers", {"standard_scale": "false"})
     assert "mean supplied expression" in \
         _prose("markers", {"standard_scale": "false", "normalize": "false"})
+
+
+def test_integration_names_the_implementation_that_actually_ran():
+    """The runner has never called `harmonypy` — batch correction is Selom Melody, an independent
+    implementation of the Harmony method, and the figure TITLE has said so the whole time while the
+    paragraph said "integrated with Scanpy and Harmony". Naming the reference package for another
+    engine's work is the defect the GSEA paragraph had (gseapy credited for blitzGSEA's runs)."""
+    text = _prose("integration", {})
+    assert "Selom Melody" in text
+    assert "independent implementation of the Harmony algorithm" in text
+
+
+def test_integration_prose_and_citations_follow_harmony2():
+    """`harmony2` is a DIFFERENT diversity penalty and a DIFFERENT ridge (Patikas et al. 2026), not
+    a tuning of the 2019 method — so describing the 2019 method, and citing Korsunsky for it, was
+    wrong on every Harmony2 run. The citation half is the load-bearing one: a methods section is
+    what a reader follows to reproduce the work."""
+    spec = load_skill("integration")
+    off_text, off_cites = methods.build_body(spec, {})
+    on_text, on_cites = methods.build_body(spec, {"harmony2": True, "alpha": 0.35})
+
+    assert "the 2019 method was used as published" in off_text
+    assert not [c for c in off_cites if "Harmony2" in c], "Harmony2 cited on a 2019-method run"
+
+    assert "Harmony2 mode was used" in on_text
+    assert "different penalty and shrinkage from the 2019 method" in on_text
+    assert "lambda = 0.35 x E" in on_text                    # the mode's own alpha, not a default
+    assert [c for c in on_cites if "Harmony2" in c], "a Harmony2 run must cite the Harmony2 preprint"
+    assert [c for c in on_cites if "Korsunsky" in c], "the base method stays cited"
+
+
+def test_integration_caption_does_not_print_the_wrong_method_name():
+    """A caption names what the reader is looking at, and the method's NAME is a claim it makes."""
+    spec = load_skill("integration")
+    assert "after Harmony correction" in legends.build_caption(spec, {})
+    assert "after Harmony2 correction" in legends.build_caption(spec, {"harmony2": True})

@@ -34,7 +34,8 @@ def run(data_path: str, params: dict) -> dict:
     sc.pp.calculate_qc_metrics(adata, qc_vars=["mt"], inplace=True, percent_top=None, log1p=False)
     obs = adata.obs
 
-    groupby = params.get("groupby") or "sample"
+    requested_groupby = str(params.get("groupby") or "sample")
+    groupby = requested_groupby
     if groupby not in obs.columns:
         groupby = next((c for c in _GROUP_FALLBACKS if c in obs.columns), None)
 
@@ -104,6 +105,18 @@ def run(data_path: str, params: dict) -> dict:
                 doublet_rows,
                 "Doublet detection (Scrublet, per group)",
             )
+    # The two facts the params cannot supply, both of which the paragraph was asserting wrongly
+    # (WS1.2 / the `layout.meta` outcome pattern; lifted as `_qc_run` by methods.build_body):
+    #   · the grouping column RESOLVED — a requested column that is absent falls back through
+    #     _GROUP_FALLBACKS, or to no split at all, while the prose named the column the user asked
+    #     for. The same substitute-and-say-nothing shape as `violin`/`deg`.
+    #   · how many cells the VIOLINS actually show. `max_cells` randomly subsamples (seeded) what is
+    #     plotted, while the filter/doublet counts and the table are computed on every cell — so the
+    #     figure and its own table describe different populations, and nothing said so.
+    spec["layout"].setdefault("meta", {})["qc"] = {
+        "groupby": groupby, "requested_groupby": requested_groupby,
+        "shown": int(len(idx)), "total": n_total,
+    }
     return jsonable(spec)
 
 

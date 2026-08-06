@@ -17,6 +17,7 @@ numbering (the reproduction ledger knows the figure label; an own-data run leave
 
 from __future__ import annotations
 
+from skills._engine import to_bool
 from skills.contract import SkillSpec, resolved_params
 
 
@@ -61,6 +62,11 @@ def _facts(figure: dict | None, table: dict | list | None) -> dict:
     # figure. Same shape as `clustered`: a fact only the runner has.
     if isinstance(meta.get("ssgsea"), dict) and "shown" in meta["ssgsea"]:
         facts["ssgsea_shown"] = meta["ssgsea"]["shown"]
+    # `heatmap`: whether the columns were block-split, and by WHAT. The blocks are the first thing a
+    # reader sees, and an unsupervised dendrogram cut looks exactly like a declared sample grouping —
+    # so a caption that stays silent lets "Cluster 1 / Cluster 2" pass for a design factor.
+    if isinstance(meta.get("heatmap"), dict):
+        facts["heatmap"] = meta["heatmap"]
     return facts
 
 
@@ -100,9 +106,13 @@ def _umap(p, f):
 def _integration(p, f):
     batch = str(p.get("batch_key") or "").strip() or "the library/batch covariate"
     color = str(p.get("color_by") or "").strip() or batch
+    # `harmony2` is a DIFFERENT diversity penalty and ridge, not a tuning of the 2019 method, so the
+    # caption may not print the same method name for both. The recipe stays in Methods; the method's
+    # NAME is a claim the caption itself makes.
+    method = "Harmony2" if to_bool(p.get("harmony2", False)) else "Harmony"
     return (
         "UMAP embedding of the batch-integrated single cells, coloured by "
-        f"{color} after Harmony correction across {batch}."
+        f"{color} after {method} correction across {batch}."
     )
 
 
@@ -180,9 +190,21 @@ def _proteomics_de(p, f):
 
 
 def _heatmap(p, f):
+    """The caption names what the reader is LOOKING at, and the column blocks are the most visible
+    thing on a split heatmap. "Cluster 1 / Cluster 2" from an unsupervised dendrogram cut reads
+    exactly like a declared sample grouping, so silence there is not neutral — it is a caption that
+    lets the data's own partition pass for the experiment's design. The recipe stays in Methods."""
+    run = f.get("heatmap") or {}
+    columns, blocks = run.get("columns"), run.get("blocks") or []
+    if columns == "split-sheet":
+        split = f"; columns blocked by {run.get('split_by') or 'a sample-sheet factor'} ({', '.join(blocks)})"
+    elif columns == "split-cut":
+        split = f"; columns blocked into {len(blocks)} unsupervised clusters cut from the column dendrogram"
+    else:
+        split = ""
     return (
         f"Heatmap of the top {p['n_genes']} genes, z-scored per gene and grouped by "
-        f"{p['groupby']}; rows ordered by hierarchical clustering."
+        f"{p['groupby']}; rows ordered by hierarchical clustering{split}."
     )
 
 

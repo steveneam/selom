@@ -299,3 +299,77 @@ def test_categorical_split_takes_precedence_over_cut():
     )
     headers = [h["text"] for h in fig["layout"]["annotations"]]
     assert headers == ["ko", "wt"]  # the sheet's categories, NOT "Cluster N"
+
+
+# ── what the METHODS paragraph may claim about these columns ────────────────────────────────────
+#
+# The column half of this figure was described entirely from the params until 2026-08-06, and the
+# params over-claim in both directions: `split_by` DROPS column clustering (so `cluster="both"`
+# printed a column dendrogram that is not on the figure), while `split_by_cut` turns column
+# clustering ON at `cluster="none"` and cuts it into blocks the paragraph never mentioned. Neither
+# could be fixed by quoting a param, because `split_by` needs a sample sheet and silently no-ops
+# without one. The runner records what it BUILT (`layout.meta.heatmap`); these pin the claim.
+
+def _prose(fig, params):
+    from companions import methods
+    from skills.contract import load_skill
+
+    return methods.build_body(load_skill("heatmap"), params, fig)[0]
+
+
+def test_prose_does_not_claim_a_column_dendrogram_the_split_dropped():
+    params = {"n_genes": 12, "cluster": "both", "split_by": "condition"}
+    fig = _run_with_design(params)
+    assert "xaxis3" not in fig["layout"]              # the figure has no column tree...
+    text = _prose(fig, params)
+    assert "column dendrogram" not in text            # ...so the paragraph may not print one
+    assert "were not clustered" in text
+    assert "condition" in text and "ko and wt" in text  # and it names the split that DID happen
+
+
+def test_prose_names_the_cut_blocks_as_unsupervised():
+    """`split_by_cut` blocks are labelled "Cluster 1 / Cluster 2" on the figure, which reads exactly
+    like a declared sample grouping. The paragraph has to say whose idea they were."""
+    params = {"n_genes": 12, "cluster": "none", "cut_k": 2, "split_by_cut": True}
+    text = _prose(_run_with_design(params), params)
+    assert "unsupervised" in text
+    assert "correspond to no declared sample grouping" in text
+
+
+def test_prose_describes_no_split_when_the_sample_sheet_was_missing():
+    """The honest half of the same fix: a REQUESTED split that found no sheet paints nothing, so a
+    param-driven sentence would have swapped one false claim for another."""
+    params = {"n_genes": 12, "cluster": "row", "split_by": "condition"}
+    fig = _run(params)                                 # no design sheet
+    main = next(t for t in fig["data"] if t["type"] == "heatmap")
+    assert " " not in main["x"]                        # no spacer → no split happened
+    text = _prose(fig, params)
+    assert "blocks" not in text and "condition" not in text
+
+
+def test_prose_states_the_realized_contrast_of_a_logfc_side_bar():
+    """`quant_track="logfc"` computes a fold change between the sheet's two groups and paints it
+    beside the rows. The param says "logfc"; only the run knows WHICH contrast."""
+    params = {"n_genes": 12, "cluster": "row", "quant_track": "logfc"}
+    fig = _run_with_design(params)
+    assert [t for t in fig["data"] if t["type"] == "bar"]
+    assert "log2FC wt/ko side bar" in _prose(fig, params)
+
+
+def test_caption_says_when_the_column_blocks_are_the_data_s_OWN_partition():
+    """A caption is one sentence, but the blocks are the first thing a reader sees — and
+    "Cluster 1 / Cluster 2" from a dendrogram cut reads exactly like a declared sample grouping.
+    Silence there lets the data's own partition pass for the experiment's design."""
+    from companions import legends
+    from skills.contract import load_skill
+
+    spec = load_skill("heatmap")
+    sheet = {"n_genes": 12, "cluster": "both", "split_by": "condition"}
+    cut = {"n_genes": 12, "cluster": "none", "cut_k": 2, "split_by_cut": True}
+    plain = {"n_genes": 12}
+
+    assert "columns blocked by condition (ko, wt)" in \
+        legends.build_caption(spec, sheet, figure=_run_with_design(sheet))
+    assert "2 unsupervised clusters cut from the column dendrogram" in \
+        legends.build_caption(spec, cut, figure=_run_with_design(cut))
+    assert "blocked" not in legends.build_caption(spec, plain, figure=_run_with_design(plain))

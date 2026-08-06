@@ -227,13 +227,45 @@ PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
     # ("methods", "gsea") is GONE — `engine` was its last waiver, and the paragraph now names the
     # engine that actually ran (recorded by the runner, because `auto` resolves at run time) and
     # cites it, instead of crediting gseapy for blitzGSEA's and the in-house engine's work.
-    ("methods", "heatmap"): _untriaged("annotations", "cut_k", "quant_track", "split_by",
-                                       "split_by_cut"),
-    ("methods", "integration"): _untriaged("alpha", "harmony2"),
+    # ── heatmap, TRIAGED 2026-08-06. The board named it the best next block and it was: reading the
+    # runner's body against the paragraph found the column half of this figure described entirely
+    # from the params, which over-claim in BOTH directions.
+    #   · `split_by` block-splits the columns and DROPS column clustering — so `cluster="both"`
+    #     printed "Samples were likewise clustered … and a column dendrogram is drawn above the
+    #     columns" over a figure with no column dendrogram, ordered by a sample-sheet factor;
+    #   · `split_by_cut` turns column clustering ON at `cluster="none"` and cuts it into blocks
+    #     labelled "Cluster 1 / Cluster 2" — an UNSUPERVISED partition that reads exactly like a
+    #     declared sample grouping — and the paragraph said nothing about columns at all;
+    #   · `quant_track="logfc"` computes a log₂ fold change between the sheet's two condition groups
+    #     and paints it beside the rows, uncited and unmentioned.
+    # And the reason none of them could be fixed from the params: `split_by`, `annotations` and
+    # `logfc` all need a sample sheet and **silently no-op without one**, so a param-driven sentence
+    # would have replaced one lie with another. The runner now records what it BUILT
+    # (`layout.meta.heatmap` → `_heatmap_run`) and every column claim is read off that.
+    ("methods", "heatmap"): {
+        # Both now have sentences, but ONLY from the recorded outcome — the param name never reaches
+        # the prose, because a requested track that found no sample sheet paints nothing and must not
+        # be described. `quant_track` also carries its realized CONTRAST ("log2FC wt/ko"), which the
+        # param (`"logfc"`) cannot express at all.
+        "annotations": _OUT, "quant_track": _OUT,
+    },
+    # ("methods", "integration") is GONE — and it was the sharpest find of the 2026-08-06 pass.
+    # `harmony2` swaps in a DIFFERENT diversity penalty and a DIFFERENT ridge (Patikas et al. 2026),
+    # while the paragraph described the validated 2019 method and CITED Korsunsky for it on every
+    # Harmony2 run — the gseapy-credited-for-blitzGSEA shape, third time. `alpha` is that mode's
+    # dynamic-lambda scale and now appears with it. The paragraph also said "integrated with Scanpy
+    # and Harmony", which reads as harmonypy; the runner has never called it — correction is Selom
+    # Melody, and the figure TITLE has said so the whole time.
     ("methods", "line"): _untriaged("central", "markers", "points", "x", "y"),
     # ("methods", "markers") is GONE — `normalize` skips log1p, and the dotplot's colour was
     # described as "mean log1p expression" either way.
-    ("methods", "normalization_qc"): _untriaged("max_cells"),
+    ("methods", "normalization_qc"): {
+        # Described, but only from the recorded outcome: the cap BITES or it does not, and that
+        # depends on the file's cell count, which the param cannot know. When it bites, the
+        # paragraph now says the violins are a seeded random subsample and the counts are not —
+        # the figure and its own summary table were describing different populations in silence.
+        "max_cells": _OUT,
+    },
     ("methods", "pathway"): _untriaged("fc_threshold", "fdr_threshold"),
     ("methods", "pca"): _untriaged("group_regex", "label_points"),
     # ("methods", "proteomics_de") is GONE — the second entry this ratchet retired, and the one the
@@ -297,20 +329,36 @@ PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
     ("legends", "gsea"): {
         "engine": _M, "gene_set": _M, "gene_sets": _M, "n_perm": _M, "set_name": _M, "weight": _M,
     },
-    ("legends", "heatmap"): _untriaged(
-        "annotations", "cluster", "cut_k", "quant_track", "split_by", "split_by_cut"
-    ),
-    ("legends", "integration"): _untriaged(
-        "alpha", "harmony2", "max_iter_harmony", "n_hvg", "n_neighbors", "n_pcs", "normalize",
-        "theta"
-    ),
+    ("legends", "heatmap"): {
+        # The caption gained the one thing a reader cannot infer from looking: whether the column
+        # blocks are a declared sample factor or an unsupervised cut of the dendrogram. Both params
+        # are stated from the recorded outcome, so they are VIA_OUTCOME rather than described.
+        "split_by": _OUT, "split_by_cut": _OUT,
+        # The recipe belongs in Methods; a caption is one sentence about one figure. The colourbar
+        # names the side bar and the track legend names the annotation strips on the figure itself,
+        # so none of these can make the caption wrong.
+        "annotations": _M, "cluster": _M, "cut_k": _M, "quant_track": _M,
+    },
+    ("legends", "integration"): {
+        # `harmony2` LEFT this list: it changes the method's NAME, which the caption itself prints,
+        # so printing "Harmony" on a Harmony2 run was a claim the caption got wrong on its own.
+        # The rest are the recipe — the Methods paragraph states every one, and the caption makes no
+        # claim about depth, neighbours, HVGs, scale or penalty that they could falsify.
+        "alpha": _M, "max_iter_harmony": _M, "n_hvg": _M, "n_neighbors": _M, "n_pcs": _M,
+        "normalize": _M, "theta": _M,
+    },
     # ("legends", "markers") is GONE — two wrong claims on the DEFAULT path: `standard_scale` is
     # default-true, so the colour encodes [0,1]-scaled expression and the caption called it the
     # mean; and "top N marker genes" named no criterion while `rank_by` chooses between a p-value
     # ranking and a one-versus-rest effect size.
-    ("legends", "normalization_qc"): _untriaged(
-        "doublet_threshold", "doublets", "filter", "max_cells", "nmads"
-    ),
+    ("legends", "normalization_qc"): {
+        # The caption names what the violins ARE (per-cell QC distributions, split by group). The
+        # QC procedure, its thresholds and the display cap are the recipe, and the Methods paragraph
+        # states all five. `max_cells` is deliberately here rather than in the caption: a seeded
+        # subsample of several thousand cells is an honest picture of a DISTRIBUTION, which is the
+        # only thing this caption claims.
+        "doublet_threshold": _M, "doublets": _M, "filter": _M, "max_cells": _M, "nmads": _M,
+    },
     ("legends", "pathway"): _untriaged("fc_threshold", "fdr_threshold"),
     ("legends", "pca"): _untriaged("group_regex", "label_points", "scale"),
     ("legends", "proteomics_de"): {
@@ -351,7 +399,8 @@ PROSE_SILENT: dict[tuple[str, str], dict[str, Silence]] = {
 # template either gives a param a sentence (it leaves the list) or records a verdict (it stays with
 # PRESENTATION / INTERNAL). Lower this number when you triage; a new UNTRIAGED entry pushes over it
 # and fails, which is the point — nothing joins the backlog silently.
-_UNTRIAGED_CEILING = 131   # 261 raw -> 179 (ERG) -> 166 (GSEA) -> 131 (deg + diff_abundance)
+_UNTRIAGED_CEILING = 104   # 261 raw -> 179 (ERG) -> 166 (GSEA) -> 131 (deg + diff_abundance)
+#                          # -> 104 (heatmap + integration + normalization_qc, 2026-08-06)
 @pytest.mark.parametrize("module,skill_id", _CASES)
 def test_every_declared_param_is_described_or_deliberately_silent(module, skill_id):
     """The reverse direction — a declared param the prose never mentions is either described or
