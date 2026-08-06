@@ -59,7 +59,7 @@
 | **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
 | older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · PROSE-TRIAGE-3 · 2026-08-06 09:25 UTC (= 19:25 AEST Sydney) · branch `main` (**`186dc29` — `21a17bb..bb6895b` PUSHED + CI green; `0347665`+`186dc29` local. Working tree clean**) · Claude (FE+BE, solo, lead)
+## ▸ LIVE · PROSE-TRIAGE-3 · 2026-08-06 09:40 UTC (= 19:40 AEST Sydney) · branch `main` (**`8855fb3` — `bb6895b..8855fb3` PUSHED, `origin/main` = `8855fb3`, working tree clean. CI run `31089744127` green: hygiene · changes · workflow-lint · backend · ci; `frontend` path-SKIPPED, correctly — this session touched no FE file. The new slow-marked test ran in CI's own slow gate, so it is verified in its target event** [[verify-ci-in-its-target-event]]) · Claude (FE+BE, solo, lead)
 
 **Direction is DECIDED and not to be re-litigated** — [[DECISIONS #17]]: keep burning down the
 honesty/reachability backlogs, P-E is not next. [[#18]]: the app moves to `/app` (decided, not
