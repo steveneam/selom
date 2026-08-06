@@ -27,7 +27,7 @@
 
 | Tag | Date | SHA range | One-line |
 |---|---|---|---|
-| **PROSE-TRIAGE-2** | 2026-08-06 | `main` `a17c8ec..0f0a056` | **`#2`'s three named blocks triaged — and reading the runners' bodies found SIX more printed-vs-computed lies, one of them in the CITATIONS.** `heatmap` described its whole column half from params that over-claim in both directions (a `split_by` split DROPS the column dendrogram the prose printed; `split_by_cut` cuts unsupervised blocks it never mentioned). `integration` cited **Korsunsky for Harmony2 runs** and credited "Harmony" for work Selom Melody did. `normalization_qc` named a `groupby` column that had been substituted, and hid that the violins are a subsample while the table is not. `PROSE_SILENT` 131 → **104**. |
+| **PROSE-TRIAGE-2** | 2026-08-06 | `main` `a17c8ec..c1d39c6` | **`#2`'s three named blocks triaged — and reading the runners' bodies found SIX more printed-vs-computed lies, one of them in the CITATIONS.** `heatmap` described its whole column half from params that over-claim in both directions (a `split_by` split DROPS the column dendrogram the prose printed; `split_by_cut` cuts unsupervised blocks it never mentioned). `integration` cited **Korsunsky for Harmony2 runs** and credited "Harmony" for work Selom Melody did. `normalization_qc` named a `groupby` column that had been substituted, and hid that the violins are a subsample while the table is not. `PROSE_SILENT` 131 → **99** across FOUR blocks — `line` added by the new pick-by-size-of-the-lie rule, where the paragraph named **neither axis** and called a representative curve a mean. |
 | **PARAM-DECL-GUARD** | 2026-08-06 | `main` `6201e85..a17c8ec` | **`#11` closed — the runner↔`skill.json` guard ships in both directions, and rendering the knob it made reachable found a reference line being clipped out of its own figure.** The board's re-measure held: **4 undeclared params across 2 skills**, so both directions are cleared to **zero with no waiver list**. `confusion.x`/`.y` deleted (undocumented aliases); `erg_bwave_bar.vline`/`.vline_label` declared + controlled (`0e1921e` wired both axes and declared neither). The third test is the load-bearing one: a params dict handed anywhere the walk can't follow is a FAILURE, not a quiet gap. |
 | **ERG-MOCK-FIGS** | 2026-08-06 | `main` `ea68c79..dbd72f9` (**PUSHED**) | **Both open founder gates answered ([[DECISIONS #17]] keep burning down · [[#18]] the app moves to `/app`), the Fig 1E mock retuned so the two rescue arms differ in the FIGURE and not just the table, and two reading variants added — where a hand-picked zoom factor clipped the very arm the comparison is measured against.** Also: `#11` probed and found to be **4 undeclared params, not a campaign**; the board pruned 1083 → 458 lines into `archive/2026-08-06-current-history.md`. |
 | **DEG-PANEL** | 2026-08-05 | `main` `9daa043..3f102ea` (**pushed 2026-08-06**) | **`#1(d)` closed spec-first — and the flagship DE figure had been claiming a fold change it never computed.** `deg` = four disjoint engines behind one `mode` knob that was itself API-only, so it needed a STRUCTURE (mode-gated `showWhen` + an `oneOf` gate), not a list of controls. 75 → 52 knobs, 12 → 10 skills. Shipped the `level` widget with it. |
@@ -58,14 +58,24 @@
 | **PORT-MERGED** | 2026-07-09 | `24c6797..2cb4cb9` | PR #1 FF-merged to `main`; two `ci.yml` trigger-event fixes. [[verify-ci-in-its-target-event]]. |
 | older | — | `git log` / `archive/` | ENG-PORT · CI-GREEN · PARALLEL-SPRINT-1 · RESTRUCTURE 01–08 · AWS materialization · deploy backbone. |
 
-## ▸ LIVE · PARAM-DECL-GUARD + PROSE-TRIAGE-2 · 2026-08-06 07:57 UTC (= 17:57 AEST Sydney) · branch `main` (**LOCAL — `0f0a056`, 3 commits ahead of `origin/main` = `6201e85`; working tree clean. PUSH IS OWED**) · Claude (FE+BE, solo, lead)
+## ▸ LIVE · PARAM-DECL-GUARD + PROSE-TRIAGE-2 · 2026-08-06 08:25 UTC (= 18:25 AEST Sydney) · branch `main` (**`c1d39c6` — `21a17bb..73104a6` PUSHED + CI green on all six jobs (run `31083092714`); `c1d39c6` local. Working tree clean**) · Claude (FE+BE, solo, lead)
 
 **Direction is DECIDED and not to be re-litigated** — [[DECISIONS #17]]: keep burning down the
 honesty/reachability backlogs, P-E is not next. [[#18]]: the app moves to `/app` (decided, not
 built — it lands with P-E's frontend half). **Nothing on this board waits on the owner except a
 real `.fcs` file and the Clerk keys.**
 
-### `#2` — the three named blocks, TRIAGED (`0f0a056`). `PROSE_SILENT` 131 → **104**.
+### `#2` — four blocks TRIAGED (`0f0a056`, `c1d39c6`). `PROSE_SILENT` 131 → **99**.
+
+**`line` (`c1d39c6`) was picked by the new rule — size of the LIE, not size of the list — and the
+rule paid on its first use:** 5 waivers, 2 lies, one of them as large as this class gets.
+- The paragraph named **neither axis**: *"Values were plotted against the x variable"*, a sentence
+  true of every line plot ever drawn. `x`/`y` default to **blank** and resolve to the first and
+  second NUMERIC column — on the real ERG table that makes the x-axis **`animal`, a subject ID** —
+  and a requested column that is absent falls back the same way, silently.
+- **`central` is not always the mean.** `representative` draws the FIRST replicate and no spread;
+  `none` draws no central line at all. The paragraph claimed *"Each point shows the mean, and a
+  shaded band shows the standard error of the mean"* on both.
 
 Reading each runner's BODY against its paragraph found **six more printed-vs-computed lies**, and
 one of them reaches the **citations** — the part of a methods section a reader follows to reproduce
@@ -158,17 +168,17 @@ covered by a bare `verify.sh`. Goldens on the real corpus **109 pass**; `skill-s
 > lands with P-E's frontend half. **The two items that were batched for the owner are now CLOSED,
 > so nothing on this board is waiting on him except a real `.fcs` file.**
 >
-> Value order: **the rest of `#2`** (**104** untriaged) → **`#5`** (the audit's open rows 21–23,
+> Value order: **the rest of `#2`** (**99** untriaged) → **`#5`** (the audit's open rows 21–23,
 > render-visible collisions) → `#7` (the isolation-coverage guard).
-> **`#11` and `#2`'s three named blocks are CLOSED — see the LIVE block.**
-> ⚑ **Pick the next `#2` block by SIZE OF THE LIE, not size of the list.** The three biggest
-> remaining entries are `legends.boxplot` (9), `legends.integration`-style recipe dumps, and
-> `legends.trajectory`/`normalization_qc` (5 each) — but the six lies found this session came from
-> reading **runner bodies**, and the best candidates are the skills whose runners RESOLVE or
-> SUBSTITUTE something: `line` (5, and `x`/`y` decide what the figure MEANS), `pseudotime_genes`
-> (`groupby` never reaches its figure — already flagged at `#1`), `trajectory`/`annotate`
-> (`embedding` + `groupby`, both of which the scRNA runners recompute on a miss —
-> NEXT#10(c) names this exact class and it is still unfixed in four skills).
+> **`#11` and `#2`'s four triaged blocks are CLOSED — see the LIVE block.**
+> ⚑ **Pick the next `#2` block by SIZE OF THE LIE, not size of the list — the rule paid on its
+> first use (`line`: 5 waivers, 2 lies, one of them "the paragraph named neither axis").** The
+> remaining best candidates are the same shape — skills whose runners RESOLVE or SUBSTITUTE
+> something: **`trajectory` + `annotate`** (`embedding` + `groupby`, which the scRNA runners
+> RECOMPUTE on a miss — **NEXT#10(c) names this exact class and it is still unfixed in these
+> four**), then **`pseudotime_genes`** (`groupby` never reaches its figure, already flagged at
+> `#1`). The big list entries (`legends.boxplot` 9) are mostly presentation and will triage fast
+> but find nothing.
 > ⚑ **`#11`'s estimate had been WRONG on the board and right after re-measuring**: 4 params, not a
 > campaign. That was the third time in four sessions a board's own characterisation of a backlog
 > was wrong (`#2` "confirmed-waive pass" → 26 live lies; `#1`'s `86/13` tally → `88/14`), and the
